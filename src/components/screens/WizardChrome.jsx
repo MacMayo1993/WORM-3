@@ -473,6 +473,9 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
  * @param onPrimary  confirm this category and go on; finishes on the last
  * @param finishLabel   what the action says on the last category
  * @param secondary  optional { label, onClick } escape hatch under the action
+ * @param quickPlay  optional () => void. When set, the big key is PLAY on every
+ *                   step (good defaults, one tap to the cube) and stepping through
+ *                   the remaining categories becomes the secondary action.
  */
 export function WizardShell({
   styles,
@@ -485,6 +488,7 @@ export function WizardShell({
   onPrimary,
   finishLabel = "Play",
   secondary = null,
+  quickPlay = null,
   mobile = isMobile,
   children
 }) {
@@ -516,6 +520,10 @@ export function WizardShell({
   const modeVars = arcadeModeVars(mode);
   const cat = categories[active];
   const last = active === categories.length - 1;
+  const quick = quickPlay && !last;
+  const primaryAction = quick ? quickPlay : onPrimary;
+  const primaryLabel = quick || last ? finishLabel : (cat.primaryLabel || 'Next');
+  const secondaryAction = quick ? { label: `Customize: ${categories[active + 1].label} →`, onClick: onPrimary } : secondary;
   const specimen = cat.hero ? <div style={styles.hero}>{cat.hero}</div> : null;
   const categoryBar = (
     <WizardCategoryBar
@@ -564,24 +572,24 @@ export function WizardShell({
           <button
             type="button"
             style={{ '--piece-color': modeVars['--arcade-accent'], marginBottom: 6 }}
-            onClick={() => { wormMenuFeedback(); onPrimary(); }}
+            onClick={() => { wormMenuFeedback(); primaryAction(); }}
             className="mode-wizard-primary piece piece--bar piece--glint"
           >
             <span className="piece-face">
-              <span className="piece-trailer">{last ? finishLabel : (cat.primaryLabel || 'Next')}</span>{' '}
+              <span className="piece-trailer">{primaryLabel}</span>{' '}
               <b className="piece-trailer" aria-hidden="true">→</b>
             </span>
           </button>
 
-          {secondary && (
+          {secondaryAction && (
             <button
               type="button"
               style={styles.btnSecondary}
-              onClick={() => { wormMenuFeedback(); secondary.onClick(); }}
+              onClick={() => { wormMenuFeedback(); secondaryAction.onClick(); }}
               onMouseEnter={e => { e.currentTarget.style.color = ARCADE_INK; }}
               onMouseLeave={e => { e.currentTarget.style.color = ARCADE_INK_STRONG; }}
             >
-              {secondary.label}
+              {secondaryAction.label}
             </button>
           )}
         </div>

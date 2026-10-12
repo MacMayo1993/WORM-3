@@ -10,7 +10,7 @@ import {
   updateTilePreview,
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
-import {
+import { DISPLAY_FONT,
   UI_FONT, HEADING_FONT, PAPER_SHEET_RAISED, UI_MOSS,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW, PAPER_BG_MUTED, NIGHT_SHEET, NIGHT_TEXT, NIGHT_TEXT_MUTED,
@@ -215,8 +215,8 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
         }}><LockIcon size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} /></span>
       ) : null}
 
-      <SpecimenWell height="52px" locked={locked}>
-        <CardArt item={item} size={48} characterId={characterId} skinId={skinId} tileColor={tileColor} />
+      <SpecimenWell height="76px" locked={locked}>
+        <CardArt item={item} size={70} characterId={characterId} skinId={skinId} tileColor={tileColor} />
       </SpecimenWell>
 
       <span style={{
@@ -235,7 +235,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
           {equipped ? 'Equipped' : 'Owned'}
         </span>
       ) : (
-        <div style={{
+        <div className={`store-card-price${canAfford ? ' can-afford' : ''}`} style={{
           marginTop: 'auto',
           display: 'flex', alignItems: 'center', gap: '4px',
           padding: '3px 8px', borderRadius: '999px',
@@ -422,14 +422,18 @@ const StoreCollection = ({ onClose, onChests }) => {
     <div ref={dialogRef} onKeyDown={onKeyDown} className="store-catalogue" role="dialog" aria-modal="true" aria-labelledby="catalogue-title"
       style={{ ...wizardPaperBackground, zIndex: Z.TOAST, fontFamily: FONT,
         '--paper-ink': PAPER_TEXT, '--paper-muted': PAPER_TEXT_MUTED, '--paper-line': PAPER_BORDER_SOFT,
-        '--paper-soft': PAPER_BG_MUTED, '--moss': UI_MOSS, '--display-font': HEADING_FONT,
+        '--paper-soft': PAPER_BG_MUTED, '--moss': UI_MOSS, '--display-font': HEADING_FONT, '--display-font-arcade': DISPLAY_FONT,
         '--night': NIGHT_SHEET, '--night-ink': NIGHT_TEXT, '--night-muted': NIGHT_TEXT_MUTED, '--category': activeTabAccent }}>
       <header className="catalogue-header">
         <div><h1 id="catalogue-title">Store</h1>
           <div className="catalogue-progress"><span style={{ width: `${collectedPct}%` }} /></div>
           <small>{ownedCount}/{ALL_ITEMS.length} collected</small>
         </div>
-        <div className="catalogue-wallet"><strong><PPCoin size={15} /> {parityPoints.toLocaleString()} PP</strong><span>◆ {gems.toLocaleString()} gems</span></div>
+        <div className="catalogue-wallet">
+          <strong className="wallet-pill" title="Parity Points buy items here. Earn them in WORM and Chaos."><PPCoin size={16} /> {parityPoints.toLocaleString()}</strong>
+          <button type="button" className="wallet-pill wallet-gems" onClick={onChests} title="Gems open cubie chests"
+            aria-label={`${gems.toLocaleString()} gems. Open cubie chests`}><span aria-hidden="true">◆</span> {gems.toLocaleString()}</button>
+        </div>
         <button className="catalogue-close" onClick={onClose} aria-label="Close store">✕</button>
       </header>
       <div className="catalogue-layout">

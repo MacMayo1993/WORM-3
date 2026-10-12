@@ -209,8 +209,10 @@ function MenuScene({ onCubeClick, background }) {
       <directionalLight position={CUBE_LIGHT_RIG.fill.position} intensity={CUBE_LIGHT_RIG.fill.intensity} color={CUBE_LIGHT_RIG.fill.color} />
       <directionalLight position={CUBE_LIGHT_RIG.rim.position} intensity={CUBE_LIGHT_RIG.rim.intensity} color={CUBE_LIGHT_RIG.rim.color} />
       <Suspense fallback={null}>
+        {/* The menu sits on the same graph paper as the opening and the mode
+            selector; the panorama is kept for its reflections only. */}
         <InteractivePhotoBackground
-          visible={!carouselActive}
+          visible={false}
           files={getBackgroundUrl(background.file)}
           // Counter-rotate the panorama against the menu cube. The faster but
           // still gentle orbit lets a player read the whole environment instead
@@ -221,7 +223,7 @@ function MenuScene({ onCubeClick, background }) {
         />
       </Suspense>
       <Suspense fallback={null}>
-        {carouselActive && <MenuPaperBackdrop />}
+        <MenuPaperBackdrop />
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (

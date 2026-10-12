@@ -212,8 +212,10 @@ function SingleOrbImpl({
           one-sided, so front faces alone would drop half the loop. */}
       <mesh ref={coreRef} geometry={g.core} material={bandMaterial ?? mat.band} />
 
-      {/* Electron orbital rings + electrons */}
-      <group ref={orbitSystemRef}>
+      {/* Orbit rings mark the orb the worm is after; every other orb is just its
+          gem and band, so a full board reads as pickups rather than a field of
+          rings. The animator skips missing rings. */}
+      {isTarget && <group ref={orbitSystemRef}>
         <mesh ref={ringARef} geometry={g.ringA} material={mat.ringA} rotation={[0.3, 0.4, 0]} />
         <mesh ref={ringBRef} geometry={g.ringB} material={mat.ringB} rotation={[-0.6, 0, 0.5]} />
         {/* Third ring — target only (geometry only exists on target set) */}
@@ -223,7 +225,7 @@ function SingleOrbImpl({
 
         {/* Orbiting electrons removed — the small low-poly glowing spheres read as faceted
             "icosahedron" clutter around the orb. The clean orbit rings stay. */}
-      </group>
+      </group>}
 
       {/* Outer aura removed per design — the orb reads off the gem, core glow and rings. */}
 

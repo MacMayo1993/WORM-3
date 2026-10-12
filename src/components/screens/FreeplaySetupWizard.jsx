@@ -75,7 +75,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       onPrimary={handleNext}
       finishLabel="Play"
       mobile={isMobile}
-      secondary={step < categories.length - 1 ? { label: 'Play Now', onClick: finish } : null}
+      quickPlay={finish}
     >
       <WizardImageInput cos={cos} />
     </WizardShell>

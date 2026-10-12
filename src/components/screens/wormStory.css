@@ -167,3 +167,24 @@
 .worm-star-requirements small { font-size:11px; }
 .worm-story-growth { display:flex; justify-content:space-between; gap:8px; padding:5px 10px; border-radius:10px; color:#fff5d5; background:#182b2ef0; font-size:11px; line-height:1.4; }
 .worm-story-finish { pointer-events:auto; min-height:44px; width:100%; padding:8px; border:1px solid #d8b653; border-radius:10px; background:#fff1b5; color:#142425; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }
+
+/* Goals read as tiles: the task, a big count and a bar, two to a row. */
+.worm-story-card .worm-story-checklist { gap:8px; margin:10px 0 6px; }
+.worm-story-card .worm-story-checklist li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto; align-items:center; gap:4px 6px;
+  padding:8px 10px; border:2px solid var(--arcade-line-soft,#d1d0b8); border-radius:12px; background:#fffcf1; }
+.worm-story-card .worm-story-checklist b { font:400 15px/1 var(--display-font,inherit); }
+.worm-story-card .worm-story-checklist .is-complete { border-color:#009B48; background:#e9f6ec; }
+.worm-story-card .worm-story-checklist .is-complete .worm-story-task { text-decoration:none; opacity:1; }
+.worm-story-goal-bar { grid-column:1 / -1; display:block; height:5px; border-radius:99px; background:#e6e4cf; overflow:hidden; }
+.worm-story-goal-bar > i { display:block; height:100%; background:#009B48; transform-origin:left; transition:transform .3s ease; }
+.worm-story-card .worm-story-clock { font-weight:800; }
+
+/* Star rules collapse behind three stars. */
+.worm-star-requirements > summary { display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; min-height:32px; }
+.worm-star-requirements > summary::-webkit-details-marker { display:none; }
+.worm-star-requirements > summary::after { content:'▾'; margin-left:auto; opacity:.6; }
+.worm-star-requirements[open] > summary::after { content:'▴'; }
+.worm-star-glance { display:inline-flex; gap:2px; font-size:20px; line-height:1; color:#ffc21a; text-shadow:0 2px 0 #b07800; }
+.worm-star-glance i { font-style:normal; }
+.worm-star-glance i[data-earned="false"] { color:#d9d6c3; text-shadow:none; }
+.worm-story-mobi-fold > summary { cursor:pointer; font:800 11px/1.3 var(--heading-font,inherit); letter-spacing:.06em; text-transform:uppercase; min-height:32px; display:flex; align-items:center; }

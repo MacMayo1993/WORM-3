@@ -292,3 +292,22 @@
   .worm-fusion-banner { animation:wormFusionFade 3.2s linear both; }
   @keyframes wormFusionFade { 0%,85% { opacity:1; } 100% { opacity:0; } }
 }
+
+/* An ability recharging is not a dead key: the icon stays at full strength and
+   the ring shows the charge; a ready ability breathes so the eye finds it. */
+.worm-signature-control button:disabled { opacity: 1 !important; filter: saturate(.35); }
+.worm-signature-control button[data-ready] { animation: worm-signature-ready 1.6s ease-in-out infinite; }
+@keyframes worm-signature-ready { 50% { transform: scale(1.04); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .worm-signature-control button[data-ready] { animation: none; } }
+
+/* Pause: one big Resume, then a row of round arcade keys. */
+.worm-pause-quick { display:flex; justify-content:center; flex-wrap:wrap; gap:6px; margin:12px 0 4px; }
+.worm-pause-key { display:flex; flex-direction:column; align-items:center; gap:4px; width:56px; padding:0; border:0; background:none; color:var(--arcade-ink,#26372d); cursor:pointer;
+  font:800 10px/1.1 var(--heading-font,inherit); letter-spacing:.05em; text-transform:uppercase; }
+.worm-pause-key > svg { box-sizing:content-box; width:26px; height:26px; padding:14px; border:2px solid var(--arcade-ink,#26372d); border-radius:50%;
+  background:#fffcf1; box-shadow:0 4px 0 var(--arcade-ink,#26372d); transition:transform .08s, box-shadow .08s; }
+.worm-pause-key > svg { padding:12px; }
+.worm-pause-key:active > svg { transform:translateY(3px); box-shadow:0 1px 0 var(--arcade-ink,#26372d); }
+.worm-pause-key[aria-pressed="false"] > svg { background:#e6e4cf; color:#7b7f70; }
+.worm-pause-key:focus-visible { outline:none; }
+.worm-pause-key:focus-visible > svg { outline:3px solid #2774ad; outline-offset:3px; }

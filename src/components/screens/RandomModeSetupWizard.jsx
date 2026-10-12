@@ -46,10 +46,8 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   ];
 
 
-  const handleNext = () => {
-    if (step < categories.length - 1) setStep(step + 1);
-    else onComplete({ backgroundTheme: cos.settings.backgroundTheme, projectiscopeDesign: cos.settings.projectiscopeDesign, cubeSize: cos.cubeSize });
-  };
+  const finish = () => onComplete({ backgroundTheme: cos.settings.backgroundTheme, projectiscopeDesign: cos.settings.projectiscopeDesign, cubeSize: cos.cubeSize });
+  const handleNext = () => (step < categories.length - 1 ? setStep(step + 1) : finish());
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
@@ -63,6 +61,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       onBack={handleBack}
       onPrimary={handleNext}
       finishLabel="Play"
+      quickPlay={finish}
       mobile={isMobile}
     />
   );

@@ -174,11 +174,13 @@ export function StoryObjectiveCard({ compact = false }) {
 
   return <section className="worm-story-card" aria-label="Story objective">
     <small>{chapterLine(level.id)}</small><strong>{level.title}</strong>
-    <StoryMobiNote levelId={level.id} />
+    {/* Mobi has just spoken this; it stays one tap away instead of filling the card. */}
+    {storyNarrative(level.id) && <details className="worm-story-mobi-fold"><summary>Mobi’s briefing</summary><StoryMobiNote levelId={level.id} /></details>}
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
       aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
       <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goal.value}/{goal.target}</b>
+      <i className="worm-story-goal-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} /></i>
     </li>)}</ul>
     <StoryStarRequirements level={level} progress={live?.starGoals} />
     <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
@@ -200,6 +202,53 @@ export function StoryStartButton() {
 // Leave the live victory camera visible, then award stars and enable navigation.
 const STAR_FIRST_MS = 1000;
 const STAR_STEP_MS = 300;
+const CONFETTI_COLORS = ['#c41e3a', '#ff7a00', '#ffd500', '#009b48', '#0051a2', '#ffffff'];
+const COINS = 6;
+
+/** A reward number that climbs from 0 once the card is ready. */
+function useRewardCount(target, start, still) {
+  const [shown, setShown] = useState(still ? target : 0);
+  useEffect(() => {
+    if (still || !target || typeof requestAnimationFrame !== 'function') { setShown(target); return undefined; }
+    let raf = 0, t0 = null;
+    const step = now => {
+      t0 ??= now;
+      const t = Math.min(1, (now - t0) / 800);
+      setShown(Math.round(target * (1 - (1 - t) ** 3)));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    const delay = setTimeout(() => { raf = requestAnimationFrame(step); }, start);
+    return () => { clearTimeout(delay); cancelAnimationFrame(raf); };
+  }, [target, start, still]);
+  return shown;
+}
+
+/**
+ * What the clear paid, counted up, with coins flying off toward the wallet and
+ * confetti in the cube's colours: the beat store games spend their polish on.
+ */
+function StoryRewardBurst({ points, xp, start, still }) {
+  const shownPoints = useRewardCount(points, start, still);
+  const shownXp = useRewardCount(xp, start + 150, still);
+  useEffect(() => {
+    if (still || !points) return undefined;
+    const timers = Array.from({ length: 3 }, (_, i) => setTimeout(() => feel('orb', { combo: i }), start + 500 + i * 140));
+    return () => timers.forEach(clearTimeout);
+  }, [points, start, still]);
+  return <>
+    {!still && <div className="story-confetti" aria-hidden="true">{Array.from({ length: 28 }, (_, i) =>
+      <i key={i} style={{ '--x': `${(i * 37) % 100}%`, '--c': CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        '--d': `${STAR_FIRST_MS + (i % 7) * 60}ms`, '--r': `${(i * 53) % 360}deg`, '--s': `${0.8 + (i % 4) * 0.15}` }} />)}</div>}
+    {(points > 0 || xp > 0) && <div className="story-reward-burst" style={{ '--burst-start': `${start}ms` }}>
+      {points > 0 && <span className="story-reward-pill story-reward-points" aria-label={`${points} Parity Points earned`}>
+        <i aria-hidden="true">P</i>+{shownPoints}
+        {!still && <span className="story-coin-flight" aria-hidden="true">{Array.from({ length: COINS }, (_, i) =>
+          <b key={i} style={{ '--k': i, '--fly': `${start + 450 + i * 70}ms` }}>P</b>)}</span>}
+      </span>}
+      {xp > 0 && <span className="story-reward-pill story-reward-xp" aria-label={`${xp} XP earned`}><i aria-hidden="true">★</i>+{shownXp} XP</span>}
+    </div>}
+  </>;
+}
 export function StoryResult(props) {
   const result = useGameStore(s => s.wormStoryResult);
   const runId = useGameStore(s => s.wormRunId);
@@ -277,6 +326,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
           </div>)}
         </div>
         <p className="story-completion-verdict" role="status">{ready ? `${stars} ${stars === 1 ? 'star' : 'stars'} earned` : '\u00a0'}</p>
+        <StoryRewardBurst points={result.points ?? 0} xp={result.xp ?? 0} start={STAR_FIRST_MS + stars * STAR_STEP_MS} still={reducedMotion} />
       </div>
       <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
         {result.unlockedCharacter && <div className="story-completion-unlock story-reward-character">

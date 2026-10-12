@@ -169,3 +169,38 @@
 .catalogue-category strong { font-weight:650; }
 .catalogue-category { position:relative; }
 .catalogue-category[aria-pressed="true"]::after { content:''; position:absolute; left:0; top:16%; bottom:16%; width:3px; background:var(--category); border-radius:2px; }
+
+/* ── Arcade shelf ───────────────────────────────────────────────────────────
+   Chunky cards on a hard ledge, a real price tag, and the wallet as pills.
+   (Card colours stay inline per item; these override the shape.) */
+.catalogue-header h1 { font-family:var(--display-font-arcade, 'Bungee', system-ui); font-weight:400; letter-spacing:.02em; text-transform:uppercase; }
+.catalogue-wallet { display:flex; gap:8px; align-items:center; text-align:left; }
+.catalogue-wallet .wallet-pill { display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:6px 12px; border:2px solid #26372d; border-radius:999px;
+  background:#fffcf1; box-shadow:0 3px 0 #26372d; color:#26372d; font:800 16px/1 var(--display-font); font-variant-numeric:tabular-nums; margin:0; }
+.catalogue-wallet .wallet-gems { color:#6b3fa0; cursor:pointer; }
+.catalogue-wallet .wallet-gems:active { transform:translateY(2px); box-shadow:0 1px 0 #26372d; }
+.catalogue-grid .store-card { border:2px solid #26372d33 !important; border-radius:16px !important; background:#fffcf1 !important; box-shadow:0 4px 0 #26372d26 !important; }
+.catalogue-grid .store-card[aria-pressed="true"] { border-color:var(--category,#009B48) !important; box-shadow:0 4px 0 var(--category,#009B48) !important; }
+.catalogue-grid .store-card.is-equipped { border-color:#009B48 !important; box-shadow:0 2px 0 #009B48 !important; }
+.store-card-price { min-height:28px; padding:4px 12px !important; }
+.store-card-price.can-afford { background:#009B48 !important; border:2px solid #26372d !important; box-shadow:0 2px 0 #26372d; }
+.store-card-price.can-afford span, .store-card-price.can-afford svg { color:#fff !important; fill:#fff; }
+.catalogue-action { border:2px solid #26372d; box-shadow:0 4px 0 #26372d; font-family:var(--display-font) !important; }
+.catalogue-action:active:not(:disabled) { transform:translateY(3px); box-shadow:0 1px 0 #26372d; }
+
+@media(max-width:650px) {
+  /* Phones: the category rail becomes a swipeable tab strip above the shelf. */
+  .catalogue-layout { display:flex; flex-direction:column; }
+  .catalogue-sidebar { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding:10px 12px; border-right:0; border-bottom:1px solid var(--paper-line); scrollbar-width:none; }
+  .catalogue-sidebar::-webkit-scrollbar { display:none; }
+  .catalogue-category { flex:0 0 auto; width:auto; min-height:48px; padding:8px 14px; border:2px solid #26372d33; border-radius:999px; background:#fffcf1; }
+  .catalogue-category small, .catalogue-category::after { display:none !important; }
+  .catalogue-category strong { font-size:13px; white-space:nowrap; }
+  .catalogue-category[aria-pressed=true] { border-color:#26372d; background:color-mix(in srgb, var(--category) 40%, #fffcf1); box-shadow:0 3px 0 #26372d; }
+  .catalogue-chests { flex:0 0 auto; display:flex; align-items:center; gap:6px; width:auto; margin:0; padding:8px 14px; border-radius:999px; min-height:48px; }
+  .catalogue-chests>span { font-size:18px; }
+  .catalogue-chests small { display:none; }
+  .catalogue-header .catalogue-progress, .catalogue-header small { display:none; }
+  .catalogue-wallet .wallet-pill { min-height:36px; padding:4px 10px; font-size:14px; }
+  .catalogue-grid { gap:12px; }
+}
