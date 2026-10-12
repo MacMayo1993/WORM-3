@@ -28,6 +28,10 @@ export const createModesSlice = (set, _get) => ({
     };
   }),
 
+  // Which modes are open: 'new' | 'gated' | 'open' (see progression/modeUnlocks.js).
+  modeGate: persistedState.modeGate ?? 'open',
+  setModeGate: (modeGate) => set({ modeGate }),
+
   // ========================================================================
   // LEVEL SYSTEM STATE
   // ========================================================================

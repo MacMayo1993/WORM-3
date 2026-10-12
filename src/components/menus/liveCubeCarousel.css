@@ -23,6 +23,15 @@
 .lc-history strong,.lc-history small { display:block; }.lc-history small { color:#6a705e; font-size:11px; margin-top:3px; }
 /* Play is a piece of the cube (mainMenuKeys.css): a sticker in the mode's face colour. */
 .lc-play { width:100%; min-height:64px; margin-top:10px; }
+/* A mode the player has not opened yet: grey sticker, padlock, and how far along they are. */
+.lc-play[data-locked]:disabled { opacity:1; cursor:default; filter:saturate(0) brightness(1.04); }
+.lc-play[data-locked] .menu-key-label { font-size:clamp(14px,3.9vw,18px); }
+.lc-face-map [data-locked] span { opacity:.38; }
+.lc-lock { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px 10px; margin:0 auto 10px; max-width:320px; padding:10px 12px; border:1px solid #d1d0b8; border-radius:10px; background:#fffcf1; }
+.lc-lock>span:first-child { grid-column:1 / -1; font:800 11px/1.3 var(--heading-font); letter-spacing:.06em; text-transform:uppercase; }
+.lc-lock-bar { height:8px; border-radius:999px; background:#e6e4cf; overflow:hidden; }
+.lc-lock-bar i { display:block; height:100%; border-radius:inherit; background:var(--mode-accent, #009b48); box-shadow:inset 0 0 0 1px #26372d33; }
+.lc-lock strong { font:800 13px/1 var(--heading-font); }
 .lc-play .menu-key-face { justify-content:space-between; gap:12px; padding:0 18px 0 12px; background-color:var(--mode-accent); }
 .lc-play .menu-key-label { flex:1; text-align:center; font-size:clamp(17px,4.6vw,22px); }
 .live-carousel button:disabled { cursor:default; }.lc-play:disabled { opacity:.65; }

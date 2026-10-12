@@ -35,6 +35,7 @@ import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_CLASSIC, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { isModeUnlocked, modeLockText, levelsUntilModeUnlock, modeUnlockLevels } from '../../progression/modeUnlocks.js';
 
 // ─── The opening's cube ────────────────────────────────────────────────────────
 // The menu cube is the one that lands in the opening (IntroScene): black plastic
@@ -1146,17 +1147,22 @@ export function modeStatItems(mode, ctx) {
 // ─── Mode carousel overlay ───────────────────────────────────────────────────
 // Controls frame the live cube. The stage has no DOM artwork or opaque panel.
 export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onSettings }) => {
-  // Open on the last-played mode so returning players are one tap from their game.
+  const modeGate = useGameStore(s => s.modeGate);
+  const playerProgress = useGameStore(s => s.playerProgress);
+  const modePlays = useGameStore(s => s.modePlays);
+  const unlocked = useCallback(id => isModeUnlocked(id, { progress: playerProgress, gate: modeGate, plays: modePlays }),
+    [playerProgress, modeGate, modePlays]);
+  // Open on the last-played mode so returning players are one tap from their game
+  // (WORM when that mode is still locked).
   const [activeIndex, setActiveIndex] = useState(() => {
     try {
       const idx = CAROUSEL_MODES.findIndex(m => m.id === localStorage.getItem(LAST_MODE_KEY));
-      return idx >= 0 ? idx : 0;
+      return idx >= 0 && unlocked(CAROUSEL_MODES[idx].id) ? idx : 0;
     } catch { return 0; }
   });
   const [show, setShow] = useState(true);
   const [diving, setDiving] = useState(false);
 
-  const modePlays = useGameStore(s => s.modePlays);
   const parityPoints = useGameStore(s => s.parityPoints);
   const ownedItems = useGameStore(s => s.ownedItems);
   const recordModePlay = useGameStore(s => s.recordModePlay);
@@ -1230,10 +1236,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   // a fallback timer launches anyway if the canvas is unavailable.
   const handlePlay = useCallback(() => {
     if (animatingRef.current || divingRef.current) return;
+    const id = CAROUSEL_MODES[activeIndexRef.current].id;
+    if (!unlocked(id)) return;
     divingRef.current = true;
     setDiving(true);
     vibrate(18);
-    const id = CAROUSEL_MODES[activeIndexRef.current].id;
     recordModePlay(id);
     let fired = false;
     const fire = () => {
@@ -1243,7 +1250,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     };
     requestModeDive(fire);
     fallbackTimerRef.current = setTimeout(fire, 850);
-  }, [launch, recordModePlay]);
+  }, [launch, recordModePlay, unlocked]);
 
   useEffect(() => {
     const fn = (e) => {
@@ -1310,7 +1317,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     onMouseLeave: () => { mouseStartX.current = null; },
   };
 
-  const actionLabel = mode.id === 'cube' ? 'Learn to solve' : mode.id === 'store' ? 'Open store' : `Play ${mode.label}`;
+  const locked = !unlocked(mode.id);
+  const actionLabel = locked ? modeLockText(mode.id, playerProgress)
+    : mode.id === 'cube' ? 'Learn to solve' : mode.id === 'store' ? 'Open store' : `Play ${mode.label}`;
+  const lockNeed = modeUnlockLevels(mode.id);
+  const lockDone = lockNeed - levelsUntilModeUnlock(mode.id, playerProgress);
 
   return (
     <div className="live-carousel" style={{ zIndex: Z.MENU, '--mode-accent': mode.tileColor, '--mode-ink': mode.textColor }}>
@@ -1328,7 +1339,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         <h1 className="lc-heading">Choose your mode</h1>
 
         <div {...swipeHandlers} ref={stageRef} className="mc-cube-window" role="group" aria-label="Rotating cube mode selector">
-          <span className="lc-sr-only" role="status" aria-live="polite">{mode.label} mode, {activeIndex + 1} of {N}</span>
+          <span className="lc-sr-only" role="status" aria-live="polite">{mode.label} mode, {activeIndex + 1} of {N}{locked ? ', locked' : ''}</span>
           <button type="button" className="lc-icon-button lc-previous" aria-label="Previous mode" disabled={!show || diving} onClick={() => navigate(-1)}>‹</button>
           <button type="button" className="lc-icon-button lc-next" aria-label="Next mode" disabled={!show || diving} onClick={() => navigate(1)}>›</button>
         </div>
@@ -1337,13 +1348,19 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           <nav className="lc-face-map" aria-label="Game modes">
             {CAROUSEL_MODES.map((m, i) => (
               <button key={m.id} type="button" aria-label={`Show ${m.label} mode`} aria-current={i === activeIndex ? 'true' : undefined}
-                title={m.label} onClick={() => selectIndex(i)} disabled={!show || diving} style={{ '--face-color': m.tileColor }}>
+                title={unlocked(m.id) ? m.label : `${m.label} (locked)`} data-locked={!unlocked(m.id) || undefined}
+                onClick={() => selectIndex(i)} disabled={!show || diving} style={{ '--face-color': m.tileColor }}>
                 <span />
               </button>
             ))}
           </nav>
           <p className="lc-swipe-hint">Swipe the cube to explore</p>
           <article className="lc-info" aria-label={`${mode.label} mode details`} style={{ opacity }}>
+            {locked && <div className="lc-lock" role="note">
+              <span>Opens after {lockNeed} WORM level{lockNeed === 1 ? '' : 's'}</span>
+              <span className="lc-lock-bar" aria-hidden="true"><i style={{ width: `${(lockDone / lockNeed) * 100}%` }} /></span>
+              <strong>{lockDone} / {lockNeed}</strong>
+            </div>}
             <div className="lc-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             <details key={mode.id}>
               <summary>{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
@@ -1351,11 +1368,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               {statItems.length > 0 && <div className="lc-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
             </details>
           </article>
-          <button type="button" className="lc-play menu-key" onClick={handlePlay} disabled={!show || diving}>
+          <button type="button" className="lc-play menu-key" onClick={handlePlay} disabled={!show || diving || locked} data-locked={locked || undefined}>
             <span className="menu-key-face">
-              <span className="menu-key-emblem" aria-hidden="true"><MenuCubeGlyph /></span>
+              <span className="menu-key-emblem" aria-hidden="true">{locked ? <LockGlyph /> : <MenuCubeGlyph />}</span>
               <span className="menu-key-label">{actionLabel}</span>
-              <span className="menu-key-arrow" aria-hidden="true">→</span>
+              {!locked && <span className="menu-key-arrow" aria-hidden="true">→</span>}
             </span>
           </button>
         </div>
@@ -1384,6 +1401,13 @@ const MenuCubeGlyph = () => (
         ))}
       </g>
     ))}
+  </svg>
+);
+
+const LockGlyph = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true" focusable="false">
+    <rect x="5" y="10.5" width="14" height="10" rx="2.2" />
+    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" strokeLinecap="round" />
   </svg>
 );
 

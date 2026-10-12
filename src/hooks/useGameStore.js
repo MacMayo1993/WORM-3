@@ -21,6 +21,7 @@ import { WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { MODES, FLIP_CAP } from '../utils/constants.js';
+import { MODE_GATE_KEY } from '../progression/modeUnlocks.js';
 import {
   createProgressionSlice,
   createCubeSlice,
@@ -140,6 +141,12 @@ useGameStore.subscribe((state) => state.ownedItems, persist(OWNED_ITEMS_KEY, JSO
 useGameStore.subscribe(state => state.chaosRecord, persist(CHAOS_RECORD_KEY, JSON.stringify));
 useGameStore.subscribe((state) => state.betStreak, persist(BET_STREAK_KEY));
 useGameStore.subscribe((state) => state.modePlays, persist(MODE_PLAYS_KEY, JSON.stringify));
+// 'open' is never written: it is either derived (a returning player, the unlock-all
+// builds) or must not outlive ?unlockall=0.
+useGameStore.subscribe(state => state.modeGate, gate => {
+  if (gate === 'open') return;
+  try { localStorage.setItem(MODE_GATE_KEY, gate); } catch { /* storage unavailable */ }
+});
 
 useGameStore.subscribe(state => state.wormMissionsCompleted,
   completed => persist(WORM_MISSION_STORAGE_KEY, JSON.stringify)({ completed }));

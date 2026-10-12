@@ -13,6 +13,7 @@ import { newChestWallet } from '../../economy/chests.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
 import { syncCharacterUnlocks } from '../../worm/wormUnlocks.js';
 import { UNLOCK_ALL } from '../../utils/testUnlock.js';
+import { MODE_GATE_KEY, resolveModeGate } from '../../progression/modeUnlocks.js';
 import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
 import { clampWormCameraZoom, WORM_CAMERA_ZOOM, WORM_CAMERA_ZOOM_KEY } from '../../worm/wormCameraZoom.js';
 
@@ -56,6 +57,7 @@ const loadPersistedState = () => {
     const settingsVersionRaw = localStorage.getItem(SETTINGS_VERSION_KEY);
     const settingsVersion = Number.parseInt(settingsVersionRaw ?? '0', 10) || 0;
     const introSeen = localStorage.getItem('worm3_intro_seen') === '1';
+    const modeGate = resolveModeGate(localStorage.getItem(MODE_GATE_KEY), { introSeen, unlockAll: DEV_FREE_ECONOMY });
     const tutorialDone = localStorage.getItem('worm3_tutorial_done') === '1';
     const firstFlipDone = localStorage.getItem('worm3_first_flip_done') === '1';
     const mobileHintShown = localStorage.getItem('worm3_mobile_hint_shown') === '1';
@@ -133,6 +135,7 @@ const loadPersistedState = () => {
       chestWallet: playerSave?.chestWallet ?? newChestWallet(),
       settings: migratedSettings,
       introSeen,
+      modeGate,
       tutorialDone,
       hasFlippedOnce: firstFlipDone,
       mobileHintShown,
@@ -154,6 +157,8 @@ const loadPersistedState = () => {
       chestWallet: playerSave?.chestWallet ?? newChestWallet(),
       settings: { ...DEFAULT_SETTINGS },
       introSeen: false,
+      // Storage unavailable: nothing could remember a first launch, so never gate.
+      modeGate: 'open',
       tutorialDone: false,
       hasFlippedOnce: false,
       mobileHintShown: false,

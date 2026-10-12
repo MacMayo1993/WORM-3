@@ -702,9 +702,21 @@ export default function WORM3() {
   // ========================================================================
   // HANDLERS
   // ========================================================================
+  // Set once handleWormSetupComplete exists (it is declared further down).
+  const firstRunLaunchRef = useRef(null);
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
+    // A brand-new player skips the menu: the intro hands them straight to WORM
+    // Story level 1, and the other modes open as they clear levels
+    // (progression/modeUnlocks.js). Only ever once per save.
+    if (useGameStore.getState().modeGate === 'new') {
+      useGameStore.getState().setModeGate('gated');
+      if (firstRunLaunchRef.current) {
+        firstRunLaunchRef.current();
+        return;
+      }
+    }
     // Only cover a real asset load; an eager cover flashes over a ready menu.
     armSceneGate('Opening the cube…', { eager: false, holdMs: 300, z: 10000 });
     // Show main menu after intro (not tutorial).
@@ -974,6 +986,11 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, [clearMegaReducedFXOverride]);
+
+  firstRunLaunchRef.current = () => {
+    const s = useGameStore.getState();
+    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(1)) });
+  };
 
   const handleWormStoryNext = useCallback(() => {
     const s = useGameStore.getState();
