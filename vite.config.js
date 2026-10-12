@@ -39,16 +39,25 @@ export default defineConfig({
       manifest: {
         name: 'WORM³ — World of Rubik\'s Manifolds',
         short_name: 'WORM³',
-        description: '3D Rubik\'s Cube puzzle on real projective plane topology',
+        description: 'Flip through the cube! Guide your worm through tunnels, heal a broken Rubik\'s cube and unlock new worms.',
         start_url: BASE,
         scope: BASE,
         display: 'standalone',
-        background_color: '#060a18',
-        theme_color: '#060a18',
-        icons: [{ src: 'vite.svg', sizes: 'any', type: 'image/svg+xml' }],
+        orientation: 'any',
+        categories: ['games', 'puzzle'],
+        // The cream graph paper and deep-green ink of the boot splash, so the
+        // OS splash screen and status bar match the first frame the app draws.
+        background_color: '#f5f2e7',
+        theme_color: '#f5f2e7',
+        icons: [
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,woff,svg}', 'Mobi.webp'],
+        globPatterns: ['**/*.{js,css,html,woff2,woff,svg}', 'Mobi.webp', 'icons/*.png'],
         globIgnores: ['environments/**', 'models/**', 'images/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${BASE}index.html`,

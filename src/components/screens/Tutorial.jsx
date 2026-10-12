@@ -17,17 +17,17 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: <>Welcome to <WormWordmark inline /></>,
       content: (
         <>
-          <p><b><WormWordmark inline /></b> is a Rubik's Cube puzzle built on real projective plane topology—every face is secretly connected to its opposite through <b>wormholes</b>.</p>
-          <p>Flip a sticker and it travels through the manifold, swapping color with its <b>antipodal partner</b> on the opposite side of the cube.</p>
-          <p>Solve the cube while managing these wormhole connections—that's what makes <WormWordmark inline /> unique.</p>
+          <p><b><WormWordmark inline /></b> is a Rubik's Cube with a secret: every tile has a <b>twin</b> straight through the middle, and the two are linked by a <b>tunnel</b>.</p>
+          <p>Flip a sticker and it dives through the cube, swapping color with its twin on the opposite side.</p>
+          <p>Turn, flip and solve. Every move changes two places at once.</p>
         </>
       )
     },
     2: {
-      title: "What Are Antipodal Pairs?",
+      title: "Meet the Twins",
       content: (
         <>
-          <p>Every face on the cube has an opposite directly across from it. These opposites are <b>antipodal pairs</b>—they share a wormhole connection.</p>
+          <p>Every face on the cube has an opposite directly across from it. These opposites are <b>twins</b>, joined by a tunnel through the middle.</p>
 
           <div style={{
             background: 'rgba(255, 255, 255, 0.06)',
@@ -36,7 +36,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             margin: '12px 0',
             border: '1px solid rgba(255, 255, 255, 0.10)'
           }}>
-            <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Three Antipodal Pairs:</p>
+            <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Three Twin Pairs:</p>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '8px' }}>
               <span><span style={{ color: COLORS.red }}>●</span> Red ↔ Orange <span style={{ color: COLORS.orange }}>●</span></span>
               <span><span style={{ color: COLORS.green }}>●</span> Green ↔ Blue <span style={{ color: COLORS.blue }}>●</span></span>
@@ -44,20 +44,20 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             </div>
           </div>
 
-          <p>Think of the Earth: your antipodal point is the exact opposite side of the planet—where you'd emerge if you dug straight through. In <WormWordmark inline />, flipping a sticker sends it on exactly that journey.</p>
-          <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED }}><b>Small circle on a sticker</b> = its original color, a breadcrumb of its journey through the manifold.</p>
+          <p>Think of digging straight through the Earth and popping out on the other side. In <WormWordmark inline />, flipping a sticker sends it on exactly that trip.</p>
+          <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED }}><b>Small circle on a sticker</b> = its original color, a breadcrumb showing where it came from.</p>
         </>
       )
     },
     3: {
-      title: "The Wormhole Connection",
+      title: "Tunnels",
       content: (
         <>
-          <p>When you flip a sticker, a glowing <b>tunnel</b> appears connecting it to its antipodal partner. Both stickers swap colors simultaneously—you're changing two points at once.</p>
+          <p>When you flip a sticker, a glowing <b>tunnel</b> appears connecting it to its twin. Both stickers swap colors simultaneously—you're changing two points at once.</p>
 
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px', margin: '12px 0', border: '1px solid rgba(255,255,255,0.10)', fontSize: '13px', lineHeight: 1.7 }}>
             <p style={{ margin: '0 0 6px 0' }}>Tunnels grow <b>thicker and brighter</b> the more times a pair has been flipped.</p>
-            <p style={{ margin: '0 0 6px 0' }}><b>Tally marks</b> on each sticker count its total wormhole journeys.</p>
+            <p style={{ margin: '0 0 6px 0' }}><b>Tally marks</b> on each sticker count how many trips it has made.</p>
             <p style={{ margin: 0 }}>Press <b>T</b> or use the Tunnels button to toggle tunnel visibility.</p>
           </div>
 
@@ -80,10 +80,10 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       )
     },
     5: {
-      title: "Flipping Through Wormholes",
+      title: "Flipping",
       content: (
         <>
-          <p>Press <b>G</b> or tap the <b>Flip</b> button to toggle Flip Mode. In Flip Mode, tapping any sticker sends it through the wormhole.</p>
+          <p>Press <b>G</b> or tap the <b>Flip</b> button to toggle Flip Mode. In Flip Mode, tapping any sticker sends it through the cube to its twin.</p>
           <p><b>Right-click</b> (or <b>long-press</b> on mobile) to flip a single sticker without enabling Flip Mode globally.</p>
           <p>In Flip Mode with the keyboard cursor active, press <b>F</b> to flip the sticker under the cursor.</p>
 
@@ -101,12 +101,12 @@ const Tutorial = ({ onClose, onMainMenu }) => {
           <p>Press <b>V</b> to cycle through four visual modes:</p>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
             <li><b>Classic:</b> Standard face colors—the familiar Rubik's Cube look</li>
-            <li><b>Grid:</b> Manifold IDs overlaid on each sticker (M1-001 format)</li>
+            <li><b>Grid:</b> A grid label on each sticker (M1-001 format)</li>
             <li><b>Sudokube:</b> Numbers on each face (1–9 for 3×3, 1–16 for 4×4)</li>
             <li><b>Colors:</b> Custom color palette from your settings applied to the cube</li>
           </ul>
-          <p><b>Explode (X):</b> Spread the cubies apart to see all wormhole tunnel connections clearly.</p>
-          <p><b>Tunnels (T):</b> Toggle the glowing wormhole tunnel visualization on or off.</p>
+          <p><b>Explode (X):</b> Spread the cubies apart to see every tunnel clearly.</p>
+          <p><b>Tunnels (T):</b> Show or hide the glowing tunnels.</p>
           <p><b>Net Panel (N):</b> Open a flat 2D map showing all six faces unfolded.</p>
         </>
       )
@@ -121,7 +121,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <li><b>Level 2:</b> Moderate, regular spreading</li>
             <li><b>Level 3:</b> Aggressive chain propagation</li>
             <li><b>Level 4:</b> Heavy sustained chaos</li>
-            <li><b>Level 5:</b> Deep-manifold surges — strong hops with pacing</li>
+            <li><b>Level 5:</b> Deep surges — strong hops with pacing</li>
           </ul>
           <p><b>AUTO Mode:</b> The cube rotates automatically based on instability — fast when chaotic, slow when stable.</p>
           <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED, marginTop: '6px' }}>

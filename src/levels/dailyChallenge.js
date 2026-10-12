@@ -350,7 +350,7 @@ export function buildDailyPack(dateKey) {
   return createLevelPack({
     id: DAILY_PACK_ID,
     name: 'Daily Descent',
-    description: 'One procedurally generated antipodal puzzle a day, the same for every player.',
+    description: 'One fresh twin-tile puzzle a day, the same for every player.',
     author: 'WORM³ Team',
     version: '1.0.0',
     levels: [buildDailyLevel(dateKey)],

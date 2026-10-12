@@ -8,7 +8,7 @@ import { createLevel, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL
 export default createLevel({
   id: 3,
   name: 'Flip Gateway',
-  description: 'Master the antipodal flip',
+  description: 'Master the twin flip',
 
   cubeSize: 3,
   scrambleSequence: [
