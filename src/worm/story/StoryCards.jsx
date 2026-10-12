@@ -174,11 +174,13 @@ export function StoryObjectiveCard({ compact = false }) {
 
   return <section className="worm-story-card" aria-label="Story objective">
     <small>{chapterLine(level.id)}</small><strong>{level.title}</strong>
-    <StoryMobiNote levelId={level.id} />
+    {/* Mobi has just spoken this; it stays one tap away instead of filling the card. */}
+    {storyNarrative(level.id) && <details className="worm-story-mobi-fold"><summary>Mobi’s briefing</summary><StoryMobiNote levelId={level.id} /></details>}
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
       aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
       <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goal.value}/{goal.target}</b>
+      <i className="worm-story-goal-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} /></i>
     </li>)}</ul>
     <StoryStarRequirements level={level} progress={live?.starGoals} />
     <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
