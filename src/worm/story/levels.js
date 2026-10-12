@@ -67,6 +67,7 @@ export function storyOutcome(level, metrics) {
   if (!complete) return null;
   const goals = storyStarGoals(level, metrics);
   return { stars: goals.stars, seconds: Math.ceil(metrics.elapsed), peakLength: goals.peakLength,
+    finalLength: metrics.currentLength,
     starGoals: { fast: goals.fast, clean: goals.clean, grown: goals.grown } };
 }
 
