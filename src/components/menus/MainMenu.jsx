@@ -35,6 +35,7 @@ import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_CLASSIC, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import ParityWallet from '../overlays/ParityWallet.jsx';
 import { isModeUnlocked, modeLockText, levelsUntilModeUnlock, modeUnlockLevels } from '../../progression/modeUnlocks.js';
 
 // ─── The opening's cube ────────────────────────────────────────────────────────
@@ -1460,7 +1461,6 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     pointerEvents: visible ? 'auto' : 'none',
   }} inert={visible ? undefined : ''}>
     <div className="worm-menu-actions" style={MENU_KEY_COLORS}>
-    <PlayerLevelBadge />
     <button
       type="button"
       className={`menu-key menu-key--play${playFlipping ? ' is-flipping' : ''}`}
@@ -1472,19 +1472,11 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         <span className="menu-key-arrow" aria-hidden="true">→</span>
       </span>
     </button>
-    <div className="worm-menu-utilities">
-      {onDemo && <button type="button" onClick={onDemo}
-        onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}
-        className="menu-key menu-key--small">
-        <span className="menu-key-face"><span aria-hidden="true">▷</span>Demo</span>
+    <div className="worm-menu-links">
+      {onDemo && <button type="button" onClick={onDemo} onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}>
+        <span aria-hidden="true">▷</span> Demo
       </button>}
-      <button type="button" className="menu-key menu-key--small"
-        onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}>
-        <span className="menu-key-face">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v12H10l-6 4V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-          Feedback
-        </span>
-      </button>
+      <button type="button" onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}>Feedback</button>
     </div>
     </div>
   </div>
@@ -1496,7 +1488,7 @@ const menuStyles = {
   titleWrap: {
     position: 'absolute', top: 0, left: 0, right: 0,
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
+    paddingTop: 'calc(max(14px, env(safe-area-inset-top, 14px)) + 66px)',
     paddingLeft: '16px', paddingRight: '16px',
     zIndex: 4,
     transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
@@ -1517,28 +1509,21 @@ export const MenuTitleCard = ({ visible }) => (
   </div>
 );
 
-// ─── Backdrop ─────────────────────────────────────────────────────────────────
-// The menu draws over whatever environment the 3D scene happened to load, and
-// those backdrops are bright, busy and mid-tone — the same range the wordmark,
-// the cube and the CTAs live in, which is why nothing separated from anything.
-// This stages the shot: a warm key light behind the cube, a vignette that drops
-// the corners, and a scrim at each end to seat the title and the button stack.
-// Purely presentational, and pointer-transparent, so the cube underneath keeps
-// its tap-to-restyle and shake-to-play behaviour.
-const MenuBackdrop = ({ visible }) => (
-  <div
-    className="worm-menu-backdrop"
-    aria-hidden="true"
-    style={{
-      position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.9s ease'
-    }}
-  >
-    <div className="worm-menu-stagelight" />
-    <div className="worm-menu-vignette" />
-    <div className="worm-menu-scrim-top" />
-    <div className="worm-menu-scrim-bottom" />
+// ─── Top bar ──────────────────────────────────────────────────────────────────
+// Who you are and what you have, the way every store game opens: level on the
+// left, wallet and settings on the right.
+const MenuTopBar = ({ visible, onSettings }) => (
+  <div className="worm-menu-topbar" style={{ opacity: visible ? 1 : 0 }} inert={visible ? undefined : ''}>
+    <div className="worm-menu-topbar-level"><PlayerLevelBadge /></div>
+    <div className="worm-menu-topbar-right">
+      <ParityWallet neutral />
+      {onSettings && <button type="button" className="worm-menu-gear" aria-label="Settings" onClick={onSettings}>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z" strokeLinejoin="round" />
+          <circle cx="12" cy="11" r="3" />
+        </svg>
+      </button>}
+    </div>
   </div>
 );
 
@@ -1567,7 +1552,7 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
-      <MenuBackdrop visible={titleVisible} />
+      <MenuTopBar visible={titleVisible} onSettings={_onSettings} />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
     </div>

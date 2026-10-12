@@ -251,3 +251,21 @@
     animation: none;
   }
 }
+
+/* Top bar: level badge left, wallet and settings right. */
+.worm-menu-topbar { position:absolute; top:0; left:0; right:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:max(12px, env(safe-area-inset-top, 12px)) 14px 0; pointer-events:auto; transition:opacity .55s ease .1s; }
+.worm-menu-topbar-level { min-width:0; flex:0 1 230px; }
+.worm-menu-topbar-level .xp-menu-badge { min-height:50px; padding:6px 10px; gap:8px; border-radius:16px; }
+.worm-menu-topbar-level .xp-badge-action, .worm-menu-topbar-level .xp-meter-copy { display:none; }
+.worm-menu-topbar-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.worm-menu-gear { display:grid; place-items:center; width:48px; height:48px; border:2px solid #26372d; border-radius:14px; background:#fffcf1; color:#26372d;
+  box-shadow:0 4px 0 #26372d; cursor:pointer; }
+.worm-menu-gear:active { transform:translateY(3px); box-shadow:0 1px 0 #26372d; }
+.worm-menu-gear:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
+
+/* Demo and Feedback: present, but no longer competing with Play. */
+.worm-menu-links { display:flex; justify-content:center; gap:22px; }
+.worm-menu-links button { min-height:44px; padding:8px 6px; border:0; background:none; cursor:pointer; color:#3f5646;
+  font:800 13px/1 var(--heading-font, system-ui); letter-spacing:.08em; text-transform:uppercase; text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:2px; }
+.worm-menu-links button:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
