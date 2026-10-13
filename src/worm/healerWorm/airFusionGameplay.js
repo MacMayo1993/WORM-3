@@ -49,7 +49,6 @@ export function airFusionLanding(sim, size) {
     }
     if (fusion === 'air-grass') {
         addElementalPatch(sim, sim.pos, 'grass', { charged: true, ttl: 12 });
-        burst(sim, [ `${sim.pos.x},${sim.pos.y},${sim.pos.z},${sim.pos.dirKey}` ]);
     }
     if (fusion === 'air-lightning') {
         burst(sim, computeBlastTiles({ tile: sim.pos }, size, 2).keys, { hit: 'kill', lightning: true });

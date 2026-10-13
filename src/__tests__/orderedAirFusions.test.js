@@ -67,6 +67,7 @@ it('Dust Devil stuns at spring takeoff; Highlands grows charged pads after actua
   expect(high.sim.fusionBursts).toHaveLength(0);
   land(high.sim,high.ctx); land(dust.sim,dust.ctx);
   expect(high.sim.elementalPatches.get(tileKey(high.sim.pos))).toMatchObject({charged:true,ttl:12});
+  expect(high.sim.fusionBursts).toHaveLength(0); // Highlands grants no landing stun.
   expect(dust.sim.elementalPatches.get(tileKey(dust.sim.pos)).charged).toBeUndefined();
   startJump(high.sim,high.ctx,SIZE); startJump(dust.sim,dust.ctx,SIZE);
   expect(high.sim.jumpHeight).toBeGreaterThan(dust.sim.jumpHeight);

@@ -32,6 +32,7 @@ vi.mock('../worm/healerWorm/bombs.js', async importOriginal => ({
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 import { HealerBombs } from '../worm/healerWorm/HealerBombs.jsx';
+import { LightningStrikes } from '../worm/healerWorm/LightningStrikes.jsx';
 import { resolveSliceHits } from '../worm/wormHelpers.js';
 import { isBombDisarmed, checkBlastHitWorm } from '../worm/healerWorm/bombs.js';
 
@@ -465,4 +466,36 @@ it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s chang
     expect(checkBlastHitWorm).not.toHaveBeenCalled();
     expect(sim.staticT).toBeGreaterThan(0);
   } else expect(checkBlastHitWorm).toHaveBeenCalled();
+});
+
+it.each([
+  ['landing', null], ['ignition', null], ['landing', 9], ['ignition', 9],
+])('Rainwind %s grants no bomb rewards after an old fatal strike (story %s)', async (reaction, level) => {
+  const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
+  const { igniteFusion } = await import('../worm/healerWorm/fusionIgnition.js');
+  worm.recordStoryBomb = vi.fn();
+  act(() => useGameStore.setState({ wormStoryLevel: level, wormStoryStarted: true, wormPaused: false }));
+  sim.elementalType = 'lightning'; sim.elementalT = wormBuffs.elementalT = 10;
+  tick(12); // Lightning has telegraphed a strike, but it has not fired yet.
+  const children = React.Children.toArray(tree.props.children.props.children);
+  const storm = children.flatMap(child => React.Children.toArray(child.props.children))
+    .find(child => child.type === LightningStrikes).props.stormRef.current;
+  expect(storm.spots.length).toBeGreaterThan(0);
+  storm.spots[0].age = storm.spots[0].delay - 0.05;
+  const { bombsRef } = children.find(child => child.type === HealerBombs).props;
+  const bomb = { id: 78, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };
+  bombsRef.current.push(bomb);
+  sim.elementalPair = 'air'; sim.elementalType = 'water';
+  if (reaction === 'landing') airFusionLanding(sim, 3);
+  else igniteFusion(sim, 'air-water', 3);
+  const coins = useGameStore.getState().parityPoints;
+  expect(useGameStore.getState().wormAlive).toBe(true);
+  tick(); // runStorm kills before runFusionBurst tries the queued Rainwind defuse.
+  expect(useGameStore.getState().wormAlive).toBe(false);
+  expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
+  expect(bombsRef.current).toContain(bomb);
+  expect(bomb.fuse).toBe(4);
+  expect(useGameStore.getState().parityPoints).toBe(coins);
+  expect(worm.recordStoryBomb).not.toHaveBeenCalled();
+  expect(sim.orbCascades).toHaveLength(0);
 });

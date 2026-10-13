@@ -410,6 +410,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // A bomb put out by a fusion (Current's arc): the same reward and credit as a disarm.
     const putOutBomb = (bomb, store) => {
+        // A telegraphed storm strike may have killed the worm earlier this frame.
+        // Recheck the live store before removing bombs or granting any rewards.
+        if (!useGameStore.getState().wormAlive) return;
         const index = bombsRef.current.indexOf(bomb);
         if (index < 0) return;
         bombsRef.current.splice(index, 1);
