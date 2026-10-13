@@ -19,7 +19,7 @@ export const isChapterFinale = id => storyChapterIndex(id) === STORY_CHAPTER_SIZ
 // same way (the 15×15 board also needs Mega's lighter effects tier).
 export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: (level.cubeSize ?? 5) >= 15,
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
-export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Water → Fire)', quenchFusions: 'Quench fusions (Fire → Water)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
+export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Fire → Water)', quenchFusions: 'Quench fusions (Water → Fire)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
   magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated',
   bodyLength: 'body segments', bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
 // Short nouns for the plain progress line, keyed like the checklist.
@@ -107,7 +107,7 @@ export function storyChecklist(level, metrics = {}) {
   const primary = { orbs: 'orbs', tunnel: 'uniqueTunnels', jump: 'bodyJumps', rotation: 'rotations' }[level.kind] ?? 'healed';
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
-  const labels = { steamFusions: 'Make Steam: Water → Fire', quenchFusions: 'Make Quench: Fire → Water', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
+  const labels = { steamFusions: 'Make Steam: Fire → Water', quenchFusions: 'Make Quench: Water → Fire', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
     magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
     bodyLength: 'Grow your worm', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',

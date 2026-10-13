@@ -36,24 +36,24 @@ it('turns the outgoing layer into the reaction: it keeps its instance and dissol
     expect(el('water').dataset.retire).toBe('0');
     expect(host.querySelector('[data-recipe]')).toBeNull();
 
-    // Water then fire: the cube becomes Steam. The water shell is the SAME instance,
-    // now draining away under the steam rather than vanishing.
+    // Water then fire: the cube becomes Quench. The water shell is the SAME instance,
+    // now draining away under the quench rather than vanishing.
     set('fire', 'water');
-    expect(rx('steam')).not.toBeNull();
+    expect(rx('quench')).not.toBeNull();
     expect(el('water').dataset.instance).toBe(water);
     expect(el('water').dataset.retire).toBe('1');
     expect(el('fire')).toBeNull();
     finish('water');
     expect(el('water')).toBeNull();
 
-    // Reclaiming the base reverses the recipe: Steam hands over to Quench the same way.
-    const steam = rx('steam').dataset.instance;
+    // Reclaiming the base reverses the recipe: Quench hands over to Steam the same way.
+    const quench = rx('quench').dataset.instance;
     set('water', 'fire');
-    expect(rx('quench')).not.toBeNull();
-    expect(rx('steam').dataset.instance).toBe(steam);
-    expect(rx('steam').dataset.retire).toBe('1');
-    finish('reaction:steam');
-    expect(rx('steam')).toBeNull();
+    expect(rx('steam')).not.toBeNull();
+    expect(rx('quench').dataset.instance).toBe(quench);
+    expect(rx('quench').dataset.retire).toBe('1');
+    finish('reaction:quench');
+    expect(rx('quench')).toBeNull();
 
     set('ice', 'water');
     expect(rx('slipstream')).not.toBeNull();

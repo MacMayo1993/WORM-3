@@ -414,8 +414,8 @@ it('completes the demo rotation only after the warned live layer has committed',
 
 it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once', effect => {
   const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
-  sim.elementalPair = effect === 'steam' ? 'water' : 'fire';
-  sim.elementalType = effect === 'steam' ? 'fire' : 'water';
+  sim.elementalPair = effect === 'steam' ? 'fire' : 'water';
+  sim.elementalType = effect === 'steam' ? 'water' : 'fire';
   sim.elementalT = wormBuffs.elementalT = 10;
   addElementalPatch(sim, sim.pos, 'fire');
   const bomb = { id: 50, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };

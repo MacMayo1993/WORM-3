@@ -82,9 +82,9 @@ describe('elemental ammunition',()=>{
     const far=add(c,'crawler',{x:2,y:2,z:0,dirKey:'NZ'});shoot(c,p,'lightning');
     expect(c.kills).toBe(2);expect(c.shotsHit).toBe(1);expect(c.enemies).toEqual([far]);
   });
-  it('cycles guaranteed elemental drops through all five types',()=>{
+  it('cycles guaranteed elemental drops through all six types',()=>{
     const c=arena(),p=player(),elements=[];
-    for(let i=0;i<9;i++) {add(c,'crawler');shoot(c,p);const last=c.drops.at(-1);if(last.element)elements.push(last.element);}
+    for(let i=0;i<ELEMENT_ORDER.length*2-1;i++) {add(c,'crawler');shoot(c,p);const last=c.drops.at(-1);if(last.element)elements.push(last.element);}
     expect(elements).toEqual(ELEMENT_ORDER);
   });
 });

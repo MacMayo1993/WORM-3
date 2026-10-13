@@ -12,8 +12,9 @@ export const ELEMENTS = Object.freeze({
   fire: { label: 'Fire', color: '#ff955c', effect: 'Burns armor' },
   ice: { label: 'Ice', color: '#a0e7ff', effect: 'Freezes crawlers' },
   water: { label: 'Water', color: '#58bbff', effect: 'Pushes enemies back' },
-  grass: { label: 'Nature', color: '#b6ed80', effect: 'Roots enemies in place' },
+  grass: { label: 'Earth', color: '#b6ed80', effect: 'Roots enemies in place' },
+  air: { label: 'Air', color: '#b9f5ed', effect: 'Gusts push and stun enemies' },
   lightning: { label: 'Lightning', color: '#d39bff', effect: 'Chains to nearby enemies' },
 });
-export const ELEMENT_ORDER = ['fire','ice','water','grass','lightning'];
+export const ELEMENT_ORDER = ['fire','ice','water','grass','lightning','air'];
 export const ELEMENT_DURATION = 14;

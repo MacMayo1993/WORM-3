@@ -2,7 +2,7 @@ import {ELEMENTS,requiredPowerCycles,SMALL_BOARD_BUDGETS} from './audit.js';
 export const GENERATOR_VERSION=1;
 export const DEFAULT_SETTINGS={total:120,seed:'worm-100-plus',profile:'balanced',pace:'standard',sizes:[3,4,5,6,7,8,9,10],combat:true,mastery:true};
 export const SUPPORTED_SIZES=[2,3,4,5,6,7,8,9,10,15];
-const CYCLE=['magnet','explode','water','rocket','fire','grass','ice','lightning'];
+const CYCLE=['magnet','explode','water','rocket','fire','grass','ice','lightning','air'];
 const patterns=['harvest','tunnels','jumps','turns','healing','elemental','blast','variety','siege','finale'];
 const adjectives=['Verdant','Prismatic','Tidal','Ember','Astral','Crystal','Neon','Lunar','Aurora','Copper','Velvet','Electric'];
 const nouns=['Circuit','Frontier','Expedition','Garden','Crossing','Spiral','Crown','Archipelago','Relay','Odyssey','Horizon','Labyrinth'];
@@ -36,7 +36,7 @@ export function levelGoal(level){
  if(level.colors)tasks.push('collect all '+level.colors+' colors');
  if(level.rotations)tasks.push('survive '+level.rotations+' layer turns');
  for(const [key,count] of Object.entries(m)){
-  const phrase={steamFusions:'make '+count+' Steam fusions (Water → Fire)',quenchFusions:'make '+count+' Quench fusions (Fire → Water)',boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+ELEMENTS.slice(0,count).join(', ')+')',elements:'master '+count+' elements ('+ELEMENTS.slice(0,count).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
+  const phrase={steamFusions:'make '+count+' Steam fusions (Fire → Water)',quenchFusions:'make '+count+' Quench fusions (Water → Fire)',boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+ELEMENTS.slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',elements:'master '+count+' elements ('+ELEMENTS.slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
   if(phrase)tasks.push(phrase);
  }
  const finish=['tunnel','collector','restore','mastery'].includes(level.kind)?' Clear your tail to finish.':level.kind==='jump'?' Empty jumps do not count.':'';
@@ -75,13 +75,13 @@ export function generateLevel(id,raw,worldTemplates,revision=0){
  if(['elemental','variety','blast','siege','finale'].includes(pattern)){
   level.kind='mastery';level.target=pairs;level.orbs=food;level.rotateEvery=Math.max(SMALL_BOARD_BUDGETS[size]?.rotateEvery??10,15-steps);level.mechanics={};
   if(pattern==='elemental')level.mechanics.elementPickups=Math.min(5,2+Math.floor(steps/2)+(rand()>.5?1:0));
-  if(pattern==='variety')level.mechanics.uniqueElements=Math.min(5,3+Math.floor(steps/2));
+  if(pattern==='variety')level.mechanics.uniqueElements=Math.min(ELEMENTS.length,3+Math.floor(steps/2));
   if(pattern==='blast')level.mechanics={explodes:Math.min(3,1+Math.floor(steps/2)),rockets:1};
   if(pattern==='siege')level.mechanics={ringHeals:1,signatures:1+(steps>=3?1:0),bombs:1+(steps>=3?1:0),kills:Math.min(4,1+steps)};
   if(pattern==='finale'){
    level.target=Math.min(6,pairs+1);level.orbs=Math.min(50,food+6);level.rotations=5+steps;
-   level.mechanics={uniqueElements:Math.min(5,3+Math.floor(steps/2)),explodes:Math.min(2,1+Math.floor(steps/3)),rockets:1,magnetOrbs:4,doubleJumps:2};
-   if(s.mastery&&chapter%2===0){delete level.mechanics.uniqueElements;level.mechanics.elements=Math.min(5,3+Math.floor(steps/2));}
+   level.mechanics={uniqueElements:Math.min(ELEMENTS.length,3+Math.floor(steps/2)),explodes:Math.min(2,1+Math.floor(steps/3)),rockets:1,magnetOrbs:4,doubleJumps:2};
+   if(s.mastery&&chapter%2===0){delete level.mechanics.uniqueElements;level.mechanics.elements=Math.min(ELEMENTS.length,3+Math.floor(steps/2));}
    if(s.combat&&steps>=2){level.mechanics.signatures=1;level.mechanics.kills=2;}
   }
  }

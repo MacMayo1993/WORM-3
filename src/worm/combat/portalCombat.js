@@ -166,14 +166,14 @@ function hitEnemy(c, shot, enemy, player) {
   if (shot.element === 'fire') enemy.burn = 3;
   if (shot.element === 'ice') enemy.freeze = 2.2;
   if (shot.element === 'grass') enemy.root = 3;
-  if (shot.element === 'water') {
+  if (shot.element === 'water' || shot.element === 'air') {
     let best = enemy.tile, distance = -1;
     for (const next of graph(c.size).get(combatKey(enemy.tile)) || []) {
       const route = surfaceRoute(next,player.head,c.size);
       if (route && route.length > distance) { best = next; distance = route.length; }
     }
     // A short surface step makes the push visible without crossing the cube.
-    enemy.next = best; enemy.t = 0; enemy.knockback = true; enemy.stun = 0.35;
+    enemy.next = best; enemy.t = 0; enemy.knockback = true; enemy.stun = shot.element === 'air' ? 1.0 : 0.35;
   }
   damageEnemy(c,enemy,1);
   if (shot.element === 'lightning') {

@@ -28,9 +28,9 @@ for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
   if (m.rockets) required.add('rocket');
   if (m.steamFusions || m.quenchFusions) { required.add('water'); required.add('fire'); }
   const count = Math.max(m.elements ?? 0, m.uniqueElements ?? 0, m.elementPickups ?? 0);
-  for (const element of ['water', 'fire', 'grass', 'ice', 'lightning'].slice(0, count)) required.add(element);
+  for (const element of ['water', 'fire', 'grass', 'ice', 'lightning', 'air'].slice(0, count)) required.add(element);
   if (m.fusions || m.uniqueFusions) for (const element of STORY_ELEMENTS.slice(0, count || STORY_ELEMENTS.length)) required.add(element);
-  if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'].filter(type => required.has(type));
+  if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air'].filter(type => required.has(type));
 }
 beforeEach(() => resetLiveRotation());
 // One marked power, plus (from level 21) a distinct elemental partner when the

@@ -1,6 +1,6 @@
 import { ShaderMaterial, Color, AdditiveBlending, NormalBlending } from 'three';
 
-const MODES = { bubbles: 0, embers: 1, spores: 2, flakes: 3, ions: 4 };
+const MODES = { bubbles: 0, embers: 1, spores: 2, flakes: 3, ions: 4, wind: 5 };
 export function makeElementalParticleMaterial(kind, color, size) {
   return new ShaderMaterial({
     uniforms: { uColor: { value: new Color(color) }, uOpacity: { value: 0 },
@@ -38,6 +38,8 @@ export function makeElementalParticleMaterial(kind, color, size) {
         } else if (uKind == 3) {
           float ray = abs(sin(atan(p.y, p.x + 0.00001) * 3.0)) * r;
           a = (1.0 - smoothstep(0.03, 0.10, ray)) * (1.0 - smoothstep(0.65, 0.85, r));
+        } else if (uKind == 5) {
+          a = exp(-pow(p.y + 0.3 * sin(p.x * 3.0), 2.0) * 80.0) * (1.0 - smoothstep(0.4, 1.0, abs(p.x)));
         } else { a = exp(-r * r * 7.0); }
         gl_FragColor = vec4(color, clamp(a, 0.0, 1.0) * uOpacity);
       }`,

@@ -2,7 +2,7 @@
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
 // text stays literal.
-const ELEMENT_NAMES = ['water', 'fire', 'grass', 'ice', 'lightning'];
+const ELEMENT_NAMES = ['water', 'fire', 'earth', 'ice', 'lightning', 'air'];
 export const TAIL_KINDS = ['tunnel', 'collector', 'restore'];
 export const TUNNEL_KINDS = ['tunnel', 'collector', 'restore', 'mastery'];
 
@@ -36,8 +36,8 @@ const TASKS = [
   ['elementPickups', n => `pick up ${count(n, 'elemental orb')}`],
   ['uniqueElements', n => `collect ${n} different elements (${names(n)})`],
   ['elements', n => n >= ELEMENT_NAMES.length ? `master all ${n} elements` : `master ${count(n, 'element')} (${names(n)})`],
-  ['steamFusions', n => `make Steam (Water → Fire)${n > 1 ? ` ${times(n)}` : ''}`],
-  ['quenchFusions', n => `make Quench (Fire → Water)${n > 1 ? ` ${times(n)}` : ''}`],
+  ['steamFusions', n => `make Steam (Fire → Water)${n > 1 ? ` ${times(n)}` : ''}`],
+  ['quenchFusions', n => `make Quench (Water → Fire)${n > 1 ? ` ${times(n)}` : ''}`],
   ['fusions', n => `fuse two elements ${times(n)}`],
   ['uniqueFusions', n => `make ${n} different fusions`],
   ['signatures', n => `use your ability ${times(n)}`],

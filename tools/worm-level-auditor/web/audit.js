@@ -1,4 +1,4 @@
-export const ELEMENTS = ['water','fire','grass','ice','lightning'];
+export const ELEMENTS = ['water','fire','grass','ice','lightning','air'];
 // Playability guardrails, not geometric impossibility proofs. Keep recovery
 // lanes and reaction time instead of scaling every task with chapter number.
 export const SMALL_BOARD_BUDGETS = {
@@ -57,7 +57,7 @@ export function assess(record, character='glow', scenario={}) {
       if(totalCap!==null&&totalCap<target)fail('Lifetime allowance cannot include every required color.');
     } else if(['steamFusions','quenchFusions'].includes(key)) {
       available=powerPool.includes('water')&&powerPool.includes('fire')?'Ordered base + timed partner':'Missing element';
-      detail='Collect '+(key==='steamFusions'?'Water → Fire':'Fire → Water')+' during one elemental window. Missed partners expire; the base can be offered again. Route execution needs a playtest.';
+      detail='Collect '+(key==='steamFusions'?'Fire → Water':'Water → Fire')+' during one elemental window. Missed partners expire; the base can be offered again. Route execution needs a playtest.';
       state='playtest';
       if(!powerPool.includes('water')||!powerPool.includes('fire'))fail('Both water and fire are required for this fusion.');
     } else if(['fusions','uniqueFusions'].includes(key)) {
@@ -71,7 +71,7 @@ export function assess(record, character='glow', scenario={}) {
       if(!recurring&&10+3*initial<target)fail('Opening food cannot grow the worm this long without refills.');
     } else if(['elements','uniqueElements','elementPickups'].includes(key)) {
       available=distinct.length+' types · repeats';
-      detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, grass spring launch, ice jump/landing, lightning survival. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
+      detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, earth spring launch, ice jump/landing, lightning survival, air jump/landing. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
       if((key==='elementPickups'&&!distinct.length)||(key!=='elementPickups'&&distinct.length<target))fail('Required elemental supply is missing from the offered cycle.');
     } else if(['explodes','rockets','magnetOrbs'].includes(key)) {
       const type={explodes:'explode',rockets:'rocket',magnetOrbs:'magnet'}[key];

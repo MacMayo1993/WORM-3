@@ -5,8 +5,8 @@ import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
 it('explains each ordered fusion by its own rule, never its reverse', () => {
   expect(fusionFeedback(getFusion('water', 'ice'), { waterMomentum: 1 }).text).toContain('+40%');
   expect(fusionFeedback(getFusion('ice', 'water'), { waterMomentum: 1 }).text).toContain('Tiles you leave freeze');
-  expect(fusionFeedback(getFusion('water', 'fire'), {}).text).toContain('Puts out bombs');
-  expect(fusionFeedback(getFusion('fire', 'water'), {}).text).toContain('Obsidian');
+  expect(fusionFeedback(getFusion('fire', 'water'), {}).text).toContain('Puts out bombs');
+  expect(fusionFeedback(getFusion('water', 'fire'), {}).text).toContain('Obsidian');
   expect(fusionFeedback(getFusion('water', 'grass'), {}).text).toContain('Rain grows a pad');
   expect(fusionFeedback(getFusion('ice', 'fire'), { meltdownT: 0.3 }).text).toContain('DASH');
   expect(fusionFeedback(getFusion('ice', 'lightning'), { staticT: 1 }).text).toContain('DISCHARGE');

@@ -37,20 +37,20 @@ it('offers reachable ordered partners, counts each recipe, and exposes the same 
   sim.elementalFocusT = 0;
   const won = { alive: true, elapsed: 90, cuts: 0, peakLength: 100, orbs: level.orbs, healed: level.target,
     remaining: 0, tailClear: true, landed: true, rotationSettled: true };
-  for (const [type, effect] of [['fire', 'steam'], ['water', 'quench']]) {
+  for (const [type, effect] of [['fire', 'quench'], ['water', 'steam']]) {
     expect(offer()).toBe(true); // bypass only the ordinary power cooldown
     const orb = sim.specials[0];
     expect(orb.type).toBe(type);
     expect(orb.ttl).toBe(sim.elementalT);
     expect(fusionReachableTiles(sim, size, p.cubies, level.speed).has(tileKey(orb))).toBe(true);
     expect(sim.powerups.some(food => tileKey(food) === tileKey(orb))).toBe(false);
-    expect(p.powerHint).toContain(effect === 'steam' ? 'Water → Fire: Steam' : 'Fire → Water: Quench');
+    expect(p.powerHint).toContain(effect === 'steam' ? 'Fire → Water: Steam' : 'Water → Fire: Quench');
     claim();
     expect(activeFusion(sim)).toBe(effect);
     expect(p.mechanics[`${effect}Fusions`]).toBe(1);
     sim.elementalFocusT = 0;
     const metrics = { ...won, ...p.mechanics };
-    expect(!!storyOutcome(level, metrics)).toBe(effect === 'quench');
+    expect(!!storyOutcome(level, metrics)).toBe(effect === 'steam');
   }
   startElemental(sim, ctx, 'water'); // same catalyst: refresh only
   expect(p.mechanics.quenchFusions).toBe(1);
@@ -59,7 +59,7 @@ it('offers reachable ordered partners, counts each recipe, and exposes the same 
   const outcome = storyOutcome(level, metrics);
   expect(outcome.stars).toBe(3);
   expect(storyChecklist(level, metrics).filter(g => g.key.endsWith('Fusions')).map(g => g.label)).toEqual([
-    'Make Steam: Water → Fire', 'Make Quench: Fire → Water',
+    'Make Steam: Fire → Water', 'Make Quench: Water → Fire',
   ]);
   const hud = storyHudSnapshot(null, level, metrics, 1, outcome);
   metrics.quenchFusions = 0;

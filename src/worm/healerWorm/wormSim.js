@@ -611,6 +611,11 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
         sim.jumpHeight = 1.8;
         sim.springLaunch = true;
     }
+    if (hasElement(sim, 'air')) {
+        sim.jumpSpan *= 1.35;
+        sim.jumpHeight *= 1.4;
+        ctx.onStoryMechanic?.('airLaunch');
+    }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
     sim.pendingTunnelTrigger = null;
@@ -2652,6 +2657,11 @@ export function stepWormSim(sim, delta, size, ctx) {
                 sim.jumpCount = 2;
                 sim.jumpSpan = 1.8;
                 sim.jumpHeight = 1.5;
+                if (hasElement(sim, 'air')) {
+                    sim.jumpSpan *= 1.35;
+                    sim.jumpHeight *= 1.4;
+                    ctx.onStoryMechanic?.('airLaunch');
+                }
                 ctx.feel('jump');
             }
         }

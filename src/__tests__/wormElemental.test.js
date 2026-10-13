@@ -55,8 +55,8 @@ function makeSim() {
 }
 
 describe('elementalDefs', () => {
-  it('defines the five elements', () => {
-    expect(ELEMENTAL_TYPES).toEqual(['water', 'fire', 'grass', 'ice', 'lightning']);
+  it('defines the six elements', () => {
+    expect(ELEMENTAL_TYPES).toEqual(['water', 'fire', 'grass', 'ice', 'lightning', 'air']);
   });
 
   it('each element reuses an existing Living tile style', () => {

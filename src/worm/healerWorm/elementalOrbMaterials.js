@@ -187,6 +187,7 @@ export const PARTICLE_KINDS = {
   bubbles: { count: 26, vy: 0.42, sway: 0.1, size: 0.055, opacity: 0.75 },
   embers: { count: 30, vy: 0.55, sway: 0.09, size: 0.05, opacity: 0.95 },
   spores: { count: 24, vy: -0.16, sway: 0.14, size: 0.05, opacity: 0.7 },
+  wind: { count: 22, vy: 0.18, sway: 0.85, size: 0.065, opacity: 0.55 },
   flakes: { count: 26, vy: -0.3, sway: 0.13, size: 0.055, opacity: 0.85 }
 };
 // The orb's non-shader materials, held per element for the same reason the badge's

@@ -1,7 +1,7 @@
 // src/worm/healerWorm/fusionLooks.js
 //
 // What a fusion LOOKS like. Two elements fused are a reaction, not two skins laid on
-// top of each other: Water → Fire is a cube boiling off clouds of steam, Fire → Water
+// top of each other: Fire → Water is a cube boiling off clouds of steam, Water → Fire
 // is lava quenched to cracked obsidian, Lightning → Ice is a blizzard. While a pair is
 // up, ElementalAtmosphere draws the recipe's look INSTEAD of either element's own:
 //

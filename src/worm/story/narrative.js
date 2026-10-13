@@ -65,7 +65,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   8: {
     briefing: [
-      'The Plane has weather you can pick up and wear: water, fire, grass, ice and lightning.',
+      'The Plane has weather you can pick up and wear: water, fire, earth, ice, lightning and air.',
       'Some of it leaked out of the Core in the crash. Grab it before it fades.',
     ],
     debrief: 'Weather back in its jars. Well, in you. You’re a kind of jar.',
@@ -181,7 +181,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   24: {
     briefing: [
-      'The Healer Corps learned to mix weather. Water, then fire, makes Steam. Fire, then water, makes Quench.',
+      'The Healer Corps learned to mix weather. Fire, then water, makes Steam. Water, then fire, makes Quench.',
       'Same two elements, opposite order, different trick. Grab the first, then chase the partner before the timer runs out.',
     ],
     debrief: 'Steam and Quench, both by the book. The Corps alchemy is alive and well. Mostly well.',
@@ -203,7 +203,7 @@ export const WORM_STORY_NARRATIVE = {
   27: {
     briefing: [
       'The Core is leaking weather. A storm is forming in the neon.',
-      'Don’t just grab the elements. Use them: build water’s speed, lay fire’s trail, spring off grass.',
+      'Don’t just grab the elements. Use them: build water’s speed, lay fire’s trail, spring off earth.',
     ],
     debrief: 'A healer who uses the weather instead of fearing it. That’s rare.',
   },
@@ -472,10 +472,10 @@ export const WORM_STORY_NARRATIVE = {
   },
   64: {
     briefing: [
-      'All five kinds of Plane weather are loose on this deck: water, fire, grass, ice and lightning.',
+      'All six kinds of Plane weather are loose on this deck: water, fire, earth, ice, lightning and air.',
       'Collect one of each. It can’t throw what we’re holding.',
     ],
-    debrief: 'Five for five. The sky over the Core is clearing. I can almost see the World Worm’s eyes. There are a lot of them.',
+    debrief: 'Six for six. The sky over the Core is clearing. I can almost see the World Worm’s eyes. There are a lot of them.',
   },
   65: {
     briefing: [
@@ -486,7 +486,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   66: {
     briefing: [
-      'The old Corps lab is down here. Twenty recipes, if you count both orders.',
+      'The old Corps lab is down here. Thirty combinations, if you count both orders.',
       'Brew a few, and at least two different kinds. Science!',
     ],
     debrief: 'Three brews, two kinds. I’ve written them down in my head, which is a block, which is very organized.',
@@ -494,7 +494,7 @@ export const WORM_STORY_NARRATIVE = {
   67: {
     briefing: [
       'Storm and gears together. The World Worm learned this combo in W³. It was its favorite.',
-      'Use your elements on the move: water to outrun the turns, fire to mark your route, grass to spring clear.',
+      'Use your elements on the move: water to outrun the turns, fire to mark your route, earth to spring clear.',
     ],
     debrief: 'Ten turns in a storm. It’s running out of favorite combos.',
   },
@@ -767,7 +767,7 @@ export const WORM_STORY_NARRATIVE = {
   106: {
     briefing: [
       'It isn’t attacking anymore, but its weather is stuck on. A storm across a whole mega deck.',
-      'Use all five elements and brew different fusions. Turn the storm into something useful.',
+      'Use all six elements and brew different fusions. Turn the storm into something useful.',
     ],
     debrief: 'The storm turned into rain, then into nothing, then into a rainbow. Is that a fusion? It should be.',
   },

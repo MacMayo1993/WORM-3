@@ -50,7 +50,7 @@ export function wormXpChanges(state, kind, total, pair, runId) {
       run.completed || state.demoMode || state.wormPaused || !state.wormHealerMode || !state.wormAlive ||
       !['active', 'finalHealing'].includes(state.wormGamePhase)) return {};
   if (kind === 'element') {
-    if (pair !== null && !['water', 'fire', 'grass', 'ice', 'lightning'].includes(pair)) return {};
+    if (pair !== null && !['water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(pair)) return {};
     const f = run.featStats || {};
     const elements = pair ? [...new Set([...(f.elements || []), pair])] : (f.elements || []);
     const next = { ...run, featStats: { ...f, elements, element: pair, grassOrbs: 0 } };
