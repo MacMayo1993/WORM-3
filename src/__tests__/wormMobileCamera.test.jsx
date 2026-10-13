@@ -1,4 +1,4 @@
-import { storyArrivalPose, STORY_ARRIVAL_SECONDS } from '../worm/healerWorm/storyArrival.js';
+import { STORY_ARRIVAL_SECONDS } from '../worm/healerWorm/storyArrival.js';
 import { makeCubies } from '../game/cubeState.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import React, { act } from 'react';
@@ -546,8 +546,7 @@ it.each(['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'])('frames the arrival face-first out
   expect(scene.camera.position.clone().sub(worm.headInterpPos.current).dot(forward)).toBeGreaterThan(0);
   for (const fraction of [.2, .55, .7, .85, 1]) {
     elapsed.current = STORY_ARRIVAL_SECONDS * fraction; tick();
-    const pose = storyArrivalPose(elapsed.current);
-    const head = worm.headInterpPos.current.clone().addScaledVector(normal, WORM_LIFT * pose.scale + pose.lift);
+    const head = worm.headInterpPos.current.clone().addScaledVector(normal, WORM_LIFT);
     const screen = head.project(scene.camera);
     expect(Math.abs(screen.x)).toBeLessThan(0.05);
     expect(Math.abs(screen.y)).toBeLessThan(0.05);

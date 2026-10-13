@@ -56,6 +56,7 @@ import { inchBodyRadius, inchGaitInto, makeInchGaitState, advanceInchGaitState }
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
+import { arrivalBeadInto } from './storyArrival.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
@@ -83,6 +84,7 @@ const _bookHeadDummy = new THREE.Object3D();
 // frame (a 1200-segment body would otherwise allocate 1200 objects a frame).
 const _inchGait = { dist: 0, arch: 0 };
 const _bodyHeadPos = new THREE.Vector3();
+const _arrivalBead = { grow: 1, lift: 0 };
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
 const _wiggleForward = new THREE.Vector3();
@@ -282,6 +284,12 @@ export function WormBody({ worm, size }) {
         fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
         worm.tunnelHeadScale *= rideFit.current.scale;
         worm.tunnelHeadShift = rideFit.current.shift;
+        // Portal arrival (StoryArrival): the head climbs out of the mouth along the
+        // body's own path and every bead trails it by the same offset.
+        const arrival = worm.arrival?.active ? worm.arrival : null;
+        const arrivalOffset = arrival ? arrival.offset : 0;
+        if (arrival) worm.tunnelHeadScale *= arrival.headGrow;
+        const headAnchor = arrival ? arrival.headPos : _bodyHeadPos;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
 
@@ -311,7 +319,7 @@ export function WormBody({ worm, size }) {
             // The body keeps its books; only the head is round now.
             const headMesh = bookHeadRef.current;
             if (headMesh) {
-                _bookHeadDummy.position.copy(_bodyHeadPos);
+                _bookHeadDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_bookHeadDummy.position, size, orbitT);
                 _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift);
                 _bookHeadDummy.quaternion.identity();
@@ -473,13 +481,14 @@ export function WormBody({ worm, size }) {
             const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
             let segmentTransit = false;
+            let beadDist = 0;
             blendTunnelBodyProfile(rideProfile.current, null);
 
             if (i === 0) {
                 // Head — reset quaternion every frame: body segments (below) rotate this
                 // same shared scratch object for book worm, and the head never re-orients.
                 _wormDummy.quaternion.identity();
-                _wormDummy.position.copy(_bodyHeadPos);
+                _wormDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_wormDummy.position, size, orbitT);
                 // Book worm's head rides a hair high, on its books' line (the
                 // orb itself is drawn above; this dummy is only the zero-size slot).
@@ -503,12 +512,13 @@ export function WormBody({ worm, size }) {
                 let targetDist;
                 if (_isInch) {
                     inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove, _inchShape);
-                    targetDist = _inchGait.dist;
+                    targetDist = _inchGait.dist + arrivalOffset;
                     _inchArch = _inchGait.arch;
                 } else {
-                    targetDist = sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING;
+                    targetDist = (sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING) + arrivalOffset;
                 }
 
+                beadDist = targetDist;
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
 
@@ -734,6 +744,13 @@ export function WormBody({ worm, size }) {
                 }
                 if (i === 0) wiggleHeadRef.current.copy(_wormDummy.position);
                 else _bodyClonePos.copy(_wormDummy.position);
+            }
+            if (arrival && i !== 0) {
+                // Still down in the portal, rising out of it, or leaping clear of the lip.
+                const bead = arrivalBeadInto(_arrivalBead, beadDist, arrival.mouth, arrivalOffset);
+                if (bead.grow < 0.002) continue;
+                _wormDummy.scale.multiplyScalar(bead.grow);
+                _wormDummy.position.addScaledVector(_bodyCloneNormal, bead.lift);
             }
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment
@@ -995,7 +1012,8 @@ export function GlowWormAura({ worm, size }) {
         // Soft pulsing light — illuminates the worm face only.
         // Kept below the 0.82 bloom threshold so nearby cube tiles don't bloom.
         if (lightRef.current) {
-            lightRef.current.position.copy(worm.headInterpPos.current)
+            if (worm.arrival?.active) lightRef.current.position.copy(worm.arrival.headPos).addScaledVector(worm.arrival.headNormal, 0.1);
+            else lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
             rocketOrbitInto(lightRef.current.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting

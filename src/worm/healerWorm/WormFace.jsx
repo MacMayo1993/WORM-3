@@ -187,6 +187,14 @@ export function WormFace({ worm, size }) {
             rocketOrbitInto(_faceHeadPos, size, lift);
         }
 
+        // Portal arrival (StoryArrival): the head is climbing out along the body's path.
+        const arrival = !inTransit && worm.arrival?.active ? worm.arrival : null;
+        if (arrival) {
+            _faceHeadPos.copy(arrival.headPos);
+            normal = arrival.headNormal;
+            _faceForward.copy(arrival.headForward);
+        }
+
         const state = useGameStore.getState();
         const rideWeight = inTransit ? (worm.tunnelRide?.current?.rideWeight ?? 0) : 0;
         const rideShift = inTransit ? (worm.tunnelHeadShift ?? 0) : 0;
@@ -207,7 +215,10 @@ export function WormFace({ worm, size }) {
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
             mobi.group.position.addScaledVector(normal, rideShift);
-            if (!bodyTransit) {
+            if (arrival) {
+                normal = arrival.headNormal;
+                mobi.group.position.copy(arrival.headPos);
+            } else if (!bodyTransit) {
                 const jump = worm.isJumping.current ? worm.jumpLift() : 0;
                 mobi.group.position.addScaledVector(normal, WORM_LIFT + jump);
             }
