@@ -1490,7 +1490,7 @@ describe('Orb Shower', () => {
 it('claims Steam then Quench through real centered pickups and records each ordered recipe once', () => {
   const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 2 });
   sim.tailLength = 0;
-  for (const [i, type] of ['water', 'fire', 'water'].entries()) {
+  for (const [i, type] of ['fire', 'water', 'fire'].entries()) {
     const tile = getNextSurfacePosition(sim.pos, sim.moveDir, SIZE);
     sim.specials = [{ ...tile, type, ttl: 20, id: `ordered-${i}` }];
     for (let frame = 0; frame < 500 && eventsOf(ctx, 'elemental').length < i + 1; frame++) stepWormSim(sim, 0.02, SIZE, ctx);
@@ -1501,5 +1501,5 @@ it('claims Steam then Quench through real centered pickups and records each orde
   }
   const fusions = eventsOf(ctx, 'storyMechanic').filter(e => e.args[0] === 'elementFusion');
   expect(fusions.map(e => e.args[1])).toEqual(['steam', 'quench']);
-  expect(sim.elementalPair).toBe('fire');
+  expect(sim.elementalPair).toBe('water');
 });

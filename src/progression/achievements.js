@@ -9,7 +9,7 @@ export const ACHIEVEMENTS = [
   feat('worm-routes', 'worm', 'Thread the Cube', 'Complete three different tunnel color routes in one run.', 50, 'worm-routes'),
   feat('worm-healer', 'worm', 'First Aid', 'Heal a tunnel pair in one run.', 25, 'worm-heals'),
   feat('worm-surgeon', 'worm', 'Cube Surgeon', 'Heal three tunnel pairs in one run.', 50, 'worm-heals'),
-  feat('worm-grass', 'worm', 'Green Thumb', 'Collect eight orbs during one grass activation.', 50),
+  feat('worm-grass', 'worm', 'Green Thumb', 'Collect eight orbs during one Earth activation.', 50),
   feat('worm-elements', 'worm', 'Element Hopper', 'Activate three different elements in one run.', 50),
   feat('worm-restored', 'worm', 'Whole Again', 'Heal the entire cube.', 100, 'worm-clear'),
   feat('worm-mega', 'worm', 'Mega Medic', 'Heal an entire Mega cube (15×15×15).', 100, 'worm-clear'),

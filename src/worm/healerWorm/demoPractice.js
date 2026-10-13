@@ -62,7 +62,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   if (lesson.id === 'magnet' || lesson.id === 'signature') {
     sim.powerups = [-1, 1].map(dx => makeGrowthOrb({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ' }));
   }
-  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning'].includes(lesson.id)) {
+  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(lesson.id)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
   }
   const marked = ring || portal || lesson.id === 'body-jump' ? { ...target, ring } : null;
@@ -72,6 +72,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
 // Reads actual outcomes after a physics tick. No input press alone completes a
 // jump, pickup, tunnel, ring or hazard lesson.
 export function readWormPractice(sim, practice, lesson, state, size, delta) {
+  practice.sawAirJump ||= sim.isJumping && sim.elementalT > 0 && sim.elementalType === 'air' && !sim.rocketActive;
   practice.sawJump ||= sim.isJumping;
   practice.sawBoost ||= sim.boostActiveT > 0;
   practice.sawRocket ||= sim.rocketActive;
@@ -143,6 +144,7 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     // Height alone cannot distinguish a normal jump from consuming a spring.
     case 'grass': done = sim.elementalType === 'grass' && sim.isJumping && !!practice.grassLaunch; break;
     case 'ice': done = sim.elementalType === 'ice' && sim.isJumping; break;
+    case 'air': done = practice.sawAirJump && !sim.isJumping && sim.phase === 'crawling' && sim.alive; break;
     case 'lightning': done = practice.elementTime >= 4; break;
     case 'signature': done = sim.signature.seq > 0 && (sim.signature.glowTrail?.path.count ?? 0) >= 2; break;
     case 'rotation': done = state.rotationEpoch > practice.rotationEpoch; break;

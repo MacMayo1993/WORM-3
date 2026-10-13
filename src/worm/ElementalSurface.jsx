@@ -33,7 +33,7 @@ import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
 
-export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3 };
+export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3, air: 4 };
 
 // Water depth above the stickers: a base, four ripple waves and one broad swell.
 // Even when every wave bottoms out together the trough stays above the tile, and
@@ -58,7 +58,7 @@ const SKIRT = 0.25;
 
 // Tessellation per element: [interior segments, skirt segments]. Water needs the
 // most, because its waves and the wrap both have to read as curved.
-const RESOLUTION = { water: [14, 4], ice: [10, 3], lightning: [6, 2], reaction: [10, 3] };
+const RESOLUTION = { water: [14, 4], ice: [10, 3], lightning: [6, 2], reaction: [10, 3], air: [6, 2] };
 
 const _geoCache = new Map();
 /**
@@ -223,6 +223,8 @@ const vertexShader = /* glsl */ `
   #elif SURFACE_MODE == 2
     // ── Lightning: charge lying on the tiles ───────────────────────────────
     depth = ${glf(CHARGE_DEPTH)} * flood;
+  #elif SURFACE_MODE == 4
+    depth = 0.055 * flood;
   #else
     // ── A fusion's reaction coat (fusionLooks.js) ──────────────────────────
     depth = uReactDepth * flood * mix(0.25, 1.0, drain);
@@ -534,6 +536,18 @@ const fragmentShader = /* glsl */ `
     // it dims the tile a little and never tints it.
     vec3 bodyCol = vec3(0.012, 0.004, 0.03);
     a = 0.14 + fres * 0.2 + rail * 0.25;
+    float fade = smoothstep(0.02, 0.4, vArrive) * (1.0 - smoothstep(0.1, 0.9, uEnv.z));
+    rgb = vec3(0.0);
+  #define SPLIT_OUTPUT
+  #elif SURFACE_MODE == 4
+    // Long, curling wind ribbons. Transparent gaps keep the board legible.
+    float gust = dot(vWorld, vec3(1.4, 0.7, 1.1)) - T * 2.4;
+    float curl = sin(dot(vWorld, vec3(-0.8, 1.5, 0.6)) + T * 0.8);
+    float ribbon = pow(0.5 + 0.5 * sin(gust * 5.0 + curl * 2.0), 24.0);
+    float fres = pow(1.0 - ndv, 2.5);
+    vec3 bodyCol = vec3(0.008, 0.018, 0.02);
+    vec3 light = uAccent * ribbon * 0.24 + uColor * fres * 0.10;
+    a = 0.02 + ribbon * 0.08 + fres * 0.04;
     float fade = smoothstep(0.02, 0.4, vArrive) * (1.0 - smoothstep(0.1, 0.9, uEnv.z));
     rgb = vec3(0.0);
   #define SPLIT_OUTPUT

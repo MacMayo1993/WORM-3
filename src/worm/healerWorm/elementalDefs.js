@@ -56,7 +56,8 @@ export const ELEMENTAL_DEFS = {
     description: 'Leave three-second fire trails: hot tiles burn bomb fuses faster and block blast damage.',
   },
   grass: {
-    label: "Nature",
+    // Keep the legacy grass key so saved runs and authored objectives remain compatible.
+    label: "Earth",
     element: true,
     tileStyle: 'grass',
     renderer: 'blades',
@@ -64,8 +65,8 @@ export const ELEMENTAL_DEFS = {
     accent: '#dcfce7',
     fogColor: '#0b2e14',
     particle: 'spores',
-    // A sprouting leaf pair.
-    iconPath: 'M12 22V9m0 0C11 5 8 3 3 3c0 5 2 8 6 9m2 0c1-4 4-6 9-6 0 5-2 8-6 9z',
+    // Mountain ridges over fertile ground.
+    iconPath: 'M2 19 9 5l4 7 3-5 6 12H2zM5 22h14M7 10l2 2 2-2',
     iconAccent: '',
     description: 'Land to grow an eight-second spring pad. Jump from it for a longer, higher leap.',
   },
@@ -82,6 +83,13 @@ export const ELEMENTAL_DEFS = {
     iconPath: 'M12 1.5v21M3.2 6.6l17.6 10.2M20.8 6.6L3.2 16.8M12 5.2l2.6-2.6M12 5.2 9.4 2.6M12 18.8l2.6 2.6M12 18.8l-2.6 2.6',
     iconAccent: '',
     description: 'Slide to the next tile before turning. Jump to regain immediate steering.',
+  },
+  air: {
+    label: "Air", element: true, tileStyle: "holographic", renderer: "surface",
+    color: "#b9f5ed", accent: "#ffffff", fogColor: "#143a40", particle: "wind",
+    iconPath: "M2 8h13c5 0 5-6 1-6-2 0-3 1-3 2M2 12h17c4 0 4 6 0 6-2 0-3-1-3-2M2 16h7c4 0 4 6 0 6",
+    iconAccent: "",
+    description: "Ride an updraft: jumps travel 35% farther and rise 40% higher, including double jumps.",
   },
   lightning: {
     label: "Lightning",
@@ -107,7 +115,7 @@ export const ELEMENTAL_DEFS = {
 };
 
 /** Canonical list of elemental orb types. */
-export const ELEMENTAL_TYPES = Object.keys(ELEMENTAL_DEFS);
+export const ELEMENTAL_TYPES = ['water', 'fire', 'grass', 'ice', 'lightning', 'air'];
 
 /** True when `type` names an elemental orb rather than a rocket/magnet special. */
 export const isElementalType = (type) => Object.prototype.hasOwnProperty.call(ELEMENTAL_DEFS, type);

@@ -8,7 +8,7 @@ import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE, ELEMENTAL_DURATION } from '../healerWorm/constants.js';
 import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
 
-export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
+export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning', 'air'];
 // Identity goals name a prefix, so unrelated pickups/mastery cannot substitute
 // for a missing authored element. Keep raw sets for effects and pickup history.
 export const storyElementCount = (elements, target = STORY_ELEMENTS.length) =>
@@ -23,12 +23,13 @@ export const STORY_POWER_COOLDOWN = 3;
 export const STORY_POWER_LIFETIME = 20;
 // Explode gets an early slot even when a magnet catch or element mastery is
 // unfinished. The cursor advances on an offer, not on successful task credit.
-const STORY_POWER_CYCLE = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'];
+const STORY_POWER_CYCLE = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air'];
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
-  grass: 'Grass: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
-export const STORY_FUSION_GOALS = { steamFusions: getFusion('water', 'fire'), quenchFusions: getFusion('fire', 'water') };
+  air: 'Air: ride an updraft jump and land safely',
+  grass: 'Earth: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
+export const STORY_FUSION_GOALS = { steamFusions: getFusion('fire', 'water'), quenchFusions: getFusion('water', 'fire') };
 const pendingFusions = (p, level) => Object.entries(STORY_FUSION_GOALS).filter(([key]) => (p.mechanics[key] ?? 0) < (level.mechanics?.[key] ?? 0)).map(([, recipe]) => recipe);
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 
@@ -43,6 +44,7 @@ export function recordStoryMechanic(practice, key, id) {
     if (goal) add(practice, goal);
     return;
   }
+  if (practice && key === 'airLaunch') { practice.airJump = true; return; }
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
   if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups', 'selfPasses', 'multiHeals'].includes(key)) return;
   // Pickup variety is separate from elemental mastery actions. Repeated
@@ -71,7 +73,7 @@ export function updateMastery(sim, p, level, delta) {
     p.doubleJump ||= sim.jumpCount >= 2;
     if (hasElement(sim, 'ice')) p.iceJump = true;
   }
-  if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; }
+  if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; p.airJump = false; }
   // An explosion counts once the cube has closed again with the worm still on it.
   if (sim.explodeT > 0) p.exploding = true;
   else if (p.exploding && safe && !(sim.expansionAmount > 0)) { add(p, 'explodes'); p.exploding = false; }
@@ -80,6 +82,7 @@ export function updateMastery(sim, p, level, delta) {
     if (p.flying) { add(p, 'rockets'); p.flying = false; }
     if (p.grassJump) { p.elements.add('grass'); p.grassJump = false; }
     if (p.iceJump) { p.elements.add('ice'); p.iceJump = false; }
+    if (p.airJump) { p.elements.add('air'); p.airJump = false; }
   }
   const sig = sim.signature;
   // Inch increments seq when charging; only its successful launch earns credit.

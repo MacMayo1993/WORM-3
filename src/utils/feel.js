@@ -195,6 +195,10 @@ const SFX = {
     sweep(520, 980, 0.22, 0.2);
     sweep(780, 1170, 0.2, 0.12, 'sine', 0.13);
   },
+  elementAir() {
+    burst(0.65, 0.14, 'bandpass', 1700, 0.45);
+    sweep(620, 1450, 0.5, 0.09, 'sine');
+  },
   elementIce() {
     for (let i = 0; i < 3; i++) tone({ freq: 1200 * [1, 1.5, 2][i], dur: 0.45, gain: 0.1, when: i * 0.09 });
   },
@@ -431,6 +435,7 @@ const HAPTICS = {
   elementWater: [8, 35, 8],
   elementIce: [5, 25, 5, 25, 5],
   elementNature: 12,
+  elementAir: [6, 35, 10],
   orb: (combo = 0) => 8 + Math.min(combo, 6) * 3, // 8 → 26ms
   jump: 14,
   boost: [0, 25, 30, 25],

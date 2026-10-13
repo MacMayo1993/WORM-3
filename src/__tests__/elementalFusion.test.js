@@ -58,19 +58,19 @@ function fused(a, b) {
 }
 
 describe('fusion catalogue', () => {
-  it('names all twenty ordered pairs exactly once', () => {
+  it('names all thirty ordered pairs exactly once', () => {
     const keys = new Set();
     for (const a of ELEMENTAL_TYPES) for (const b of ELEMENTAL_TYPES) if (a !== b) keys.add(fusionKey(a, b));
     expect([...keys].sort()).toEqual(Object.keys(ORDERED_FUSIONS).sort());
-    expect(keys.size).toBe(20);
-    expect(getFusion('water', 'fire').id).toBe('steam');
-    expect(getFusion('fire', 'water').id).toBe('quench');
+    expect(keys.size).toBe(30);
+    expect(getFusion('fire', 'water').id).toBe('steam');
+    expect(getFusion('water', 'fire').id).toBe('quench');
     expect(fusionKey('water', 'water')).toBeNull();
     expect(fusionKey('water', 'rocket')).toBeNull();
   });
 
-  it('gives every ordered recipe a rule of its own, different from its reverse', () => {
-    const recipes = Object.values(ORDERED_FUSIONS);
+  it('gives each dedicated reaction a rule of its own, different from its reverse', () => {
+    const recipes = Object.values(ORDERED_FUSIONS).filter(f => f.rule);
     expect(recipes.every(f => f.rule && !f.fallback)).toBe(true);
     expect(new Set(recipes.map(f => f.id)).size).toBe(20);
     expect(new Set(recipes.map(f => f.description)).size).toBe(20);
@@ -85,7 +85,7 @@ describe('fusion catalogue', () => {
 
   it('has a live HUD readout for every recipe', () => {
     const generic = elementalFeedback('water', { waterMomentum: 0 }).text;
-    const texts = Object.values(ORDERED_FUSIONS).map(f => elementalFeedback(f.catalyst, { waterMomentum: 0 }, f.id).text);
+    const texts = Object.values(ORDERED_FUSIONS).filter(f => f.rule).map(f => elementalFeedback(f.catalyst, { waterMomentum: 0 }, f.id).text);
     expect(texts).not.toContain(generic);
     expect(new Set(texts).size).toBe(20);
   });
@@ -114,18 +114,18 @@ describe('claiming into a fusion', () => {
   });
 
   it('runs both elements on one refreshed clock and tells the renderer the partner', () => {
-    const { sim, ctx } = fused('water', 'fire');
-    expect(sim.elementalType).toBe('fire');
-    expect(sim.elementalPair).toBe('water');
+    const { sim, ctx } = fused('fire', 'water');
+    expect(sim.elementalType).toBe('water');
+    expect(sim.elementalPair).toBe('fire');
     expect(sim.elementalT).toBe(ELEMENTAL_DURATION);
     expect(hasElement(sim, 'water')).toBe(true);
     expect(hasElement(sim, 'fire')).toBe(true);
     expect(hasElement(sim, 'ice')).toBe(false);
     expect(activeFusion(sim)).toBe('steam');
-    expect(ctx.events).toContainEqual(['fire', ELEMENTAL_DURATION, 'water']);
+    expect(ctx.events).toContainEqual(['water', ELEMENTAL_DURATION, 'fire']);
     expect(ctx.events).toContainEqual(['story', 'elementFusion', 'steam']);
     startElemental(sim, ctx, 'ice');
-    expect([sim.elementalType, sim.elementalPair]).toEqual(['ice', 'fire']);
+    expect([sim.elementalType, sim.elementalPair]).toEqual(['ice', 'water']);
   });
 
   it('ends both halves together when the wash runs out', () => {
@@ -172,9 +172,9 @@ describe('Slipstream (water + ice)', () => {
   });
 });
 
-describe('Steam (water + fire)', () => {
+describe('Steam (Fire → Water)', () => {
   it('turns the fire trail into a wall that joins the Glow Worm\'s light', () => {
-    const { sim } = fused('water', 'fire');
+    const { sim } = fused('fire', 'water');
     const a = { x: 0, y: 2, z: 4, dirKey: 'PZ' }, b = { x: 1, y: 2, z: 4, dirKey: 'PZ' };
     addElementalPatch(sim, a, 'fire');
     addElementalPatch(sim, b, 'grass');
@@ -248,13 +248,13 @@ describe('Wildfire (fire + nature)', () => {
 });
 
 
-describe('Quench (Fire → Water)', () => {
+describe('Quench (Water → Fire)', () => {
   it('converts existing fire and lays persistent obsidian without hot-tile effects', () => {
     const sim = makeSim(), ctx = makeCtx();
-    startElemental(sim, ctx, 'fire');
+    startElemental(sim, ctx, 'water');
     addElementalPatch(sim, sim.pos, 'fire');
     expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(true);
-    startElemental(sim, ctx, 'water');
+    startElemental(sim, ctx, 'fire');
     expect(activeFusion(sim)).toBe('quench');
     expect(sim.elementalPatches.get(key(sim.pos))).toMatchObject({ obsidian: true, ttl: 8 });
     expect(isFirebreakTile(sim.elementalPatches, sim.pos)).toBe(true);
@@ -274,23 +274,23 @@ describe('Quench (Fire → Water)', () => {
   });
 
   it('only preserves turns on obsidian, and reversing the pair changes the effect once', () => {
-    const { sim, ctx } = fused('fire', 'water');
+    const { sim, ctx } = fused('water', 'fire');
     expect(turnShedsMomentum(sim)).toBe(true);
     addElementalPatch(sim, sim.pos, 'fire');
     expect(turnShedsMomentum(sim)).toBe(false);
-    startElemental(sim, ctx, 'fire');
+    startElemental(sim, ctx, 'water');
     expect(activeFusion(sim)).toBe('steam');
     expect(turnShedsMomentum(sim)).toBe(true);
     expect(steamTiles(sim)).toBeNull(); // old obsidian does not suddenly become hot
     addElementalPatch(sim, sim.pos, 'fire');
     expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(true);
     expect(steamTiles(sim).has(key(sim.pos))).toBe(true);
-    startElemental(sim, ctx, 'fire'); // catalyst refresh: no duplicate objective
+    startElemental(sim, ctx, 'water'); // catalyst refresh: no duplicate objective
     expect(ctx.events.filter(e => e[1] === 'elementFusion').map(e => e[2])).toEqual(['quench', 'steam']);
   });
 
   it('holds its lifetime on pause and through focus, rotates with the tile, and stays bounded', () => {
-    const { sim, ctx } = fused('fire', 'water');
+    const { sim, ctx } = fused('water', 'fire');
     addElementalPatch(sim, sim.pos, 'fire');
     const pad = sim.elementalPatches.get(key(sim.pos));
     ctx.isPaused = () => true;
@@ -468,8 +468,8 @@ describe('fusion ignition', () => {
     return { sim, ctx };
   };
 
-  it('every recipe has its own ignition, posted once as the pair forms', () => {
-    const recipes = Object.values(ORDERED_FUSIONS);
+  it('every dedicated reaction has its own ignition, posted once as the pair forms', () => {
+    const recipes = Object.values(ORDERED_FUSIONS).filter(f => f.rule);
     expect(Object.keys(IGNITIONS).sort()).toEqual(recipes.map(f => f.id).sort());
     expect(new Set(Object.values(IGNITIONS).map(i => i.text)).size).toBe(20);
     for (const f of recipes) {
@@ -489,12 +489,12 @@ describe('fusion ignition', () => {
 
   it('lays each recipe\'s own ground around the head', () => {
     const at = sim => sim.elementalPatches.get(key(sim.pos));
-    expect(at(sizedFuse('fire', 'water').sim)).toMatchObject({ type: 'fire', obsidian: true });
+    expect(at(sizedFuse('water', 'fire').sim)).toMatchObject({ type: 'fire', obsidian: true });
     expect(at(sizedFuse('fire', 'ice').sim)).toMatchObject({ type: 'fire', cold: true });
     expect(at(sizedFuse('ice', 'water').sim)).toMatchObject({ type: 'frost' });
     expect(at(sizedFuse('grass', 'lightning').sim)).toMatchObject({ type: 'grass', charged: true });
     expect(at(sizedFuse('ice', 'fire').sim)).toMatchObject({ type: 'fire', melt: true });
-    const steam = sizedFuse('water', 'fire').sim;
+    const steam = sizedFuse('fire', 'water').sim;
     expect(steamTiles(steam).size).toBe(lastBurst(steam).tiles.length);
     expect(lastBurst(steam).tiles.length).toBeGreaterThan(9);
     const bloom = sizedFuse('water', 'grass').sim;

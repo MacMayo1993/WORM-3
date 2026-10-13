@@ -42,6 +42,7 @@ const PARTICLE_KINDS = {
   flakes: { vy: -0.45, sway: 0.45, size: 0.08, blend: THREE.NormalBlending, opacity: 0.8 },
   // Ion motes drift UP and slowly, the way charge bleeds off a surface — fast
   // sparks would read as embers and put lightning in fire's register.
+  wind: { count: 22, vy: 0.18, sway: 0.85, size: 0.065, blend: THREE.AdditiveBlending, opacity: 0.55 },
   ions: { vy: 0.32, sway: 0.22, size: 0.055, blend: THREE.AdditiveBlending, opacity: 0.75 }
 };
 

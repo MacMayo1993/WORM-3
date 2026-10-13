@@ -9,23 +9,22 @@
 // two. Every element check reads `hasElement`, never `elementalType` alone, or the
 // partner's half of a fusion silently switches off.
 //
-// All 20 ordered recipes have stable identities and a rule of their own, so the
-// same two elements picked up in the other order do something else entirely.
+// The original 20 ordered recipes have dedicated reaction rules. Air adds ten
+// ordered combinations that retain both base mechanics.
 //
 // Pure, like elementalDefs.js: no React, no Three, no store.
 
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 
 // Recipe identity is ordered: the first pickup is the base, the second the catalyst.
-// Every recipe has its own rule (see the elemental-fusions skill for where each lives);
-// `fallback` stays in the shape so a future recipe can borrow a shipped rule
-// explicitly, but none does today.
+// Dedicated reactions have a description and rule; Air combinations below keep
+// both base effects. `fallback` reserves an explicit way to reuse a shipped rule.
 const recipes = [
-  ['water', 'fire', 'steam', 'Steam', 'Your steaming trail scalds and stuns enemies and puts out bombs.'],
+  ['fire', 'water', 'steam', 'Steam', 'Your steaming trail scalds and stuns enemies and puts out bombs.'],
   ['water', 'ice', 'slipstream', 'Slipstream', 'Turns keep water momentum; full momentum gives 40% extra speed.'],
   ['water', 'grass', 'bloom', 'Bloom', 'Rain grows a spring pad behind every 4th tile you crawl, and pads last 12 seconds.'],
   ['water', 'lightning', 'conductor', 'Conductor', 'Wet and grounded: marks never aim at your body, and every strike forks to a second tile.'],
-  ['fire', 'water', 'quench', 'Quench', 'Your trail becomes obsidian for 8 seconds: it blocks blasts without speeding bomb fuses. Turns on obsidian keep water momentum.'],
+  ['water', 'fire', 'quench', 'Quench', 'Your trail becomes obsidian for 8 seconds: it blocks blasts without speeding bomb fuses. Turns on obsidian keep water momentum.'],
   ['fire', 'ice', 'coldfire', 'Coldfire', 'Your trail burns blue for 5 seconds: it blocks blasts, never speeds fuses, and freezes enemies that touch it.'],
   ['fire', 'grass', 'wildfire', 'Wildfire', 'Land a spring leap to ignite the surrounding 3×3 and defeat enemies there.'],
   ['fire', 'lightning', 'plasma', 'Plasma', 'Twice the marks, and they never land on your fire trail. Every strike leaves its tile burning for 8 seconds.'],
@@ -42,11 +41,21 @@ const recipes = [
   ['lightning', 'ice', 'cryostorm', 'Cryostorm', 'Marks charge twice as long and strike as frost: no harm to you, no flips; enemies nearby freeze and bombs stop ticking.'],
   ['lightning', 'grass', 'grounded', 'Grounded', 'Strikes grow charged spring pads instead of flipping tiles, and a strike on your body grows a pad instead of cutting.'],
 ];
+// Air pairs combine their two base mechanics. Additional reaction rules can be
+// introduced independently without pretending an unimplemented bonus is active.
+for (const [other, forward, reverse] of [
+  ['water', 'Sea Breeze', 'Rainwind'], ['fire', 'Updraft', 'Bellows'],
+  ['grass', 'Dust Devil', 'Highlands'], ['ice', 'Snowdrift', 'Polar Wind'],
+  ['lightning', 'Thunderhead', 'Stormwind'],
+]) {
+  recipes.push([other, 'air', `${other}-air`, forward, null]);
+  recipes.push(['air', other, `air-${other}`, reverse, null]);
+}
 export const ORDERED_FUSIONS = Object.fromEntries(recipes.map(([base, catalyst, id, label, description, fallback = null]) => [
   `${base}>${catalyst}`, { base, catalyst, id, label, rule: !!description, fallback,
     description: description ?? (fallback
       ? `Currently uses ${recipes.find(r => r[2] === fallback)[3]}: ${recipes.find(r => r[2] === fallback)[4]}`
-      : `${ELEMENTAL_DEFS[base].label} and ${ELEMENTAL_DEFS[catalyst].label} base effects together; no additional fusion effect yet.`) },
+      : `${ELEMENTAL_DEFS[base].label} and ${ELEMENTAL_DEFS[catalyst].label} effects together.`) },
 ]));
 
 /** Arguments are chronological: first pickup, then second pickup. */

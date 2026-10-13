@@ -5,7 +5,7 @@ export function fusionFeedback(recipe, buffs) {
     if (effect) return elementalFeedback(recipe.catalyst, buffs, effect);
     // Recipes without a special rule still combine two real mechanics. Name
     // both rather than quietly showing only the newest element's feedback.
-    const effects = { water: 'Water momentum', fire: 'Fire trail', grass: 'Nature spring pads', ice: 'Ice sliding', lightning: 'Lightning strikes' };
+    const effects = { air: 'Air updraft', water: 'Water momentum', fire: 'Fire trail', grass: 'Earth spring pads', ice: 'Ice sliding', lightning: 'Lightning strikes' };
     const fraction = [recipe.base, recipe.catalyst].includes('water') ? elementalFeedback('water', buffs).fraction : 0;
     return { text: `${effects[recipe.base]} + ${effects[recipe.catalyst]}`, fraction };
 }
@@ -35,6 +35,7 @@ export function elementalFeedback(type, buffs, fusion = null) {
     if (fusion === 'firestorm') return { text: 'Strikes ignite a cross of fire', fraction: 0 };
     if (fusion === 'cryostorm') return { text: 'Slow marks · Strikes freeze, never hurt you', fraction: 0 };
     if (fusion === 'grounded') return { text: 'Strikes grow charged pads · Body is safe', fraction: 0 };
+    if (type === 'air') return { text: 'UPDRAFT · Jumps +35% farther · +40% higher', fraction: 0 };
     if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · Turns slow you`, fraction: momentum };
     if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Jump for a longer leap' : `${buffs.springCount || 0} springs · Land to grow one`, fraction: buffs.springReady ? 1 : 0 };
     if (type === 'fire') return { text: 'Shield tiles block blasts · Flames still hurt', fraction: 0 };

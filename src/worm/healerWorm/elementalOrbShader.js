@@ -33,7 +33,7 @@
 import * as THREE from 'three';
 
 /** Element → shader branch. Matches ELEMENTAL_TYPES order but is looked up by key. */
-export const ELEMENT_MODE = { water: 0, fire: 1, grass: 2, ice: 3, lightning: 4 };
+export const ELEMENT_MODE = { water: 0, fire: 1, grass: 2, ice: 3, lightning: 4, air: 5 };
 
 const varyings = /* glsl */ `
   uniform float uTime;
@@ -128,6 +128,11 @@ const coreFragment = /* glsl */ `
       col = mix(uColor * 0.35, uAccent, facets * 0.45 + fres * 0.35);
       col += uAccent * crystal * (0.35 + 0.35 * pow(0.5 + 0.5 * sin(radius * 8.0 - t), 8.0));
       alpha = 0.48 + fres * 0.4;
+    } else if (uMode == 5) {
+      float angle = atan(p.z, p.x + 0.00001);
+      float spiral = pow(0.5 + 0.5 * sin(angle * 3.0 + p.y * 5.0 - t * 4.0), 12.0);
+      col = mix(uColor * 0.25, uAccent, spiral * 0.85 + fres * 0.15);
+      alpha = 0.16 + spiral * 0.65 + fres * 0.25;
     } else {
       // ── Lightning: a dark conductive body with white-hot filaments running
       // through it, discharging in bursts rather than pulsing evenly. The core is

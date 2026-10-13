@@ -3,11 +3,13 @@ export const ELEMENTAL_EXPERIENCE = {
   fire: { sweep: 2.4, fadeOut: 1.8, body: '#ffae52', sound: 'elementFire' },
   water: { sweep: 2.8, fadeOut: 1.6, body: '#8ae7ff', sound: 'elementWater' },
   ice: { sweep: 3.0, fadeOut: 2.0, body: '#d5f5ff', sound: 'elementIce' },
+  air: { sweep: 2.2, fadeOut: 1.6, body: '#d8fff8', sound: 'elementAir' },
   grass: { sweep: 2.6, fadeOut: 1.8, body: '#adf29a', sound: 'elementNature' },
 };
 
 export function elementalBodyWave(element, time, index, count) {
   const along = index / Math.max(1, count - 1);
+  if (element === 'air') return (0.5 + 0.5 * Math.sin(along * 16 - time * 4)) ** 4;
   if (element === 'water') return (0.5 + 0.5 * Math.sin(along * 12 - time * 2.4)) ** 4;
   if (element === 'fire') return (0.5 + 0.5 * Math.sin(along * 22 - time * 3.5)) ** 6;
   if (element === 'grass') return (0.5 + 0.5 * Math.sin(along * 10 - time * 1.2)) ** 2;
