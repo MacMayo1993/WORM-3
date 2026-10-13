@@ -11,10 +11,10 @@ const LETTERS = [
 ];
 const BEAT_COLORS = { 3: '#488dff', 2: '#ff9c29', 1: '#54cf73' };
 
-export default function WormCountdownOverlay({ step }) {
+export default function WormCountdownOverlay({ step, arrival = false }) {
   const number = typeof step === 'number';
   const leaving = step === 'hold';
-  return <div className="worm-countdown" data-stage={number ? 'count' : leaving ? 'exit' : 'launch'} style={{
+  return <div className={`worm-countdown${arrival ? ' worm-countdown--arrival' : ''}`} data-stage={number ? 'count' : leaving ? 'exit' : 'launch'} style={{
     '--countdown-display': DISPLAY_FONT,
     '--countdown-ui': UI_FONT,
     '--beat': `${COUNTDOWN_STEP_DURATION}s`,

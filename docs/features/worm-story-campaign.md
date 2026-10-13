@@ -86,3 +86,9 @@ The guided demo tells the same story in miniature. Its cold open names Mobi, the
 1. Edit the level in `campaign.js` and keep its `par`/`limit` consistent with neighbours of the same chapter.
 2. Give a new level a world in `worlds.js` (unique name, one tile style on all faces) and lines in `narrative.js`.
 3. Run the story tests. Their messages name the broken constraint. The local auditor (`npm run worm:tools`) shows supply per objective.
+
+## Portal arrival
+
+Story Start and Free Play share a 3.4-second entrance. The portal charges through 3–2–1, then the equipped worm materializes at hero scale above the deck amid counter-rotating rings, a vortex and 24 shards. A front three-quarter camera shot reveals Mobi's face and settles into the chase camera as the worm reaches its exact playable pose. The countdown and effects use one clock; there is no separate wait after the entrance.
+
+Gameplay HUD and pickups clear the shot until play begins. Pause remains available and freezes the entrance; Resume preserves the phase pause. Movement, bombs and rotation timers start only after the arrival settles. Story's authored starting trail and equipped cosmetics stay intact. Retries restart the same entrance, and a delayed frame cannot skip it. Reduced motion uses a 0.35-second scale reveal without the portal, lift, turn or camera sweep.

@@ -1,3 +1,4 @@
+import { storyArrivalPose, STORY_ARRIVAL_SECONDS } from '../worm/healerWorm/storyArrival.js';
 import { makeCubies } from '../game/cubeState.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import React, { act } from 'react';
@@ -46,8 +47,8 @@ function makeWorm(size, dirKey = 'PZ') {
     rocketActive: ref(false), rocketT: ref(0), isJumping: ref(false), jumpT: ref(0)
   };
 }
-function render(worm, size, key = 'run') {
-  act(() => root.render(<WormChaseCamera key={key} worm={worm} size={size} />));
+function render(worm, size, key = 'run', arrivalElapsed) {
+  act(() => root.render(<WormChaseCamera key={key} worm={worm} size={size} arrivalElapsed={arrivalElapsed} />));
 }
 function tick() {
   scene.frame({}, 1 / 60);
@@ -534,4 +535,25 @@ it.each([2, 3, 4, 5, 6, 7, 8, 9, 10, 15])('fits every rotating corner of the siz
       }
     }
   }
+});
+
+it.each(['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'])('frames the arrival face-first outside %s and settles onto the chase view', dir => {
+  const worm = makeWorm(6, dir), elapsed = ref(0);
+  useGameStore.setState({ wormGamePhase: 'spawning' });
+  render(worm, 6, 'arrival', elapsed);
+  tick();
+  const forward = new Vector3(...DIR_FORWARD[dir].up), normal = FACE_NORMALS[dir];
+  expect(scene.camera.position.clone().sub(worm.headInterpPos.current).dot(forward)).toBeGreaterThan(0);
+  for (const fraction of [.2, .55, .7, .85, 1]) {
+    elapsed.current = STORY_ARRIVAL_SECONDS * fraction; tick();
+    const pose = storyArrivalPose(elapsed.current);
+    const head = worm.headInterpPos.current.clone().addScaledVector(normal, WORM_LIFT * pose.scale + pose.lift);
+    const screen = head.project(scene.camera);
+    expect(Math.abs(screen.x)).toBeLessThan(0.05);
+    expect(Math.abs(screen.y)).toBeLessThan(0.05);
+    expect(scene.camera.position.clone().sub(worm.headInterpPos.current).dot(normal)).toBeGreaterThan(1);
+  }
+  const settled = scene.camera.position.clone();
+  useGameStore.setState({ wormGamePhase: 'active' }); tick();
+  expect(scene.camera.position.distanceTo(settled)).toBeLessThan(0.2);
 });

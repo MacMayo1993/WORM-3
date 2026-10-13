@@ -1,3 +1,4 @@
+import { storyArrivalPose } from './healerWorm/storyArrival.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
 import { victoryViewport, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
 import { OPENING_FOV, openingCameraDistance } from './healerWorm/openingRotation.js';
@@ -28,6 +29,7 @@ import {
     windupPoseInto,
 } from './tunnelCameraRails.js';
 import {
+    WORM_LIFT,
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
     LOOK_AHEAD,
@@ -48,6 +50,9 @@ import { getTunnelWorldPosInto, padCoilHeadingInto } from './wormLogic.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
+const _arrivalSide = new THREE.Vector3();
+const _arrivalEye = new THREE.Vector3();
+const _arrivalLook = new THREE.Vector3();
 const _camUp = new THREE.Vector3();
 // Orientation scratch — the chase view's roll is a rotation, not an up vector
 // handed to lookAt (see aimCamera below).
@@ -187,7 +192,7 @@ export function frameSurfaceCamera(camera, portraitFactor, head = null, anchorY 
 
 const _desktopAim = new THREE.Vector3();
 
-export default function WormChaseCamera({ worm, size }) {
+export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const { camera, gl, size: viewportSize } = useThree();
     const mobile = useIsMobile();
     const platformFrame = useRef(makePlatformFrame());
@@ -570,7 +575,11 @@ export default function WormChaseCamera({ worm, size }) {
             if (enteredReveal) revealTRef.current = 0;
             // The briefing already shows the new run's opening shot. Hold it
             // there until Start, then continue the same dolly into 3-2-1.
-            if (!storyBriefing) revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
+            const arriving = gamePhase === 'spawning' && arrivalElapsed;
+            const reduced = gameState.settings?.reducedMotion || prefersReducedMotion();
+            const arrival = arriving ? storyArrivalPose(arrivalElapsed.current, reduced) : null;
+            if (arriving) revealTRef.current = reduced ? 1 : arrival.t;
+            else if (!storyBriefing) revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
             const rt = revealTRef.current;
             const pull = 1 - rt * rt * (3 - 2 * rt); // smoothstep-eased, 1 → 0
 
@@ -582,13 +591,25 @@ export default function WormChaseCamera({ worm, size }) {
             // Centre the spawning worm first; ease out to the chase aim as the pull expires.
             _camTargetLook.lerp(_camWormWorld, pull * 0.8);
             if (mobile) _camTargetLook.copy(_mobileHeadWorld);
+            if (arriving && !reduced) {
+                // Show the face from in front, then arc over the surface into chase.
+                // Both endpoints stay outside the face; no chord through the cube.
+                _arrivalSide.crossVectors(_camForward, _camNormal).normalize();
+                const fit = Math.max(1, 0.8 / Math.max(0.35, camera.aspect));
+                _arrivalLook.copy(_camWormWorld).addScaledVector(_camNormal, arrival.lift + WORM_LIFT * arrival.scale + 0.1);
+                _arrivalEye.copy(_arrivalLook).addScaledVector(_camNormal, 2.5 * fit)
+                    .addScaledVector(_camForward, 2.8 * fit).addScaledVector(_arrivalSide, 1.5 * fit);
+                _camTargetCam.lerp(_arrivalEye, 1 - arrival.settle);
+                _camTargetLook.lerp(_arrivalLook, 1 - arrival.settle);
+                if (mobile) _mobileHeadWorld.addScaledVector(_camNormal, arrival.lift + WORM_LIFT * (arrival.scale - 1));
+            }
 
             // Same horizon the chase will use, so the countdown reveal hands over to
             // live play without the view rolling on the first crawling frame.
             if (horizonMode === 'face') _camUp.copy(_camNormal);
             else _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
-            const revealA = enteredReveal ? 1 : 1 - Math.exp(-CAM_LERP * delta);
+            const revealA = arriving || enteredReveal ? 1 : 1 - Math.exp(-CAM_LERP * delta);
             if (enteredReveal) {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
