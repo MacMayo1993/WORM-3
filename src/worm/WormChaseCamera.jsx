@@ -596,12 +596,17 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                 // Both endpoints stay outside the face; no chord through the cube.
                 _arrivalSide.crossVectors(_camForward, _camNormal).normalize();
                 const fit = Math.max(1, 0.8 / Math.max(0.35, camera.aspect));
-                _arrivalLook.copy(_camWormWorld).addScaledVector(_camNormal, arrival.lift + WORM_LIFT * arrival.scale + 0.1);
-                _arrivalEye.copy(_arrivalLook).addScaledVector(_camNormal, 2.5 * fit)
-                    .addScaledVector(_camForward, 2.8 * fit).addScaledVector(_arrivalSide, 1.5 * fit);
+                // Frame the portal and the start tile together, sliding onto the
+                // head as the body crawls out (StoryArrival publishes the focus).
+                const focus = worm.arrival?.active ? worm.arrival.focus : _camWormWorld;
+                _arrivalLook.copy(focus).addScaledVector(_camNormal, WORM_LIFT + 0.1);
+                // Close on the worm, dollying in as it crawls out of the portal.
+                const dolly = fit * (1.35 - 0.35 * arrival.emerge);
+                _arrivalEye.copy(_arrivalLook).addScaledVector(_camNormal, 1.0 * dolly)
+                    .addScaledVector(_camForward, 1.15 * dolly).addScaledVector(_arrivalSide, 0.65 * dolly);
                 _camTargetCam.lerp(_arrivalEye, 1 - arrival.settle);
                 _camTargetLook.lerp(_arrivalLook, 1 - arrival.settle);
-                if (mobile) _mobileHeadWorld.addScaledVector(_camNormal, arrival.lift + WORM_LIFT * (arrival.scale - 1));
+                if (mobile && worm.arrival?.active) _mobileHeadWorld.lerp(_arrivalLook, 1 - arrival.settle);
             }
 
             // Same horizon the chase will use, so the countdown reveal hands over to
