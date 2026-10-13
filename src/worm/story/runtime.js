@@ -5,7 +5,8 @@ import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './m
 import { rollStoryElements, storyElementTypes } from './elementGoals.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
-import { ttAt } from '../circularBuffers.js';
+import { ttAt, ttReset } from '../circularBuffers.js';
+import { getStickerWorldPos } from '../../game/coordinates.js';
 import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
 import { getActiveTunnels, getStableKey, findStickerByStableKey } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
@@ -13,51 +14,79 @@ import { tileKey } from '../healerWorm/wormSim.js';
 import { STORY_WORLDS, STORY_ORB_ROUTES } from './worlds.js';
 import { BODY_JUMP_PATH, seedPracticeBody, trackPracticeBodyJump } from '../healerWorm/bodyJumpPractice.js';
 
-const LONG_PATH = [[2,0],[1,0],[0,0],[0,1],[0,2],[0,3],[0,4],[1,4],[1,3]];
 const MOUTHS = [[1,2,4,'PZ'], [4,2,1,'PX'], [1,4,2,'PY'], [3,2,4,'PZ'], [4,2,3,'PX'], [3,4,2,'PY']];
 // Smallest board the authored 5×5 templates fit. Below it, trails, mouths and
 // routes are generated to the face instead of shifted off its edge.
 const TEMPLATE_SIZE = 5;
 export const STORY_ORB_REFILL_INTERVAL = 0.75;
 
-// Face-local (u, v) on PZ, in board coordinates. The head spawns at (c, 0)
-// heading up column c (see stageWormPractice); every trail keeps that column
-// clear ahead of the head except where a jump level lays its body across it.
+// The head arrives on the middle tile of the spawn face (PZ), heading up, with
+// its body straight down the column behind it, so it comes out of the portal
+// and carries straight on. Older trail turns along row 0, so a growing tail
+// still has a path. Jump lessons keep their start on row 0 with the body laid
+// across the head's column: jumping it is the lesson.
+// A 2×2 face has no middle: its head keeps the bottom row and steering room,
+// with the body laid along that row.
+export const storyStartTile = size => [Math.floor(size / 2), Math.floor((size - 1) / 2)];
+
+// Face-local (u, v) on PZ, in board coordinates, head first.
 export function storyBodyPath(size, level) {
-  const offset = Math.floor(size / 2) - 2;
-  if (size >= TEMPLATE_SIZE) {
-    const template = level.kind === 'jump' ? BODY_JUMP_PATH : level.id === 1 ? LONG_PATH.slice(0, 6) : LONG_PATH;
-    return template.map(([x, y]) => [x + offset, y]);
-  }
   const c = Math.floor(size / 2);
-  const path = [[c, 0]];
-  for (let x = c - 1; x >= 0; x--) path.push([x, 0]);
   if (level.kind === 'jump') {
+    if (size >= TEMPLATE_SIZE) return BODY_JUMP_PATH.map(([x, y]) => [x + c - 2, y]);
     // Lay the body across the head's column on the far row: a small face has
     // no room to spare, and a nearer crossing arrives before the first jump can.
+    const path = [[c, 0]];
+    for (let x = c - 1; x >= 0; x--) path.push([x, 0]);
     const row = size - 1;
     for (let y = 1; y <= row; y++) path.push([0, y]);
     for (let x = 1; x < size; x++) path.push([x, row]);
     return path;
   }
-  for (let y = 1; y < size; y++) path.push([0, y]);
-  for (let x = 1; x < c; x++) path.push([x, size - 1]);
-  // Keep at least one row of the spawn face free for its own color's orbs.
-  return path.slice(0, Math.max(2, size * size - size));
+  const [, m] = storyStartTile(size);
+  const path = [];
+  for (let v = m; v >= 0; v--) path.push([c, v]);
+  for (let u = c - 1; u >= 0; u--) path.push([u, 0]);
+  return path;
+}
+
+// On a double-heal level the pairs that open together must be close at both
+// ends: two mouths a step apart on one face have twins a step apart on the
+// opposite face, so riding out of one lands beside the other. Keep the first
+// mouth of each pair and bring its nearest same-face mouth up beside it; a
+// mouth with no partner on its face waits until every pair is placed.
+function pairNearby(mouths) {
+  const out = [], single = [], rest = mouths.slice();
+  while (rest.length) {
+    const a = rest.shift();
+    let best = -1, bestDistance = Infinity;
+    rest.forEach((b, i) => {
+      if (b[3] !== a[3]) return;
+      const distance = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+      if (distance < bestDistance) { bestDistance = distance; best = i; }
+    });
+    if (best >= 0) out.push(a, rest.splice(best, 1)[0]);
+    else single.push(a);
+  }
+  return out.concat(single);
 }
 
 // Tunnel mouths live on the three positive faces; their twins land on the
 // negative faces, so no two mouths can share a pair.
-export function storyMouths(size, count, levelId = 1) {
+export function storyMouths(size, count, levelId = 1, { chain = false } = {}) {
   // Rotate the safe authored candidates per level; retries keep the same layout.
   const offsetIndex = Math.max(0, levelId - 1) % MOUTHS.length;
-  const pick = candidates => candidates.slice(offsetIndex).concat(candidates.slice(0, offsetIndex)).slice(0, count);
+  const pick = candidates => {
+    const rotated = candidates.slice(offsetIndex).concat(candidates.slice(0, offsetIndex));
+    return (chain ? pairNearby(rotated) : rotated).slice(0, count);
+  };
   if (size >= TEMPLATE_SIZE) {
     const edge = size - 1, offset = Math.floor(size / 2) - 2;
-    // Spawn-face mouths keep their rows: the head starts on row 0 at every size,
-    // so shifting them up with the board would land one under the body trail.
-    return pick(MOUTHS).map(([x, y, z, dir]) => [
-      dir === 'PX' ? edge : x + offset, dir === 'PY' ? edge : dir === 'PZ' ? y : y + offset, dir === 'PZ' ? edge : z + offset, dir]);
+    // Spawn-face mouths sit on the row behind the head's start tile, either side
+    // of its column: never beside the start, never on the body's column or row 0.
+    const row = storyStartTile(size)[1] - 1;
+    return pick(MOUTHS.map(([x, y, z, dir]) => [
+      dir === 'PX' ? edge : x + offset, dir === 'PY' ? edge : dir === 'PZ' ? row : y + offset, dir === 'PZ' ? edge : z + offset, dir]));
   }
   return pick(smallBoardMouths(size, Math.max(count, MOUTHS.length)));
 }
@@ -75,13 +104,15 @@ function smallBoardMouths(size, count) {
   const edge = size - 1, c = Math.floor(size / 2);
   // The spawn face keeps the head's column, its first row and the body trail open.
   const body = new Set(storyBodyPath(size, { kind: 'tunnel', id: 0 }).map(([u, v]) => `${u},${v}`));
+  const start = storyStartTile(size);
   const outer = t => (t === 0 || t === edge ? 1 : 0);
   const rank = ([u, v]) => outer(u) + outer(v);   // 0 face piece, 1 edge piece, 2 corner
   const centre = ([u, v]) => Math.abs(u - edge / 2) + Math.abs(v - edge / 2);
   const cells = dir => {
     const out = [];
     for (let u = 0; u < size; u++) for (let v = 0; v < size; v++) {
-      if (dir === 'PZ' && (u === c || u === 0 || v === 0 || body.has(`${u},${v}`))) continue;
+      if (dir === 'PZ' && (u === c || u === 0 || v === 0 || body.has(`${u},${v}`) ||
+        Math.abs(u - start[0]) + Math.abs(v - start[1]) <= 1)) continue;
       out.push([u, v]);
     }
     return out.sort((a, b) => rank(a) - rank(b) || centre(a) - centre(b) || a[0] - b[0] || a[1] - b[1]);
@@ -125,7 +156,7 @@ export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
   const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
-  const mouths = storyMouths(size, pairCount, level.id);
+  const mouths = storyMouths(size, pairCount, level.id, { chain: !!level.mechanics?.multiHeals });
   const mouthKeys = mouths.map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
   const pendingMouths = mouthKeys.slice(2);
   const tunnelGoals = Object.fromEntries(['selfPasses', 'multiHeals', 'ringHeals']
@@ -164,6 +195,12 @@ export function stageStory(sim, size, level, character) {
     }
   }
   seedPracticeBody(sim, size, body);
+  // The head starts where the trail does (the middle tile, or row 0 for a jump lesson).
+  sim.pos = { x: body[0][0], y: body[0][1], z: edge, dirKey: 'PZ' };
+  sim.moveDir = 'up';
+  sim._curWP.fromArray(getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, 'PZ', size, 0));
+  sim.headInterpPos.copy(sim._curWP);
+  ttReset(sim.pathHistory, tileKey(sim.pos));
   sim.peakTailLength = sim.tailLength;
   if (level.kind === 'jump') {
     const row = size >= TEMPLATE_SIZE ? 2 : size - 1;

@@ -3,6 +3,7 @@ import { WORM_STORY_LEVELS, storyLevel, storyChecklist, storyOutcome } from '../
 import { storyGrowthTarget } from '../worm/story/starGoals.js';
 import { stageStory, replenishStoryTunnel } from '../worm/story/runtime.js';
 import { makeWormSim } from '../worm/healerWorm/wormSim.js';
+import { ttReset } from '../worm/circularBuffers.js';
 import { getActiveTunnels, findStickerByStableKey } from '../worm/wormLogic.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { healSticker } from '../game/cubeState.js';
@@ -91,6 +92,10 @@ it.each(['tail', 'pause', 'rotation', 'animation', 'heal', 'cut', 'rescue', 'rev
 it('follows rotated retry mouths and waits for pickups at both endpoints', () => {
   const { p, sim, state, size, refill } = exhausted(54);
   state.cubies = rotateSliceCubies(state.cubies, size, 'row', 1, 1);
+  // The turned row carries a mouth's twin onto the start tile; a worm standing
+  // there rightly holds that pair shut, so crawl it to the bottom face first.
+  sim.pos = { x: 1, y: 0, z: 1, dirKey: 'NY' };
+  ttReset(sim.tileTrail, `${sim.pos.x},${sim.pos.y},${sim.pos.z},${sim.pos.dirKey}`);
   const map = buildManifoldGridMap(state.cubies, size);
   sim.powerups = p.retryMouths.map(key => {
     const mouth = findStickerByStableKey(state.cubies, size, key, map);

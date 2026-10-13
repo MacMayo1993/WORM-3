@@ -114,7 +114,7 @@ it('stages the fresh level before paint when retrying a previous tunnel run', ()
   // spawn face and board, instead of the prior tunnel/camera anchor.
   const start = layoutStarts.at(-1);
   expect(start).toMatchObject({ runId: state().wormRunId, ready: true, phase: 'crawling',
-    pos: { x: Math.floor(state().size / 2), y: 0, z: state().size - 1, dirKey: 'PZ' } });
+    pos: { x: Math.floor(state().size / 2), y: Math.floor((state().size - 1) / 2), z: state().size - 1, dirKey: 'PZ' } });
   expect(start.head.toArray()).not.toEqual([81, -23, 17]);
   expect(state().cubies).not.toBe(oldBoard);
   expect(worm.timeAliveRef.current).toBe(0);
