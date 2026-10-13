@@ -304,6 +304,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             if (!useGameStore.getState().wormAlive) break;
             const key = tileKeyOf(spot.tile);
             const reach = springSlamTiles(spot.tile, size);
+            // Thunderhead turns every marked strike into wind, without worm damage or flips.
+            if (fusion === 'lightning-air') {
+                worm.staticT.current = FUSION.staticBurstT;
+                worm.feel('boost');
+                if (combatBridge.current) afflictEnemies(combatBridge.current, reach, 'stun', 1.4);
+                continue;
+            }
             // Static: a strike near the head discharges into the worm as speed. No harm, no flip.
             if (nearHead?.has(key)) {
                 worm.staticT.current = FUSION.staticBurstT;
@@ -403,6 +410,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // A bomb put out by a fusion (Current's arc): the same reward and credit as a disarm.
     const putOutBomb = (bomb, store) => {
+        // A telegraphed storm strike may have killed the worm earlier this frame.
+        // Recheck the live store before removing bombs or granting any rewards.
+        if (!useGameStore.getState().wormAlive) return;
         const index = bombsRef.current.indexOf(bomb);
         if (index < 0) return;
         bombsRef.current.splice(index, 1);
@@ -428,8 +438,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const resolveFusionBurst = burst => {
         // A fusion's ignition (fusionIgnition.js): its ground is already laid in the sim;
         // here the enemies in reach take its hit and fire recipes put flames up.
-        if (burst.kind === 'ignite') {
+        if (burst.kind === 'ignite' || burst.kind === 'air-reaction') {
             const reach = new Set(burst.tiles);
+            if (burst.defuse) {
+                const store = useGameStore.getState();
+                for (const bomb of [...bombsRef.current]) if (reach.has(tileKeyOf(bomb.tile))) putOutBomb(bomb, store);
+            }
+            if (burst.lightning) for (const key of reach) addStormFlash(stormRef.current, tileOf(key));
             if (combatBridge.current && reach.size) {
                 if (burst.hit === 'kill') strikeEnemies(combatBridge.current, reach);
                 else afflictEnemies(combatBridge.current, reach, burst.hit, burst.hit === 'freeze' ? 4 : burst.hit === 'burn' ? 3 : 1.4);

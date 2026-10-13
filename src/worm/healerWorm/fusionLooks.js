@@ -52,6 +52,16 @@ const look = (pattern, color, accent, glow, particle, tint, tint2, depth = 0.05)
  * coat's height above the stickers.
  */
 export const FUSION_LOOKS = Object.freeze({
+  'water-air': look('flow', '#58e4d1', '#ffffff', '#a0fff0', 'spray', '#e8fff9', '#5ec9e8', 0.04),
+  'air-water': look('mist', '#759dbb', '#c4f3ff', '#9cdae8', 'spray', '#c8edff', '#709ac7', 0.06),
+  'fire-air': look('flow', '#ffb64c', '#fff2ab', '#ffd479', 'embers', '#fff0a6', '#ff863e', 0.05),
+  'air-fire': look('flame', '#ed4934', '#ffc578', '#ff7e54', 'smoke', '#f7a16b', '#884336', 0.05),
+  'grass-air': look('storm', '#ac895e', '#e3d49e', '#caba84', 'spores', '#cfb781', '#8cba6e', 0.05),
+  'air-grass': look('crust', '#4e725c', '#d0ed96', '#a0ce83', 'petals', '#d6dc98', '#72ae83', 0.06),
+  'ice-air': look('mist', '#adcfe8', '#ffffff', '#deefff', 'snow', '#f2fbff', '#9fbde0', 0.08),
+  'air-ice': look('flow', '#65b8cf', '#e8ffff', '#9be8ff', 'frost', '#dbffff', '#7dc7ed', 0.04),
+  'lightning-air': look('storm', '#8e91c7', '#ffffff', '#c1c8ff', 'steam', '#c4d5f9', '#9ba7db', 0.07),
+  'air-lightning': look('plasma', '#ced76e', '#ffffff', '#ecf7ab', 'sparks', '#f8ffbd', '#b9c3ff', 0.04),
   // Water first
   steam:         look('mist',   '#eef6ff', '#9fd4ff', '#d8ecff', 'steam',  '#ffffff', '#cfe6f5', 0.11),
   slipstream:    look('flow',   '#4fd6ff', '#e8fbff', '#7fe3ff', 'spray',  '#e8fbff', '#7fd8ff', 0.06),

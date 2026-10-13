@@ -32,6 +32,7 @@ vi.mock('../worm/healerWorm/bombs.js', async importOriginal => ({
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 import { HealerBombs } from '../worm/healerWorm/HealerBombs.jsx';
+import { LightningStrikes } from '../worm/healerWorm/LightningStrikes.jsx';
 import { resolveSliceHits } from '../worm/wormHelpers.js';
 import { isBombDisarmed, checkBlastHitWorm } from '../worm/healerWorm/bombs.js';
 
@@ -439,4 +440,62 @@ it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once
     expect(blast.has(`${sim.pos.x},${sim.pos.y},${sim.pos.z},${sim.pos.dirKey}`)).toBe(false);
     expect(blast.size).toBeGreaterThan(0); // neighbouring unprotected tiles still burn
   }
+});
+
+it('Rainwind douses bombs in its landing burst once, while Sea Breeze leaves them ticking', async () => {
+  const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const bomb = { id: 77, tile: {...sim.pos}, fuse: 4, maxFuse: 5 };
+  props.bombsRef.current.push(bomb);
+  sim.elementalPair = 'water'; sim.elementalType = 'air'; sim.elementalT = wormBuffs.elementalT = 10;
+  const coins = useGameStore.getState().parityPoints;
+  airFusionLanding(sim,3); tick();
+  expect(props.bombsRef.current).toHaveLength(1);
+  sim.elementalPair = 'air'; sim.elementalType = 'water';
+  airFusionLanding(sim,3); tick();
+  expect(props.bombsRef.current).toHaveLength(0);
+  expect(useGameStore.getState().parityPoints).toBe(coins+12);
+  tick(); expect(useGameStore.getState().parityPoints).toBe(coins+12);
+});
+
+it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s changes whether marked strikes harm the worm', (base,catalyst,safe) => {
+  sim.elementalPair = base; sim.elementalType = catalyst; sim.elementalT = wormBuffs.elementalT = 10;
+  tick(28);
+  expect(useGameStore.getState().wormAlive).toBe(safe);
+  if (safe) {
+    expect(checkBlastHitWorm).not.toHaveBeenCalled();
+    expect(sim.staticT).toBeGreaterThan(0);
+  } else expect(checkBlastHitWorm).toHaveBeenCalled();
+});
+
+it.each([
+  ['landing', null], ['ignition', null], ['landing', 9], ['ignition', 9],
+])('Rainwind %s grants no bomb rewards after an old fatal strike (story %s)', async (reaction, level) => {
+  const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
+  const { igniteFusion } = await import('../worm/healerWorm/fusionIgnition.js');
+  worm.recordStoryBomb = vi.fn();
+  act(() => useGameStore.setState({ wormStoryLevel: level, wormStoryStarted: true, wormPaused: false }));
+  sim.elementalType = 'lightning'; sim.elementalT = wormBuffs.elementalT = 10;
+  tick(12); // Lightning has telegraphed a strike, but it has not fired yet.
+  const children = React.Children.toArray(tree.props.children.props.children);
+  const storm = children.flatMap(child => React.Children.toArray(child.props.children))
+    .find(child => child.type === LightningStrikes).props.stormRef.current;
+  expect(storm.spots.length).toBeGreaterThan(0);
+  storm.spots[0].age = storm.spots[0].delay - 0.05;
+  const { bombsRef } = children.find(child => child.type === HealerBombs).props;
+  const bomb = { id: 78, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };
+  bombsRef.current.push(bomb);
+  sim.elementalPair = 'air'; sim.elementalType = 'water';
+  if (reaction === 'landing') airFusionLanding(sim, 3);
+  else igniteFusion(sim, 'air-water', 3);
+  const coins = useGameStore.getState().parityPoints;
+  expect(useGameStore.getState().wormAlive).toBe(true);
+  tick(); // runStorm kills before runFusionBurst tries the queued Rainwind defuse.
+  expect(useGameStore.getState().wormAlive).toBe(false);
+  expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
+  expect(bombsRef.current).toContain(bomb);
+  expect(bomb.fuse).toBe(4);
+  expect(useGameStore.getState().parityPoints).toBe(coins);
+  expect(worm.recordStoryBomb).not.toHaveBeenCalled();
+  expect(sim.orbCascades).toHaveLength(0);
 });

@@ -17,6 +17,7 @@ import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
     fusionSpeedBonus, postFusionBurst, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
+import { airFusionLaunch, airFusionStep, airFusionLanding } from './airFusionGameplay.js';
 import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
 import { igniteFusion } from './fusionIgnition.js';
@@ -615,6 +616,7 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
         sim.jumpSpan *= 1.35;
         sim.jumpHeight *= 1.4;
         ctx.onStoryMechanic?.('airLaunch');
+        if (!liveRotation.active && !sim.restRead) airFusionLaunch(sim, grounded, size);
     }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
@@ -2047,6 +2049,7 @@ const PHASE_HANDLERS = {
                 sim.prevDirKey = sim.pos.dirKey;
                 // Snapshot the tile we're leaving as the interpolation source so a
                 // mid-step slice rotation can ride/commit it correctly.
+                if (!liveRotation.active && !sim.restRead) airFusionStep(sim);
                 if (hasElement(sim, 'fire') && !sim.isJumping && !liveRotation.active && !sim.restRead) {
                     addElementalPatch(sim, sim.pos, 'fire');
                 }
@@ -2694,6 +2697,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             if (hasElement(sim, 'grass') && settled) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }
+            if (settled) airFusionLanding(sim, size);
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;

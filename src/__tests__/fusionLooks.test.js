@@ -14,7 +14,7 @@ const seeded = (seed = 7) => () => {
 
 describe('fusion looks', () => {
   it('gives every dedicated reaction a look of its own', () => {
-    const ids = Object.values(ORDERED_FUSIONS).filter(f => f.rule).map(f => f.id).sort();
+    const ids = Object.values(ORDERED_FUSIONS).map(f => f.id).sort();
     expect(Object.keys(FUSION_LOOKS).sort()).toEqual(ids);
     const signatures = new Set();
     for (const id of ids) {
@@ -27,11 +27,11 @@ describe('fusion looks', () => {
       expect(reactionPatternOf(id)).toBe(REACTION_PATTERNS[look.pattern]);
       signatures.add(`${look.pattern}|${look.color}|${look.particle}`);
     }
-    expect(signatures.size).toBe(20);
+    expect(signatures.size).toBe(30);
   });
 
   it('never reuses either element\'s own colour as a reaction\'s main colour', () => {
-    for (const recipe of Object.values(ORDERED_FUSIONS).filter(f => f.rule)) {
+    for (const recipe of Object.values(ORDERED_FUSIONS)) {
       const look = fusionLookOf(recipe.id);
       expect(look.color.toLowerCase()).not.toBe(ELEMENTAL_DEFS[recipe.base].color.toLowerCase());
       expect(look.color.toLowerCase()).not.toBe(ELEMENTAL_DEFS[recipe.catalyst].color.toLowerCase());
@@ -39,8 +39,8 @@ describe('fusion looks', () => {
   });
 
   it('makes the reverse order of a pair look different', () => {
-    for (const recipe of Object.values(ORDERED_FUSIONS).filter(f => f.rule)) {
-      const reverse = Object.values(ORDERED_FUSIONS).filter(f => f.rule).find(f => f.base === recipe.catalyst && f.catalyst === recipe.base);
+    for (const recipe of Object.values(ORDERED_FUSIONS)) {
+      const reverse = Object.values(ORDERED_FUSIONS).find(f => f.base === recipe.catalyst && f.catalyst === recipe.base);
       const a = fusionLookOf(recipe.id), b = fusionLookOf(reverse.id);
       expect(a.pattern !== b.pattern || a.particle !== b.particle || a.color !== b.color).toBe(true);
     }
