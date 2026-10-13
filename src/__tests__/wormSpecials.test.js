@@ -757,10 +757,10 @@ describe('special type chooser', () => {
     return () => values[i++ % values.length];
   };
 
-  it('balances four gameplay powers with one view power in each bag', () => {
+  it('balances five gameplay powers with one view power in each bag', () => {
     const picker = makeSpecialPicker();
-    const drawn = Array.from({ length: 5 }, () => drawSpecialType(picker, { rand: () => 0.4 }));
-    expect(drawn).toEqual(expect.arrayContaining(['rocket', 'magnet', 'explode', 'orb-shower']));
+    const drawn = Array.from({ length: 6 }, () => drawSpecialType(picker, { rand: () => 0.4 }));
+    expect(drawn).toEqual(expect.arrayContaining(['rocket', 'magnet', 'explode', 'orb-shower', 'spring']));
     expect(drawn.filter(isViewPower)).toHaveLength(1);
   });
 
@@ -1310,13 +1310,13 @@ it.each(['remote', 'head', 'glow'])('credits Story magnet catches for remote mag
 
 
 describe('Explode pickup', () => {
-  it('offers Explode as the first ambient pickup, then balances all five power categories', () => {
+  it('offers Explode as the first ambient pickup, then balances all six power categories', () => {
     const sim = makeSim(), ctx = makeCtx();
     sim.specialTimer = 0;
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.specials.find(s => !isElementalType(s.type))?.type).toBe('explode');
-    const types = Array.from({ length: 5 }, () => drawSpecialType(sim.specialPicker));
-    expect(types).toEqual(expect.arrayContaining(['explode', 'rocket', 'magnet', 'orb-shower']));
+    const types = Array.from({ length: 6 }, () => drawSpecialType(sim.specialPicker));
+    expect(types).toEqual(expect.arrayContaining(['explode', 'rocket', 'magnet', 'orb-shower', 'spring']));
     expect(types.filter(isViewPower)).toHaveLength(1);
   });
 
@@ -1381,7 +1381,7 @@ describe('Explode pickup', () => {
 describe('temporary cube views', () => {
   it('offers every supported view before repeating, without crowding out other powers', () => {
     const picker = makeSpecialPicker();
-    const draws = Array.from({ length: VIEW_POWER_TYPES.length * 5 }, () => drawSpecialType(picker, { rand: () => 0.3 }));
+    const draws = Array.from({ length: VIEW_POWER_TYPES.length * 6 }, () => drawSpecialType(picker, { rand: () => 0.3 }));
     expect(new Set(draws.filter(isViewPower))).toEqual(new Set(VIEW_POWER_TYPES));
     expect(draws.filter(t => t === 'rocket')).toHaveLength(VIEW_POWER_TYPES.length);
   });

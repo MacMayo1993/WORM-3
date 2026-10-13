@@ -22,6 +22,12 @@ import { VIEW_POWER_DEFS } from './viewPowerups.js';
 import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDefs.js';
 
 const BASE_SPECIAL_DEFS = {
+  spring: {
+    label: 'Spring', color: '#ffcf40', accent: '#fff6c4', icon: 'spring',
+    iconPath: 'M5 2h14v3H5zM5 19h14v3H5zM6 5l12 3v2L10 12l8 2v2L6 19v-2l8-2-8-2v-2l8-2-8-2z',
+    iconAccent: 'M12 1l-3 3h6z',
+    description: 'Touch the spring to bounce, then automatically double jump at the top. Steer your landing!',
+  },
   'orb-shower': {
     label: 'Orb Shower', color: '#72edbb', accent: '#fff0a8', icon: 'orb-shower', particle: 'bubbles',
     iconPath: 'M7 3a4 4 0 0 1 7-1 4 4 0 0 1 5 6H5a3 3 0 0 1 2-5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
@@ -68,7 +74,7 @@ export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS, ...VIEW_P
 /** Canonical list of supported special types (buffs + elements). */
 export const SPECIAL_TYPES = Object.keys(SPECIAL_DEFS);
 
-/** The four gameplay buffs — every bag offers each plus one cube-view pickup. */
+/** The gameplay buffs — every bag offers each plus one cube-view pickup. */
 export const BUFF_TYPES = Object.keys(BASE_SPECIAL_DEFS);
 
 /** Just the elemental orb types, in catalogue order. */
