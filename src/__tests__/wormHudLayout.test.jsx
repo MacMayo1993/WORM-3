@@ -155,6 +155,9 @@ it('puts Start level at the bottom, counts down, then shows automatic checked ta
   expect(start.textContent).toContain('Start level');
   act(() => start.click());
   expect(host.querySelector('.worm-story-start')).toBeNull();
+  expect(document.querySelector('.worm-countdown-digit')).toBeNull();
+  expect(useGameStore.getState().wormGamePhase).toBe('spawning');
+  act(() => useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 }));
   expect(document.querySelector('.worm-countdown-digit').textContent).toBe('3');
   expect(useGameStore.getState().wormPaused).toBe(true);
   expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(true);

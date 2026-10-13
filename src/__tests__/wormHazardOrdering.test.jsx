@@ -110,7 +110,7 @@ it('plays every countdown beat in Free Play and releases only after the word exi
   expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
 });
 
-it('counts down after Start level and on retry without scrambling or replacing the staged body', () => {
+it('reveals the worm then counts down after Start level and on retry without scrambling or replacing the staged body', () => {
   const shuffle = vi.fn();
   act(() => root.render(<Harness cubies={useGameStore.getState().cubies} size={3} onRotate={rotate} onAnimatedShuffle={shuffle} />));
   shuffle.mockClear();
@@ -124,8 +124,16 @@ it('counts down after Start level and on retry without scrambling or replacing t
     expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormPaused: true, wormStoryStarted: false });
     vi.mocked(feel).mockClear();
     act(() => useGameStore.getState().startWormStory());
-    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: null, wormPaused: true });
     tick(1, .01); // phase driver accepts the request
+    tick(1, .5);
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormPaused: true });
+    act(() => useGameStore.setState({ wormPauseMenuOpen: true }));
+    tick(1, 3);
+    expect(useGameStore.getState().wormGamePhase).toBe('spawning');
+    act(() => useGameStore.setState({ wormPauseMenuOpen: false }));
+    tick(1, 1);
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
     for (const step of [2, 1, 'go', 'hold']) {
       tick(1, COUNTDOWN_STEP_DURATION + .001);
       expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: step, wormPaused: true });

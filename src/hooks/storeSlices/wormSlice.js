@@ -26,10 +26,10 @@ export const createWormSlice = (set, get) => ({
   wormStoryVisualBase: null,
   wormStoryViewBase: null,
   applyWormStoryLook: id => set(s => id !== null && !storyUnlocked(s.playerProgress, id) ? s : storyVisualChanges(s, id)),
-  // Dismiss the briefing into the shared countdown. Only the phase driver may
+  // Dismiss the briefing into the worm entrance, then the shared countdown. Only the phase driver may
   // release movement/objective time once the WORM launch has finished.
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen
-    ? { wormStoryStarted: true, wormPaused: true, wormGamePhase: 'countdown', wormCountdownStep: 3 } : s),
+    ? { wormStoryStarted: true, wormPaused: true, wormGamePhase: 'spawning', wormCountdownStep: null } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
   finishWormStory: () => set(s => {
     const offer = s.wormStoryChecklist;

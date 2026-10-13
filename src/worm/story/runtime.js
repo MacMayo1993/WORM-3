@@ -47,15 +47,18 @@ export function storyBodyPath(size, level) {
 
 // Tunnel mouths live on the three positive faces; their twins land on the
 // negative faces, so no two mouths can share a pair.
-export function storyMouths(size, count) {
+export function storyMouths(size, count, levelId = 1) {
+  // Rotate the safe authored candidates per level; retries keep the same layout.
+  const offsetIndex = Math.max(0, levelId - 1) % MOUTHS.length;
+  const pick = candidates => candidates.slice(offsetIndex).concat(candidates.slice(0, offsetIndex)).slice(0, count);
   if (size >= TEMPLATE_SIZE) {
     const edge = size - 1, offset = Math.floor(size / 2) - 2;
     // Spawn-face mouths keep their rows: the head starts on row 0 at every size,
     // so shifting them up with the board would land one under the body trail.
-    return MOUTHS.slice(0, count).map(([x, y, z, dir]) => [
+    return pick(MOUTHS).map(([x, y, z, dir]) => [
       dir === 'PX' ? edge : x + offset, dir === 'PY' ? edge : dir === 'PZ' ? y : y + offset, dir === 'PZ' ? edge : z + offset, dir]);
   }
-  return smallBoardMouths(size, count);
+  return pick(smallBoardMouths(size, Math.max(count, MOUTHS.length)));
 }
 
 // Small boards (below the 5×5 templates). Mouths used to go on the face corners, and
@@ -121,7 +124,7 @@ export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
   const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
-  const mouths = storyMouths(size, pairCount);
+  const mouths = storyMouths(size, pairCount, level.id);
   const mouthKeys = mouths.map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
   const pendingMouths = mouthKeys.slice(2);
   const tunnelGoals = Object.fromEntries(['selfPasses', 'multiHeals', 'ringHeals']
