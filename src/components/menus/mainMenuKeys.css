@@ -272,3 +272,11 @@
 .worm-menu-wallet { display:inline-flex; padding:5px 4px; border:2px solid #26372d; border-radius:999px; background:#fffcf1; box-shadow:0 4px 0 #26372d; }
 /* Over a photo panorama the links sit on cream chips so they read on any scene. */
 .worm-menu-links button { padding:8px 14px; border-radius:999px; background:#fffcf1e6; box-shadow:0 2px 0 #26372d55; text-decoration:none; }
+
+/* Reserve the same heading height used to frame the live cube. */
+.worm-menu-title .worm-wordmark--menu { font-size: var(--menu-title-size); }
+@media (orientation: landscape) and (max-height: 600px) {
+  .worm-menu-title { width: 48%; box-sizing: border-box; }
+  .worm-menu-dock { left: 50% !important; top: 80px; bottom: 16px !important; padding-bottom: 0 !important; }
+  .worm-menu-dock .worm-menu-actions { width: min(340px, calc(50vw - 32px)); }
+}

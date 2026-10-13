@@ -675,6 +675,12 @@ const DRIFT_NOD_AMP = 0.60; //   divide the yaw's, so the pose never quite repea
 // Home-screen cube scale. The carousel instead fits its measured stage.
 const MENU_CUBE_GROWTH = 1.05;
 const MENU_BUTTON_LIFT_PX = 24;
+// Move the wordmark and live cube as one composition into the open space above
+// Play. Short screens retain their clearance; desktop needs a smaller shift.
+const menuHeroDrop = (width, height) => Math.max(0, Math.min(
+  height > width ? 64 : 24, (height - 600) * 0.28,
+));
+const menuTitleSize = (width, height) => Math.max(74, Math.min(width * 0.21, height * 0.16, 170));
 const MENU_CUBE_ZOOM = 0.8 * MENU_CUBE_GROWTH;
 const MENU_REST_SCALE = 1.022 * MENU_CUBE_ZOOM;
 const MENU_PRESS_SCALE = 0.968 * MENU_CUBE_ZOOM; // finger down on the cube
@@ -944,8 +950,8 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     // the idle home pose; the carousel/dive paths above keep their own framing.
     const { width, height } = state.size;
     const landscape = width > height && height <= 600;
-    const heroTop = landscape ? 130 : height <= 740 ? 130 : 200;
-    const heroBottom = landscape ? height - 16 : height - 320;
+    const heroTop = 80 + menuHeroDrop(width, height) + menuTitleSize(width, height) * 1.1 + 24;
+    const heroBottom = height - (landscape ? 16 : height > width ? 260 : 300);
     const heroHeight = Math.max(64, heroBottom - heroTop);
     const homeScale = Math.min(1, heroHeight / (height * 4 / state.viewport.height));
     cubeRef.current.scale.setScalar(cubeCurrentScale.current * homeScale);
@@ -1449,7 +1455,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     onClick?.();
   };
   return (
-  <div style={{
+  <div className="worm-menu-dock" style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: `calc(${padBottom} + ${MENU_BUTTON_LIFT_PX}px)`,
     display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
@@ -1495,19 +1501,23 @@ const menuStyles = {
   },
 };
 
-export const MenuTitleCard = ({ visible }) => (
-  <div style={{
+export const MenuTitleCard = ({ visible }) => {
+  const [viewport, setViewport] = useState(() => typeof window === 'undefined' ? [414, 808] : [window.innerWidth, window.innerHeight]);
+  useEffect(() => {
+    const update = () => setViewport([window.innerWidth, window.innerHeight]);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return <div className="worm-menu-title" style={{
     ...menuStyles.titleWrap,
+    top: menuHeroDrop(...viewport),
+    '--menu-title-size': `${menuTitleSize(...viewport)}px`,
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0)' : 'translateY(-18px)',
   }}>
     <WormWordmark menu animated />
-    {/* One line of eyebrow type, ruled on both sides. It fills the gap between
-        the wordmark and the cube and answers the question a first-time player
-        actually has: what is the cube in front of me doing? */}
-
-  </div>
-);
+  </div>;
+};
 
 // ─── Backdrop ─────────────────────────────────────────────────────────────────
 // The menu draws over whatever environment the 3D scene happened to load, and
