@@ -440,3 +440,29 @@ it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once
     expect(blast.size).toBeGreaterThan(0); // neighbouring unprotected tiles still burn
   }
 });
+
+it('Rainwind douses bombs in its landing burst once, while Sea Breeze leaves them ticking', async () => {
+  const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const bomb = { id: 77, tile: {...sim.pos}, fuse: 4, maxFuse: 5 };
+  props.bombsRef.current.push(bomb);
+  sim.elementalPair = 'water'; sim.elementalType = 'air'; sim.elementalT = wormBuffs.elementalT = 10;
+  const coins = useGameStore.getState().parityPoints;
+  airFusionLanding(sim,3); tick();
+  expect(props.bombsRef.current).toHaveLength(1);
+  sim.elementalPair = 'air'; sim.elementalType = 'water';
+  airFusionLanding(sim,3); tick();
+  expect(props.bombsRef.current).toHaveLength(0);
+  expect(useGameStore.getState().parityPoints).toBe(coins+12);
+  tick(); expect(useGameStore.getState().parityPoints).toBe(coins+12);
+});
+
+it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s changes whether marked strikes harm the worm', (base,catalyst,safe) => {
+  sim.elementalPair = base; sim.elementalType = catalyst; sim.elementalT = wormBuffs.elementalT = 10;
+  tick(28);
+  expect(useGameStore.getState().wormAlive).toBe(safe);
+  if (safe) {
+    expect(checkBlastHitWorm).not.toHaveBeenCalled();
+    expect(sim.staticT).toBeGreaterThan(0);
+  } else expect(checkBlastHitWorm).toHaveBeenCalled();
+});

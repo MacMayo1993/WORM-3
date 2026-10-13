@@ -70,10 +70,10 @@ describe('fusion catalogue', () => {
   });
 
   it('gives each dedicated reaction a rule of its own, different from its reverse', () => {
-    const recipes = Object.values(ORDERED_FUSIONS).filter(f => f.rule);
+    const recipes = Object.values(ORDERED_FUSIONS);
     expect(recipes.every(f => f.rule && !f.fallback)).toBe(true);
-    expect(new Set(recipes.map(f => f.id)).size).toBe(20);
-    expect(new Set(recipes.map(f => f.description)).size).toBe(20);
+    expect(new Set(recipes.map(f => f.id)).size).toBe(30);
+    expect(new Set(recipes.map(f => f.description)).size).toBe(30);
     for (const f of recipes) {
       expect(fusionEffect(f)).toBe(f.id);
       expect(fusionEffect(getFusion(f.catalyst, f.base))).not.toBe(f.id);
@@ -85,9 +85,9 @@ describe('fusion catalogue', () => {
 
   it('has a live HUD readout for every recipe', () => {
     const generic = elementalFeedback('water', { waterMomentum: 0 }).text;
-    const texts = Object.values(ORDERED_FUSIONS).filter(f => f.rule).map(f => elementalFeedback(f.catalyst, { waterMomentum: 0 }, f.id).text);
+    const texts = Object.values(ORDERED_FUSIONS).map(f => elementalFeedback(f.catalyst, { waterMomentum: 0 }, f.id).text);
     expect(texts).not.toContain(generic);
-    expect(new Set(texts).size).toBe(20);
+    expect(new Set(texts).size).toBe(30);
   });
 });
 
@@ -469,9 +469,9 @@ describe('fusion ignition', () => {
   };
 
   it('every dedicated reaction has its own ignition, posted once as the pair forms', () => {
-    const recipes = Object.values(ORDERED_FUSIONS).filter(f => f.rule);
+    const recipes = Object.values(ORDERED_FUSIONS);
     expect(Object.keys(IGNITIONS).sort()).toEqual(recipes.map(f => f.id).sort());
-    expect(new Set(Object.values(IGNITIONS).map(i => i.text)).size).toBe(20);
+    expect(new Set(Object.values(IGNITIONS).map(i => i.text)).size).toBe(30);
     for (const f of recipes) {
       const { sim, ctx } = sizedFuse(f.base, f.catalyst);
       expect(lastBurst(sim)).toMatchObject({ kind: 'ignite', recipe: f.id, hit: IGNITIONS[f.id].hit });

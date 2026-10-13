@@ -9,16 +9,15 @@
 // two. Every element check reads `hasElement`, never `elementalType` alone, or the
 // partner's half of a fusion silently switches off.
 //
-// The original 20 ordered recipes have dedicated reaction rules. Air adds ten
-// ordered combinations that retain both base mechanics.
+// All 30 ordered recipes have dedicated reaction rules. Reversing pickup order
+// changes the mechanic as well as the presentation.
 //
 // Pure, like elementalDefs.js: no React, no Three, no store.
 
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 
 // Recipe identity is ordered: the first pickup is the base, the second the catalyst.
-// Dedicated reactions have a description and rule; Air combinations below keep
-// both base effects. `fallback` reserves an explicit way to reuse a shipped rule.
+// Every recipe retains both base effects alongside its ordered reaction rule.
 const recipes = [
   ['fire', 'water', 'steam', 'Steam', 'Your steaming trail scalds and stuns enemies and puts out bombs.'],
   ['water', 'ice', 'slipstream', 'Slipstream', 'Turns keep water momentum; full momentum gives 40% extra speed.'],
@@ -41,16 +40,19 @@ const recipes = [
   ['lightning', 'ice', 'cryostorm', 'Cryostorm', 'Marks charge twice as long and strike as frost: no harm to you, no flips; enemies nearby freeze and bombs stop ticking.'],
   ['lightning', 'grass', 'grounded', 'Grounded', 'Strikes grow charged spring pads instead of flipping tiles, and a strike on your body grows a pad instead of cutting.'],
 ];
-// Air pairs combine their two base mechanics. Additional reaction rules can be
-// introduced independently without pretending an unimplemented bonus is active.
-for (const [other, forward, reverse] of [
-  ['water', 'Sea Breeze', 'Rainwind'], ['fire', 'Updraft', 'Bellows'],
-  ['grass', 'Dust Devil', 'Highlands'], ['ice', 'Snowdrift', 'Polar Wind'],
-  ['lightning', 'Thunderhead', 'Stormwind'],
-]) {
-  recipes.push([other, 'air', `${other}-air`, forward, null]);
-  recipes.push(['air', other, `air-${other}`, reverse, null]);
-}
+// Each Air order has a dedicated rule; keep IDs stable for recorded fusion goals.
+recipes.push(
+  ['water', 'air', 'water-air', 'Sea Breeze', 'Build and keep water momentum in flight; airborne turns preserve it and full momentum gives 40% extra speed while airborne.'],
+  ['air', 'water', 'air-water', 'Rainwind', 'Land to refill water momentum, stun nearby enemies and put out bombs in the surrounding 3×3.'],
+  ['fire', 'air', 'fire-air', 'Updraft', 'Jump from a hot trail tile for an extra tile of travel and 1.2 extra lift on top of Air’s boost.'],
+  ['air', 'fire', 'air-fire', 'Bellows', 'Rain fire onto every tile you fly over during a jump; those firebreaks burn for 6 seconds and speed bomb fuses.'],
+  ['grass', 'air', 'grass-air', 'Dust Devil', 'Launching from a spring pad sends a gust two surface steps outward, stunning enemies around the launch.'],
+  ['air', 'grass', 'air-grass', 'Highlands', 'Every landing grows a charged spring pad lasting 12 seconds; jump from it for a rocket-high leap amplified by Air.'],
+  ['ice', 'air', 'ice-air', 'Snowdrift', 'Jumping leaves a 7-second frost trail beneath you: enemies freeze and bombs on those tiles stop ticking.'],
+  ['air', 'ice', 'air-ice', 'Polar Wind', 'Steer freely on the ground. Each ground takeoff freezes a cross reaching two tiles in every direction for 3 seconds.'],
+  ['lightning', 'air', 'lightning-air', 'Thunderhead', 'Marked strikes become harmless gusts: they stun nearby enemies and grant a 35% speed burst instead of cutting, killing or flipping tiles.'],
+  ['air', 'lightning', 'air-lightning', 'Stormwind', 'Every landing discharges a cross reaching two tiles in every direction, defeating enemies there. Normal lightning strikes remain dangerous.'],
+);
 export const ORDERED_FUSIONS = Object.fromEntries(recipes.map(([base, catalyst, id, label, description, fallback = null]) => [
   `${base}>${catalyst}`, { base, catalyst, id, label, rule: !!description, fallback,
     description: description ?? (fallback

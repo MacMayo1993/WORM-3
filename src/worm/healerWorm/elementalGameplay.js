@@ -112,7 +112,7 @@ export function tickElementalGameplay(sim, delta, size = 0) {
     sim.staticT = Math.max(0, (sim.staticT ?? 0) - delta);
     sim.surgeT = Math.max(0, (sim.surgeT ?? 0) - delta);
     // Geyser: the launch carries the water with it, so a spring leap keeps momentum.
-    const carried = !sim.isJumping || (sim.springLaunch && activeFusion(sim) === 'geyser');
+    const carried = !sim.isJumping || activeFusion(sim) === 'water-air' || (sim.springLaunch && activeFusion(sim) === 'geyser');
     const target = hasElement(sim, 'water') && carried ? 1 : 0;
     sim.waterMomentum += (target - sim.waterMomentum) * (1 - Math.exp(-delta * 2));
 }
@@ -155,10 +155,11 @@ export function chargeSpringPad(patches, tileOrKey) {
 }
 
 /** Water momentum's speed bonus at full momentum: Slipstream raises it. */
-export const waterSpeedBonus = sim => (activeFusion(sim) === 'slipstream' ? 0.4 : 0.25);
+export const waterSpeedBonus = sim => (activeFusion(sim) === 'slipstream' || (activeFusion(sim) === 'water-air' && sim.isJumping && !sim.rocketActive) ? 0.4 : 0.25);
 
 /** Whether a turn costs the worm its water momentum. Slipstream keeps it. */
 export const turnShedsMomentum = sim => activeFusion(sim) !== 'slipstream'
+    && !(activeFusion(sim) === 'water-air' && sim.isJumping && !sim.rocketActive)
     && !(activeFusion(sim) === 'quench' && isObsidianTile(sim.elementalPatches, sim.pos));
 
 /** Quench converts the hot trail already on the board as well as future steps. */
@@ -183,7 +184,7 @@ export function steamTiles(sim, also = null) {
 }
 
 export function iceHoldsTurn(sim, delta, stepSec) {
-    return hasElement(sim, 'ice') && !sim.isJumping
+    return hasElement(sim, 'ice') && activeFusion(sim) !== 'air-ice' && !sim.isJumping
         && !sim.rocketActive && sim.interpT > 0.05 && sim.interpT + delta / stepSec < 1;
 }
 

@@ -13,6 +13,16 @@ export function fusionFeedback(recipe, buffs) {
 export function elementalFeedback(type, buffs, fusion = null) {
     const momentum = buffs.rocketActive ? 0 : Math.max(0, Math.min(1, buffs.waterMomentum || 0));
     // A fused pair's own rule leads the readout (elementalFusion.js).
+    if (fusion === 'water-air') return { text: 'Keep momentum in flight · Airborne speed up to +40%', fraction: momentum };
+    if (fusion === 'air-water') return { text: 'Land: refill momentum · Douse bombs in the 3×3', fraction: momentum };
+    if (fusion === 'fire-air') return { text: 'Hot-tile takeoff: +1 tile · +1.2 lift', fraction: 0 };
+    if (fusion === 'air-fire') return { text: 'Jump: rain 6-second fire trails beneath you', fraction: 0 };
+    if (fusion === 'grass-air') return { text: 'Spring launch: stun enemies within 2 steps', fraction: buffs.springReady ? 1 : 0 };
+    if (fusion === 'air-grass') return { text: 'Land: grow a charged 12-second spring pad', fraction: buffs.springReady ? 1 : 0 };
+    if (fusion === 'ice-air') return { text: 'Jump: leave 7-second frost beneath you', fraction: 0 };
+    if (fusion === 'air-ice') return { text: 'Free steering · Takeoff freezes a 2-tile cross', fraction: 0 };
+    if (fusion === 'lightning-air') return { text: buffs.staticT > 0 ? 'GUST! · +35% speed · Harmless strikes' : 'Strikes become safe gusts and speed bursts', fraction: buffs.staticT > 0 ? 1 : 0 };
+    if (fusion === 'air-lightning') return { text: 'Land: discharge a lethal cross · Dodge storm marks', fraction: 0 };
     if (fusion === 'slipstream') return { text: `Slipstream +${Math.round(momentum * 40)}% · Turns keep momentum`, fraction: momentum };
     if (fusion === 'quench') return { text: 'Obsidian blocks blasts · Turns on it keep momentum', fraction: momentum };
     if (fusion === 'steam') return { text: 'Steam trail scalds enemies · Puts out bombs', fraction: 0 };

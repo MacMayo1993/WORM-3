@@ -42,6 +42,26 @@ const cross = (head, size, reach) => [...computeBlastTiles({ tile: head }, size,
  * one-line description of the moment.
  */
 export const IGNITIONS = Object.freeze({
+  'water-air': { text: 'A sea breeze fills your momentum: carry it into a jump.', hit: 'stun',
+    boost: sim => { sim.waterMomentum = 1; }, ground: () => [] },
+  'air-water': { text: 'A rainburst douses nearby bombs and fills your momentum.', hit: 'stun', defuse: true,
+    boost: sim => { sim.waterMomentum = 1; }, ground: (sim, head, size) => [...springSlamTiles(head, size)] },
+  'fire-air': { text: 'A hot launch tile ignites beneath you: jump into the updraft.', hit: 'burn',
+    ground: (sim, head) => lay(sim, [keyOf(head)], 'fire', { ttl: 6 }) },
+  'air-fire': { text: 'The bellows fan a ring of long-burning flame.', hit: 'burn', flames: true,
+    ground: (sim, head, size) => lay(sim, around(head, size), 'fire', { ttl: 6 }) },
+  'grass-air': { text: 'A spring rises beneath you; dust stuns enemies nearby.', hit: 'stun',
+    ground: (sim, head, size) => { lay(sim, [keyOf(head)], 'grass'); return ring(head, size, 2); } },
+  'air-grass': { text: 'A charged highland pad rises beneath you for a towering leap.', hit: 'stun',
+    ground: (sim, head) => lay(sim, [keyOf(head)], 'grass', { charged: true, ttl: 12 }) },
+  'ice-air': { text: 'A snowdrift freezes the ground; jump to extend it beneath you.', hit: 'freeze',
+    ground: (sim, head, size) => lay(sim, around(head, size), 'frost', { ttl: 7 }) },
+  'air-ice': { text: 'Polar wind freezes a cross and releases your ground steering.', hit: 'freeze',
+    ground: (sim, head, size) => lay(sim, cross(head, size, 2), 'frost', { ttl: 3 }) },
+  'lightning-air': { text: 'Thunder becomes a safe gust: nearby enemies stagger as you accelerate.', hit: 'stun',
+    boost: sim => { sim.staticT = FUSION.staticBurstT; }, ground: (sim, head, size) => ring(head, size, 1) },
+  'air-lightning': { text: 'A stormwind discharge strikes a cross around you.', hit: 'kill', lightning: true,
+    ground: (sim, head, size) => cross(head, size, 2) },
   steam: { text: 'A ring of steam bursts out: bombs in it go out.', hit: 'stun',
     ground: (sim, head, size) => lay(sim, ring(head, size, 2), 'fire') },
   quench: { text: 'The ground around you sets into obsidian.', hit: 'stun',
@@ -108,5 +128,5 @@ export function igniteFusion(sim, recipeId, size = 0) {
   const head = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
   ignition.boost?.(sim);
   const tiles = size ? ignition.ground(sim, head, size) : [];
-  return postFusionBurst(sim, { kind: 'ignite', recipe: recipeId, hit: ignition.hit, flames: !!ignition.flames, tile: head, tiles });
+  return postFusionBurst(sim, { kind: 'ignite', recipe: recipeId, hit: ignition.hit, flames: !!ignition.flames, defuse: !!ignition.defuse, lightning: !!ignition.lightning, tile: head, tiles });
 }

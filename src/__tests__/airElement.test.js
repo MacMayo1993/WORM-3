@@ -51,8 +51,9 @@ it.each(ELEMENTAL_TYPES.filter(type => type !== 'air'))('combines Air with %s in
     expect(hasElement(sim, base)).toBe(true);
     expect(hasElement(sim, catalyst)).toBe(true);
     const recipe = getFusion(base, catalyst);
-    expect(fusionEffect(recipe)).toBeNull();
-    expect(fusionFeedback(recipe, {}).text).toContain('Air updraft');
+    expect(fusionEffect(recipe)).toBe(recipe.id);
+    expect(recipe.rule).toBe(true);
+    expect(fusionFeedback(recipe, {}).text).not.toBe(fusionFeedback(getFusion(catalyst, base), {}).text);
     expect(fusionFeedback(recipe, {}).text).not.toContain('undefined');
   }
 });
