@@ -10,6 +10,7 @@ import { surfacePose } from '../worm/combat/portalCombat.js';
 import { shAt, ttAt } from '../worm/circularBuffers.js';
 import { WORM_LIFT } from '../worm/healerWorm/constants.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
+import { STORY_ELEMENTS } from '../worm/story/elementGoals.js';
 
 // Every listed task at its target, settled on the surface.
 const completed = (level, extra = {}) => ({ alive: true, elapsed: 200, cuts: 0, peakLength: 300, remaining: 0,
@@ -19,6 +20,8 @@ function setup(id = 10) {
   resetLiveRotation();
   const level = storyLevel(id), size = level.cubeSize ?? 5;
   const sim = makeWormSim(size), p = stageStory(sim, size, level);
+  // Deal the authored order so these cycle and credit checks can name elements.
+  if (p.elementOrder) p.elementOrder = [...STORY_ELEMENTS];
   p.rotationEpoch = 0;
   const read = (delta = 0.05) => storyMetrics(sim, p, level, { wormSessionOrbs: 0, rotationEpoch: 0 }, [], delta);
   return { sim, level, p, read };

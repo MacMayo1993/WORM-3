@@ -57,6 +57,8 @@ export function auditGeneratedLevel(candidate){
   for(const character of ['glow','classic']){
    resetLiveRotation();const sim=makeWormSim(size);sim.rand=()=>.42;
    const p=stageStory(sim,size,level,character),initialOrbs=sim.powerups.length;
+   // A run deals its elements at random; every deal relabels the same slots, so audit the authored one.
+   if(p.elementOrder)p.elementOrder=elementTypes(level).slice();
    const activePairs=getActiveTunnels(p.cubies,size).length;
    const totalPairs=['tunnel','collector','restore','mastery'].includes(level.kind)?level.target:0;
    invariant(new Set(sim.powerups.map(tileKey)).size===initialOrbs,'Staged food overlaps.');

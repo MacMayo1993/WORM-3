@@ -57,8 +57,10 @@ it('waits for the flight and recovery to finish before repeating a required rock
 });
 it('cycles every unfinished quest power even when earlier tasks earn no credit', () => {
   const { sim, p, level, offer } = setup(40);
+  // The elements fill their cycle slots in the order this attempt dealt them.
+  const [a, b, c, d, e, f] = p.elementOrder;
   for (let round = 0; round < 2; round++) {
-    for (const type of ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air']) {
+    for (const type of ['magnet', 'explode', a, 'rocket', b, c, d, e, f]) {
       sim.specials = []; p.powerDelay = 0;
       expect(nextStoryPower(p, level)).toBe(type);
       expect(offer()).toBe(true);

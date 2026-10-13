@@ -1,7 +1,7 @@
 import { storyStarGoals } from './starGoals.js';
 import { STORY_LEVEL_DATA, STORY_CHAPTER_DATA } from './campaign.js';
 import { storyGoalText, TAIL_KINDS } from './goalText.js';
-import { STORY_ELEMENTS, storyElementNames } from './elementGoals.js';
+import { STORY_ELEMENTS, storyElementNames, storyElementsRandom } from './elementGoals.js';
 
 // Every level is authored in campaign.js; the mission sentence is derived from
 // its targets so the map, pause card and checklist never disagree.
@@ -116,8 +116,12 @@ export function storyChecklist(level, metrics = {}) {
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
   return Object.entries(targets).map(([key, target]) => {
     const value = Math.min(target, Math.max(0, metrics[key] ?? 0));
+    // A run deals its own elements (metrics.elementOrder); before one, a random level says so.
+    const elementLabel = target === STORY_ELEMENTS.length ? `all ${target} elements`
+      : storyElementsRandom(level) && !metrics.elementOrder ? `${target} random elements`
+      : storyElementNames(level, target, metrics.elementOrder).join(', ');
     const label = ['elements', 'uniqueElements'].includes(key)
-      ? `${key === 'elements' ? 'Master' : 'Collect'} ${target === STORY_ELEMENTS.length ? `all ${target} elements` : storyElementNames(level, target).join(', ')}`
+      ? `${key === 'elements' ? 'Master' : 'Collect'} ${elementLabel}`
       : labels[key];
     return { key, label, value, target, done: value >= target };
   });

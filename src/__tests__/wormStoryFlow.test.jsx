@@ -422,7 +422,9 @@ it('publishes level 30 distinct element credit from real pickups and resets it o
   const [sim, practice] = metricsSpy.mock.calls.at(-1);
   // Leave the other goals incomplete; isolate pickup credit from mastery and
   // the offer delay while using the real crawler, event bridge and HUD store.
-  for (const [type, expected] of [['water', 1], ['water', 1], ['fire', 2], ['grass', 3]]) {
+  // The run dealt its own three elements; collect them, repeating the first.
+  const [first, second, third] = practice.elementOrder;
+  for (const [type, expected] of [[first, 1], [first, 1], [second, 2], [third, 3]]) {
     sim.elementalT = 0; sim.elementalFocusT = 0; sim.elementalType = null;
     practice.powerDelay = 100;
     const target = { ...sim.pos, type, id: `credit-${type}-${expected}`, ttl: 20, maxTtl: 20 };

@@ -20,6 +20,8 @@ const setup = (level, character, seed) => {
   resetLiveRotation(); const sim = makeWormSim(level.cubeSize);
   sim.rand = seededRandom(seed + ':' + level.id + ':' + character);
   const p = stageStory(sim, level.cubeSize, level, character);
+  // A run deals its elements at random; every deal relabels the same slots, so audit the authored one.
+  if (p.elementOrder) p.elementOrder = [...storyElementTypes(level)];
   return { sim, p, state: { cubies: p.cubies, wormPaused: false, animState: null } };
 };
 const readColors = (sim, cubies) => sim.powerups.reduce((counts, orb) => {

@@ -7,7 +7,8 @@ import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 function setup(id) {
   const level = storyLevel(id), size = level.cubeSize, sim = makeWormSim(size);
   const p = stageStory(sim, size, level, 'classic');
-  p.bonusDelay = 0; p.powerDelay = 0;
+  // Each attempt opens the lane on a random power; walk it from the first here.
+  p.bonusDelay = 0; p.powerDelay = 0; p.bonusIndex = 0;
   return { sim, p, level, size, bonus: () => offerStoryBonus(sim, p, level, size, p.cubies),
     quest: () => offerStoryPower(sim, p, level, size, p.cubies) };
 }
@@ -60,4 +61,16 @@ it.each(WORM_STORY_LEVELS.filter(l => l.mechanics?.uniqueElements || l.mechanics
     expect(second.dirKey).not.toBe(first.dirKey);
     expect(fusionReachableTiles({ ...sim, pos: first, elementalT: 10 }, size, p.cubies, level.speed).has(tileKey(second))).toBe(true);
   }
+});
+
+it('opens the bonus lane on a different power from attempt to attempt', () => {
+  const level = storyLevel(40), size = level.cubeSize;
+  const firsts = new Set();
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const sim = makeWormSim(size), p = stageStory(sim, size, level, 'classic');
+    p.bonusDelay = 0;
+    expect(offerStoryBonus(sim, p, level, size, p.cubies)).toBe(true);
+    firsts.add(sim.specials[0].type);
+  }
+  expect(firsts.size).toBeGreaterThan(2);
 });
