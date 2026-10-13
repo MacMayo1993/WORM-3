@@ -92,13 +92,14 @@ export async function startFreePlay(page, { viewport } = {}) {
   await mobi.getByRole('button', { name: 'Skip', exact: true }).click();
   await expect(mobi).toBeHidden();
   if (viewport) await page.setViewportSize(viewport);
-  // A visible HUD can still belong to the paused opening scramble. Only an
-  // enabled Pause confirms that spawning and the countdown reached live play.
+  // Pause becomes enabled during the entrance so the player can freeze it.
+  // Wait for the steering controls too: the arrival hides them until live play.
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await expect(pause).toBeVisible();
   // Twenty render-clock turns can take over two minutes on software GL. Leave
   // enough of the existing four-minute test budget for the scramble and countdown.
   await expect(pause).toBeEnabled({ timeout: 180_000 });
+  await expect(page.getByRole('button', { name: 'Turn left', exact: true })).toBeVisible();
 }
 
 /**
