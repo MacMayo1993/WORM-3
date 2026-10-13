@@ -24,7 +24,7 @@ it('renders every view as its own cube, reserves elemental rendering for element
     renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
   const root = createRoot(canvas);
   root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
-  const specials = [...VIEW_POWER_TYPES, 'orb-shower', 'fire'].map((type, id) => ({
+  const specials = [...VIEW_POWER_TYPES, 'orb-shower', 'spring', 'fire'].map((type, id) => ({
     id, type, x: 1, y: 1, z: 2, dirKey: 'PZ', ttl: 20, maxTtl: 20,
   }));
   useGameStore.setState({ wormSpecials: specials });
@@ -72,6 +72,13 @@ it('renders every view as its own cube, reserves elemental rendering for element
         }
       }
     }
+    const spring = store.scene.getObjectByName('spring-pickup');
+    expect(spring).toBeDefined();
+    const coilGroup = spring.children[1];
+    const extension = coilGroup.scale.y;
+    advance(12);
+    expect(coilGroup.scale.y).not.toBeCloseTo(extension);
+    expect(coilGroup.children[0].geometry.type).toBe('TubeGeometry');
     expect(store.scene.getObjectByName('elemental-fire')).toBeDefined();
     expect(store.scene.getObjectByName('elemental-view-lego')).toBeUndefined();
     expect(store.scene.getObjectByName('elemental-orb-shower')).toBeUndefined();

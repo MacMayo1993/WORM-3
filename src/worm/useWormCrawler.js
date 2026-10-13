@@ -7,7 +7,7 @@ import { orbsCarried } from './healerWorm/economy.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
 import { shouldFinishStory } from './story/starGoals.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
-import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
+import { offerStoryBonus, offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
 import { stageStory, storyMetrics, replenishStoryTunnel, replenishStoryOrbs } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
@@ -629,9 +629,10 @@ export function useWormCrawler(size, cubies) {
             // Rescue and pickup reveals hold the deadline/par clock until play resumes.
             const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current,
                 sim.jumpRescueHeld || elementalRevealHeld ? 0 : delta);
-            if (!sim.jumpRescueHeld && !live.animState && !liveRotation.active && sim.cutFocusT <= 0 && sim.healPauseT <= 0 &&
-                offerStoryPower(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies)) {
-                useGameStore.setState({ wormSpecials: sim.specials.slice(), wormPowerups: sim.powerups.slice() });
+            if (!sim.jumpRescueHeld && !live.animState && !liveRotation.active && sim.cutFocusT <= 0 && sim.healPauseT <= 0) {
+                const offered = offerStoryPower(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies);
+                const bonus = offerStoryBonus(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies);
+                if (offered || bonus) useGameStore.setState({ wormSpecials: sim.specials.slice(), wormPowerups: sim.powerups.slice() });
             }
             if (!elementalRevealHeld && replenishStoryOrbs(sim, storyPracticeRef.current, live, sizeRef.current, delta)) {
                 useGameStore.setState({ wormPowerups: sim.powerups.slice() });

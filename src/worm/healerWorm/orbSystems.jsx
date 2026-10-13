@@ -21,6 +21,7 @@ import ParityOrbs from '../ParityOrb.jsx';
 import OrbPickupBurst from './OrbPickupBurst.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 import ViewPickupCube from './ViewPickupCube.jsx';
+import SpringPickup from './SpringPickup.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // The band wears the manifold the orb sits on (its colour and tile style), and
@@ -201,7 +202,7 @@ function SpecialOrb({ special, size }) {
     return (
         <group ref={groupRef} visible={false}>
             <group ref={spinRef}>
-                {viewPickup ? <ViewPickupCube view={look.view} /> : showerPickup ? (
+                {special.type === 'spring' ? <SpringPickup /> : viewPickup ? <ViewPickupCube view={look.view} /> : showerPickup ? (
                     <group name="orb-shower-pickup">
                         {/* X/Z span the tile: -Z is the cloud's top; Y is depth.
                             Separating these along Y hides the rain behind the cloud head-on. */}
@@ -272,7 +273,7 @@ function SpecialOrb({ special, size }) {
                 )}
             </group>
 
-            {viewPickup || showerPickup ? null : special.type === 'explode' ? <mesh geometry={_specialGeos.cubie} scale={3.6} ref={tag(0.3)}>
+            {viewPickup || showerPickup || special.type === 'spring' ? null : special.type === 'explode' ? <mesh geometry={_specialGeos.cubie} scale={3.6} ref={tag(0.3)}>
                 <meshBasicMaterial color={look.accent} wireframe transparent opacity={0.3} depthWrite={false} />
             </mesh> : special.type === 'rocket' ? (
                 /* Tall triangular exhaust beacon: points along the rocket and cannot
