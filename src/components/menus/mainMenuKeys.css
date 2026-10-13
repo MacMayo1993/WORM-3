@@ -277,6 +277,7 @@
 .worm-menu-title .worm-wordmark--menu { font-size: var(--menu-title-size); }
 @media (orientation: landscape) and (max-height: 600px) {
   .worm-menu-title { width: 48%; box-sizing: border-box; }
-  .worm-menu-dock { left: 50% !important; top: 80px; bottom: 16px !important; padding-bottom: 0 !important; }
-  .worm-menu-dock .worm-menu-actions { width: min(340px, calc(50vw - 32px)); }
+  .worm-menu-dock { left: 50% !important; right: env(safe-area-inset-right, 0px) !important;
+    top: 80px; bottom: 16px !important; padding: 0 16px !important; box-sizing: border-box; }
+  .worm-menu-dock .worm-menu-actions { width: min(340px, 100%); }
 }

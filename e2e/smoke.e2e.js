@@ -10,17 +10,30 @@ test.afterEach(async ({ page, errors }) => {
   expect(await page.locator('[data-testid="app-error"]').count()).toBe(0);
 });
 
-test('boots to the main menu', async ({ page }) => {
+test('boots to the main menu and keeps landscape actions inside the safe area', async ({ page }) => {
   await openGame(page);
   await expect(page.locator('button:visible', { hasText: /demo/i }).first()).toBeVisible();
   await expect(page.locator('canvas').first()).toBeAttached();
   await page.waitForTimeout(2000);   // let late errors (a lazy chunk, a worker) surface before the afterEach check
+  await page.setViewportSize({ width: 812, height: 375 });
+  const cdp = await page.context().newCDPSession(page);
+  const play = page.getByRole('button', { name: 'Play', exact: true });
+  // Exercise the real CSS env() value, including an iPhone-sized landscape cutout.
+  for (const right of [0, 44]) {
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { right } });
+    await expect.poll(async () => {
+      const box = await play.boundingBox();
+      return box ? box.x + box.width : Infinity;
+    }, { timeout: 5000 }).toBeLessThanOrEqual(812 - right - 16);
+    expect((await play.boundingBox()).width).toBeGreaterThanOrEqual(250);
+  }
 });
 
 test('starts a WORM free-play run', async ({ page }) => {
-  // Complete setup at the normal viewport, then render fewer desktop pixels.
-  // The opening scramble needs rendered frames to complete on software GL.
-  await startFreePlay(page, { viewport: { width: 1024, height: 320 } });
+  // Keep the full wizard/launch path, but render fewer pixels on software GL.
+  // The opening turns and arrival advance on rendered frames, not wall time.
+  await page.setViewportSize({ width: 640, height: 480 });
+  await startFreePlay(page, { viewport: { width: 640, height: 320 } });
   await expect(page.getByRole('button', { name: /^Collect \d+ orbs: 0 of \d+/ })).toBeVisible();
   for (const control of ['Turn left', 'Turn right', 'Boost']) await expect(page.getByRole('button', { name: control, exact: true })).toBeVisible();
   await expect(page.locator('canvas').first()).toBeVisible();
