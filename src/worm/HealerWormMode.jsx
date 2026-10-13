@@ -1,5 +1,5 @@
 import { StoryArrival } from './healerWorm/StoryArrival.jsx';
-import { STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS } from './healerWorm/storyArrival.js';
+import { STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS, storyArrivalPose } from './healerWorm/storyArrival.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import CautionFallFX from './healerWorm/CautionFallFX.jsx';
 import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
@@ -29,7 +29,7 @@ import BurrowEffects from './healerWorm/BurrowEffects.jsx';
 // Chase camera follows the worm crawling on the cube exterior.
 // Flipped tiles are instant wormholes; jump to clear them.
 //
-// This file owns only the scramble → spawning → countdown → active →
+// This file owns only the scramble → portal arrival → active →
 // finalHealing → solved phase machine and the inverse-rotation hazard
 // scheduler. The rendering subsystems (body, trail, face, rings, portal/heal/
 // impact FX, tunnel interior) were split into ./healerWorm/ in 2026-07 — each
@@ -46,14 +46,12 @@ import { getActiveTunnels, collectManifoldRing } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import {
-    WORM_LIFT,
     FACE_NORMALS,
     DIR_FORWARD,
     STEPS_PER_TILE,
     AUTO_ROTATE_WARNING,
     SCRAMBLE_STEPS,
     ACTIVE_ROTATE_INTERVAL,
-    COUNTDOWN_STEP_DURATION,
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
     CUT_FOCUS_DURATION,
@@ -102,8 +100,6 @@ import { DroppedOrbs } from './healerWorm/DroppedOrbs.jsx';
 import { sampleSeveredTail, wormdKindForDeath } from './healerWorm/wormdFx.js';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
 
-const SPAWN_DURATION = 0.75;
-
 // Scratch vectors used to seed synthetic body history during spawning.
 const _seedPos = new THREE.Vector3();
 const _seedNorm = new THREE.Vector3();
@@ -120,7 +116,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
     const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
     const spawnTimerRef     = useRef(0);    // seconds elapsed in spawning entrance animation
-    const countdownTimerRef = useRef(0);    // seconds elapsed in countdown phase
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
 
@@ -512,7 +507,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
             spawnTimerRef.current     = 0;
-            countdownTimerRef.current = 0;
             countdownStepRef.current  = -1;
             autoTimerRef.current      = 0;
             pendingRotRef.current     = null;
@@ -528,8 +522,31 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Keep the full scramble and its inverse. CubeAssembly presents these
             // turns on the render clock with size-aware, non-overshooting easing;
             // the shared shuffle queue commits them without counting player moves.
-            // When done, go to 'spawning' so the worm can emerge before the countdown.
+            // When done, charge the portal and reveal the worm through the ready beats.
             const afterShuffle = () => {
+                // Free play gets a complete resting body before the portal opens.
+                const { x, y, z, dirKey } = worm.pos.current;
+                const norm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+                const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+                worm.headInterpPos.current.set(...wp);
+                // Seed step history so the full worm body is visible during countdown.
+                // Push points trailing behind the head along the face surface (opposite
+                // to the initial move direction), spaced at BODY_BALL_SPACING intervals.
+                _seedNorm.copy(norm);
+                const fwd = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
+                _seedBackDir.set(-fwd[0], -fwd[1], -fwd[2]);
+                const segCount = BASE_TAIL_LENGTH * STEPS_PER_TILE;
+                const stepSize = BODY_BALL_SPACING / STEPS_PER_TILE;
+                for (let i = segCount - 1; i >= 0; i--) {
+                    const d = (i + 1) * stepSize;
+                    _seedPos.set(
+                        wp[0] + _seedBackDir.x * d,
+                        wp[1] + _seedBackDir.y * d,
+                        wp[2] + _seedBackDir.z * d,
+                    );
+                    shPush(worm.stepHistory.current, _seedPos, _seedNorm, x, y, z);
+                }
+
                 gameModePhaseRef.current = 'spawning';
                 spawnTimerRef.current    = 0;
                 useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
@@ -549,14 +566,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         const unsub = useGameStore.subscribe(s => s.wormRunId, generateScramble);
         return unsub;
-    }, [size, onAnimatedShuffle]);
+    }, [size, onAnimatedShuffle, worm.headInterpPos, worm.moveDir, worm.pos, worm.stepHistory]);
 
-    const beginCountdown = () => {
-        gameModePhaseRef.current = 'countdown';
-        countdownTimerRef.current = 0;
-        countdownStepRef.current = 0;
-        useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
-        feel('countdownBeat');
+    const releaseArrival = () => {
+        gameModePhaseRef.current = 'active';
+        autoTimerRef.current = 0;
+        pendingRotRef.current = null;
+        warningProgressRef.current = 0;
+        resetRotationClock();
+        bombTimerRef.current = BOMB_SPAWN_INTERVAL;
+        useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
     };
 
     useFrame((_, delta) => {
@@ -568,7 +587,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             spawnTimerRef.current = 0;
             return;
         }
-        if (story && startState.wormPauseMenuOpen &&
+        if (startState.wormPauseMenuOpen &&
             (gameModePhaseRef.current === 'spawning' || gameModePhaseRef.current === 'countdown')) return;
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { bombTiles: bombsRef.current.map(b => b.tile), busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
@@ -620,83 +639,19 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             return;
         }
 
-        // ── Phase: spawning — worm wiggles out of the face center ─────────────
+        // ── Portal arrival: ready beats, reveal and control handoff share a clock.
         if (gameModePhaseRef.current === 'spawning') {
-            spawnTimerRef.current += delta;
-            if (story) {
-                const reduced = startState.settings?.reducedMotion || prefersReducedMotion();
-                const duration = reduced ? STORY_ARRIVAL_REDUCED_SECONDS : STORY_ARRIVAL_SECONDS;
-                if (spawnTimerRef.current >= duration) beginCountdown();
-                return;
+            // A resumed tab must not skip the whole reveal in one frame.
+            spawnTimerRef.current += Math.min(0.05, Math.max(0, delta));
+            const reduced = startState.settings?.reducedMotion || prefersReducedMotion();
+            const duration = reduced ? STORY_ARRIVAL_REDUCED_SECONDS : STORY_ARRIVAL_SECONDS;
+            const pose = storyArrivalPose(spawnTimerRef.current, reduced);
+            if (pose.step !== countdownStepRef.current) {
+                countdownStepRef.current = pose.step;
+                useGameStore.setState({ wormCountdownStep: pose.step });
+                if (pose.step !== null) feel(pose.step === 'go' ? 'countdownGo' : 'countdownBeat');
             }
-            const t = Math.min(spawnTimerRef.current / SPAWN_DURATION, 1);
-            // Damped spring: shoots out of the face then settles
-            const bounce = Math.sin(t * Math.PI * 2.4) * Math.exp(-t * 4.0) * 0.4;
-            const { x, y, z, dirKey } = worm.pos.current;
-            const norm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
-            const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
-            worm.headInterpPos.current.set(wp[0], wp[1], wp[2]).addScaledVector(norm, WORM_LIFT + bounce);
-            if (t >= 1) {
-                // Seed step history so the full worm body is visible during countdown.
-                // Push points trailing behind the head along the face surface (opposite
-                // to the initial move direction), spaced at BODY_BALL_SPACING intervals.
-                _seedNorm.copy(norm);
-                const fwd = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
-                _seedBackDir.set(-fwd[0], -fwd[1], -fwd[2]);
-                const segCount = BASE_TAIL_LENGTH * STEPS_PER_TILE;
-                const stepSize = BODY_BALL_SPACING / STEPS_PER_TILE;
-                for (let i = segCount - 1; i >= 0; i--) {
-                    const d = (i + 1) * stepSize;
-                    _seedPos.set(
-                        wp[0] + _seedBackDir.x * d,
-                        wp[1] + _seedBackDir.y * d,
-                        wp[2] + _seedBackDir.z * d,
-                    );
-                    shPush(worm.stepHistory.current, _seedPos, _seedNorm, x, y, z);
-                }
-
-                beginCountdown();
-            }
-            return;
-        }
-
-        // ── Phase: countdown ──────────────────────────────────────────────────
-        if (gameModePhaseRef.current === 'countdown') {
-            countdownTimerRef.current += delta;
-
-            // Idle breathing animation — gentle bob on the surface normal
-            const { x, y, z, dirKey } = worm.pos.current;
-            const norm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
-            const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
-            const breathe = Math.sin(countdownTimerRef.current * 3.5) * 0.03;
-            worm.headInterpPos.current.set(wp[0], wp[1], wp[2]).addScaledVector(norm, WORM_LIFT + breathe);
-
-            const step = Math.floor(countdownTimerRef.current / COUNTDOWN_STEP_DURATION);
-            if (step !== countdownStepRef.current) {
-                countdownStepRef.current = step;
-                if      (step === 0) { useGameStore.setState({ wormCountdownStep: 3 }); feel('countdownBeat'); }
-                else if (step === 1) { useGameStore.setState({ wormCountdownStep: 2 }); feel('countdownBeat'); }
-                else if (step === 2) { useGameStore.setState({ wormCountdownStep: 1 }); feel('countdownBeat'); }
-                else if (step === 3) {
-                    useGameStore.setState({ wormCountdownStep: 'go' });
-                    feel('countdownGo');
-                } else if (step === 4) {
-                    // The final beat pulls WORM into the portal and closes it.
-                    // Its staggered CSS exit fits entirely inside this beat.
-                    useGameStore.setState({ wormCountdownStep: 'hold' });
-                } else if (step >= 5) {
-                    // Countdown done — release the worm
-                    gameModePhaseRef.current = 'active';
-                    autoTimerRef.current = 0;
-                    pendingRotRef.current = null;
-                    warningProgressRef.current = 0;
-                    resetRotationClock();
-                    // Give the player a full interval of breathing room before the
-                    // first bomb spawns (the rotation hazard already ramps in slowly).
-                    bombTimerRef.current = BOMB_SPAWN_INTERVAL;
-                    useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
-                }
-            }
+            if (spawnTimerRef.current + 1e-9 >= duration) releaseArrival();
             return;
         }
 
@@ -1073,7 +1028,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     return (
         <WormLighting><PickupMaterialProvider>
-            <WormChaseCamera worm={worm} size={size} />
+            <WormChaseCamera worm={worm} size={size} arrivalElapsed={spawnTimerRef} />
             <DemoPracticeTargets size={size} />
             {!demoMode && (combatMode || enemiesEnabled) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
@@ -1122,8 +1077,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}
-            <PowerupOrbs size={size} worm={worm} />
-            <SpecialOrbs size={size} hidden={wormInTunnel} />
+            <group visible={wormGamePhase !== 'spawning'}><PowerupOrbs size={size} worm={worm} /></group>
+            <SpecialOrbs size={size} hidden={wormInTunnel || wormGamePhase === 'spawning'} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <SeveredTail severedRef={severedRef} />
             <DroppedOrbs worm={worm} size={size} />

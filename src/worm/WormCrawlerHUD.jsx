@@ -1335,9 +1335,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     // The pause menu must freeze the live simulation, not just overlay it. wormPaused is the
     // flag the crawler tick and rotation hazard check, but it's also owned by the game-phase
-    // machine during scramble/countdown/solved — so only drive it here during actual gameplay,
-    // otherwise resuming could release the worm mid-countdown.
-    const canPause = wormAlive && (wormGamePhase === 'active' || wormGamePhase === 'finalHealing');
+    // machine during entrance/countdown/solved. Resuming an entrance keeps that
+    // phase pause intact; only the arrival handoff can release the crawler.
+    const canPause = wormAlive && (wormGamePhase === 'spawning' || wormGamePhase === 'active' || wormGamePhase === 'finalHealing');
     const handlePause = useCallback(() => {
         if (!canPause) return;
         resumeFeel(); feel('uiKey');
@@ -1347,7 +1347,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const handleResume = useCallback(() => {
         resumeFeel(); feel('uiKey');
         setIsPaused(false);
-        setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormFinished)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
+        setWormPaused(['spawning', 'countdown'].includes(useGameStore.getState().wormGamePhase) || (storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormFinished)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode, storyId]);
 
     useEffect(() => {
@@ -1386,7 +1386,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     </div>;
 
     return (
-        <div className="worm-instrument" data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
+        <div className="worm-instrument" data-arriving={wormGamePhase === 'spawning' || undefined} data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
@@ -1510,8 +1510,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             )}
 
             {/* ── Countdown overlay ── */}
-            {wormGamePhase === 'countdown' && wormCountdownStep !== null && (
-                <CaptureVisual><WormCountdownOverlay step={wormCountdownStep} /></CaptureVisual>
+            {!isPaused && (wormGamePhase === 'countdown' || wormGamePhase === 'spawning') && wormCountdownStep !== null && (
+                <CaptureVisual><WormCountdownOverlay step={wormCountdownStep} arrival={wormGamePhase === 'spawning'} /></CaptureVisual>
             )}
 
             {/* ── Winner screen ── */}

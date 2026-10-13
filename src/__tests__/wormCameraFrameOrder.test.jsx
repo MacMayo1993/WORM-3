@@ -75,8 +75,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   rotate = vi.fn();
   act(() => root.render(<Harness cubies={cubies} size={15} onRotate={rotate} onAnimatedShuffle={(_moves, done) => done()} />));
-  tick(1, 1); // spawn
-  tick(1, 5); // countdown
+  tick(68, 0.05); // portal arrival and ready beats
   expect(useGameStore.getState().wormGamePhase).toBe('active');
 });
 

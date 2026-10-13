@@ -368,3 +368,19 @@ it('announces a new fusion with a FUSION banner naming the ordered recipe and it
   expect(host.querySelector('.worm-fusion-banner')).toBeNull();
   wormBuffs.elementalT = 0;
 });
+
+it('lets the arrival pause and resume without releasing gameplay early', () => {
+  useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: 2, wormPaused: true });
+  renderPhase('crawling');
+  expect(host.querySelector('.worm-instrument').dataset.arriving).toBe('true');
+  expect(document.querySelector('.worm-countdown--arrival')).not.toBeNull();
+  act(() => host.querySelector('[aria-label="Pause"]').click());
+  expect(useGameStore.getState().wormPauseMenuOpen).toBe(true);
+  expect(document.querySelector('.worm-countdown')).toBeNull();
+  act(() => host.querySelector('.worm-pause-resume').click());
+  expect(useGameStore.getState().wormPauseMenuOpen).toBe(false);
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(document.querySelector('.worm-countdown--arrival')).not.toBeNull();
+  act(() => useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false }));
+  expect(host.querySelector('.worm-instrument').hasAttribute('data-arriving')).toBe(false);
+});

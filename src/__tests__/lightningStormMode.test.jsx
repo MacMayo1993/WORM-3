@@ -60,7 +60,7 @@ beforeEach(() => {
     demoMode: false, wormStoryLevel: null, wormStoryResult: null, wormCombatMode: false, wormEnemiesEnabled: false, wormPhase: 'crawling' });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   act(() => root.render(<Harness cubies={cubies} size={3} onRotate={vi.fn()} onAnimatedShuffle={(_moves, done) => done()} />));
-  tick(1, 1); tick(1, 5);
+  tick(68, 0.05);
   expect(useGameStore.getState().wormGamePhase).toBe('active');
   tick(1, 0.01);                      // the first active frame binds the storm to this run
   storm = findElement(tree, LightningStrikes).props.stormRef.current;
@@ -182,7 +182,7 @@ describe('the lightning storm in the mode', () => {
   it('forgets its marks on a new run', () => {
     mark(FAR);
     act(() => useGameStore.setState({ wormRunId: (useGameStore.getState().wormRunId ?? 0) + 1 }));
-    tick(1, 1); tick(1, 5);             // a new run goes through its spawn and countdown again
+    tick(68, 0.05);             // a new run goes through its spawn and countdown again
     tick(1, 0.1);
     expect(storm.spots).toHaveLength(0);
     expect(worm.strikeTile).not.toHaveBeenCalled();

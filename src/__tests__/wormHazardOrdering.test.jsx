@@ -9,7 +9,6 @@ import { WORM_DEMO_LESSONS, newWormDemo } from '../game/wormDemoLessons.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
-import { COUNTDOWN_STEP_DURATION } from '../worm/healerWorm/constants.js';
 import { stageStory } from '../worm/story/runtime.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
@@ -69,8 +68,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   rotate = vi.fn();
   act(() => root.render(<Harness cubies={cubies} size={3} onRotate={rotate} onAnimatedShuffle={(_moves, done) => done()} />));
-  tick(1, 1); // spawn
-  tick(1, 5); // countdown
+  tick(68, 0.05); // complete the bounded portal arrival
   expect(useGameStore.getState().wormGamePhase).toBe('active');
 });
 
@@ -97,21 +95,21 @@ it('opens the authored WORM demo board without a scramble or countdown', () => {
   expect(useGameStore.getState().wormGamePhase).toBe('active');
 });
 
-it('plays every countdown beat in Free Play and releases only after the word exits', () => {
+it('charges the portal through ready beats and starts Free Play when the reveal finishes', () => {
   act(() => useGameStore.getState().initWormMode());
-  tick(1, 1); // spawn
-  expect(useGameStore.getState()).toMatchObject({ wormCountdownStep: 3, wormPaused: true });
-  for (const step of [2, 1, 'go', 'hold']) {
-    tick(1, COUNTDOWN_STEP_DURATION + .001);
-    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: step, wormPaused: true });
+  tick(1, 0.01);
+  expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: 3, wormPaused: true });
+  for (const step of [2, 1, 'go']) {
+    tick(17, 0.05);
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: step, wormPaused: true });
   }
-  tick(1, COUNTDOWN_STEP_DURATION - .01);
+  tick(16, 0.05);
   expect(useGameStore.getState().wormPaused).toBe(true);
-  tick(1, .02);
+  tick(1, 0.05);
   expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
 });
 
-it('reveals the worm then counts down after Start level and on retry without scrambling or replacing the staged body', () => {
+it('reveals the worm during the ready beats after Start level and on retry without scrambling or replacing the staged body', () => {
   const shuffle = vi.fn();
   act(() => root.render(<Harness cubies={useGameStore.getState().cubies} size={3} onRotate={rotate} onAnimatedShuffle={shuffle} />));
   shuffle.mockClear();
@@ -127,17 +125,17 @@ it('reveals the worm then counts down after Start level and on retry without scr
     act(() => useGameStore.getState().startWormStory());
     expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: null, wormPaused: true });
     tick(1, .01); // phase driver accepts the request
-    tick(1, .5);
+    tick(10, .05);
     expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormPaused: true });
     act(() => useGameStore.setState({ wormPauseMenuOpen: true }));
     tick(1, 3);
     expect(useGameStore.getState().wormGamePhase).toBe('spawning');
     act(() => useGameStore.setState({ wormPauseMenuOpen: false }));
-    tick(1, 1);
-    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
-    for (const step of [2, 1, 'go', 'hold']) {
-      tick(1, COUNTDOWN_STEP_DURATION + .001);
-      expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: step, wormPaused: true });
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: 3, wormPaused: true });
+    tick(7, .05);
+    for (const step of [2, 1, 'go']) {
+      if (step !== 2) tick(17, .05);
+      expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: step, wormPaused: true });
       act(() => useGameStore.getState().startWormStory()); // repeated click cannot restart/release
       expect(useGameStore.getState().wormCountdownStep).toBe(step);
     }
@@ -145,7 +143,7 @@ it('reveals the worm then counts down after Start level and on retry without scr
     expect(sim.stepHistory.buf.map(point => point.pos)).toEqual(history);
     expect(useGameStore.getState().cubies).toBe(staged.cubies);
     expect(feel.mock.calls.map(([event]) => event)).toEqual(['countdownBeat', 'countdownBeat', 'countdownBeat', 'countdownGo']);
-    tick(1, COUNTDOWN_STEP_DURATION);
+    tick(17, .05);
     expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
     tick(2);
     expect(useGameStore.getState().wormGamePhase).toBe('active');
@@ -498,4 +496,17 @@ it.each([
   expect(useGameStore.getState().parityPoints).toBe(coins);
   expect(worm.recordStoryBomb).not.toHaveBeenCalled();
   expect(sim.orbCascades).toHaveLength(0);
+});
+
+it('does not skip the arrival on a delayed frame or run hazards while its pause menu is open', () => {
+  act(() => useGameStore.getState().initWormMode());
+  tick(1, 90);
+  expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: 3, wormPaused: true });
+  act(() => useGameStore.setState({ wormPauseMenuOpen: true }));
+  tick(100, 1);
+  expect(useGameStore.getState().wormCountdownStep).toBe(3);
+  expect(rotate).not.toHaveBeenCalled();
+  act(() => useGameStore.setState({ wormPauseMenuOpen: false }));
+  tick(67, .05);
+  expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormPaused: false });
 });

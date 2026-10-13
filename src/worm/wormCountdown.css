@@ -169,3 +169,22 @@
   }
 }
 @keyframes wormCountdownFade { to { opacity: 0; } }
+
+/* The 3D entrance is the main event. Keep its ready cue below the hero. */
+.worm-countdown--arrival { place-items: end center; padding-bottom: max(20vh, 100px); }
+.worm-countdown--arrival .worm-countdown-art { width: 240px; height: 100px; }
+.worm-countdown--arrival .worm-countdown-portal { display: none; }
+.worm-countdown--arrival .worm-countdown-digit { font-size: 56px; -webkit-text-stroke-width: 2px; }
+.worm-countdown--arrival .worm-countdown-ready { margin-top: 7px; }
+.worm-countdown--arrival .worm-countdown-pips { margin-top: 6px; }
+.worm-countdown--arrival .worm-countdown-word { font-size: 48px; }
+@media (max-height: 500px) {
+  .worm-countdown--arrival { padding-bottom: 20px; }
+  .worm-countdown--arrival .worm-countdown-art { height: 70px; }
+  .worm-countdown--arrival .worm-countdown-ready { display: none; }
+}
+
+/* Keep Pause accessible while the reveal owns the rest of the screen. */
+.worm-instrument[data-arriving] .worm-hud-top,
+.worm-instrument[data-arriving] .worm-hud-bottom { visibility: hidden; }
+.worm-instrument[data-arriving] .worm-hud-top [aria-label="Pause"] { visibility: visible; }

@@ -31,3 +31,9 @@ it('announces the beats and keeps the same letters mounted for their exit', () =
   expect(host.querySelector('[role="status"]')).toBe(announcement);
   expect(announcement.textContent).toBe('WORM!');
 });
+
+it('uses compact placement for the 3D arrival while keeping the ready cue accessible', () => {
+  act(() => root.render(<WormCountdownOverlay step={2} arrival />));
+  expect(host.querySelector('.worm-countdown--arrival')).not.toBeNull();
+  expect(host.querySelector('[role="status"]').textContent).toBe('2');
+});
