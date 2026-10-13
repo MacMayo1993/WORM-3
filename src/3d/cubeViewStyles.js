@@ -24,6 +24,10 @@ export function pickCubeletViewStyle(ox, oy, oz, tick, pool = PER_CUBELET_VIEW_S
   return pool[h % pool.length];
 }
 
+// The same mirror-polished finish covers the tile face and its chassis.
+// Tile colors remain the manifold's live colors, including antipodal flips.
+export const CHROME_TILE_FINISH = { roughness: 0.06, metalness: 1, envMapIntensity: 1.25 };
+
 // Body material parameters per view style. The cubie "body" is the frame the stickers
 // sit on; swapping its material is what gives chrome/neon/etc. their whole-cube identity.
 // Callers layer any mode-specific transparency (e.g. wormMode) on top of these.
@@ -34,7 +38,7 @@ export function bodyMaterialProps(mode) {
     case 'glass':
       return { color: '#111111', roughness: 0.05, metalness: 0.3, envMapIntensity: 0.8, transparent: true, opacity: 0.12 };
     case 'chrome':
-      return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
+      return { color: '#d6d9dd', ...CHROME_TILE_FINISH };
     case 'neon':
       return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
     case 'lego': // glossy ABS plastic
