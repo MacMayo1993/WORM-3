@@ -2,7 +2,7 @@ import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
-import { storyElementTypes } from './elementGoals.js';
+import { rollStoryElements, storyElementTypes } from './elementGoals.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ttAt } from '../circularBuffers.js';
@@ -194,7 +194,10 @@ export function stageStory(sim, size, level, character) {
   const practice = { ...base, pendingMouths, retryMouths: mouthKeys.slice(0, 2), tunnelGoals, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
-    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set() };
+    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set(),
+    // Dealt afresh on every attempt, so a retry or replay meets different elements
+    // and the bonus lane opens on a different power.
+    elementOrder: rollStoryElements(level, sim.rand ?? Math.random), bonusIndex: Math.floor((sim.rand ?? Math.random)() * 6) };
   return practice;
 }
 
@@ -255,8 +258,9 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   updateMastery(sim, practice, level, delta);
   return {
     ...practice.mechanics,
-    elements: storyElementCount(practice.elements, level.mechanics?.elements, storyElementTypes(level)),
-    uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements, storyElementTypes(level)),
+    elements: storyElementCount(practice.elements, level.mechanics?.elements, storyElementTypes(level, practice.elementOrder)),
+    uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements, storyElementTypes(level, practice.elementOrder)),
+    elementOrder: practice.elementOrder,
     uniqueFusions: practice.fusionIds?.size ?? 0,
     powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,

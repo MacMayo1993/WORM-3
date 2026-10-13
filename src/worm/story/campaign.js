@@ -47,6 +47,8 @@ export const STORY_LEVEL_DATA = [
     reward: ['accessory_spoolBackpack', 'accessory_windupKey'], rewardLabel: 'Choose an accessory', fallback: 200 },
   { id: 8, cubeSize: 6, title: 'Force of Nature', subtitle: 'Weather spilled from the Core.',
     kind: 'mastery', target: 3, orbs: 28, speed: 2.25, rotateEvery: 13, par: 375, limit: 650,
+    // Its tip and Mobi's lines name these elements, so this level keeps them.
+    elementTypes: ['water', 'fire', 'grass'],
     mechanics: { uniqueElements: 3 },
     tip: 'Collect Water, Fire and Earth once each. Earth is the green mountain orb: land to grow a spring pad, then jump from it for a bigger leap.',
     reward: ['scheme_aurora', 'scheme_cosmic'], rewardLabel: 'Choose a palette', fallback: 150 },
@@ -190,6 +192,8 @@ export const STORY_LEVEL_DATA = [
     mechanics: { selfPasses: 1 } },
   { id: 48, cubeSize: 7, title: 'Coil and Spring', subtitle: 'Big bodies need big moves.',
     kind: 'mastery', target: 3, orbs: 42, speed: 2.5, rotateEvery: 13, par: 425, limit: 710, points: 65,
+    // Mobi's briefing names these elements, so this level keeps them.
+    elementTypes: ['water', 'fire'],
     mechanics: { elements: 2, rockets: 1, magnetOrbs: 4, bodyLength: 120 } },
   { id: 49, cubeSize: 8, title: 'Long Guard', subtitle: 'A kind wall.',
     kind: 'mastery', target: 4, orbs: 40, speed: 2.5, rotateEvery: 13, par: 340, limit: 570, points: 65,
@@ -307,6 +311,8 @@ export const STORY_LEVEL_DATA = [
     mechanics: { kills: 3 } },
   { id: 83, cubeSize: 7, title: 'Ring of Fire', subtitle: 'A hoop of kindly fire.',
     kind: 'mastery', target: 4, orbs: 54, speed: 2.65, rotateEvery: 11, par: 470, limit: 735, points: 85,
+    // Mobi's briefing names these elements, so this level keeps them.
+    elementTypes: ['fire', 'water'],
     mechanics: { ringHeals: 3, elements: 2, bombs: 3, bodyLength: 150 } },
   { id: 84, cubeSize: 9, title: 'Long Wall', subtitle: 'A wall of worm.',
     kind: 'orbs', target: 60, colors: 6, speed: 2.65, par: 405, limit: 635, points: 85,

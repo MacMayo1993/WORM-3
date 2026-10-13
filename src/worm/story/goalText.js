@@ -2,7 +2,7 @@
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
 // text stays literal.
-import { STORY_ELEMENTS, storyElementNames } from './elementGoals.js';
+import { STORY_ELEMENTS, storyElementNames, storyElementsRandom } from './elementGoals.js';
 export const TAIL_KINDS = ['tunnel', 'collector', 'restore'];
 export const TUNNEL_KINDS = ['tunnel', 'collector', 'restore', 'mastery'];
 
@@ -34,8 +34,11 @@ const TASKS = [
   ['magnetOrbs', n => `catch ${count(n, 'remote orb')} with a magnet`],
   ['explodes', n => n === 1 ? 'ride out an explosion' : `ride out ${n} explosions`],
   ['elementPickups', n => `pick up ${count(n, 'elemental orb')}`],
-  ['uniqueElements', (n, level) => `collect ${n === STORY_ELEMENTS.length ? 'all ' : ''}${n} different elements (${names(level, n)})`],
-  ['elements', (n, level) => n === STORY_ELEMENTS.length ? `master all ${n} elements` : `master ${count(n, 'element')} (${names(level, n)})`],
+  // A level that deals its elements at random each run cannot name them here.
+  ['uniqueElements', (n, level) => n === STORY_ELEMENTS.length ? `collect all ${n} different elements`
+    : storyElementsRandom(level) ? `collect ${n} different random elements` : `collect ${n} different elements (${names(level, n)})`],
+  ['elements', (n, level) => n === STORY_ELEMENTS.length ? `master all ${n} elements`
+    : storyElementsRandom(level) ? `master ${count(n, 'random element')}` : `master ${count(n, 'element')} (${names(level, n)})`],
   ['steamFusions', n => `make Steam (Fire → Water)${n > 1 ? ` ${times(n)}` : ''}`],
   ['quenchFusions', n => `make Quench (Water → Fire)${n > 1 ? ` ${times(n)}` : ''}`],
   ['fusions', n => `fuse two elements ${times(n)}`],

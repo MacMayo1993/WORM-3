@@ -155,7 +155,8 @@ const prefixLevels = WORM_STORY_LEVELS.filter(level => level.id >= 21 &&
 it.each(prefixLevels)('level $id keeps the last required element in the fusion offering', level => {
   const { sim, p, offer } = setup(level.id);
   const key = level.mechanics.uniqueElements ? 'uniqueElements' : 'elements';
-  const required = STORY_ELEMENTS.slice(0, level.mechanics[key]);
+  // This attempt's deal decides which elements the goal asks for.
+  const required = (p.elementOrder ?? STORY_ELEMENTS).slice(0, level.mechanics[key]);
   p.mechanics = { ...level.mechanics };
   p.collectedElements = new Set(required.slice(0, -1));
   p.elements = new Set(required.slice(0, -1));
@@ -173,15 +174,15 @@ it.each(prefixLevels)('level $id keeps the last required element in the fusion o
 it.each(prefixLevels)('level $id rejects unrelated elements as substitutes for its authored prefix', level => {
   const { sim, p, size } = setup(level.id);
   const key = level.mechanics.uniqueElements ? 'uniqueElements' : 'elements';
-  const count = level.mechanics[key], required = STORY_ELEMENTS.slice(0, count);
+  const order = p.elementOrder ?? STORY_ELEMENTS, count = level.mechanics[key], required = order.slice(0, count);
   p.mechanics = { ...level.mechanics };
   sim.combat = { kills: level.mechanics.kills ?? 0 };
-  p.collectedElements = new Set([...required.slice(0, -1), STORY_ELEMENTS[count]]);
+  p.collectedElements = new Set([...required.slice(0, -1), order[count]]);
   p.elements = new Set(p.collectedElements);
   const read = () => storyMetrics(sim, p, level, { size, rotationEpoch: 0, wormSessionOrbs: 0 }, [], 0);
   // Every other task is complete; only the element identity goal is in question.
   const won = { alive: true, elapsed: 1, landed: true, tailClear: true, rotationSettled: true, remaining: 0,
-    ...Object.fromEntries(storyChecklist(level).filter(goal => goal.key !== key).map(goal => [goal.key, goal.target])) };
+    ...Object.fromEntries(storyChecklist(level, { elementOrder: p.elementOrder }).filter(goal => goal.key !== key).map(goal => [goal.key, goal.target])) };
   expect(read()[key]).toBe(count - 1);
   expect(storyOutcome(level, { ...read(), ...won })).toBeNull();
   expect(nextStoryPower(p, level)).toBe(required.at(-1));

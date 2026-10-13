@@ -91,10 +91,16 @@ export function updateMastery(sim, p, level, delta) {
     if (type === 'lightning' && time >= 4) p.elements.add('lightning');
   }
 }
+// The elements take their slots in the cycle in this attempt's dealt order, so
+// a run that dealt ice first is offered ice where another would get water.
+const storyPowerCycle = order => {
+  let next = 0;
+  return order ? STORY_POWER_CYCLE.map(type => STORY_ELEMENTS.includes(type) ? order[next++] : type) : STORY_POWER_CYCLE;
+};
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
-  const elements = storyElementTypes(level);
+  const elements = storyElementTypes(level, p.elementOrder);
   const needs = new Set();
   for (const recipe of pendingFusions(p, level)) { needs.add(recipe.base); needs.add(recipe.catalyst); }
   for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket']]) {
@@ -108,11 +114,12 @@ export function nextStoryPower(p, level) {
   // Free fusions come from the paired offers: every element in the level's pool
   // returns, each with a distinct partner beside it, until the brews are made.
   if ((p.mechanics.fusions ?? 0) < (m.fusions ?? 0) || (p.fusionIds?.size ?? 0) < (m.uniqueFusions ?? 0)) {
-    for (const type of storyElementPool(level)) needs.add(type);
+    for (const type of storyElementPool(level, p.elementOrder)) needs.add(type);
   }
-  const last = STORY_POWER_CYCLE.indexOf(p.lastPower);
-  for (let offset = 1; offset <= STORY_POWER_CYCLE.length; offset++) {
-    const type = STORY_POWER_CYCLE[(last + offset) % STORY_POWER_CYCLE.length];
+  const cycle = storyPowerCycle(p.elementOrder);
+  const last = cycle.indexOf(p.lastPower);
+  for (let offset = 1; offset <= cycle.length; offset++) {
+    const type = cycle[(last + offset) % cycle.length];
     if (needs.has(type)) return type;
   }
   return null;
@@ -238,7 +245,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
     return true;
   }
   let type = partnerRecipe?.catalyst ?? nextStoryPower(p, level);
-  const elementPool = storyElementPool(level);
+  const elementPool = storyElementPool(level, p.elementOrder);
   const canOfferView = !type && level.id >= 21 && !p.viewOffered;
   if (!type && !canOfferView && level.id >= 21) {
     type = elementPool[(elementPool.indexOf(p.lastPower) + 1) % elementPool.length];

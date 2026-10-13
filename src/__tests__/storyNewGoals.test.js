@@ -165,7 +165,8 @@ describe('story credit for the new goals', () => {
 
   it('offers paired elements until a fusion quest is brewed, then stops', () => {
     const { level, sim, p } = setup(66);
-    expect(nextStoryPower(p, level)).toBe('water');
+    // The first element this attempt dealt is the first one offered.
+    expect(nextStoryPower(p, level)).toBe(p.elementOrder[0]);
     p.powerDelay = 0;
     expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
     expect(sim.specials).toHaveLength(2);

@@ -33,6 +33,9 @@ for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
   if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air'].filter(type => required.has(type));
 }
 beforeEach(() => resetLiveRotation());
+// The tables name elements in their authored slots. A level without its own
+// elementTypes deals a fresh order each attempt; read each slot through it.
+const dealt = (p, list) => list.map(type => p.elementOrder && STORY_ELEMENTS.includes(type) ? p.elementOrder[STORY_ELEMENTS.indexOf(type)] : type);
 // One marked power, plus (from level 21) a distinct elemental partner when the
 // first is an element, so fusions can be practised. The partner never changes
 // which power the quest cycle offers first.
@@ -71,7 +74,7 @@ it.each(WORM_STORY_LEVELS)('level $id supplies six colors, every tunnel and recu
         expectOffer(sim, level);
         offered.push(sim.specials[0].type);
       }
-      expect(offered).toEqual(pool);
+      expect(offered).toEqual(dealt(p, pool));
     }
     expect(p.mechanics).toEqual({});
     expect(p.elements.size).toBe(0);
@@ -86,10 +89,10 @@ it('level 30 offers Explode second and all three elements without requiring magn
   const { sim, p, reoffer } = setup(30);
   const offered = [];
   for (let i = 0; i < 10; i++) { expect(reoffer()).toBe(true); offered.push(sim.specials[0].type); }
-  expect(offered).toEqual([...POOLS[30], ...POOLS[30]]);
+  expect(offered).toEqual(dealt(p, [...POOLS[30], ...POOLS[30]]));
   p.mechanics.explodes = 1; p.mechanics.magnetOrbs = 4;
-  p.collectedElements.add('fire');
-  for (const type of ['water', 'grass', 'water', 'grass']) {
+  p.collectedElements.add(dealt(p, ['fire'])[0]);
+  for (const type of dealt(p, ['water', 'grass', 'water', 'grass'])) {
     expect(reoffer()).toBe(true); expect(sim.specials[0].type).toBe(type);
   }
   expect(stageStory(sim, 6, storyLevel(30)).lastPower).toBeNull();

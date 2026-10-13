@@ -11,7 +11,7 @@ import {getActiveTunnels,collectManifoldRing} from '../../../src/worm/wormLogic.
 import {resetLiveRotation} from '../../../src/worm/liveRotation.js';
 import {ELEMENTAL_DURATION,MAGNET_RADIUS} from '../../../src/worm/healerWorm/constants.js';
 import {STORY_WORLDS} from '../../../src/worm/story/worlds.js';
-import {assess} from '../web/audit.js';
+import {assess,elementTypes} from '../web/audit.js';
 const repo='MacMayo1993/WORM-3';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
@@ -32,6 +32,8 @@ const records=WORM_STORY_LEVELS.map(level=>{
   resetLiveRotation();
   const sim=makeWormSim(level.cubeSize);sim.rand=()=>0.42;
   const p=stageStory(sim,level.cubeSize,level,character);
+  // A run deals its elements at random; every deal relabels the same slots, so audit the authored one.
+  if(p.elementOrder)p.elementOrder=elementTypes(level).slice();
   const activePairs=getActiveTunnels(p.cubies,level.cubeSize).length;
   const initialOrbs=sim.powerups.length;
   assert.equal(new Set(sim.powerups.map(tileKey)).size,initialOrbs);

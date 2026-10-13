@@ -1,16 +1,30 @@
 import { ELEMENTAL_TYPES, getElementalDef } from '../healerWorm/elementalDefs.js';
 
 export const STORY_ELEMENTS = ELEMENTAL_TYPES;
-// Most levels teach the original progression. A focused lesson can instead name
-// its own elementTypes; the offers, credit and instructions must use that same set.
-export const storyElementTypes = level => level.elementTypes ?? STORY_ELEMENTS;
+// A focused lesson names its own elementTypes (and a level whose story is told
+// around particular elements pins them the same way). Every other level deals
+// its elements afresh on each attempt: stageStory rolls `practice.elementOrder`
+// and the offers, credit, checklist and hints all read that one order.
+const DEALT_GOALS = ['elements', 'uniqueElements', 'elementPickups', 'fusions', 'uniqueFusions'];
+export const storyElementsRandom = level => !level.elementTypes && DEALT_GOALS.some(key => level.mechanics?.[key]);
+/** This attempt's element order, or null for a level that names its own (or asks for none). */
+export function rollStoryElements(level, rand = Math.random) {
+  if (!storyElementsRandom(level)) return null;
+  const order = STORY_ELEMENTS.slice();
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+export const storyElementTypes = (level, order = null) => level.elementTypes ?? order ?? STORY_ELEMENTS;
 export const storyElementCount = (elements, target = STORY_ELEMENTS.length, types = STORY_ELEMENTS) =>
   types.slice(0, target).filter(type => elements.has(type)).length;
-export function storyElementPool(level) {
+export function storyElementPool(level, order = null) {
   const m = level.mechanics ?? {};
   const count = Math.max(m.uniqueElements ?? 0, m.elements ?? 0, m.elementPickups ?? 0);
-  const types = storyElementTypes(level);
+  const types = storyElementTypes(level, order);
   return count ? types.slice(0, count) : types;
 }
-export const storyElementNames = (level, count) =>
-  storyElementTypes(level).slice(0, count).map(type => getElementalDef(type).label.toLowerCase());
+export const storyElementNames = (level, count, order = null) =>
+  storyElementTypes(level, order).slice(0, count).map(type => getElementalDef(type).label.toLowerCase());
