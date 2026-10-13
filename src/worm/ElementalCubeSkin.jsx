@@ -22,6 +22,8 @@
 // stands in for a patch of stickers, and its shader redraws the per-sticker seams
 // inside it from the world-unit lattice. Cost is constant in cube size, and every
 // skin draws the whole cube as one InstancedMesh (one draw call per material layer).
+// During Explode, each sticker gets its own cell so no patch bridges separate
+// cubies. Detail per cell shrinks to keep the geometry budget near the same size.
 //
 // ── The transform ────────────────────────────────────────────────────────────
 // Each cell rides its representative sticker's LIVE cubie: position, normal AND
@@ -49,8 +51,10 @@ import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './he
 import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
-import { publishWormUniforms, uCubeHalf } from './healerWorm/elementalUniforms.js';
-import { getWormStickerWorldPos } from './wormExpansion.js';
+import { publishWormUniforms, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
+import { expandedElementalQuality, elementalHalfExtent } from './healerWorm/elementalExpansion.js';
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
+import { getWormStickerWorldPos, wormExpansion } from './wormExpansion.js';
 import ElementalGrassSkin from './ElementalGrassSkin.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
 import { ElementalSurfaceSkin, ReactionSurfaceSkin } from './ElementalSurface.jsx';
@@ -140,9 +144,10 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
 
   // Device budget. Read once per mount: the tier only depends on facts that do not
   // change mid-session, and re-resolving it per frame would churn the cell memo.
+  const separated = useGameStore(s => !!s.wormExplodeActive || s.explosionT > 0);
   const quality = useMemo(
-    () => resolveElementalQuality({ mobile: isMobile, reducedMotion: prefersReducedMotion(), cubeSize: size }),
-    [size]
+    () => expandedElementalQuality(resolveElementalQuality({ mobile: isMobile, reducedMotion: prefersReducedMotion(), cubeSize: size }), size, separated),
+    [size, separated]
   );
 
   const cells = useMemo(() => (Skin ? buildElementalCells(size, quality.skinGrid) : []), [Skin, size, quality.skinGrid]);
@@ -157,6 +162,7 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
   // A layer brought back before it finished leaving starts any later exit afresh.
   if (!retire && retireRef.current.t > 0) retireRef.current = { t: 0, done: false };
   const lastOriginRef = useRef(undefined);
+  const lastCellsRef = useRef(null);
   if (lastElementRef.current !== layerKey) {
     lastElementRef.current = layerKey;
     clockRef.current = { elapsed: 0, claim: undefined, origin: null };
@@ -166,8 +172,8 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
 
   useFrame((_, delta) => {
     if (!Skin) return;
-    if (useGameStore.getState().wormPaused) return;
-    const clock = advanceElementalLayer(clockRef.current, wormBuffs.elementalOrigin, fused, delta);
+    const paused = useGameStore.getState().wormPaused;
+    const clock = advanceElementalLayer(clockRef.current, wormBuffs.elementalOrigin, fused, paused ? 0 : delta);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
     let env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
@@ -176,7 +182,7 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
     // fades) while the reaction floods in over it, then hands itself back.
     if (retire) {
       const r = retireRef.current;
-      r.t += Math.min(delta, 0.1);
+      r.t += paused ? 0 : Math.min(delta, 0.1);
       const k = Math.min(1, r.t / RETIRE_SECONDS);
       _retireEnv.claim = env.claim;
       _retireEnv.release = Math.max(env.release, k);
@@ -190,8 +196,9 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
     // taken on and never mutates it, so an identity check is enough to notice a new
-    // claim — this recomputes once per wash, not per frame.
-    if (lastOriginRef.current !== clock.origin) {
+    // claim, or once when expansion changes the cover grid, not per frame.
+    if (lastOriginRef.current !== clock.origin || lastCellsRef.current !== cells) {
+      lastCellsRef.current = cells;
       lastOriginRef.current = clock.origin;
       // Under reduced motion nothing travels across the cube: every cell arrives
       // together, as one uniform fade and grow, instead of a front sweeping out
@@ -200,15 +207,18 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
       writeSweep(cells, cellData.sweep, origin);
       const attr = instRef.current?.geometry?.getAttribute?.('aSweep');
       if (attr) attr.needsUpdate = true;
-      // The same origin as a world point, for the shell skins' continuous flood.
-      if (origin) {
-        const wp = getWormStickerWorldPos(origin.x, origin.y, origin.z, origin.dirKey, size, 0);
-        claimPoint.current.set(wp[0], wp[1], wp[2], 1);
-      } else {
-        claimPoint.current.set(0, 0, 0, 0);
-      }
     }
-    uCubeHalf.value = size / 2;
+    // The claim keeps its identity, but its world position changes throughout
+    // expansion/collapse and slice turns. Refresh geometry even while paused.
+    const origin = quality.animate ? clock.origin : null;
+    if (origin) {
+      if (!readLiveTile(origin, _livePos, _liveNorm)) {
+        _livePos.fromArray(getWormStickerWorldPos(origin.x, origin.y, origin.z, origin.dirKey, size));
+      }
+      claimPoint.current.set(_livePos.x, _livePos.y, _livePos.z, 1);
+    } else claimPoint.current.set(0, 0, 0, 0);
+    uCubeHalf.value = elementalHalfExtent(size, wormExpansion.amount);
+    uCubeGap.value = cubeExpansionScale(size, wormExpansion.amount) - 1;
 
     // An InstancedMesh's capacity is fixed at construction. During the frame an
     // element swap or a size change commits, the ref can still hold the outgoing
@@ -231,8 +241,8 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
           _quat.premultiply(_fix);
         }
       } else {
-        // Before the meshes exist: the stationary rest grid.
-        _livePos.fromArray(c.restPos);
+        // Before the meshes exist: the current expanded lattice.
+        _livePos.fromArray(getWormStickerWorldPos(c.x, c.y, c.z, c.dirKey, size));
         _quat.copy(c.restQuat);
       }
       _matrix.compose(_livePos, _quat, _unit);

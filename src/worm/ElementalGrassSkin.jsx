@@ -369,9 +369,11 @@ export function getNatureMaterials() {
  */
 export default function ElementalGrassSkin({ count, cellData, quality, meshRef }) {
   const budget = NATURE_BUDGET[quality?.tier] ?? NATURE_BUDGET.low;
+  const detail = quality?.cellDetail ?? 1;
   const geometry = useMemo(
-    () => attachCellAttributes(buildNatureCellGeometry(budget.blades, budget.leaves, budget.flowers), cellData),
-    [budget, cellData]
+    () => attachCellAttributes(buildNatureCellGeometry(Math.max(2, Math.floor(budget.blades * detail)),
+      Math.floor(budget.leaves * detail), Math.floor(budget.flowers * detail)), cellData),
+    [budget, cellData, detail]
   );
   // The geometry is built per mount (its size depends on the quality tier), so it
   // is ours to dispose. The materials are shared and stay.

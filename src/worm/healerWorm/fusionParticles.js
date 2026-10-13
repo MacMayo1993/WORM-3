@@ -10,6 +10,8 @@
 // Pure and allocation-free per frame: one set of typed arrays per field, written in
 // place. Randomness comes from the caller, so tests are deterministic.
 
+import { expandedFaceCoordinate, elementalHalfExtent } from './elementalExpansion.js';
+
 const AXES = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 
 /** A field of `count` particles, all waiting to be born (staggered so they never arrive in one burst). */
@@ -29,7 +31,7 @@ export function makeReactionField(count) {
   };
 }
 
-function spawn(field, i, cfg, size, worm, rand) {
+function spawn(field, i, cfg, size, worm, rand, expansion) {
   const h = size / 2;
   let px, py, pz, nx = 0, ny = 0, nz = 0;
   if (worm && worm.count > 0 && rand() < cfg.worm) {
@@ -44,12 +46,14 @@ function spawn(field, i, cfg, size, worm, rand) {
     // Off a random point of a random face.
     const axis = Math.floor(rand() * 3) % 3;
     const sign = rand() < 0.5 ? -1 : 1;
-    const u = (rand() * 2 - 1) * h, w = (rand() * 2 - 1) * h;
+    const u = expandedFaceCoordinate((rand() * 2 - 1) * h, size, expansion);
+    const w = expandedFaceCoordinate((rand() * 2 - 1) * h, size, expansion);
+    const surface = elementalHalfExtent(size, expansion);
     const n = AXES[axis];
     nx = n[0] * sign; ny = n[1] * sign; nz = n[2] * sign;
-    px = axis === 0 ? sign * h : u;
-    py = axis === 1 ? sign * h : axis === 0 ? u : w;
-    pz = axis === 2 ? sign * h : w;
+    px = axis === 0 ? sign * surface : u;
+    py = axis === 1 ? sign * surface : axis === 0 ? u : w;
+    pz = axis === 2 ? sign * surface : w;
   }
   const j = i * 3;
   field.pos[j] = px + nx * 0.06; field.pos[j + 1] = py + ny * 0.06; field.pos[j + 2] = pz + nz * 0.06;
@@ -74,13 +78,13 @@ function spawn(field, i, cfg, size, worm, rand) {
  * @param {boolean} o.emitting  false once the wash is ending: particles finish their lives, none are born
  * @param {() => number} o.rand
  */
-export function stepReactionField(field, dt, { cfg, size, worm = null, emitting = true, rand }) {
+export function stepReactionField(field, dt, { cfg, size, worm = null, emitting = true, rand, expansion = 0 }) {
   if (!field.started) {
     // The fusion ERUPTS: the whole first generation is born at once, already spread
     // across the first part of a life, so the reaction bursts off the cube the moment
     // it forms instead of trickling in. Later generations stagger naturally.
     for (let i = 0; i < field.count; i++) {
-      spawn(field, i, cfg, size, worm, rand);
+      spawn(field, i, cfg, size, worm, rand, expansion);
       field.age[i] = rand() * field.life[i] * 0.6;
     }
     field.started = true;
@@ -91,7 +95,7 @@ export function stepReactionField(field, dt, { cfg, size, worm = null, emitting 
     if (field.age[i] < 0) { field.alpha[i] = 0; continue; }
     if (field.age[i] >= field.life[i]) {
       if (!emitting) { field.alpha[i] = 0; continue; }
-      spawn(field, i, cfg, size, worm, rand);
+      spawn(field, i, cfg, size, worm, rand, expansion);
     }
     const j = i * 3;
     field.vel[j] *= drag; field.vel[j + 2] *= drag;

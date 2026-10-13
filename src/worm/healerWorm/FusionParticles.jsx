@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { wormExpansion } from '../wormExpansion.js';
 import { wormBuffs } from '../wormBuffs.js';
 import { wormSegments } from '../wormSegments.js';
 import { elementalEnvelope } from './elementalLifecycle.js';
@@ -38,7 +39,7 @@ export default function FusionParticles({ recipe, size, count }) {
     const dt = Math.min(delta, 0.05);
     elapsed.current += dt;
     const env = elementalEnvelope({ elapsed: elapsed.current, remaining: wormBuffs.elementalT });
-    stepReactionField(field, dt, { cfg, size, worm: wormSegments, emitting: env.accents || env.phase === 'claim', rand: Math.random });
+    stepReactionField(field, dt, { cfg, size, expansion: wormExpansion.amount, worm: wormSegments, emitting: env.accents || env.phase === 'claim', rand: Math.random });
     const attrs = geometry.attributes;
     attrs.position.needsUpdate = true;
     attrs.aAlpha.needsUpdate = true;
