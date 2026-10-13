@@ -1,3 +1,6 @@
+import { StoryArrival } from './healerWorm/StoryArrival.jsx';
+import { STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS } from './healerWorm/storyArrival.js';
+import { prefersReducedMotion } from '../utils/device.js';
 import CautionFallFX from './healerWorm/CautionFallFX.jsx';
 import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
 import WormEffectWarmup from './healerWorm/WormEffectWarmup.jsx';
@@ -124,6 +127,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
     const glowCharacter = useGameStore(s => s.wormCharacter === 'glow');
     const demoMode = useGameStore(s => s.demoMode);
+    const storyBriefing = useGameStore(s => !!s.wormStoryLevel && !s.wormStoryStarted);
     const combatMode = useGameStore(s => s.wormCombatMode);
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
@@ -517,7 +521,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             };
             if (story || practice) {
                 // Story reset stages its authored board before paint. Its ready
-                // card requests the countdown; demo lessons stage on their next tick.
+                // card requests the entrance; demo lessons stage on their next tick.
                 gameModePhaseRef.current = 'active';
                 useGameStore.setState({ wormGamePhase: 'active', wormPaused: true, wormCountdownStep: null });
             }
@@ -543,12 +547,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useFrame((_, delta) => {
         const startState = useGameStore.getState();
         const story = storyLevel(startState.wormStoryLevel);
-        // Story starts with an authored body/board already staged behind its
-        // briefing. Enter directly, without scrambling or reseeding that body.
-        if (story && startState.wormGamePhase === 'countdown' && gameModePhaseRef.current === 'active') {
-            beginCountdown();
+        // Reveal the staged body only after Start. Never reseed the authored trail.
+        if (story && startState.wormGamePhase === 'spawning' && gameModePhaseRef.current === 'active') {
+            gameModePhaseRef.current = 'spawning';
+            spawnTimerRef.current = 0;
             return;
         }
+        if (story && startState.wormPauseMenuOpen &&
+            (gameModePhaseRef.current === 'spawning' || gameModePhaseRef.current === 'countdown')) return;
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { bombTiles: bombsRef.current.map(b => b.tile), busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
@@ -602,6 +608,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: spawning — worm wiggles out of the face center ─────────────
         if (gameModePhaseRef.current === 'spawning') {
             spawnTimerRef.current += delta;
+            if (story) {
+                const reduced = startState.settings?.reducedMotion || prefersReducedMotion();
+                const duration = reduced ? STORY_ARRIVAL_REDUCED_SECONDS : STORY_ARRIVAL_SECONDS;
+                if (spawnTimerRef.current >= duration) beginCountdown();
+                return;
+            }
             const t = Math.min(spawnTimerRef.current / SPAWN_DURATION, 1);
             // Damped spring: shoots out of the face then settles
             const bounce = Math.sin(t * Math.PI * 2.4) * Math.exp(-t * 4.0) * 0.4;
@@ -1042,7 +1054,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     }, -0.5); // After live cubie transforms (-1), before chase camera (-0.25) and body (0).
 
     const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting' || wormPhaseReactive === 'windout';
-    const wormAlive = wormGamePhase !== 'scrambling';
+    const wormAlive = wormGamePhase !== 'scrambling' && !storyBriefing;
 
     return (
         <WormLighting><PickupMaterialProvider>
@@ -1061,9 +1073,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /></group>
             {/* Keep the equipped body/face and their programs through retries. The
                 hidden scramble frame also prepares their instanced attributes. */}
-            <group ref={reflectionSource} visible={wormAlive}>
-                <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
-            </group>
+            <StoryArrival worm={worm} elapsed={spawnTimerRef}>
+                <group ref={reflectionSource} visible={wormAlive}>
+                    <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
+                </group>
+            </StoryArrival>
             <CautionFallFX worm={worm} body={reflectionSource} />
             <WormEffectWarmup body={reflectionSource} />
             {wormAlive && <RocketExhaust worm={worm} size={size} />}

@@ -39,7 +39,7 @@ function begin(id) {
   frame();
   expect(state()).toMatchObject({ wormStoryReady: true, wormPaused: true, wormStoryStarted: false });
   act(() => state().startWormStory());
-  expect(state()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
+  expect(state()).toMatchObject({ wormGamePhase: 'spawning', wormCountdownStep: null, wormPaused: true });
   const before = { position: { ...worm.pos.current }, time: worm.timeAliveRef.current };
   frame(4);
   expect(worm.pos.current).toEqual(before.position);
