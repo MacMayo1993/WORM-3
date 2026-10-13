@@ -68,8 +68,8 @@ export const WORM_STORY_NARRATIVE = {
   },
   8: {
     briefing: [
-      'The Plane has weather you can pick up and wear: water, fire, earth, ice, lightning and air.',
-      'Some of it leaked out of the Core in the crash. Grab it before it fades.',
+      'Start with three kinds of Plane weather: water, fire and earth. Collect one of each.',
+      'Water builds speed and fire leaves a hot trail. Earth is the green mountain: land to plant a spring pad, then jump from it.',
     ],
     debrief: 'Weather back in its jars. Well, in you. You’re a kind of jar.',
   },
@@ -106,9 +106,9 @@ export const WORM_STORY_NARRATIVE = {
   13: {
     briefing: [
       'Numbers view: every face holds every number once. It kept Corps medics from getting turned around.',
-      'Your tail keeps getting turned around. Jump it.',
+      'Earth can help you clear your tail. Collect the green mountain orb, land to grow a spring pad, then jump from the pad and land safely.',
     ],
-    debrief: 'The numbers moved. Their order didn’t. Remember that. Doors move, but twins stay twins.',
+    debrief: 'Spring planted, spring launched. That is Earth mastery: your last landing becomes your next launch point.',
   },
   14: {
     briefing: [
@@ -134,7 +134,7 @@ export const WORM_STORY_NARRATIVE = {
   17: {
     briefing: [
       'Launch Pad! I took off from here a thousand times. Courier worms rode rockets across broken decks.',
-      'Build speed, take the air, and leave yourself room to land.',
+      'The mint wind orb is Air. It carries jumps farther and higher. Jump with it and land safely; a rocket flight is a separate trick.',
     ],
     debrief: 'That landing! For a second I heard the old launch crew cheering. It was the gears. Still nice.',
   },
@@ -301,7 +301,7 @@ export const WORM_STORY_NARRATIVE = {
   40: {
     briefing: [
       'The Longhaul is pulling its longest body toward us through the doors. If it reconnects, the Flip Cube becomes part of it.',
-      'Heal every door on this deck and its grip loosens. Every trick you’ve got, partner. All of them.',
+      'Heal every door on this deck and its grip loosens. Use all six elements, including Earth’s spring pads and Air’s updraft jumps. Every trick you’ve got, partner.',
     ],
     debrief: 'It let go! For now. Its head is still in the Core, awake and hungry. And it remembers my name. It remembers me.',
   },
@@ -511,7 +511,7 @@ export const WORM_STORY_NARRATIVE = {
   69: {
     briefing: [
       'The Longhaul’s lightning keeps hitting the doors. We’ll use that: a charged door costs less to heal.',
-      'Master every element, heal every door, and double one up.',
+      'Master all six elements, heal every door, and double one up. Spring from Earth’s pads and land an Air jump as well as surviving the lightning.',
     ],
     debrief: 'Every door healed and every element mastered. You’re the storm now.',
   },

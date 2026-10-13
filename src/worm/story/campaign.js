@@ -1,3 +1,5 @@
+import { STORY_ELEMENTS } from './elementGoals.js';
+
 // The authored WORM³ story: 120 levels in twelve chapters of ten. Each level
 // teaches or combines the crawler's real mechanics, and later chapters ask for
 // more of everything: longer bodies on every board size, passes through the
@@ -45,8 +47,8 @@ export const STORY_LEVEL_DATA = [
     reward: ['accessory_spoolBackpack', 'accessory_windupKey'], rewardLabel: 'Choose an accessory', fallback: 200 },
   { id: 8, cubeSize: 6, title: 'Force of Nature', subtitle: 'Weather spilled from the Core.',
     kind: 'mastery', target: 3, orbs: 28, speed: 2.25, rotateEvery: 13, par: 375, limit: 650,
-    mechanics: { elementPickups: 3 },
-    tip: 'Steer onto each marked elemental orb to claim it.',
+    mechanics: { uniqueElements: 3 },
+    tip: 'Collect Water, Fire and Earth once each. Earth is the green mountain orb: land to grow a spring pad, then jump from it for a bigger leap.',
     reward: ['scheme_aurora', 'scheme_cosmic'], rewardLabel: 'Choose a palette', fallback: 150 },
   { id: 9, cubeSize: 6, title: 'Under Siege', subtitle: 'War leftovers in the hold.',
     kind: 'mastery', target: 4, orbs: 28, speed: 2.25, rotateEvery: 14, par: 290, limit: 505,
@@ -63,8 +65,10 @@ export const STORY_LEVEL_DATA = [
     mechanics: { bodyLength: 35 } },
   { id: 12, cubeSize: 3, title: 'Grid Lines', subtitle: 'Mobi’s old ferry run.',
     kind: 'tunnel', target: 3, orbsPerFace: 3, speed: 1.5, par: 110, limit: 195, points: 30 },
-  { id: 13, cubeSize: 4, title: 'Numbers Underfoot', subtitle: 'Doors move. Twins stay twins.',
-    kind: 'jump', target: 3, orbs: 16, speed: 1.8, par: 120, limit: 215,
+  { id: 13, cubeSize: 4, title: 'Earth Underfoot', subtitle: 'Turn a landing into a launch.',
+    kind: 'jump', target: 3, orbs: 16, speed: 1.8, par: 155, limit: 275,
+    elementTypes: ['grass'], mechanics: { elements: 1 },
+    tip: 'Collect Earth, jump and land to plant a pad. Jump from that pad and land safely to master Earth. Clear your body on three jumps too.',
     reward: ['hat_beanie', 'hat_flower'], rewardLabel: 'Choose a hat', fallback: 120 },
   { id: 14, cubeSize: 3, title: 'Glass Carousel', subtitle: 'Gears that think it’s wartime.',
     kind: 'rotation', target: 5, orbs: 16, orbsPerFace: 3, speed: 1.45, rotateEvery: 16, par: 155, limit: 275, points: 30 },
@@ -74,8 +78,9 @@ export const STORY_LEVEL_DATA = [
   { id: 16, cubeSize: 7, title: 'Sea of Seven', subtitle: 'A whole sea, folded into a deck.',
     kind: 'restore', target: 6, orbs: 32, rotations: 5, speed: 2.33, rotateEvery: 13, par: 325, limit: 565, points: 35 },
   { id: 17, cubeSize: 4, title: 'Launch Pad', subtitle: 'Where the couriers took off.',
-    kind: 'mastery', target: 3, orbs: 20, speed: 1.9, par: 190, limit: 330,
-    mechanics: { boosts: 2, doubleJumps: 2, rockets: 1 },
+    kind: 'mastery', target: 3, orbs: 20, speed: 1.9, par: 230, limit: 400,
+    elementTypes: ['air'], mechanics: { boosts: 2, doubleJumps: 2, rockets: 1, elements: 1 },
+    tip: 'Collect the mint Air orb, then jump and land safely. Air jumps travel 35% farther and rise 40% higher; a rocket landing does not count as Air mastery.',
     reward: ['hat_paperboat', 'hat_thimble'], rewardLabel: 'Choose a hat', fallback: 150 },
   { id: 18, cubeSize: 6, title: 'Blast Radius', subtitle: 'Pieces apart, twins together.',
     kind: 'mastery', target: 3, orbs: 26, speed: 2.33, rotateEvery: 15, par: 215, limit: 375,
@@ -155,8 +160,8 @@ export const STORY_LEVEL_DATA = [
     kind: 'orbs', target: 60, colors: 6, speed: 2.62, par: 475, limit: 770, points: 75,
     mechanics: { bodyLength: 160 } },
   { id: 40, cubeSize: 10, title: 'Worm Eternal', subtitle: 'The Longhaul remembers Mobi’s name.',
-    kind: 'mastery', target: 6, orbs: 52, rotations: 10, speed: 2.55, rotateEvery: 10, par: 740, limit: 1200,
-    mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, explodes: 2, elements: 5, bombs: 2, kills: 5, bodyLength: 140 },
+    kind: 'mastery', target: 6, orbs: 52, rotations: 10, speed: 2.55, rotateEvery: 10, par: 780, limit: 1265,
+    mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, explodes: 2, elements: STORY_ELEMENTS.length, bombs: 2, kills: 5, bodyLength: 140 },
     reward: ['skin_mono', 'skin_cherry'], rewardLabel: 'Choose a grandmaster skin', fallback: 500 },
 
   // ── Chapter 5 · The Long Body ─────────────────────────────────────────────────────
@@ -241,7 +246,7 @@ export const STORY_LEVEL_DATA = [
     mechanics: { elements: 2, bodyLength: 120 } },
   { id: 64, cubeSize: 7, title: 'Six Winds', subtitle: 'It can’t throw what we’re holding.',
     kind: 'mastery', target: 3, orbs: 42, speed: 2.55, rotateEvery: 12, par: 485, limit: 790, points: 75,
-    mechanics: { uniqueElements: 6, bodyLength: 120 } },
+    mechanics: { uniqueElements: STORY_ELEMENTS.length, bodyLength: 120 } },
   { id: 65, cubeSize: 6, title: 'Thunder Tunnels', subtitle: 'Meet yourself in the crackle.',
     kind: 'tunnel', target: 5, speed: 2.55, par: 345, limit: 560, points: 75,
     mechanics: { selfPasses: 1, elementPickups: 3 } },
@@ -255,11 +260,11 @@ export const STORY_LEVEL_DATA = [
     kind: 'jump', target: 6, orbs: 38, speed: 2.55, par: 420, limit: 680, points: 75,
     mechanics: { elements: 4, bodyLength: 120 } },
   { id: 69, cubeSize: 8, title: 'Lightning Rods', subtitle: 'You’re the storm now.',
-    kind: 'restore', target: 6, orbs: 40, rotations: 6, speed: 2.55, rotateEvery: 11, par: 575, limit: 935, points: 75,
-    mechanics: { multiHeals: 1, elements: 5 } },
+    kind: 'restore', target: 6, orbs: 40, rotations: 6, speed: 2.55, rotateEvery: 11, par: 615, limit: 1000, points: 75,
+    mechanics: { multiHeals: 1, elements: STORY_ELEMENTS.length } },
   { id: 70, cubeSize: 7, title: 'Eye of the Storm', subtitle: 'The Longhaul asked again: how?',
     kind: 'mastery', target: 5, orbs: 54, rotations: 6, speed: 2.6, rotateEvery: 11, par: 580, limit: 940, points: 125,
-    mechanics: { selfPasses: 2, multiHeals: 1, elements: 6, fusions: 2, bodyLength: 150 } },
+    mechanics: { selfPasses: 2, multiHeals: 1, elements: STORY_ELEMENTS.length, fusions: 2, bodyLength: 150 } },
 
   // ── Chapter 8 · The War Machine ───────────────────────────────────────────────────
   { id: 71, cubeSize: 8, title: 'Gear Teeth', subtitle: 'The Grind.',
@@ -356,7 +361,7 @@ export const STORY_LEVEL_DATA = [
     mechanics: { multiHeals: 3, bombs: 3, kills: 4 } },
   { id: 100, cubeSize: 8, title: 'Recognition', subtitle: 'The tail was theirs.',
     kind: 'mastery', target: 6, orbs: 66, rotations: 8, speed: 2.75, rotateEvery: 10, par: 715, limit: 1120, points: 140,
-    mechanics: { selfPasses: 4, multiHeals: 3, elements: 6, fusions: 2, kills: 4, bodyLength: 180 } },
+    mechanics: { selfPasses: 4, multiHeals: 3, elements: STORY_ELEMENTS.length, fusions: 2, kills: 4, bodyLength: 180 } },
 
   // ── Chapter 11 · The Mega Decks ────────────────────────────────────────────────────
   { id: 101, cubeSize: 15, title: 'Cargo Hold', subtitle: 'Hold the longest body’s attention.',
@@ -376,7 +381,7 @@ export const STORY_LEVEL_DATA = [
     mechanics: { multiHeals: 3, magnetOrbs: 8, bodyLength: 180 } },
   { id: 106, cubeSize: 15, title: 'Mega Storm', subtitle: 'Turn the storm into something useful.',
     kind: 'mastery', target: 4, orbs: 64, speed: 2.75, rotateEvery: 12, par: 700, limit: 1080, points: 95,
-    mechanics: { elements: 6, uniqueFusions: 3, bodyLength: 180 } },
+    mechanics: { elements: STORY_ELEMENTS.length, uniqueFusions: 3, bodyLength: 180 } },
   { id: 107, cubeSize: 10, title: 'Heavy Artillery', subtitle: 'The last guns of W³.',
     kind: 'mastery', target: 5, orbs: 56, speed: 2.75, rotateEvery: 11, par: 585, limit: 900, points: 95,
     mechanics: { rockets: 3, explodes: 4, bombs: 4, kills: 5 } },
@@ -400,7 +405,7 @@ export const STORY_LEVEL_DATA = [
     mechanics: { selfPasses: 1, multiHeals: 1, bodyLength: 75 } },
   { id: 113, cubeSize: 9, title: 'Fusion Furnace', subtitle: 'Warm for the first time since the crash.',
     kind: 'mastery', target: 4, orbs: 54, speed: 2.8, rotateEvery: 11, par: 645, limit: 980, points: 100,
-    mechanics: { elements: 6, steamFusions: 1, quenchFusions: 1, uniqueFusions: 4 } },
+    mechanics: { elements: STORY_ELEMENTS.length, steamFusions: 1, quenchFusions: 1, uniqueFusions: 4 } },
   { id: 114, cubeSize: 6, title: 'Giant’s Leap', subtitle: 'A happy earthquake.',
     kind: 'jump', target: 12, orbs: 64, speed: 2.8, par: 415, limit: 630, points: 100,
     mechanics: { doubleJumps: 6, bodyLength: 200 } },
@@ -421,5 +426,5 @@ export const STORY_LEVEL_DATA = [
     mechanics: { selfPasses: 4, multiHeals: 3, bodyJumps: 4, rockets: 2, explodes: 3, bombs: 3, kills: 3, bodyLength: 210 } },
   { id: 120, cubeSize: 10, title: 'Through the Middle', subtitle: 'Head meets tail.',
     kind: 'mastery', target: 6, orbs: 78, rotations: 10, speed: 2.85, rotateEvery: 9, par: 990, limit: 1500, points: 150,
-    mechanics: { selfPasses: 4, multiHeals: 4, bodyJumps: 6, ringHeals: 3, rockets: 2, magnetOrbs: 8, explodes: 3, elements: 6, uniqueFusions: 3, signatures: 4, bombs: 3, kills: 5, bodyLength: 220 } },
+    mechanics: { selfPasses: 4, multiHeals: 4, bodyJumps: 6, ringHeals: 3, rockets: 2, magnetOrbs: 8, explodes: 3, elements: STORY_ELEMENTS.length, uniqueFusions: 3, signatures: 4, bombs: 3, kills: 5, bodyLength: 220 } },
 ];

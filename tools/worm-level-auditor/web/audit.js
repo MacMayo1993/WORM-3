@@ -1,4 +1,5 @@
 export const ELEMENTS = ['water','fire','grass','ice','lightning','air'];
+export const elementTypes = level => level.elementTypes ?? ELEMENTS;
 // Playability guardrails, not geometric impossibility proofs. Keep recovery
 // lanes and reaction time instead of scaling every task with chapter number.
 export const SMALL_BOARD_BUDGETS = {
@@ -72,7 +73,7 @@ export function assess(record, character='glow', scenario={}) {
     } else if(['elements','uniqueElements','elementPickups'].includes(key)) {
       available=distinct.length+' types · repeats';
       detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, earth spring launch, ice jump/landing, lightning survival, air jump/landing. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
-      if((key==='elementPickups'&&!distinct.length)||(key!=='elementPickups'&&distinct.length<target))fail('Required elemental supply is missing from the offered cycle.');
+      if((key==='elementPickups'&&!distinct.length)||(key!=='elementPickups'&&elementTypes(level).slice(0,target).filter(type=>distinct.includes(type)).length<target))fail('Required elemental supply is missing from the offered cycle.');
     } else if(['explodes','rockets','magnetOrbs'].includes(key)) {
       const type={explodes:'explode',rockets:'rocket',magnetOrbs:'magnet'}[key];
       available=powerPool.includes(type)?(key==='magnetOrbs'?stage.magnetReach+' in reach · repeats':'Recurring'):'0 offers';

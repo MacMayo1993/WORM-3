@@ -12,14 +12,14 @@ import { ttPush } from '../worm/circularBuffers.js';
 
 // Independent checklist of every authored power quest, including required variety.
 const POOLS = {
-  7: ['magnet', 'rocket'], 8: ['water', 'fire', 'grass'], 17: ['rocket'], 18: ['explode'],
+  7: ['magnet', 'rocket'], 8: ['water', 'fire', 'grass'], 13: ['grass'], 17: ['rocket', 'air'], 18: ['explode'],
   20: ['magnet', 'explode', 'water', 'rocket', 'fire'],
   24: ['water', 'fire'], 27: ['water', 'fire', 'grass'], 28: ['explode', 'rocket'],
   30: ['magnet', 'explode', 'water', 'fire', 'grass'], 36: ['water', 'fire', 'grass', 'ice'],
-  37: ['explode', 'rocket'], 40: ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'],
+  37: ['explode', 'rocket'], 40: ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air'],
 };
 // Later chapters derive the same canonical inventory; keep the table above fixed.
-// Fusion quests return every element in the level's pool (all five when unset),
+// Fusion quests return every element in the level's pool (all six when unset),
 // and ordered Steam/Quench lessons need water and fire.
 for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
   const m = level.mechanics ?? {}, required = new Set();

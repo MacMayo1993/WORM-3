@@ -2,14 +2,14 @@
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
 // text stays literal.
-const ELEMENT_NAMES = ['water', 'fire', 'earth', 'ice', 'lightning', 'air'];
+import { STORY_ELEMENTS, storyElementNames } from './elementGoals.js';
 export const TAIL_KINDS = ['tunnel', 'collector', 'restore'];
 export const TUNNEL_KINDS = ['tunnel', 'collector', 'restore', 'mastery'];
 
 const times = n => n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`;
 const count = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const names = n => {
-  const list = ELEMENT_NAMES.slice(0, n);
+const names = (level, n) => {
+  const list = storyElementNames(level, n);
   return list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0];
 };
 const sentence = parts => parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
@@ -34,8 +34,8 @@ const TASKS = [
   ['magnetOrbs', n => `catch ${count(n, 'remote orb')} with a magnet`],
   ['explodes', n => n === 1 ? 'ride out an explosion' : `ride out ${n} explosions`],
   ['elementPickups', n => `pick up ${count(n, 'elemental orb')}`],
-  ['uniqueElements', n => `collect ${n} different elements (${names(n)})`],
-  ['elements', n => n >= ELEMENT_NAMES.length ? `master all ${n} elements` : `master ${count(n, 'element')} (${names(n)})`],
+  ['uniqueElements', (n, level) => `collect ${n === STORY_ELEMENTS.length ? 'all ' : ''}${n} different elements (${names(level, n)})`],
+  ['elements', (n, level) => n === STORY_ELEMENTS.length ? `master all ${n} elements` : `master ${count(n, 'element')} (${names(level, n)})`],
   ['steamFusions', n => `make Steam (Fire → Water)${n > 1 ? ` ${times(n)}` : ''}`],
   ['quenchFusions', n => `make Quench (Water → Fire)${n > 1 ? ` ${times(n)}` : ''}`],
   ['fusions', n => `fuse two elements ${times(n)}`],
@@ -54,7 +54,7 @@ export function storyGoalText(level) {
   if (level.orbs) tasks.push(`collect ${count(level.orbs, 'orb')}`);
   if (level.colors && level.kind !== 'orbs') tasks.push(`collect all ${level.colors} colors`);
   if (level.rotations) tasks.push(`survive ${count(level.rotations, 'layer turn')}`);
-  for (const [key, phrase] of TASKS) if (m[key]) tasks.push(phrase(m[key]));
+  for (const [key, phrase] of TASKS) if (m[key]) tasks.push(phrase(m[key], level));
 
   const notes = [];
   if (TAIL_KINDS.includes(level.kind)) notes.push('Clear your tail to finish.');

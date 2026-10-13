@@ -79,25 +79,26 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
   sim.isJumping = true; sim.jumpCount = 2; read();
   sim.alive = false; sim.isJumping = false; expect(read().doubleJumps).toBeUndefined();
 });
-it('checks all five elemental effects and cycles back to missed powers', () => {
+it('checks all six elemental effects and cycles back to missed powers', () => {
   const { sim, p, level, read } = setup(40);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4; p.mechanics.explodes = 2;
   sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
-  for (const type of ['fire', 'grass', 'ice', 'lightning', 'water']) {
+  for (const type of ['fire', 'grass', 'ice', 'lightning', 'air', 'water']) {
     sim.specials = []; p.powerDelay = 0;
     expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
     expect(sim.specials[0].type).toBe(type);
   }
-  for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
+  for (const type of ['water', 'fire', 'grass', 'ice', 'lightning', 'air']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
     sim.waterMomentum = 0;
     for (let i = 0; i < 81; i++) read();
     if (type === 'water') { expect(p.elements.has(type)).toBe(false); sim.waterMomentum = 0.9; read(); }
     if (type === 'fire') { expect(p.elements.has(type)).toBe(false); sim.elementalPatches.set('test', { type: 'fire' }); read(); }
-    if (type === 'grass' || type === 'ice') {
+    if (type === 'grass' || type === 'ice' || type === 'air') {
       expect(p.elements.has(type)).toBe(false);
       sim.isJumping = true; sim.jumpHeight = type === 'grass' ? 3 : 1;
+      if (type === 'air') recordStoryMechanic(p, 'airLaunch');
       if (type === 'grass') { read(); expect(p.elements.has(type)).toBe(false); recordStoryMechanic(p, 'grassLaunch'); }
       read();
       expect(p.elements.has(type)).toBe(false);
@@ -106,11 +107,11 @@ it('checks all five elemental effects and cycles back to missed powers', () => {
     expect(p.elements.has(type)).toBe(true);
     expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false); // don't replace an active element
   }
-  expect(read().elements).toBe(5); expect(nextStoryPower(p, level)).toBeNull();
+  expect(read().elements).toBe(6); expect(nextStoryPower(p, level)).toBeNull();
 });
 it('finishes level eight with three collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
-  expect(level.mechanics).toEqual({ elementPickups: 3 });
+  expect(level.mechanics).toEqual({ uniqueElements: 3 });
   p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
   p.powerDelay = 0;
@@ -119,18 +120,18 @@ it('finishes level eight with three collected elements without waiting for maste
   expect(sim.specials[0].type).toBe('fire');
   expect(read().elementPickups).toBeUndefined();
   const won = completed(level, { elapsed: 80 });
-  recordStoryMechanic(p, 'elementPickups');
-  recordStoryMechanic(p, 'elementPickups');
-  expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).toBeNull();
+  recordStoryMechanic(p, 'elementPickups', 'water');
+  recordStoryMechanic(p, 'elementPickups', 'fire');
+  expect(storyOutcome(level, { ...won, uniqueElements: read().uniqueElements })).toBeNull();
   expect(nextStoryPower(p, level)).toBe('grass');
   sim.specials = []; sim.elementalT = 10;
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
   sim.elementalT = 0; p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('grass');
-  recordStoryMechanic(p, 'elementPickups');
+  recordStoryMechanic(p, 'elementPickups', 'grass');
   expect(p.elements.size).toBe(0);
-  expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).not.toBeNull();
+  expect(storyOutcome(level, { ...won, uniqueElements: read().uniqueElements })).not.toBeNull();
   expect(nextStoryPower(p, level)).toBeNull();
   expect(stageStory(sim, level.cubeSize ?? 5, level).mechanics).toEqual({});
 });
@@ -144,7 +145,7 @@ it('counts distinct elemental pickups for level 30 without hidden mastery action
     expect(metrics.uniqueElements).toBe(expected);
     expect(metrics.elements).toBe(0);
     expect(storyChecklist(level, metrics).find(g => g.key === 'uniqueElements')).toMatchObject({
-      label: 'Collect different elements', value: expected, target: 3, done: expected === 3,
+      label: 'Collect water, fire, earth', value: expected, target: 3, done: expected === 3,
     });
     expect(storyOutcome(level, metrics) !== null).toBe(expected === 3);
   }
@@ -214,7 +215,7 @@ it('offers one optional view in later Story levels without replacing required po
   expect(sim.specials[0].type).toBe('magnet');
   sim.specials = [];
   p.mechanics = { ...level.mechanics };
-  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning', 'air']);
   p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toMatch(/^view-/);
@@ -231,6 +232,8 @@ it('keeps optional view transformations out of the first two chapters after requ
     const { sim, p, level } = setup(id);
     sim.powerups = []; sim.specials = []; p.powerDelay = 0;
     p.mechanics = { ...level.mechanics };
+    p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning', 'air']);
+    p.collectedElements = new Set(p.elements);
     expect(nextStoryPower(p, level)).toBeNull();
     expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
     expect(sim.specials).toHaveLength(0);

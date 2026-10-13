@@ -2,6 +2,7 @@ import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
+import { storyElementTypes } from './elementGoals.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ttAt } from '../circularBuffers.js';
@@ -254,8 +255,8 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   updateMastery(sim, practice, level, delta);
   return {
     ...practice.mechanics,
-    elements: storyElementCount(practice.elements, level.mechanics?.elements),
-    uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements),
+    elements: storyElementCount(practice.elements, level.mechanics?.elements, storyElementTypes(level)),
+    uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements, storyElementTypes(level)),
     uniqueFusions: practice.fusionIds?.size ?? 0,
     powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
