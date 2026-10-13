@@ -48,19 +48,22 @@ describe('Mobi’s story', () => {
     expect(WORM_CHARACTERS.find(character => character.id === 'mobi').subtitle).toBe('Multi-Oriented Block Intelligence');
   });
 
-  it('tells the war as a feud between two clans, never as one world-sized worm', () => {
+  it('tells the war as a feud between two clans, with Mobi as the only voice', () => {
     const copy = [
       ...WORM_STORY_LEVELS.flatMap(level => [...storyNarrative(level.id).briefing, storyNarrative(level.id).debrief]),
       ...WORM_STORY_LEVELS.map(level => level.subtitle).filter(Boolean),
       ...WORM_STORY_CHAPTERS.map(chapter => chapter.blurb),
     ];
-    for (const line of copy) expect(line).not.toMatch(/world worm/i);
+    for (const line of copy) {
+      expect(line).not.toMatch(/world worm/i);
+      expect(line).not.toMatch(/\b(Brand|Hesper|Quill)\b/);
+    }
     expect(storyNarrative(9).briefing.join(' ')).toContain('Longhaul');
     expect(storyNarrative(31).briefing.join(' ')).toContain('Ringfolk');
   });
 
   it('builds to an ending where the war is over and Mobi stays', () => {
-    expect(storyNarrative(30).debrief).toContain('Brand’s head is wedged in our Core');
+    expect(storyNarrative(30).debrief).toContain('The Longhaul’s longest body is wedged in our Core');
     expect(storyNarrative(120).debrief).toContain('The Great Worm War is over');
     expect(storyNarrative(120).debrief).toContain('not going anywhere without you');
   });
