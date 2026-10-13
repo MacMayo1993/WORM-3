@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
 import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
 import { DEFAULT_SETTINGS, generateCampaign, generateLevel, modeledPowerBudget } from '../../tools/worm-level-auditor/web/generator.js';
-import { assess, requiredPowerCycles } from '../../tools/worm-level-auditor/web/audit.js';
+import { assess, ELEMENTS, requiredPowerCycles } from '../../tools/worm-level-auditor/web/audit.js';
 import { auditGeneratedLevel } from '../../tools/worm-level-auditor/scripts/generator-engine.mjs';
 
 const templates = Object.entries(STORY_WORLDS).filter(([id]) => Number(id) <= 40).map(([, world]) => world);
@@ -39,7 +39,7 @@ describe('campaign drafting workshop', () => {
   it('rejects impossible edits and flags inadequate time budgets', () => {
     const original = generateLevel(50, RECIPE, templates);
     for (const mutate of [draft => { draft.config.target = 7; },
-      draft => { draft.config.mechanics.uniqueElements = 6; },
+      draft => { draft.config.mechanics.uniqueElements = ELEMENTS.length + 1; },
       draft => { draft.config.mechanics.unsupported = 1; },
       draft => { draft.world.route = 'missing'; }]) {
       const draft = structuredClone(original); mutate(draft);
