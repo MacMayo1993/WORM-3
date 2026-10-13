@@ -258,7 +258,6 @@ export function WormBody({ worm, size }) {
         // constant altitude that rounds every edge — rather than each part offsetting
         // itself along whichever face normal it happens to hold. See rocketOrbit.js.
         const orbitT = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const flightBlend = Math.min(1, orbitT * 4);
         // During transit (entering/tunnel/exiting) and the windout spiral the body segments ride
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
@@ -490,7 +489,7 @@ export function WormBody({ worm, size }) {
                 if (_isWiggle) {
                     bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
-                    _wigglePrev.copy(_bodyHeadPos); wigglePrevValid = !_bodyTransit && orbitT === 0; // the head is not lifted by a rocket flight, the beads are
+                    _wigglePrev.copy(_wormDummy.position); wigglePrevValid = !_bodyTransit;
                 }
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
@@ -504,8 +503,8 @@ export function WormBody({ worm, size }) {
                 let targetDist;
                 if (_isInch) {
                     inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove, _inchShape);
-                    targetDist = THREE.MathUtils.lerp(_inchGait.dist, i * BODY_BALL_SPACING, flightBlend);
-                    _inchArch = _inchGait.arch * (1 - flightBlend);
+                    targetDist = _inchGait.dist;
+                    _inchArch = _inchGait.arch;
                 } else {
                     targetDist = sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING;
                 }
@@ -540,6 +539,9 @@ export function WormBody({ worm, size }) {
 
                         // Calculate forward/side vector for the wiggle at this exact localized point
                         _bodySegForward.subVectors(aPos, bPos).normalize();
+                        // Flight lifts the path, not the gait: keep the same wave and
+                        // humps, using the airborne shell's local up around cube edges.
+                        if (orbitT > 0 && !segmentTransit) cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
                         if (_isWiggle && !segmentTransit) {
@@ -553,10 +555,10 @@ export function WormBody({ worm, size }) {
                         const wiggle = (_isInch || segmentTransit) ? 0 : _isWiggle
                             ? wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time)
                             : Math.sin(targetDist * 0.8 / BODY_BALL_SPACING - time * 6) * 0.08 * Math.sin(fade * Math.PI);
-                        _bodyClonePos.addScaledVector(_bodySideVec, wiggle * (1 - flightBlend));
+                        _bodyClonePos.addScaledVector(_bodySideVec, wiggle);
                         // Point the bead along the wave it rides, not the straight path under it.
                         if (_isWiggle && !segmentTransit) {
-                            _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend)).normalize();
+                            _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time)).normalize();
                             if (wigglePrevValid) limitWiggleGap(_bodyClonePos, _wigglePrev);
                             _wigglePrev.copy(_bodyClonePos); wigglePrevValid = true;
                         } else if (_isWiggle) wigglePrevValid = false;
@@ -585,10 +587,11 @@ export function WormBody({ worm, size }) {
                         // worm at one point. Continue its oldest heading instead.
                         _bodySegForward.copy(_wiggleForward);
                         _bodyClonePos.addScaledVector(_bodySegForward, -Math.max(0, targetDist - cumulativeDist));
+                        if (orbitT > 0) cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
                         _bodyClonePos.addScaledVector(_bodySideVec,
-                            wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend));
-                        _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend)).normalize();
+                            wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time));
+                        _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time)).normalize();
                         if (wigglePrevValid) limitWiggleGap(_bodyClonePos, _wigglePrev);
                         _wigglePrev.copy(_bodyClonePos); wigglePrevValid = true;
                     } else {
@@ -641,8 +644,8 @@ export function WormBody({ worm, size }) {
                 } else if (isMobi) {
                     _wormDummy.scale.setScalar(MOBI_SEGMENT_RADIUS);
                     // Blocks tumble a little in a follow-the-leader wave instead of
-                    // marching in lockstep. Surface only: tunnels own the swim stroke.
-                    if (!segmentTransit && swimWeight === 0 && orbitT === 0) {
+                    // marching in lockstep. Keep the sway in flight; tunnels own the swim stroke.
+                    if (!segmentTransit && swimWeight === 0) {
                         const sway = mobiTailSwayInto(_mobiSway, i / ORB_SEGMENT_GROWTH,
                             worm.crawlDistance?.current ?? 0, time, reducedPickupMotion);
                         _wormDummy.rotateZ(sway.roll).rotateX(sway.pitch).rotateY(sway.yaw);
