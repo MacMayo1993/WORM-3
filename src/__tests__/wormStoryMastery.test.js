@@ -46,15 +46,17 @@ it('stages the Stage 9 body on the 6x6 exterior and completes only with every bo
   const { sim, level, p } = setup(9);
   expect(level.cubeSize).toBe(6);
   expect(p.cubies).toHaveLength(6);
-  expect(sim.pos).toMatchObject({ x: 3, y: 0, z: 5, dirKey: 'PZ' });
-  const headZ = getStickerWorldPos(3, 0, 5, 'PZ', 6, 0)[2] + WORM_LIFT;
+  // The head arrives on the face's middle tile, its body straight down the column.
+  expect(sim.pos).toMatchObject({ x: 3, y: 2, z: 5, dirKey: 'PZ' });
+  const headZ = getStickerWorldPos(3, 2, 5, 'PZ', 6, 0)[2] + WORM_LIFT;
   for (let i = 0; i < sim.stepHistory.count; i++) {
     const point = shAt(sim.stepHistory, i);
     expect(point.tz).toBe(5);
     expect(point.pos.z).toBeCloseTo(headZ, 8);
     if (i > 0) expect(point.pos.distanceTo(shAt(sim.stepHistory, i - 1).pos)).toBeCloseTo(0.02, 8);
   }
-  expect(ttAt(sim.tileTrail, 0)).toBe('3,0,5,PZ');
+  expect(ttAt(sim.tileTrail, 0)).toBe('3,2,5,PZ');
+  expect(ttAt(sim.tileTrail, 1)).toBe('3,1,5,PZ');
   const won = completed(level);
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   expect(storyOutcome(level, { ...won, bombs: level.mechanics.bombs - 1 })).toBeNull();
