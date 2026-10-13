@@ -143,8 +143,9 @@ function ActiveInspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
             guide.matrix.copy(cubeRef.current.matrixWorld).multiply(scale.makeScale(state.size, state.size, state.size));
             guide.matrixWorldNeedsUpdate = true;
             const stickers = scene.getObjectByName('StickerInstanceMesh');
+            const chromeStickers = scene.getObjectByName('ChromeStickerInstanceMesh');
             const tileSurfaces = scene.getObjectByName('TileSurfaceBatches');
-            renderInspectionPass(gl, scene, lensCamera, lensTarget, [root, exteriorRef.current, stickers, tileSurfaces], [guide]);
+            renderInspectionPass(gl, scene, lensCamera, lensTarget, [root, exteriorRef.current, stickers, chromeStickers, tileSurfaces], [guide]);
             lastCapture = now;
           }
           lensMesh.visible = true;

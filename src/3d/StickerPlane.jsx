@@ -1,3 +1,4 @@
+import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
 import { spiderVertexShader, spiderFragmentShader, neonBorderVertexShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader } from './stickerPortalShaders.js';
 import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { burrowSticker } from '../worm/burrowBridge.js';
@@ -246,7 +247,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }))
   );
   // Cinematics render real stickers with local styling, never changing saved settings.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  const { biomeEnabled: configuredBiome, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  const isChrome = mode === 'chrome';
+  const biomeEnabled = configuredBiome && !isChrome;
   const flipPads = presentation ? settings?.flipPads : gameConfig.flipPads;
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
@@ -349,7 +352,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, []);
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
-  const instanceCtx = useStickerInstances();
+  const instanceCtx = useStickerInstances(mode);
   const surfaceCtx = useTileSurfaceInstances();
   // THREE.Color kept in sync with the current material colour; manager reads it
   // each frame to upload per-instance colour without any allocation.
@@ -640,7 +643,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipFromColor.current = fc[fromFaceId];
       flipToColor.current = fc[curr];
       // Texture follows city identity — use biome ground textures in biome mode
-      if (biomeEnabled && meta?.orig) {
+      if (isChrome) {
+        flipFromTexture.current = flipToTexture.current = null;
+      } else if (biomeEnabled && meta?.orig) {
         const newFlips = flips;
         // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
         const fromFace = newFlips % 2 === 1
@@ -697,7 +702,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       // Restore the correct FROM texture now that flipFromTexture is known, and ensure the
       // mesh is visible so living/patterned styles show through the additive rim glow.
-      if (preserveFlipStyle && !biomeEnabled && !isGlass && !isSudokube && meshRef.current) {
+      if (preserveFlipStyle && !biomeEnabled && !isGlass && !isChrome && !isSudokube && meshRef.current) {
         meshRef.current.material = getTileStyleMaterial(
           manifoldStyles?.[fromFaceId] || 'solid', flipFromColor.current,
           !!flipFromTexture.current, flipFromTexture.current, fc[ANTIPODAL_COLOR[fromFaceId]]);
@@ -932,7 +937,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           // Swap the opaque surface only while shut. Odd-parity flips previously
           // held FROM until completion, underneath a translucent TO overlay.
           const mat = meshRef.current?.material;
-          if (!biomeEnabled && !isGlass && !isSudokube && meshRef.current) {
+          if (!biomeEnabled && !isGlass && !isChrome && !isSudokube && meshRef.current) {
             meshRef.current.material = getTileStyleMaterial(
               tileStyleRef.current, baseColorRef.current,
               !!flipToTexture.current, flipToTexture.current, antipodalHexRef.current);
@@ -1258,7 +1263,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
-  const currTexture = isDead ? null
+  const currTexture = isDead || isChrome ? null
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
   const currTextureReady = isTextureReady(currTexture);
@@ -1293,7 +1298,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const _styleKey = biomeEnabled ? cityFace : meta?.orig;
   // Dead (capped) tiles render flat gray with no decorative style, so a board of
   // spent tiles reads as spent and the surviving pair actually stands out.
-  const tileStyle = isDead || lightweightNumbers
+  const tileStyle = isDead || lightweightNumbers || isChrome
     ? 'solid'
     : biomeGroundTexture
     ? 'solid'
@@ -1348,11 +1353,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const bindStyleIdentity = useMemo(() => bindTileStyleIdentity({ x: meta?.origPos?.x, y: meta?.origPos?.y, z: meta?.origPos?.z }, meta?.orig),
     [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
 
-  const backTileStyle = isDead || lightweightNumbers ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
+  const backTileStyle = isDead || lightweightNumbers || isChrome ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
-    if (instanceBack) return surfaceCtx.backMaterial;
+    if (instanceBack) return isChrome ? surfaceCtx.chromeMaterial : surfaceCtx.backMaterial;
+    if (isChrome) return new THREE.MeshStandardMaterial({ ...CHROME_TILE_FINISH, color: isDead ? '#555555' : antipodalHex });
     if (useGlassStyle) {
       const material = getGlassMaterial(isDead ? '#555555' : antipodalHex).clone();
       material.side = THREE.FrontSide;
@@ -1360,7 +1366,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
     if (backTileStyle !== 'solid') return getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
     return new THREE.MeshStandardMaterial({ color: isDead ? '#555555' : antipodalHex, roughness: 0.45, metalness: 0.08 });
-  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle, instanceBack, surfaceCtx]);
+  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle, isChrome, instanceBack, surfaceCtx]);
   useEffect(() => () => {
     // Shader styles belong to the shared tile cache; only the plain back owns
     // its material, along with the glass clone. Never dispose a cached shader.
@@ -1458,7 +1464,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // the mesh must hold the correct color itself.
         const fromFaceId = preserveFlipStyle ? displayedFaceRef.current : prevCurr.current;
         const fromColor = fc[fromFaceId];
-        if (preserveFlipStyle && !biomeEnabled && !isGlass && !isSudokube && fromColor) {
+        if (preserveFlipStyle && !biomeEnabled && !isGlass && !isChrome && !isSudokube && fromColor) {
           const texture = faceTextures?.[fromFaceId] || null;
           meshRef.current.material = getTileStyleMaterial(
             manifoldStyles?.[fromFaceId] || 'solid', fromColor,
@@ -1486,7 +1492,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Worm and cube modes share the same batched, animated portal face.
@@ -1596,7 +1602,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
             <primitive object={_sharedStickerGeo} attach="geometry" />
           )}
-          {!(useGlassStyle && glassMaterial) && !(useShaderStyle && styleMaterial) && (plainSticker ? (
+          {!(useGlassStyle && glassMaterial) && !(useShaderStyle && styleMaterial) && (isChrome ? (
+            <meshStandardMaterial color={materialColor} {...CHROME_TILE_FINISH} />
+          ) : plainSticker ? (
             isMobile
               ? <meshStandardMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />
               : <meshPhysicalMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />

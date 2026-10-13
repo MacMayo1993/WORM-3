@@ -77,7 +77,7 @@ describe('sticker finish', () => {
 // the menu cube's rounded sticker, plain ones clear-coated, styled ones finished.
 const PLAIN = 'plain', FINISHED = 'finished';
 const VIEW_CASES = [
-  ...['classic', 'grid', 'chrome', 'neon', 'gap', 'lego'].flatMap((mode) => [
+  ...['classic', 'grid', 'neon', 'gap', 'lego'].flatMap((mode) => [
     [mode, 'solid', false, THREE.ExtrudeGeometry, PLAIN],
     [mode, 'carbonFiber', false, THREE.ExtrudeGeometry, FINISHED]
   ]),

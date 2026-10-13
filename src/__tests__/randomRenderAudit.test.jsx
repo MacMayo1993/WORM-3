@@ -73,9 +73,11 @@ it.each([false, true])('keeps Random surfaces correct across remixes and turns (
         expect(positions.has(key), `overlapping front at ${key}, tick ${tick}`).toBe(false);
         positions.add(key);
       };
-      const batch = scene.getObjectByName('StickerInstanceMesh');
       const matrix = new THREE.Matrix4();
-      for (let slot = 0; slot < batch.count; slot++) { batch.getMatrixAt(slot, matrix); addPosition(matrix); }
+      for (const name of ['StickerInstanceMesh', 'ChromeStickerInstanceMesh']) {
+        const batch = scene.getObjectByName(name);
+        for (let slot = 0; slot < batch.count; slot++) { batch.getMatrixAt(slot, matrix); addPosition(matrix); }
+      }
 
       const colors = resolveColors(useGameStore.getState().settings);
       scene.traverse(mesh => {

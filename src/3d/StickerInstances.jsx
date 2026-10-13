@@ -1,3 +1,4 @@
+import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
 import { uploadInstancePrefix } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
 import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
@@ -32,9 +33,13 @@ import * as THREE from 'three';
 // ─── Context ─────────────────────────────────────────────────────────────────
 
 export const StickerInstanceContext = createContext(null);
+const ChromeStickerInstanceContext = createContext(null);
 
 /** Hook consumed by StickerPlane to access the batch manager. */
-export const useStickerInstances = () => useContext(StickerInstanceContext);
+export const useStickerInstances = mode => {
+  const plain = useContext(StickerInstanceContext), chrome = useContext(ChromeStickerInstanceContext);
+  return mode === 'chrome' ? chrome : plain;
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,7 +58,7 @@ const _zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
  * to the Three.js scene root (world space) so sticker world matrices can be
  * applied without any parent-transform offset.
  */
-export function StickerInstanceProvider({ children, exteriorPortals }) {
+function StickerBatch({ children, exteriorPortals, chrome = false }) {
   const { scene } = useThree();
 
   // ── InstancedMesh ───────────────────────────────────────────────────────────
@@ -69,13 +74,14 @@ export function StickerInstanceProvider({ children, exteriorPortals }) {
     // still one draw call for every plain sticker on the cube.
     const geo = createPlayStickerGeometry();
     const { Material, sticker } = rubiksFinish(isMobile);
-    const source = new Material({ ...sticker, envMapIntensity: 0.3 });
+    const source = chrome ? new THREE.MeshStandardMaterial(CHROME_TILE_FINISH)
+      : new Material({ ...sticker, envMapIntensity: 0.3 });
     const mat = exteriorPortals?.materialFor(source) ?? source;
     const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES);
     // Render all MAX_INSTANCES slots; unused ones are zeroed out (invisible).
     mesh.count = MAX_INSTANCES;
     mesh.frustumCulled = false; // world-space AABB would be wrong anyway
-    mesh.name = 'StickerInstanceMesh';
+    mesh.name = chrome ? 'ChromeStickerInstanceMesh' : 'StickerInstanceMesh';
     // Disable raycasting — zero-scale matrices produce degenerate inverse matrices
     // that cause Infinity/NaN values in the ray, leading to unpredictable hit results.
     // This mesh is purely visual; no pointer interaction is needed.
@@ -83,7 +89,7 @@ export function StickerInstanceProvider({ children, exteriorPortals }) {
     for (let i = 0; i < MAX_INSTANCES; i++) mesh.setMatrixAt(i, _zeroMatrix);
     mesh.instanceMatrix.needsUpdate = true;
     return mesh;
-  }, [exteriorPortals]);
+  }, [exteriorPortals, chrome]);
 
   // Add to scene root.  Remove on unmount.
   // NOTE: geometry and material are NOT disposed here.  In React 18 Strict Mode
@@ -282,9 +288,18 @@ export function StickerInstanceProvider({ children, exteriorPortals }) {
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);
 
-  return (
-    <StickerInstanceContext.Provider value={ctx}>
-      <TileSurfaceProvider exteriorPortals={exteriorPortals}><PadProvider exteriorPortals={exteriorPortals}>{children}</PadProvider></TileSurfaceProvider>
-    </StickerInstanceContext.Provider>
-  );
+  const Context = chrome ? ChromeStickerInstanceContext : StickerInstanceContext;
+  return <Context.Provider value={ctx}>{children}</Context.Provider>;
+}
+
+// Separate shared materials allow chrome and ordinary tiles to coexist in Random
+// Mode without turning the entire batch metallic or adding a draw per tile.
+export function StickerInstanceProvider({ children, exteriorPortals }) {
+  return <StickerBatch exteriorPortals={exteriorPortals}>
+    <StickerBatch exteriorPortals={exteriorPortals} chrome>
+      <TileSurfaceProvider exteriorPortals={exteriorPortals}>
+        <PadProvider exteriorPortals={exteriorPortals}>{children}</PadProvider>
+      </TileSurfaceProvider>
+    </StickerBatch>
+  </StickerBatch>;
 }
