@@ -135,8 +135,6 @@ export default function GameScene({
   // skip it too — their translucent bodies don't read shadows usefully.
   const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
 
-  // During a WORM run the photo backdrop steps back so the board reads first.
-  const skyCalm = wormHealerMode ? 1 : 0;
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
@@ -247,7 +245,7 @@ export default function GameScene({
             had. See STORY_ENVIRONMENTS for the chapter → environment casting. */}
         {storyEnvFile && (
           <ErrorBoundary3D>
-            <InteractivePhotoBackground files={getBackgroundUrl(storyEnvFile)} calm={skyCalm} />
+            <InteractivePhotoBackground files={getBackgroundUrl(storyEnvFile)} />
           </ErrorBoundary3D>
         )}
         {/* Free play: Black Hole */}
@@ -263,12 +261,12 @@ export default function GameScene({
         {/* Free play: interactive photo panoramas */}
         {!currentLevelData && bgConfig?.file && (
           <ErrorBoundary3D>
-            <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} calm={skyCalm} />
+            <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
           </ErrorBoundary3D>
         )}
         {!currentLevelData && !bgConfig?.file && PHOTO_PRESETS.has(settings.backgroundTheme) && (
           <ErrorBoundary3D>
-            <InteractivePhotoBackground preset={settings.backgroundTheme} calm={skyCalm} />
+            <InteractivePhotoBackground preset={settings.backgroundTheme} />
           </ErrorBoundary3D>
         )}
         {!currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
