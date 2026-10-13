@@ -2,26 +2,28 @@ import { expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import {
   storyArrivalPose, STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS,
-  ARRIVAL_RAMP, arrivalBeadInto, arrivalOffset, arrivalPathPointInto,
+  ARRIVAL_RAMP, arrivalBeadInto, arrivalHeadInto, arrivalPathPointInto, arrivalTuck,
 } from '../worm/healerWorm/storyArrival.js';
 import { storyMouths } from '../worm/story/runtime.js';
 import { makeStepHistory, shPush } from '../worm/circularBuffers.js';
 
 const at = fraction => storyArrivalPose(STORY_ARRIVAL_SECONDS * fraction);
 
-it('opens the portal before the worm comes out, then crawls it onto its authored body', () => {
-  expect(storyArrivalPose(0)).toMatchObject({ open: 0, ring: 0, emerge: 0 });
+it('opens the portal, pops the head out, then uncoils the body onto its authored trail', () => {
+  expect(storyArrivalPose(0)).toMatchObject({ open: 0, ring: 0, rise: 0, emerge: 0 });
   expect(at(0.2).open).toBe(1);
-  expect(at(0.25).emerge).toBe(0);
-  expect(at(0.5).emerge).toBeGreaterThan(0.3);
-  expect(at(0.5).emerge).toBeLessThan(1);
+  expect(at(0.23)).toMatchObject({ rise: 0, emerge: 0 });
+  expect(at(0.42).rise).toBe(1);
+  expect(at(0.42).emerge).toBeGreaterThan(0);
+  expect(at(0.6).emerge).toBeGreaterThan(0.3);
+  expect(at(0.6).emerge).toBeLessThan(1);
   expect(at(0.85).shock).toBeGreaterThan(0.5);
-  expect(storyArrivalPose(STORY_ARRIVAL_SECONDS)).toMatchObject({ emerge: 1, ring: 0, shock: 0, settle: 1, step: 'go' });
+  expect(storyArrivalPose(STORY_ARRIVAL_SECONDS)).toMatchObject({ rise: 1, emerge: 1, ring: 0, shock: 0, settle: 1, step: 'go' });
   expect([0.1, 0.3, 0.6, 0.8].map(t => at(t).step)).toEqual([3, 2, 1, 'go']);
   expect(storyArrivalPose(STORY_ARRIVAL_SECONDS + 20)).toEqual(storyArrivalPose(STORY_ARRIVAL_SECONDS));
 });
 
-it('crawls forward the whole way, never backing up', () => {
+it('uncoils forward the whole way, never backing up', () => {
   let previous = -1;
   for (let i = 0; i <= 200; i++) {
     const { emerge } = at(i / 200);
@@ -31,23 +33,35 @@ it('crawls forward the whole way, never backing up', () => {
 });
 
 it('uses a brief motion-free reveal for reduced motion', () => {
-  expect(storyArrivalPose(0.1, true)).toMatchObject({ emerge: 1, ring: 0, step: null });
+  expect(storyArrivalPose(0.1, true)).toMatchObject({ rise: 1, emerge: 1, ring: 0, step: null });
   expect(storyArrivalPose(STORY_ARRIVAL_REDUCED_SECONDS, true).t).toBe(1);
 });
 
-it('keeps the whole worm in the portal at first and every bead at its real size once out', () => {
+it('pops the head out of the portal nose first and lands it level, at its real size', () => {
+  const head = { grow: 0, lift: 0, pitch: 0 };
+  expect(arrivalHeadInto(head, 0)).toMatchObject({ grow: 0 });
+  expect(head.lift).toBeLessThan(0);
+  expect(head.pitch).toBeGreaterThan(0.2);
+  expect(arrivalHeadInto(head, 0.5).lift).toBeGreaterThan(0.1);
+  for (let r = 0; r <= 1; r += 0.05) expect(arrivalHeadInto(head, r).grow).toBeLessThanOrEqual(1);
+  arrivalHeadInto(head, 1);
+  expect(head.grow).toBe(1);
+  expect(head.lift).toBeCloseTo(0, 9);
+  expect(head.pitch).toBeCloseTo(0, 9);
+});
+
+it('keeps the whole body in the portal at first and every bead at its real size once out', () => {
   const mouth = 0.81, bead = { grow: 0, lift: 0 };
-  const start = arrivalOffset(0, mouth);
-  // Head and every bead behind it are below the lip and drawn at nothing.
-  expect(arrivalBeadInto(bead, start, mouth, start).grow).toBe(0);
-  expect(bead.lift).toBeLessThan(0);
+  const start = arrivalTuck(0, mouth);
+  // Every bead, the tail included, is still below the lip and drawn at nothing.
+  for (let s = 0.09; s <= mouth + 1e-9; s += 0.09) expect(arrivalBeadInto(bead, s, start).grow).toBe(0);
   // Never larger than life: growth tops out at exactly 1.
   for (let s = 0; s <= mouth + ARRIVAL_RAMP; s += 0.01) {
-    for (const offset of [0, 0.2, 0.6]) expect(arrivalBeadInto(bead, s, mouth, offset).grow).toBeLessThanOrEqual(1);
+    for (const tuck of [0, 0.2, 0.6]) expect(arrivalBeadInto(bead, s, tuck).grow).toBeLessThanOrEqual(1);
   }
-  // A bead that just cleared the lip leaps; at rest nothing is lifted or shrunk.
-  expect(arrivalBeadInto(bead, mouth - 0.2, mouth, 0.5).lift).toBeGreaterThan(0.1);
-  for (let s = 0; s <= mouth; s += 0.09) expect(arrivalBeadInto(bead, s, mouth, 0)).toEqual({ grow: 1, lift: 0 });
+  // A bead that just cleared the lip arches; at rest nothing is lifted or shrunk.
+  expect(arrivalBeadInto(bead, 0.5, 0.3).lift).toBeGreaterThan(0.1);
+  for (let s = 0.09; s <= mouth; s += 0.09) expect(arrivalBeadInto(bead, s, arrivalTuck(1, mouth))).toEqual({ grow: 1, lift: 0 });
 });
 
 it('walks the resting path on the tile surface and carries on off its end', () => {

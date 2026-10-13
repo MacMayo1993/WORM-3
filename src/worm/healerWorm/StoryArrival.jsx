@@ -7,7 +7,7 @@ import { DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { bodyDistanceAt } from './sliceBodyPath.js';
 import {
   ARRIVAL_PORTAL_RADIUS as R,
-  arrivalBeadInto, arrivalOffset, arrivalPathPointInto, storyArrivalPose,
+  arrivalHeadInto, arrivalPathPointInto, arrivalTuck, storyArrivalPose,
 } from './storyArrival.js';
 
 const Z = new Vector3(0, 0, 1);
@@ -60,13 +60,13 @@ export function StoryArrival({ worm, elapsed, children }) {
   const body = useRef(), portal = useRef(), aperture = useRef(), beam = useRef(), arcs = useRef([]),
     sparks = useRef(), shock = useRef(), ripple = useRef();
   const scratch = useMemo(() => ({
-    dummy: new Object3D(), bead: { grow: 1, lift: 0 }, ahead: new Vector3(), behind: new Vector3(), n: new Vector3(),
-    rest: new Vector3(), side: new Vector3(), breachAt: null,
+    dummy: new Object3D(), head: { grow: 1, lift: 0, pitch: 0 }, ahead: new Vector3(), n: new Vector3(),
+    side: new Vector3(), breachAt: null,
     aperture: { uTime: { value: 0 }, uOpen: { value: 0 }, uPower: { value: 0 }, uFlash: { value: 0 } },
     beam: { uTime: { value: 0 }, uPower: { value: 0 } },
   }), []);
   const arrival = useMemo(() => ({
-    active: false, offset: 0, mouth: 0, headGrow: 1,
+    active: false, tuck: 0, headGrow: 1,
     headPos: new Vector3(), headNormal: new Vector3(), headForward: new Vector3(),
     portalPos: new Vector3(), portalNormal: new Vector3(), focus: new Vector3(),
   }), []);
@@ -95,44 +95,28 @@ export function StoryArrival({ worm, elapsed, children }) {
     const now = elapsed.current;
     const pose = storyArrivalPose(now);
     const mouth = bodyDistanceAt(worm, Math.max(0, worm.tailLength.current - 1));
-    const offset = arrivalOffset(pose.emerge, mouth);
-    arrival.mouth = mouth;
-    arrival.offset = offset;
+    const tuck = arrivalTuck(pose.emerge, mouth);
+    arrival.tuck = tuck;
 
-    // The portal sits under the resting tail: the body pours out of it and
-    // crawls up its own path, so the last bead out lands exactly at rest.
-    arrivalPathPointInto(worm, mouth, arrival.portalPos, arrival.portalNormal);
-    arrivalPathPointInto(worm, offset, arrival.headPos, arrival.headNormal);
-    const bead = arrivalBeadInto(scratch.bead, offset, mouth, offset);
-    arrival.headGrow = Math.max(1e-3, bead.grow);
-    arrival.headPos.addScaledVector(arrival.headNormal, WORM_LIFT + bead.lift);
-
-    // Face along the path, easing onto the steering heading as it comes to rest.
-    arrivalPathPointInto(worm, Math.max(0, offset - 0.08), scratch.ahead, scratch.n);
-    arrivalPathPointInto(worm, offset + 0.08, scratch.behind, scratch.n);
-    const forward = arrival.headForward.subVectors(scratch.ahead, scratch.behind);
-    const normal = arrival.headNormal;
-    forward.addScaledVector(normal, -forward.dot(normal));
+    // The portal sits under the start tile. The head pops straight up out of it
+    // already facing the way it will crawl, so nothing turns when play starts,
+    // and the body uncoils out of the hole behind it onto its resting trail.
+    arrivalPathPointInto(worm, 0, arrival.portalPos, arrival.portalNormal);
+    const head = arrivalHeadInto(scratch.head, pose.rise);
+    arrival.headGrow = Math.max(1e-3, head.grow);
+    const normal = arrival.headNormal.copy(arrival.portalNormal);
+    arrival.headPos.copy(arrival.portalPos).addScaledVector(normal, WORM_LIFT + head.lift);
     const restArr = DIR_FORWARD[worm.pos.current.dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
-    scratch.rest.set(restArr[0], restArr[1], restArr[2]);
-    if (forward.lengthSq() < 1e-10) forward.copy(scratch.rest);
-    forward.normalize().lerp(scratch.rest, 1 - smooth(offset / 0.25)).normalize();
-    // Pitch head and face together with the leap: nose up out of the mouth,
-    // nose down onto the tile.
-    const eps = 0.02;
-    const up = arrivalBeadInto(scratch.bead, offset - eps, mouth, offset).lift;
-    const down = arrivalBeadInto(scratch.bead, offset + eps, mouth, offset).lift;
-    const pitch = Math.atan((up - down) / (2 * eps)) * 0.8;
-    if (Math.abs(pitch) > 1e-4) {
+    const forward = arrival.headForward.set(restArr[0], restArr[1], restArr[2]);
+    if (Math.abs(head.pitch) > 1e-4) {
       scratch.side.crossVectors(forward, normal).normalize();
-      forward.applyAxisAngle(scratch.side, pitch);
-      normal.applyAxisAngle(scratch.side, pitch);
+      forward.applyAxisAngle(scratch.side, head.pitch);
+      normal.applyAxisAngle(scratch.side, head.pitch);
     }
 
-    // The camera keeps the mouth and the start tile in frame, sliding onto the
-    // head as the body comes out.
-    arrivalPathPointInto(worm, 0, arrival.focus, scratch.n);
-    arrival.focus.lerp(arrival.portalPos, 0.5 * (1 - pose.emerge));
+    // The camera holds on the head, easing back over the body as it uncoils.
+    arrivalPathPointInto(worm, mouth * 0.4, scratch.ahead, scratch.n);
+    arrival.focus.copy(arrival.portalPos).lerp(scratch.ahead, 0.4 * pose.emerge);
 
     // ── Portal ──
     const g = portal.current;
@@ -141,8 +125,7 @@ export function StoryArrival({ worm, elapsed, children }) {
     g.position.copy(arrival.portalPos).addScaledVector(arrival.portalNormal, 0.012);
     g.quaternion.setFromUnitVectors(Z, arrival.portalNormal);
 
-    const headU = mouth - offset; // how far the head has come out of the mouth
-    if (scratch.breachAt === null && headU >= -0.02 && pose.emerge > 0) scratch.breachAt = now;
+    if (scratch.breachAt === null && head.lift >= -0.02 && pose.rise > 0) scratch.breachAt = now;
     const sinceBreach = scratch.breachAt === null ? -1 : now - scratch.breachAt;
     const breach = sinceBreach < 0 ? 0 : Math.exp(-sinceBreach * 4.5);
     const iris = pose.open * (1 - pose.close) * (1 + 0.12 * breach);
