@@ -4,15 +4,30 @@
 
 ## 1. Canon
 
-- **MOBI** is a **Multi-Oriented Block Intelligence**: a block-built mind that faces every way at once. He was a ferry pilot for the Healer Corps.
-- **The Projective Plane** is his home. Every spot there has a twin straight through the middle, and anything long enough meets itself coming the other way, mirrored. In copy it is a place name, never a math lesson.
-- **The Flip Cube** is his ship. Its tiles are doors and the Core is its middle, the only spot that is its own twin. Every size, from the 2×2 pocket deck to the 15×15 cargo deck, is a **deck** of the same ship, which is why the campaign changes board size.
-- **W³, the Great World Worm War.** The **World Worm** grew so long that it wrapped the whole Plane. It met its own tail coming back mirrored, did not recognize it, and attacked. Every twin, tunnel and turning layer became a weapon. On Mobi's last ferry run it lunged through one of the ship's doors, and Mobi slammed the door on its neck. The Flip Cube survived and crash-landed here broken, with the World Worm's head trapped in the Core.
-- **The player** is a worm who hatches aboard after the crash. Mobi calls them "partner".
-- **The Rumbler** is unchanged: a stowaway under the tiles, separate from the World Worm.
-- **The ending.** The player leads the World Worm through the middle until its head meets its tail and it recognizes itself. The war ends and the way home opens. Mobi stays with the player, so the free modes keep their guide.
+> **Canon revised 2026-10-13.** The Great World Worm War is retired. W³ is a feud between two clans of Singular-Oriented worms. `narrative.js` and the copy in `campaign.js` follow the text below.
 
-The theme ties to mechanics. Healing joins twins back together. **Passing yourself in the Core** without biting is exactly what the World Worm could never do. Growing huge is how a healer matches a world-sized problem.
+- **MOBI** is a **Multi-Oriented Block Intelligence**: a block-built mind that faces every way at once. He was a ferry pilot for the Healer Corps, flying wounded worms from both sides of the war.
+- **The Projective Plane** is his home. Every spot there has a twin straight through the middle, and anything long enough comes back round to meet itself, mirrored. In copy it is a place name, never a math lesson.
+- **The Singular-Oriented** are the worms of the Plane. Each has one front and one back, faces one way at a time, and cannot tell a mirror image from a stranger.
+- **The Ringfolk** keep their bodies short and coiled and hold the near side of the Plane. **The Longhaul** grow long and run its far routes. For generations both clans used the Plane's doors, and the Healer Corps ferried between them.
+- **W³, the Great Worm War.** Brand, captain of the Longhaul, grew so long his body wrapped the Plane. His tail came back round the far side mirrored, and nobody warned him it was his. Hesper, a Ringfolk scout, saw a stranger on her side and bit it: the first bite. Each clan took the other for an invader, and every twin, tunnel and turning layer became a weapon.
+- **The Flip Cube** is Mobi's ship. Its tiles are doors; every size, from the 2×2 pocket deck to the 15×15 cargo deck, is a **deck** of the same ship, which is why the campaign changes board size. The Core is its middle, the only spot that is its own twin. On Mobi's last ferry run, with wounded from both clans aboard, Brand lunged through one of the ship's doors at the Core. Mobi slammed the door shut on his neck. The Flip Cube crash-landed here broken, with Brand's head wedged in the Core.
+- **The player** is a hatchling healer worm born in the wreck. Mobi calls them "partner".
+- **The Rumbler** is unchanged: a stowaway under the tiles.
+- **The ending.** The player leads Brand through the middle until his head meets his own tail and he recognizes it. Hesper sees her reflection and doesn't bite. The war ends, the way home opens, and Mobi stays with the player, so the free modes keep their guide.
+
+### Cast
+
+| Name | Who | Arc |
+| --- | --- | --- |
+| **Mobi** (he) | Multi-Oriented Block Intelligence, Healer Corps ferry pilot, the guide. | Saw both sides. The door he slammed on Brand is the war's wound. |
+| **Brand** (he) | Captain of the Longhaul, the longest Singular. | Never knew his tail was his. Ends by recognizing it. |
+| **Hesper** (she) | Ringfolk scout who bit the first reflection. | Watches from the far-side window. Ends by seeing her own reflection without biting. |
+| **Quill** (they) | Young Longhaul runner. | Asks whether a worm can jump its own tail, and learns it can. |
+| **The player** | Hatchling healer worm, born in the wreck. | Grows long enough to heal the ship and lead Brand through the middle. |
+| **The Rumbler** | Stowaway under the tiles. | Unchanged, and separate from the war. |
+
+The theme ties to mechanics. Healing joins twins back together. **Passing yourself in the Core** without biting is exactly what the feud never learned. Growing huge is how a healer matches a war-sized problem.
 
 ## 2. Chapters
 
@@ -20,16 +35,16 @@ The theme ties to mechanics. Healing joins twins back together. **Passing yourse
 | --- | --- | --- | --- | --- |
 | 1 | Crash Landing | 1–10 | Hatching, the wreck; the doors were chewed open from inside. | 6×6 classic: every core action once, a first siege, first growth goal. |
 | 2 | Every Deck | 11–20 | Decks of every size; Mobi's ferry run; routes sealed from inside. | 2×2–8×8, alternate views, explode and flight. |
-| 3 | Strange Views | 21–30 | The Core bends the decks; the memory of the slammed door. | Hollow, wireframe, bricks, far side, Steam and Quench. |
-| 4 | The Grand Crawl | 31–40 | The story of W³; the World Worm pulls for its body. | 9×9, 10×10, 15×15, long bodies, everything combined. |
-| 5 | The Long Body | 41–50 | "Long can mean kind"; the World Worm says "MINE." | Growth goals everywhere; first passes through the Core. |
-| 6 | Pocket Worlds | 51–60 | It hides in the smallest decks; it asks "HOW?" | Huge worms on 2×2–4×4; first double heals. |
-| 7 | Weather of War | 61–70 | It answers with storms. | Free fusions, recipe variety, all five elements mastered. |
-| 8 | The War Machine | 71–80 | The ship as a weapon: the Grind, the Fold. | Turns every 9–10 s, blasts, bombs, rockets. |
-| 9 | Siege of the Core | 81–90 | Crawlers dig in; the first door into the Core opens. | Fights, rings, bombs and abilities on long bodies. |
-| 10 | Mirror Decks | 91–100 | The World Worm meets its reflection: "Mine… is me?" | Far-side and mirrored views; many passes and double heals. |
-| 11 | The Mega Decks | 101–110 | Hold its attention; make the ship whole enough to fly. | 10×10 and 15×15 with 200-segment worms; a giant on a 2×2. |
-| 12 | Through the Middle | 111–120 | Lead it through the Core; the war ends. | Every mechanic, the tightest clocks, the longest worms. |
+| 3 | Strange Views | 21–30 | The Core bends the decks; a coil in the far-side window; the last ferry run and the slammed door. | Hollow, wireframe, bricks, far side, Steam and Quench. |
+| 4 | The Grand Crawl | 31–40 | The story of W³: Brand's mirrored tail, Hesper's first bite, and Brand pulling for his body. | 9×9, 10×10, 15×15, long bodies, everything combined. |
+| 5 | The Long Body | 41–50 | "Long can mean kind"; Brand says "MINE." | Growth goals everywhere; first passes through the Core. |
+| 6 | Pocket Worlds | 51–60 | Brand hides in the smallest decks; he asks "HOW?" | Huge worms on 2×2–4×4; first double heals. |
+| 7 | Weather of War | 61–70 | Brand answers with storms. | Free fusions, recipe variety, all five elements mastered. |
+| 8 | The War Machine | 71–80 | The ship as a weapon: the Longhaul's Grind and the Ringfolk's Fold. | Turns every 9–10 s, blasts, bombs, rockets. |
+| 9 | Siege of the Core | 81–90 | Longhaul crawlers dig in; the first door into the Core opens. | Fights, rings, bombs and abilities on long bodies. |
+| 10 | Mirror Decks | 91–100 | Brand meets his reflection: "Mine… is me?" | Far-side and mirrored views; many passes and double heals. |
+| 11 | The Mega Decks | 101–110 | Hold Brand's attention; Quill asks whether a worm can jump its tail; make the ship whole enough to fly. | 10×10 and 15×15 with 200-segment worms; a giant on a 2×2. |
+| 12 | Through the Middle | 111–120 | Lead Brand through the Core; Quill jumps its tail; Hesper sees her reflection; the war ends. | Every mechanic, the tightest clocks, the longest worms. |
 
 ## 3. Goals
 

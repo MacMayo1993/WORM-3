@@ -315,7 +315,7 @@ describe('demo follows the story canon', () => {
 
   it('opens with who Mobi is, where he is from, and what broke his ship', () => {
     const open = MOBI_LINES_DEMO_INTRO.join(' ');
-    for (const fact of ['Multi-Oriented Block Intelligence', 'Projective Plane', 'Flip Cube is my ship', 'W³', 'Great World Worm War', 'crash']) {
+    for (const fact of ['Multi-Oriented Block Intelligence', 'Projective Plane', 'Flip Cube is my ship', 'W³', 'Great Worm War', 'crash']) {
       expect(open).toContain(fact);
     }
     expect(MOBI_LINES_DEMO_INTRO.length).toBeLessThanOrEqual(5);

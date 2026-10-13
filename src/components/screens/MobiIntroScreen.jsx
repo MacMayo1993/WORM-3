@@ -15,10 +15,10 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 
 // Demo cold open starts with WORM; the cube lessons follow its practice sequence.
 // Canon: MOBI (Multi-Oriented Block Intelligence) flies a Flip Cube out of the
-// Projective Plane; it survived W³, the Great World Worm War, and crashed here.
+// Projective Plane; it survived W³, the Great Worm War, and crashed here.
 export const MOBI_LINES_DEMO_INTRO = [
   "Aloha! I'm Mobi, a Multi-Oriented Block Intelligence from the Projective Plane, where every spot has a twin straight through the middle.",
-  "This Flip Cube is my ship. It got me through W³, the Great World Worm War, then crash-landed here scrambled. Help me heal it so we can fly home.",
+  "This Flip Cube is my ship. It got me through W³, the Great Worm War, then crash-landed here scrambled. Help me heal it so we can fly home.",
   "You hatched aboard, and worms are the best healers in the Plane. Let’s start you crawling: collect orbs to grow, jump over your body, and ride tunnels to heal them.",
   "Go at your pace. Skip Mobi skips my instructions; Skip Step moves to the next section.",
 ];

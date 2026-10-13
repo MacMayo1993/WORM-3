@@ -475,9 +475,11 @@ The gates copy the Lightning storm's (`lightningStorm.js` and the `runStorm` gat
 
 MOBI is a **Multi-Oriented Block Intelligence** from **the Projective Plane**.
 The Flip Cube is his ship, not a fragment of his world. It survived **W³, the
-Great World Worm War**, and crash-landed here broken. The World Worm grew so long
-that it met its own tail mirrored and attacked it; its head came along in the
-crash, trapped in the Core. The full 120-level arc, chapter by chapter, is in
+Great Worm War**, and crash-landed here broken. The war was a feud between two
+clans of Singular-Oriented worms, the Ringfolk and the Longhaul. Brand of the
+Longhaul grew so long his tail came back mirrored; Hesper of the Ringfolk bit it,
+and each clan took the other for an invader. Brand's head came along in the
+crash, wedged in the Core. The full 120-level arc, chapter by chapter, is in
 [worm-story-campaign.md](worm-story-campaign.md). Where §6.1–6.3 below disagree,
 that document and `docs/COPY_STYLE.md` win.
 

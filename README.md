@@ -198,22 +198,22 @@ Abilities require an eligible surface state and respect pauses, airborne actions
 
 WORM Story is a separate action campaign from the cube puzzle packs: twelve ten-level chapters with linear unlocks, all authored in [story/campaign.js](src/worm/story/campaign.js). Each level has a preflight checklist, live objectives, a time limit, a target time and a fixed world setting.
 
-**The story.** MOBI (Multi-Oriented Block Intelligence) is a ferry pilot from the Projective Plane, a world where every spot has a twin straight through the middle. His ship is the Flip Cube. It survived W³, the Great World Worm War, then crash-landed here broken. The player is the worm who hatches aboard, grows, and heals the ship. Along the way Mobi finds out that the World Worm's head came with them, trapped in the Core. Mobi tells the story before each level and reacts after it ([story/narrative.js](src/worm/story/narrative.js)). The mission text stays literal.
+**The story.** MOBI (Multi-Oriented Block Intelligence) is a ferry pilot from the Projective Plane, a world where every spot has a twin straight through the middle. His ship is the Flip Cube. It survived W³, the Great Worm War between the Ringfolk and the Longhaul, two clans of Singular-Oriented worms, then crash-landed here broken. The player is the hatchling worm who grows up in the wreck, heals the ship, and leads Brand, captain of the Longhaul, through the middle until he recognizes his own tail. Mobi tells the story before each level and reacts after it ([story/narrative.js](src/worm/story/narrative.js)). The mission text stays literal.
 
 | Chapter | Levels | Story beat | Focus |
 | --- | --- | --- | --- |
 | **Crash Landing** | 1–10 | The hatchling and the wreck; the damage was chewed from inside. | 6×6 classic boards: crawl, cross, jump the body, survive turns, heal, powers, a first siege. |
 | **Every Deck** | 11–20 | Every size is a deck of the same ship; the routes were sealed from inside. | 2×2 to 8×8, grid, numbers, glass, chrome and neon views, explosion and flight. |
-| **Strange Views** | 21–30 | The Core bends the decks; Mobi remembers slamming a door on the World Worm. | Hollow, wireframe, bricks, the far side, the first fusions. |
-| **The Grand Crawl** | 31–40 | The story of W³: a worm that didn't recognize its own tail. | 9×9, 10×10 and 15×15 with long bodies and everything combined. |
+| **Strange Views** | 21–30 | The Core bends the decks; Mobi remembers slamming a door on Brand. | Hollow, wireframe, bricks, the far side, the first fusions. |
+| **The Grand Crawl** | 31–40 | The story of W³: a captain whose tail came back mirrored, and a scout's first bite. | 9×9, 10×10 and 15×15 with long bodies and everything combined. |
 | **The Long Body** | 41–50 | Long can mean kind. | Growth targets on every board and the first passes through the Core. |
-| **Pocket Worlds** | 51–60 | The World Worm hides in the smallest decks. | Huge worms on 2×2–4×4 cubes; double heals. |
-| **Weather of War** | 61–70 | It answers with storms. | Fusions of every kind, all five elements mastered. |
+| **Pocket Worlds** | 51–60 | Brand hides in the smallest decks. | Huge worms on 2×2–4×4 cubes; double heals. |
+| **Weather of War** | 61–70 | Brand answers with storms. | Fusions of every kind, all five elements mastered. |
 | **The War Machine** | 71–80 | The ship turned into a weapon. | Turns every 9–10 s, blasts, bombs, rockets. |
 | **Siege of the Core** | 81–90 | The crawlers dig in around the Core. | Fights, rings, bombs and abilities on long bodies. |
-| **Mirror Decks** | 91–100 | The World Worm meets its reflection. | Far-side and mirrored views; many passes and double heals. |
-| **The Mega Decks** | 101–110 | Hold its attention; make the ship whole. | 10×10 and 15×15 with 200-segment worms, plus a giant on a 2×2. |
-| **Through the Middle** | 111–120 | Lead it through the Core and end the war. | Every mechanic, the tightest clocks, the longest worms. |
+| **Mirror Decks** | 91–100 | Brand meets his reflection. | Far-side and mirrored views; many passes and double heals. |
+| **The Mega Decks** | 101–110 | Hold Brand's attention; make the ship whole. | 10×10 and 15×15 with 200-segment worms, plus a giant on a 2×2. |
+| **Through the Middle** | 111–120 | Lead Brand through the Core and end the war. | Every mechanic, the tightest clocks, the longest worms. |
 
 Beyond collecting orbs and colors, crossing pairs, jumping the body, surviving turns, healing, the powers, elements, fights and bombs, later levels ask for:
 
