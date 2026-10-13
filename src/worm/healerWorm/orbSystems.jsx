@@ -203,12 +203,14 @@ function SpecialOrb({ special, size }) {
             <group ref={spinRef}>
                 {viewPickup ? <ViewPickupCube view={look.view} /> : showerPickup ? (
                     <group name="orb-shower-pickup">
+                        {/* X/Z span the tile: -Z is the cloud's top; Y is depth.
+                            Separating these along Y hides the rain behind the cloud head-on. */}
                         {[-1, 0, 1].map((x) => <mesh key={`cloud-${x}`} geometry={_specialGeos.cloud}
-                            position={[x * 0.14, 0.12 + (x === 0 ? 0.07 : 0), 0]} scale={[1, 0.8, 0.75]} ref={tag(1)}>
+                            position={[x * 0.14, 0, -0.12 - (x === 0 ? 0.07 : 0)]} scale={[1, 0.75, 0.8]} ref={tag(1)}>
                             <meshStandardMaterial color="#ecfff8" emissive={look.color} emissiveIntensity={0.35} roughness={0.6} transparent />
                         </mesh>)}
                         {[-1, 0, 1].map((x) => <mesh key={`rain-${x}`} geometry={_specialGeos.rain}
-                            position={[x * 0.14, -0.1 - (x === 0 ? 0.1 : 0), 0]} ref={tag(1)}>
+                            position={[x * 0.14, 0, 0.1 + (x === 0 ? 0.1 : 0)]} ref={tag(1)}>
                             <meshBasicMaterial color={x === 0 ? look.accent : look.color} toneMapped={false} transparent />
                         </mesh>)}
                     </group>

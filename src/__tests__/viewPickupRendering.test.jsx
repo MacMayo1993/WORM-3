@@ -49,7 +49,29 @@ it('renders every view as its own cube, reserves elemental rendering for element
       expect(pickup.position.z).toBeGreaterThan(1.5);
       expect(new THREE.Vector3(0, 1, 0).applyQuaternion(pickup.quaternion).z).toBeCloseTo(1);
     }
-    expect(store.scene.getObjectByName('orb-shower-pickup')).toBeDefined();
+    const shower = store.scene.getObjectByName('orb-shower-pickup');
+    expect(shower).toBeDefined();
+    const clouds = shower.children.filter(mesh => mesh.geometry.type === 'SphereGeometry');
+    const drops = shower.children.filter(mesh => mesh.geometry.type === 'OctahedronGeometry');
+    expect(drops).toHaveLength(3);
+    // Look straight down every face normal through each drop. The cloud must
+    // never cover it, including as the pickup spins in the tile's plane.
+    const ray = new THREE.Raycaster(), dropPosition = new THREE.Vector3();
+    for (const normal of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+      new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+      new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)]) {
+      shower.parent.parent.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+      for (const angle of [0, Math.PI / 4, Math.PI / 2, Math.PI]) {
+        shower.parent.rotation.y = angle;
+        store.scene.updateMatrixWorld(true);
+        for (const drop of drops) {
+          drop.getWorldPosition(dropPosition);
+          ray.set(dropPosition.clone().addScaledVector(normal, 3), normal.clone().negate());
+          expect(ray.intersectObjects([drop]).length).toBeGreaterThan(0);
+          expect(ray.intersectObjects(clouds)).toHaveLength(0);
+        }
+      }
+    }
     expect(store.scene.getObjectByName('elemental-fire')).toBeDefined();
     expect(store.scene.getObjectByName('elemental-view-lego')).toBeUndefined();
     expect(store.scene.getObjectByName('elemental-orb-shower')).toBeUndefined();
