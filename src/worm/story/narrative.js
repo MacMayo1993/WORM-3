@@ -1,9 +1,12 @@
 // Mobi's story, kept outside campaign.js so tuning a level never rewrites it.
 // MOBI (Multi-Oriented Block Intelligence) is a ferry pilot from the Projective
-// Plane, where every spot has a twin straight through the middle. His Flip Cube
-// survived W³, the Great World Worm War, and crash-landed here broken; the
-// World Worm's head came with it, trapped in the Core. The player is the
-// hatchling who grows long enough to heal the ship and end the war.
+// Plane, where every spot has a twin straight through the middle. Two clans of
+// Singular-Oriented worms, the Ringfolk and the Longhaul, fought the Great Worm
+// War (W³) over the Plane's doors, and the Healer Corps flew its ferries between
+// them. On Mobi's last run a Longhaul worm lunged through one of the Flip Cube's
+// doors, and the ship crash-landed here broken. Mobi is the only voice in the
+// story: he explains it all to the player, the hatchling who grows long enough
+// to heal the ship and bring the feud to an end.
 //
 // `briefing` is the story Mobi tells before play: each line is one dialogue card
 // at launch (the mission card follows it), and the lines read together on the
@@ -14,8 +17,8 @@ export const WORM_STORY_NARRATIVE = {
   1: {
     briefing: [
       'Oh! You hatched! Hello, little worm. I’m Mobi: Multi-Oriented Block Intelligence. I face every way at once, which helps when you’re lost.',
-      'We’re lost. This is my Flip Cube. It carried me out of the Projective Plane and through W³, the Great World Worm War. Then it crash-landed here.',
-      'Its energy spilled everywhere. Eat it up and grow. Big worms fix big problems.',
+      'We’re lost. This is my Flip Cube. It carried me out of the Projective Plane and through W³, the Great Worm War, then crash-landed here, broken.',
+      'Its energy spilled everywhere. Eat it up and grow. You’re Singular-Oriented, so you face one way at a time. Big worms fix big problems anyway.',
     ],
     debrief: 'Look at you, all six colors and growing. The cube felt that. So did my stomach. I don’t have a stomach.',
   },
@@ -30,8 +33,8 @@ export const WORM_STORY_NARRATIVE = {
   3: {
     briefing: [
       'In the Plane we have a saying: a worm’s worst enemy is its own tail.',
-      'During W³ that was true in the worst way. More on that later.',
-      'For now your body is lying across the route. Jump it, land clean, keep growing.',
+      'In the Great Worm War that was true in the worst way, and I’ll explain why. For now, your body is lying across the route.',
+      'Jump it, land clean, keep growing.',
     ],
     debrief: 'Five clean jumps. Most worms in the war didn’t land so politely.',
   },
@@ -58,7 +61,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   7: {
     briefing: [
-      'During W³ I ferried healer worms to the front. They traveled light and fast.',
+      'During the war I ferried Healer Corps medics to the front. They traveled light and fast.',
       'Their gear is still in the hold: a speed burst, a second jump, a rocket, a magnet. Try everything. Land everything.',
     ],
     debrief: 'You’d have made the Healer Corps. Their motto was “Patch fast, land soft.” You did both.',
@@ -72,7 +75,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   9: {
     briefing: [
-      'Uh-oh. War leftovers. Rift crawlers came aboard with the crash, and a bomb is still ticking.',
+      'Uh-oh. War leftovers. Rift crawlers from the Longhaul came aboard in the crash, and a bomb is still ticking.',
       'Grow long enough to wrap a door and it heals without a toll. Wrap a bomb and it fizzles. Bite back if something bites you.',
     ],
     debrief: 'Deck secure. Those crawlers weren’t strays, though. They were guarding something.',
@@ -82,7 +85,7 @@ export const WORM_STORY_NARRATIVE = {
       'One more deck before the lower levels. Get long, heal the doors, clear out the guards.',
       'And partner? Look at the door hinges as you pass.',
     ],
-    debrief: 'See the hinges? Bite marks. On the inside. Something chewed these doors open from inside the ship.',
+    debrief: 'See the hinges? Bite marks. On the inside. Those crawlers chewed these doors open from inside the ship.',
   },
 
   // ── Chapter 2 · Every Deck ───────────────────────────────────────────────
@@ -102,7 +105,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   13: {
     briefing: [
-      'Numbers view: every face holds every number once. It kept soldiers from getting turned around.',
+      'Numbers view: every face holds every number once. It kept Corps medics from getting turned around.',
       'Your tail keeps getting turned around. Jump it.',
     ],
     debrief: 'The numbers moved. Their order didn’t. Remember that. Doors move, but twins stay twins.',
@@ -140,7 +143,7 @@ export const WORM_STORY_NARRATIVE = {
       'The explode orb pulls the whole ship apart for a while. Healers used it to slip between the pieces.',
       'The pieces separate, but twins stay connected. Keep crawling until it snaps back.',
     ],
-    debrief: 'Pieces apart, twins together. Breaking the surface never broke the connections. The World Worm hated that.',
+    debrief: 'Pieces apart, twins together. Breaking the surface never broke the connections. Both clans forgot that in the war.',
   },
   19: {
     briefing: [
@@ -154,7 +157,7 @@ export const WORM_STORY_NARRATIVE = {
       'The summit deck, where every route meets. If anything is sealed inside this ship, it’s under here.',
       'Use everything you’ve learned. I’ll keep an eye on the Core. Both eyes. All my eyes.',
     ],
-    debrief: 'The routes were sealed from the inside, and they all point at the Core. Partner, I don’t think we crashed alone.',
+    debrief: 'The routes were sealed from the inside, and they all point at the Core. Partner, somebody did that on purpose.',
   },
 
   // ── Chapter 3 · Strange Views ────────────────────────────────────────────
@@ -170,14 +173,14 @@ export const WORM_STORY_NARRATIVE = {
       'No stickers here. Just edges and doors. This is what a Flip Cube looks like in a nightmare.',
       'The doors still work. Ride them before this deck forgets it has any.',
     ],
-    debrief: 'Ghost frame, real tunnels. When you rode through, I heard something in the Core. Like a yawn.',
+    debrief: 'Ghost frame, real tunnels. When you rode through, something in the Core groaned like a yawn. Something huge, stuck in there, and bored.',
   },
   23: {
     briefing: [
-      'Bricks? The Core is remembering this deck as a toy. Funny thing to remember.',
+      'Bricks? The Core remembers this deck as a toy. Funny thing to remember.',
       'Your tail is all over the bricks. Jump it.',
     ],
-    debrief: 'Whatever is in the Core is dreaming, partner. It dreams about toys. And tails.',
+    debrief: 'Whatever is stuck in the Core is dreaming, partner. It dreams about toys. And tails.',
   },
   24: {
     briefing: [
@@ -191,7 +194,7 @@ export const WORM_STORY_NARRATIVE = {
       'The far-side window shows each tile’s twin. Same place, other view.',
       'Heal the doors and keep an eye on that window. Tell me if anything in there… moves.',
     ],
-    debrief: 'Did you see it? In the window, behind the Core. Something long. Something coiled.',
+    debrief: 'Did you see it? In the window, behind the Core. Something short and coiled, watching us like a spring. A Ringfolk, by the look of it.',
   },
   26: {
     briefing: [
@@ -219,94 +222,94 @@ export const WORM_STORY_NARRATIVE = {
       'More rift crawlers. They’re guarding the way to the Core. Somebody gave them orders.',
       'Surround a door, use your ability, disarm the bombs, and push through.',
     ],
-    debrief: 'They fell back toward the middle. Crawlers only serve one master. And now I remember its name.',
+    debrief: 'They fell back toward the middle. Crawlers only serve one master. The Longhaul’s, and I remember that now.',
   },
   30: {
     briefing: [
-      'My last ferry run. The World Worm was chasing us. A worm so long it wrapped around the whole Plane.',
-      'It lunged through one of our doors to catch the Flip Cube. I slammed the door shut. On its neck.',
+      'My last ferry run. I had wounded from both clans aboard, Longhaul and Ringfolk, which was my whole job.',
+      'The Longhaul ambushed us at the Core’s door. A big one lunged through our door after the Ringfolk, and I slammed it shut. On its neck.',
       'Heal this deck. I need to see what’s left in the Core.',
     ],
-    debrief: 'It’s still here, partner. The World Worm’s head is in our Core. W³ didn’t end. It came with us.',
+    debrief: 'It’s still here, partner. The Longhaul’s longest body is wedged in our Core, head first. W³ didn’t end when the door closed. It came with us.',
   },
 
   // ── Chapter 4 · The Grand Crawl ──────────────────────────────────────────
   31: {
     briefing: [
-      'Here’s the story of W³. The World Worm grew so long it wrapped the whole Projective Plane.',
-      'In the Plane, anything that long meets itself coming the other way, mirrored. The World Worm didn’t recognize its own tail.',
-      'It thought its tail was an invader, and it attacked. That was the war.',
+      'Here’s the story of W³. The Longhaul grew so long that their longest body wrapped the whole Projective Plane.',
+      'In the Plane, anything that long meets itself coming the other way, mirrored. Their longest tail came round the far side, and they didn’t know it was theirs.',
+      'Singular-Oriented worms can’t tell a mirror image from a stranger. The Ringfolk saw a stranger on their side and bit it. That was the first bite of the war.',
     ],
     debrief: 'You’re getting long too. Don’t worry. When you meet your own tail, you’ll know it’s you. I’ll make sure.',
   },
   32: {
     briefing: [
-      'Ten layers. The World Worm’s head is pushing on the Core, and every door here is bulging.',
+      'Ten layers. The longest body is pushing on the Core, and every door here is bulging.',
       'Cross every pair before it pushes one wider.',
     ],
-    debrief: 'All six crossed. When you rode through the Core, it watched you. I felt it watching.',
+    debrief: 'All six crossed. When you rode through the Core, the Longhaul watched you. I felt them watching.',
   },
   33: {
     briefing: [
-      'The pocket deck again, but now the World Worm has its teeth in the gears. They bite every few seconds.',
-      'Tiny deck. Fast turns. Big appetite. Yours, not its. Hopefully.',
+      'The pocket deck again, but now the Longhaul’s crawlers have their teeth in the gears. They bite every few seconds.',
+      'Tiny deck. Fast turns. Big appetite. Yours, not theirs. Hopefully.',
     ],
     debrief: 'Every turn survived on a deck the size of a dice. You don’t scare easily, do you?',
   },
   34: {
     briefing: [
-      'The repair bay’s big sister. The World Worm reopens doors as fast as we close them.',
+      'The repair bay’s big sister. The Longhaul’s crawlers reopen doors as fast as we close them.',
       'So close them faster.',
     ],
-    debrief: 'Every door shut, and it didn’t reopen one. We’re winning a race it didn’t know it was in.',
+    debrief: 'Every door shut, and it didn’t reopen one. We’re winning a race they didn’t know they were in.',
   },
   35: {
     briefing: [
-      'Its crawlers are all over this hollow deck, carrying pieces of the ship back to the Core.',
+      'The Longhaul’s crawlers are all over this hollow deck, carrying pieces of the ship back to the Core.',
       'Ring the doors, defuse the bombs, and send the crawlers home empty.',
     ],
     debrief: 'Siege broken. The crawlers ran for the Core. They’ll be back with friends.',
   },
   36: {
     briefing: [
-      'The World Worm breathes weather through the Core. Ice and storm, on a deck with no stickers to hold on to.',
-      'Grab the elements before they spread. It can’t breathe what you’ve already caught.',
+      'The Longhaul breathes weather through the Core. Ice and storm, on a deck with no stickers to hold on to.',
+      'Grab the elements before they spread. They can’t breathe what you’ve already caught.',
     ],
-    debrief: 'Four elements caught. The storm is calmer. Its breathing isn’t.',
+    debrief: 'Four elements caught. The storm is calmer. Their breathing isn’t.',
   },
   37: {
     briefing: [
-      'Ten layers of bricks. The World Worm built itself a wall. Let’s take it apart.',
+      'Ten layers of bricks. The Longhaul’s crawlers built themselves a wall. Let’s take it apart.',
       'Then fly over the rubble. The rocket is in the hold.',
     ],
     debrief: 'Wall’s down. Bricks are bricks again. I may have enjoyed that too much.',
   },
   38: {
     briefing: [
-      'Numbers on this side, twins on the far side. The World Worm can’t read either one. That’s our advantage.',
+      'Numbers on this side, twins on the far side. The Longhaul can’t read either one. That’s our advantage.',
       'Heal every door before the gears catch you.',
     ],
-    debrief: 'In the far-side window, the coil flinched every time a twin came home.',
+    debrief: 'In the far-side window, the Ringfolk coil flinched every time a twin came home. They’re counting too.',
   },
   39: {
     briefing: [
       'The cargo deck. Fifteen layers. The biggest room on the ship.',
-      'The World Worm got huge by eating. We’re going to beat it at its own game. Eat everything. Grow enormous.',
+      'The Longhaul got huge by eating. We’re going to beat them at their own game. Eat everything. Grow enormous.',
     ],
     debrief: 'Look at you. Longest worm aboard. Well, second longest. We’ll fix that.',
   },
   40: {
     briefing: [
-      'The World Worm is pulling its body toward us through the doors. If it reconnects, the Flip Cube becomes part of it.',
-      'Heal every door on this deck and it loses its grip. Every trick you’ve got, partner. All of them.',
+      'The Longhaul is pulling its longest body toward us through the doors. If it reconnects, the Flip Cube becomes part of it.',
+      'Heal every door on this deck and its grip loosens. Every trick you’ve got, partner. All of them.',
     ],
-    debrief: 'It let go! For now. Its head is still in the Core, awake and hungry. And it heard my name. It remembered me.',
+    debrief: 'It let go! For now. Its head is still in the Core, awake and hungry. And it remembers my name. It remembers me.',
   },
 
   // ── Chapter 5 · The Long Body ────────────────────────────────────────────
   41: {
     briefing: [
-      'New plan. The World Worm thinks long means strong. We’ll show it long can also mean kind.',
+      'New plan. The Longhaul thinks long means strong. We’ll show them long can also mean kind.',
       'Step one is the long part. Eat.',
     ],
     debrief: 'A hundred segments. You’re officially a large worm. I’m having a badge made. In my head.',
@@ -324,11 +327,11 @@ export const WORM_STORY_NARRATIVE = {
       'Your head and your tail pass each other in the Core. You’ll see yourself, mirrored.',
       'Say hello. Don’t bite.',
     ],
-    debrief: 'You passed yourself in the Core and didn’t bite. The World Worm never learned that. That’s the whole war, partner.',
+    debrief: 'You passed yourself in the Core and didn’t bite. The Longhaul never learned that. That’s the whole war, partner.',
   },
   44: {
     briefing: [
-      'The longer you get, the more of you a gear can catch. The World Worm counted on that.',
+      'The longer you get, the more of you a gear can catch. The Longhaul counted on that.',
       'Keep your whole body off the lit layers.',
     ],
     debrief: 'Eight turns and not a segment lost. Long and careful. Rare combination.',
@@ -336,9 +339,9 @@ export const WORM_STORY_NARRATIVE = {
   45: {
     briefing: [
       'Let’s mix it up. Heal the doors, and pass yourself in the Core while you’re at it.',
-      'Every time you meet yourself in there, the World Worm sees it happen.',
+      'Every time you meet yourself in there, the Longhaul sees it happen.',
     ],
-    debrief: 'Through and back, and polite about it. The coil in the Core went very still. I think it’s thinking.',
+    debrief: 'Through and back, and polite about it. The far-side window went very still. The Ringfolk are thinking.',
   },
   46: {
     briefing: [
@@ -352,34 +355,34 @@ export const WORM_STORY_NARRATIVE = {
       'A small deck, a long worm, and gears. You’ll be crossing your own path a lot.',
       'Use the Core. It’s the only spot on the ship that is its own twin, so it’s where you meet yourself.',
     ],
-    debrief: 'Every door healed, and you met yourself without a scratch. The World Worm pushed on the Core the whole time. It’s curious.',
+    debrief: 'Every door healed, and you met yourself without a scratch. The Longhaul pushed on the Core the whole time. They’re curious, too.',
   },
   48: {
     briefing: [
       'Big bodies need big moves. Use water to build speed and fire to lay a trail.',
       'Then rocket over everything and magnet up the leftovers.',
     ],
-    debrief: 'Water, fire, flight, magnet. A long worm with tricks. The World Worm only ever had one trick: eat.',
+    debrief: 'Water, fire, flight, magnet. A long worm with tricks. The Longhaul only ever had one trick: eat.',
   },
   49: {
     briefing: [
-      'The crawlers are back. A long body makes a great wall.',
+      'The Longhaul’s crawlers are back. A long body makes a great wall.',
       'Wrap the doors and the crawlers can’t reach them.',
     ],
     debrief: 'Doors ringed, crawlers sent home. You’re a wall now. A kind wall.',
   },
   50: {
     briefing: [
-      'Partner, the World Worm is trying to talk. Through the Core. To you.',
-      'Heal this deck and pass yourself where it can see. Show it how a worm treats its own tail.',
+      'Partner, the Longhaul is trying to talk. Through the Core. To you.',
+      'Heal this deck and pass yourself where they can see. Show them how a worm treats its own tail.',
     ],
-    debrief: 'It spoke. One word: “MINE.” It thinks everything long is its tail. Including you.',
+    debrief: 'Their whole answer comes down to one word: mine. They think everything long is their tail. Including you.',
   },
 
   // ── Chapter 6 · Pocket Worlds ────────────────────────────────────────────
   51: {
     briefing: [
-      'It’s retreating into the pocket decks, where a big worm can barely turn around.',
+      'The Longhaul is retreating into the pocket decks, where a big worm can barely turn around.',
       'So turn around anyway. Grow big in a small place.',
     ],
     debrief: 'A well-fed worm on a two-by-two, with room left to turn. Small deck, good manners.',
@@ -403,25 +406,25 @@ export const WORM_STORY_NARRATIVE = {
       'New trick. If your head rides one door while your tail is still in another, both doors heal back to back.',
       'Two at once. These doors heal for free when you ride them, so practice the timing.',
     ],
-    debrief: 'A double heal! Two doors, one body. The World Worm can only bite one thing at a time. You can heal two.',
+    debrief: 'A double heal! Two doors, one body. The Longhaul can only bite one thing at a time. You can heal two.',
   },
   55: {
     briefing: [
       'Same trick, but now the doors want their toll. Carry both colors.',
       'Ride one, then the other, before your tail clears the first.',
     ],
-    debrief: 'Paid in full, healed in pairs. The pocket deck sounds quieter. The World Worm is backing off.',
+    debrief: 'Paid in full, healed in pairs. The pocket deck sounds quieter. The Longhaul is backing off.',
   },
   56: {
     briefing: [
-      'The World Worm jammed its teeth into the pocket gears. A layer turns every few seconds.',
+      'The Longhaul’s crawlers jammed their teeth into the pocket gears. A layer turns every few seconds.',
       'On a two-by-two, every layer is half the world. Keep moving.',
     ],
-    debrief: 'You outlasted the gears on the tiniest deck there is. If the World Worm has a face, it’s making one.',
+    debrief: 'You outlasted the gears on the tiniest deck there is. If the Longhaul has a face, it’s making one.',
   },
   57: {
     briefing: [
-      'It’s blowing weather into the small decks to flush us out.',
+      'The Longhaul is blowing weather into the small decks to flush us out.',
       'Catch the elements before they spread. In here, a storm has nowhere to go but onto you.',
     ],
     debrief: 'The elements are yours. The storm ran out of room before you did.',
@@ -442,16 +445,16 @@ export const WORM_STORY_NARRATIVE = {
   },
   60: {
     briefing: [
-      'Found it. The World Worm’s hiding place is the smallest door on the ship. It leads straight into the Core.',
+      'Found it. The Longhaul’s hiding place is the smallest door on the ship. It leads straight into the Core.',
       'Gather your colors, watch the gears, and repair each door at your own pace.',
     ],
-    debrief: 'It came to the door to watch. You made room to grow and repaired every door it had torn open. Then it said a second word: “HOW?”',
+    debrief: 'The Longhaul came to the door to watch. You made room to grow and repaired every door they had torn open. Then they asked the question the whole war never answered: how?',
   },
 
   // ── Chapter 7 · Weather of War ───────────────────────────────────────────
   61: {
     briefing: [
-      'It doesn’t like questions. It’s throwing weather at us instead.',
+      'The Longhaul doesn’t like questions. They’re throwing weather at us instead.',
       'Grab two elements back to back and they fuse. The order changes the result. Let’s see what you can brew.',
     ],
     debrief: 'Your first fusion of the storm. The Corps used to say: every storm is just ingredients.',
@@ -465,7 +468,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   63: {
     briefing: [
-      'The World Worm set this deck on fire.',
+      'The Longhaul set this deck on fire.',
       'So use water’s speed and lay fire’s trail. Fight fire with both.',
     ],
     debrief: 'You outran the fire and laid your own. Controlled burns. Very responsible.',
@@ -473,16 +476,16 @@ export const WORM_STORY_NARRATIVE = {
   64: {
     briefing: [
       'All six kinds of Plane weather are loose on this deck: water, fire, earth, ice, lightning and air.',
-      'Collect one of each. It can’t throw what we’re holding.',
+      'Collect one of each. They can’t throw what we’re holding.',
     ],
-    debrief: 'Six for six. The sky over the Core is clearing. I can almost see the World Worm’s eyes. There are a lot of them.',
+    debrief: 'Six for six. The sky over the Core is clearing. I can almost see the Longhaul in it. They look surprised.',
   },
   65: {
     briefing: [
       'Lightning charges the doors on this deck.',
       'Ride through and meet yourself in the crackle.',
     ],
-    debrief: 'Five doors, one hello, three storms bottled. It tried to shock you mid-pass. It missed.',
+    debrief: 'Five doors, one hello, three storms bottled. The Longhaul tried to shock you mid-pass. They missed.',
   },
   66: {
     briefing: [
@@ -493,10 +496,10 @@ export const WORM_STORY_NARRATIVE = {
   },
   67: {
     briefing: [
-      'Storm and gears together. The World Worm learned this combo in W³. It was its favorite.',
+      'Storm and gears together. The Longhaul learned this combo in W³. It was their favorite.',
       'Use your elements on the move: water to outrun the turns, fire to mark your route, earth to spring clear.',
     ],
-    debrief: 'Ten turns in a storm. It’s running out of favorite combos.',
+    debrief: 'Ten turns in a storm. They’re running out of favorite combos.',
   },
   68: {
     briefing: [
@@ -507,37 +510,37 @@ export const WORM_STORY_NARRATIVE = {
   },
   69: {
     briefing: [
-      'Its lightning keeps hitting the doors. We’ll use that: a charged door costs less to heal.',
+      'The Longhaul’s lightning keeps hitting the doors. We’ll use that: a charged door costs less to heal.',
       'Master every element, heal every door, and double one up.',
     ],
     debrief: 'Every door healed and every element mastered. You’re the storm now.',
   },
   70: {
     briefing: [
-      'We’re in the eye of its storm. It’s quiet here. It’s listening.',
-      'Show it what a healer does with weather.',
+      'We’re in the eye of their storm. It’s quiet here. They’re listening.',
+      'Show them what a healer does with weather.',
     ],
-    debrief: 'The storm stopped. It just stopped. It asked again: “HOW?” I told it: “Practice.” It didn’t like that answer.',
+    debrief: 'The storm stopped. It just stopped. The Longhaul asked again: how? I told them: practice. They didn’t like that answer.',
   },
 
   // ── Chapter 8 · The War Machine ──────────────────────────────────────────
   71: {
     briefing: [
-      'It’s driving the gears now. All of them. In W³ we called this the Grind.',
+      'The Longhaul is driving the gears now. All of them. In W³ we called this the Grind.',
       'A long body on a grinding deck. Keep every segment off the light.',
     ],
     debrief: 'Twelve turns, not a segment lost. The Grind didn’t grind you.',
   },
   72: {
     briefing: [
-      'It sealed these doors with blast plating.',
+      'The Longhaul sealed these doors with blast plating.',
       'Blow the ship apart and slip between the pieces.',
     ],
     debrief: 'Three blasts, two flights, four doors healed. Open was the problem. Healed is the answer.',
   },
   73: {
     briefing: [
-      'It mined this deck. One bomb at a time. Ring each one with your body before the fuse burns down.',
+      'The Longhaul mined this deck. One bomb at a time. Ring each one with your body before the fuse burns down.',
       'Ring the doors too. You’re long enough now.',
     ],
     debrief: 'Four bombs fizzled. Bombs don’t scare a worm who can hug them.',
@@ -547,7 +550,7 @@ export const WORM_STORY_NARRATIVE = {
       'The flight deck. Courier worms launched from here with rockets and magnets.',
       'Go fast, go high, and pull orbs from everywhere.',
     ],
-    debrief: 'Three flights, eight catches. If the World Worm has a flight deck, it’s jealous.',
+    debrief: 'Three flights, eight catches. If the Longhaul has a flight deck, it’s jealous.',
   },
   75: {
     briefing: [
@@ -558,7 +561,7 @@ export const WORM_STORY_NARRATIVE = {
   },
   76: {
     briefing: [
-      'The Fold was its signature move in the war: a turn that folds your own body back across your path.',
+      'The Fold was the Ringfolk’s signature move in the war: a turn that folds your own body back across your path.',
       'So jump yourself. A lot.',
     ],
     debrief: 'Eight jumps through the Fold. It can’t fold a worm who’s always in the air.',
@@ -575,18 +578,18 @@ export const WORM_STORY_NARRATIVE = {
       'When one door heals, the next is easier. Chain them.',
       'Two at once, then two at once again.',
     ],
-    debrief: 'A double, then another double. The machine stuttered. It can’t keep up with healing in pairs.',
+    debrief: 'A double, then another double. The Longhaul’s machine stuttered. It can’t keep up with healing in pairs.',
   },
   79: {
     briefing: [
-      'Its crawlers planted bombs in the repair bay. Sabotage.',
+      'The Longhaul’s crawlers planted bombs in the repair bay. Sabotage.',
       'Ring them, use your ability, and fly over the mess.',
     ],
     debrief: 'Repair bay saved. Again. I’m putting a lock on it. A big one. In my head.',
   },
   80: {
     briefing: [
-      'This is the engine room. The World Worm wired every gear, bomb and blast door into one machine.',
+      'This is the engine room. The Longhaul wired every gear, bomb and blast door into one machine.',
       'Heal every door and the machine has nothing left to turn.',
     ],
     debrief: 'The engine is quiet. The Flip Cube is ours again. Every deck except the Core.',
@@ -595,10 +598,10 @@ export const WORM_STORY_NARRATIVE = {
   // ── Chapter 9 · Siege of the Core ────────────────────────────────────────
   81: {
     briefing: [
-      'The crawlers dug rifts all around the Core. They come out one at a time.',
+      'The Longhaul’s crawlers dug rifts all around the Core. They come out one at a time.',
       'Be ready, and don’t forget your own trick.',
     ],
-    debrief: 'Four crawlers down. They aren’t fighting for the World Worm, you know. They’re scared of it.',
+    debrief: 'Four crawlers down. They aren’t fighting out of loyalty, you know. They’re scared of the longest body.',
   },
   82: {
     briefing: [
@@ -649,23 +652,23 @@ export const WORM_STORY_NARRATIVE = {
   89: {
     briefing: [
       'The last bastion before the Core.',
-      'Ring the doors, double up your heals, and defuse the bombs.',
+      'Ring the doors, double up on heals, and defuse the bombs.',
     ],
-    debrief: 'The bastion is ours. One door left between us and the World Worm’s head.',
+    debrief: 'The bastion is ours. One door left between us and the longest body.',
   },
   90: {
     briefing: [
-      'This is it: the first door into the Core. Every crawler it has left is here.',
-      'Heal the deck around it and the door opens. Then we see the World Worm face to face. Faces to faces.',
+      'This is it: the first door into the Core. Every crawler the Longhaul has left is here.',
+      'Heal the deck around it and the door opens. Then we see the longest body face to face. Faces to faces.',
     ],
-    debrief: 'The door is open. It isn’t attacking. Its head is staring at its own reflection on the far side, and it can’t stop shaking.',
+    debrief: 'The door is open. The longest body isn’t attacking. Its head is staring at its own reflection on the far side, and it can’t stop shaking.',
   },
 
   // ── Chapter 10 · Mirror Decks ────────────────────────────────────────────
   91: {
     briefing: [
       'Inside the Core every deck is a mirror. Watch the far-side window: that’s you, from the other side.',
-      'Pass yourself, and again. Let it see you do it.',
+      'Pass yourself, and again. Let the Longhaul see you do it.',
     ],
     debrief: 'Twice you met yourself and smiled. Okay, worms don’t smile. You did the worm version.',
   },
@@ -673,14 +676,14 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Glass reflects everything. Grow huge here and there will be two of you to look at.',
     ],
-    debrief: 'A hundred and seventy segments, reflected. The World Worm stared the whole time.',
+    debrief: 'A hundred and seventy segments, reflected. The Longhaul stared the whole time.',
   },
   93: {
     briefing: [
       'Numbers on this side, twins on the other, gears in between.',
-      'The World Worm is copying your moves now. Badly. Show it the right way.',
+      'The Longhaul is copying your moves now. Badly. Show them the right way.',
     ],
-    debrief: 'It tried to pass itself in the Core. It flinched and bit the air. But it tried.',
+    debrief: 'Their longest body tried to pass itself in the Core. It flinched and bit the air. But it tried.',
   },
   94: {
     briefing: [
@@ -694,7 +697,7 @@ export const WORM_STORY_NARRATIVE = {
       'The hall of mirrors. Every door has a reflection, and both need healing.',
       'Heal in pairs. Ring the stubborn ones.',
     ],
-    debrief: 'Three doubles. Pairs, pairs, pairs. The World Worm counted along. It’s learning numbers.',
+    debrief: 'Three doubles. Pairs, pairs, pairs. The Longhaul counted along. They’re learning numbers.',
   },
   96: {
     briefing: [
@@ -718,26 +721,26 @@ export const WORM_STORY_NARRATIVE = {
   },
   99: {
     briefing: [
-      'Its last crawlers are panicking.',
+      'The Longhaul’s last crawlers are panicking.',
       'Heal the doors in pairs, and don’t let them panic onto you.',
     ],
-    debrief: 'Every crawler down, every door home. The World Worm is alone with its reflection now.',
+    debrief: 'Every crawler down, every door home. The longest body is alone with its reflection now.',
   },
   100: {
     briefing: [
-      'This is the mirror at the center of the Core. The World Worm is right behind it, watching its own tail.',
-      'Pass yourself again and again. Heal in pairs. Show it a worm that knows its own tail.',
+      'This is the mirror at the center of the Core. The longest body is right behind it, watching its own tail.',
+      'Pass yourself again and again. Heal in pairs. Show the Longhaul a worm that knows its own tail.',
     ],
-    debrief: 'It looked at its tail, then at you, then at its tail again. Then it whispered: “Mine… is me?” Partner, I think it gets it.',
+    debrief: 'It looked at its tail, then at you, then at its tail again. Then the Longhaul worked it out: that tail was theirs. Partner, I think they get it.',
   },
 
   // ── Chapter 11 · The Mega Decks ──────────────────────────────────────────
   101: {
     briefing: [
-      'It understands now, but understanding isn’t healing. Its body is still stretched across the Plane, pulling at our doors.',
+      'The longest body understands now, but understanding isn’t healing. It is still stretched across the Plane, pulling at our doors.',
       'To hold its attention you need to be enormous. The cargo deck has all the food we need.',
     ],
-    debrief: 'Two hundred segments. The World Worm measured you. It looked impressed. It has a lot of faces to look impressed with.',
+    debrief: 'Two hundred segments. The Longhaul measured you. They looked impressed, which for the Longhaul is a hug.',
   },
   102: {
     briefing: [
@@ -766,22 +769,22 @@ export const WORM_STORY_NARRATIVE = {
   },
   106: {
     briefing: [
-      'It isn’t attacking anymore, but its weather is stuck on. A storm across a whole mega deck.',
+      'The Longhaul isn’t attacking anymore, but their weather is stuck on. A storm across a whole mega deck.',
       'Use all six elements and brew different fusions. Turn the storm into something useful.',
     ],
     debrief: 'The storm turned into rain, then into nothing, then into a rainbow. Is that a fusion? It should be.',
   },
   107: {
     briefing: [
-      'Some of its crawlers didn’t get the message. They’re dug in with the last artillery from the war.',
+      'Some of the Longhaul’s crawlers didn’t get the message. They’re dug in with the last artillery from the war.',
     ],
-    debrief: 'Artillery silent. The crawlers surrendered to the World Worm, and it told them to go home. They don’t have one either.',
+    debrief: 'Artillery silent. The Longhaul’s young worms asked whether a worm can learn to jump its own tail. I said we’d find out.',
   },
   108: {
     briefing: [
       'Your body is so long it’s in your way everywhere. Big jumps. Lots of them.',
     ],
-    debrief: 'Ten clean jumps over two hundred twenty segments. The World Worm tried one. It got stuck. We’ll work on it.',
+    debrief: 'Ten clean jumps over two hundred twenty segments. The longest body tried one. It got stuck. We’ll work on it.',
   },
   109: {
     briefing: [
@@ -792,26 +795,26 @@ export const WORM_STORY_NARRATIVE = {
   },
   110: {
     briefing: [
-      'All hands on deck. Every deck. The Flip Cube is nearly whole, and the World Worm’s body is pulling hard one last time.',
+      'All hands on deck. Every deck. The Flip Cube is nearly whole, and the longest body is pulling hard one last time.',
       'Be bigger than its pull. Heal everything.',
     ],
-    debrief: 'It stopped pulling. Its body went slack across the Plane. Partner, the World Worm is asking us for help.',
+    debrief: 'It stopped pulling. Its body went slack across the Plane. Partner, the Longhaul is asking us for help.',
   },
 
   // ── Chapter 12 · Through the Middle ──────────────────────────────────────
   111: {
     briefing: [
-      'To let go, it has to see its tail as itself. Out in the Plane, the twist makes that hard. In the Core it’s easy.',
+      'To let go, the longest body has to see its tail as its own. Out in the Plane, the twist makes that hard. In the Core it’s easy.',
       'So we’ll lead it through the middle. First, clear a path: every door, every gear.',
     ],
-    debrief: 'Path cleared. The World Worm’s head is following you. Slowly. Like a puppy the size of a planet.',
+    debrief: 'Path cleared. The longest body is following you. Slowly. Like a puppy the size of a planet.',
   },
   112: {
     briefing: [
       'The pocket gears are the last thing still biting.',
       'Ride the doors, pass yourself, heal in pairs, and outlast the turns.',
     ],
-    debrief: 'The pocket gears stopped. That was the last of its teeth. It isn’t biting anything now. Not even the air.',
+    debrief: 'The pocket gears stopped. That was the last of the Longhaul’s teeth. Nothing is biting now. Not even the air.',
   },
   113: {
     briefing: [
@@ -822,9 +825,9 @@ export const WORM_STORY_NARRATIVE = {
   },
   114: {
     briefing: [
-      'The World Worm wants to learn to jump its own tail. Show it how. Again and again.',
+      'The Longhaul’s young worms want to learn to jump their own tails. Show them how. Again and again.',
     ],
-    debrief: 'Twelve leaps. It tried one, and it cleared its tail! Barely. It made a sound like a happy earthquake.',
+    debrief: 'Twelve leaps. The first clean one cleared its own tail! Barely. The whole Longhaul made a sound like a happy earthquake.',
   },
   115: {
     briefing: [
@@ -834,21 +837,21 @@ export const WORM_STORY_NARRATIVE = {
   },
   116: {
     briefing: [
-      'The last bombs from W³ are rolling around loose.',
+      'The last bombs from the war are rolling around loose.',
       'Ring them, ring the doors, and heal in pairs.',
     ],
-    debrief: 'Every bomb from W³ is a dud now. The war is out of ammunition. It never needed much.',
+    debrief: 'Every bomb from the war is a dud now. The war is out of ammunition. It never needed much.',
   },
   117: {
     briefing: [
       'Some crawlers still think the war is on.',
       'Send them home. Gently, if they let you.',
     ],
-    debrief: 'They didn’t let us. They’re home now anyway. The World Worm said it would explain things to them.',
+    debrief: 'They didn’t let us. They’re home now anyway. The longest body says it will explain things to them.',
   },
   118: {
     briefing: [
-      'Final rehearsal. The World Worm will copy you exactly.',
+      'Final rehearsal. The longest body will copy you exactly.',
       'Pass yourself, heal in pairs, bring every color home.',
     ],
     debrief: 'It matched you move for move. It passed itself in the Core without biting, for the first time since the war began.',
@@ -862,11 +865,11 @@ export const WORM_STORY_NARRATIVE = {
   },
   120: {
     briefing: [
-      'This is it, partner. The World Worm will follow you through the middle, head to tail, and meet itself in the Core.',
+      'This is it, partner. The longest body will follow you through the middle, head to tail, and meet itself in the Core.',
       'Heal every door, two at a time. When the last pair closes, its head and tail touch, and it will know they’re the same worm.',
       'Then the Flip Cube can fold us home. Ready? Me too. Both ways.',
     ],
-    debrief: 'Its head met its tail, and it didn’t bite. It laughed. The Great World Worm War is over. The way home is open, and I’m not going anywhere without you. Wherever home turns out to be, we’ll get there through the middle.',
+    debrief: 'Its head met its tail, and it didn’t bite. It laughed. The Ringfolk, watching from the far-side window, didn’t bite either. The Great Worm War is over. The way home is open, and I’m not going anywhere without you. Wherever home turns out to be, we’ll get there through the middle.',
   },
 };
 
