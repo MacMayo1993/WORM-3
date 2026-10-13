@@ -19,7 +19,7 @@ it('keeps Earth save compatibility and appends Air after authored element prefix
   expect(getElementalDef('grass').label).toBe('Earth');
   expect(getElementalDef('air').label).toBe('Air');
   expect(ELEMENTAL_TYPES).toEqual(STORY_ELEMENTS);
-  expect(storyLevel(40).mechanics.elements).toBe(5);
+  expect(storyLevel(40).mechanics.elements).toBe(6);
   expect(storyLevel(64).mechanics.uniqueElements).toBe(6);
 });
 it('maps Fire then Water to Steam and the reverse to Quench', () => {

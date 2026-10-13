@@ -7,17 +7,9 @@ import { getSpecialDef } from '../healerWorm/specialDefs.js';
 import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE, ELEMENTAL_DURATION } from '../healerWorm/constants.js';
 import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
+import { STORY_ELEMENTS, storyElementTypes, storyElementPool } from './elementGoals.js';
+export { STORY_ELEMENTS, storyElementCount } from './elementGoals.js';
 
-export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning', 'air'];
-// Identity goals name a prefix, so unrelated pickups/mastery cannot substitute
-// for a missing authored element. Keep raw sets for effects and pickup history.
-export const storyElementCount = (elements, target = STORY_ELEMENTS.length) =>
-  STORY_ELEMENTS.slice(0, target).filter(type => elements.has(type)).length;
-const storyElementPool = level => {
-  const m = level.mechanics ?? {};
-  const count = Math.max(m.uniqueElements ?? 0, m.elements ?? 0, m.elementPickups ?? 0);
-  return count ? STORY_ELEMENTS.slice(0, count) : STORY_ELEMENTS;
-};
 export const STORY_POWER_OPENING_DELAY = 10;
 export const STORY_POWER_COOLDOWN = 3;
 export const STORY_POWER_LIFETIME = 20;
@@ -102,16 +94,17 @@ export function updateMastery(sim, p, level, delta) {
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
+  const elements = storyElementTypes(level);
   const needs = new Set();
   for (const recipe of pendingFusions(p, level)) { needs.add(recipe.base); needs.add(recipe.catalyst); }
   for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket']]) {
     if ((p.mechanics[key] ?? 0) < (m[key] ?? 0)) needs.add(type);
   }
   if ((p.mechanics.elementPickups ?? 0) < (m.elementPickups ?? 0)) {
-    for (const type of STORY_ELEMENTS.slice(0, m.elementPickups)) needs.add(type);
+    for (const type of elements.slice(0, m.elementPickups)) needs.add(type);
   }
-  for (const type of STORY_ELEMENTS.slice(0, m.uniqueElements ?? 0)) if (!p.collectedElements.has(type)) needs.add(type);
-  for (const type of STORY_ELEMENTS.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
+  for (const type of elements.slice(0, m.uniqueElements ?? 0)) if (!p.collectedElements.has(type)) needs.add(type);
+  for (const type of elements.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
   // Free fusions come from the paired offers: every element in the level's pool
   // returns, each with a distinct partner beside it, until the brews are made.
   if ((p.mechanics.fusions ?? 0) < (m.fusions ?? 0) || (p.fusionIds?.size ?? 0) < (m.uniqueFusions ?? 0)) {

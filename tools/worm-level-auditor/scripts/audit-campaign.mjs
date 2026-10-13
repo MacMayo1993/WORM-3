@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { WORM_STORY_LEVELS } from '../../../src/worm/story/levels.js';
 import { stageStory, replenishStoryOrbs, replenishStoryTunnel } from '../../../src/worm/story/runtime.js';
-import { updateMastery, recordStoryMechanic, nextStoryPower, offerStoryPower, STORY_ELEMENTS } from '../../../src/worm/story/mastery.js';
+import { storyElementTypes } from '../../../src/worm/story/elementGoals.js';
+import { updateMastery, recordStoryMechanic, nextStoryPower, offerStoryPower } from '../../../src/worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../../../src/worm/healerWorm/wormSim.js';
 import { getActiveTunnels } from '../../../src/worm/wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../../../src/game/manifoldLogic.js';
@@ -94,15 +95,16 @@ for (const level of WORM_STORY_LEVELS) {
         for (let i = 0; i < count; i++) recordStoryMechanic(p, 'elementFusion', key === 'steamFusions' ? 'steam' : 'quench');
         assert.equal(p.mechanics[key], count);
       } else if (['elementPickups', 'uniqueElements'].includes(key)) {
-        for (let i = 0; i < count; i++) recordStoryMechanic(p, 'elementPickups', STORY_ELEMENTS[i % STORY_ELEMENTS.length]);
+        for (let i = 0; i < count; i++) recordStoryMechanic(p, 'elementPickups', storyElementTypes(level)[i % storyElementTypes(level).length]);
         const distinct = p.collectedElements.size;
-        recordStoryMechanic(p, 'elementPickups', 'water'); assert.equal(p.collectedElements.size, distinct);
+        recordStoryMechanic(p, 'elementPickups', storyElementTypes(level)[0]); assert.equal(p.collectedElements.size, distinct);
         assert((key === 'uniqueElements' ? distinct : p.mechanics.elementPickups) >= count);
       } else if (key === 'elements') {
-        for (const type of STORY_ELEMENTS.slice(0, count)) {
+        for (const type of storyElementTypes(level).slice(0, count)) {
           sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0; sim.waterMomentum = 1;
           if (type === 'fire') sim.elementalPatches.set('audit', { type: 'fire' });
           if (type === 'grass') recordStoryMechanic(p, 'grassLaunch');
+          if (type === 'air') recordStoryMechanic(p, 'airLaunch');
           if (type === 'ice') { sim.isJumping = true; tick(); sim.isJumping = false; }
           for (let i = 0; i < 45; i++) tick();
           assert(p.elements.has(type));

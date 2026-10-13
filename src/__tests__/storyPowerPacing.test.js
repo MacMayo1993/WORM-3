@@ -58,7 +58,7 @@ it('waits for the flight and recovery to finish before repeating a required rock
 it('cycles every unfinished quest power even when earlier tasks earn no credit', () => {
   const { sim, p, level, offer } = setup(40);
   for (let round = 0; round < 2; round++) {
-    for (const type of ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning']) {
+    for (const type of ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air']) {
       sim.specials = []; p.powerDelay = 0;
       expect(nextStoryPower(p, level)).toBe(type);
       expect(offer()).toBe(true);
@@ -68,7 +68,7 @@ it('cycles every unfinished quest power even when earlier tasks earn no credit',
   expect(p.mechanics).toEqual({});
   expect(p.elements.size).toBe(0);
   p.mechanics = { ...level.mechanics, rockets: 0 };
-  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning', 'air']);
   expect(nextStoryPower(p, level)).toBe('rocket');
   p.mechanics.rockets = 1;
   expect(nextStoryPower(p, level)).toBeNull();
@@ -88,7 +88,7 @@ it('gives mastery magnet bonuses stable identities through a layer turn and fres
   expect(tileKey(sim.powerups[0])).not.toBe(tileKey(before[0]));
   sim.powerups = []; sim.specials = []; p.powerDelay = 0;
   p.mechanics = { explodes: 2, rockets: 1 };
-  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning', 'air']);
   expect(offer()).toBe(true);
   expect(sim.specials[0].type).toBe('magnet');
   expect(sim.powerups).toHaveLength(4);

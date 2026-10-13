@@ -30,12 +30,12 @@ The theme ties to mechanics. Healing joins twins back together. **Passing yourse
 | # | Chapter | Levels | Story | Gameplay focus |
 | --- | --- | --- | --- | --- |
 | 1 | Crash Landing | 1–10 | Hatching, the wreck; the doors were chewed open from inside. | 6×6 classic: every core action once, a first siege, first growth goal. |
-| 2 | Every Deck | 11–20 | Decks of every size; Mobi's ferry run; routes sealed from inside. | 2×2–8×8, alternate views, explode and flight. |
+| 2 | Every Deck | 11–20 | Decks of every size; Mobi's ferry run; routes sealed from inside. | 2×2–8×8, alternate views, Earth spring pads, Air jumps, explode and flight. |
 | 3 | Strange Views | 21–30 | The Core bends the decks; a coil in the far-side window; the last ferry run and the slammed door. | Hollow, wireframe, bricks, far side, Steam and Quench. |
 | 4 | The Grand Crawl | 31–40 | The story of W³: the Longhaul's longest body, its mirrored tail, and the Ringfolk's first bite. | 9×9, 10×10, 15×15, long bodies, everything combined. |
 | 5 | The Long Body | 41–50 | "Long can mean kind"; the Longhaul's answer is one word: "mine." | Growth goals everywhere; first passes through the Core. |
 | 6 | Pocket Worlds | 51–60 | The Longhaul hides in the smallest decks and asks the question the war never answered. | Huge worms on 2×2–4×4; first double heals. |
-| 7 | Weather of War | 61–70 | The Longhaul answers with storms. | Free fusions, recipe variety, all five elements mastered. |
+| 7 | Weather of War | 61–70 | The Longhaul answers with storms. | Free fusions, recipe variety, all six elements mastered. |
 | 8 | The War Machine | 71–80 | The ship as a weapon: the Longhaul's Grind and the Ringfolk's Fold. | Turns every 9–10 s, blasts, bombs, rockets. |
 | 9 | Siege of the Core | 81–90 | Longhaul crawlers dig in; the first door into the Core opens. | Fights, rings, bombs and abilities on long bodies. |
 | 10 | Mirror Decks | 91–100 | The longest body meets its reflection and learns whose tail it is. | Far-side and mirrored views; many passes and double heals. |
@@ -43,6 +43,8 @@ The theme ties to mechanics. Healing joins twins back together. **Passing yourse
 | 12 | Through the Middle | 111–120 | Lead the longest body through the Core; the Ringfolk watch without biting; the war ends. | Every mechanic, the tightest clocks, the longest worms. |
 
 ## 3. Goals
+
+The six elements are Water, Fire, Earth, Ice, Lightning and Air. Level 8 requires Water, Fire and Earth collection; level 13 teaches an Earth spring launch and safe landing; level 17 teaches an Air jump and safe landing. Level 64 collects all six. Levels 40, 69, 70, 100, 106, 113 and 120 master all six. Focused lessons use `elementTypes` so their offers, objective credit and text share the same named set. The internal `grass` ID remains Earth for save compatibility.
 
 Every existing objective is still used (orbs, colors, tunnel crossings, body jumps, layer turns, heals, surrounds, boosts, double jumps, rockets, magnets, explosions, element pickups, distinct elements, element mastery, Steam and Quench, abilities, bombs, enemies). Mechanic goals may now sit on any level kind, so a tunnel trial can also ask for passes and a rotation trial for growth. Four goals are new:
 
