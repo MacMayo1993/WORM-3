@@ -21,6 +21,8 @@ import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
 import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
+import { elementalHalfExtent } from './healerWorm/elementalExpansion.js';
+import { wormExpansion } from './wormExpansion.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
@@ -49,7 +51,7 @@ const PARTICLE_KINDS = {
 // `count` comes from the quality budget rather than a fixed constant: the field is
 // one draw call at any size, but its CPU cost is a loop over every particle every
 // frame, which is exactly the kind of work a phone cannot spare.
-function ElementalParticles({ element, kind, color, extent, count }) {
+function ElementalParticles({ element, kind, color, extent, count, size }) {
   const pointsRef = useRef();
 
   const elapsedRef = useRef(0);
@@ -82,6 +84,8 @@ function ElementalParticles({ element, kind, color, extent, count }) {
   useFrame((state, delta) => {
     const pts = pointsRef.current;
     if (!pts) return;
+    const padding = extent - size / 2;
+    pts.scale.setScalar((elementalHalfExtent(size, wormExpansion.amount) + padding) / extent);
     if (useGameStore.getState().wormPaused) return;
     const dt = Math.min(delta, 0.05);
     const arr = pts.geometry.attributes.position.array;
@@ -247,6 +251,7 @@ export default function ElementalAtmosphere({ size = 3 }) {
           kind={getElementalDef(type).particle}
           color={type === 'fire' ? getElementalDef(type).color : getElementalDef(type).accent}
           extent={extent}
+          size={size}
           count={Math.floor(quality.particleCount / layers.length)}
         />
       ))}

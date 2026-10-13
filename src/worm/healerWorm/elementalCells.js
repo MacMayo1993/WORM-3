@@ -29,7 +29,7 @@
 // cell is centred on a sticker) and draw per-sticker seams at any board size.
 
 import * as THREE from 'three';
-import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
+import { getStickerWorldPos } from '../../game/coordinates.js';
 import { FACE_NORMALS } from './constants.js';
 
 // Per-face definition: the fixed axis pinned to the outer layer, plus the two

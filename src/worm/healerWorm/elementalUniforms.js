@@ -27,7 +27,9 @@ const BODY_REACH = 16;
 
 // Claim origins belong to each skin material: fused elements keep independent
 // sweeps. Only the worm positions and cube dimensions are shared across layers.
-/** Half the cube's edge length, world units — how far a flood has to reach. */
+/** Gap between adjacent cubies; shell borders open as the lattice expands. */
+export const uCubeGap = { value: 0 };
+/** Half the current expanded hull, world units — how far a flood has to reach. */
 export const uCubeHalf = { value: 1.5 };
 
 /**

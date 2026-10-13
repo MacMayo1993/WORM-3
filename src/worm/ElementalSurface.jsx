@@ -31,7 +31,7 @@ import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
-import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf } from './healerWorm/elementalUniforms.js';
+import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
 
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3 };
 
@@ -113,6 +113,7 @@ const vertexShader = /* glsl */ `
   uniform float uTime;
   // Reaction coat height above the stickers (fusionLooks.js).
   uniform float uReactDepth;
+  uniform float uCubeGap;
   // (intensity, claim, release, animate) — the shared elemental envelope.
   uniform vec4 uEnv;
   uniform vec4 uClaimOrigin;
@@ -172,13 +173,15 @@ const vertexShader = /* glsl */ `
     float sy = q.y > 1.0 ? 1.0 : (q.y < 0.0 ? -1.0 : 0.0);
     float tx = sx > 0.0 ? (q.x - 1.0) / ${glf(SKIRT)} : (sx < 0.0 ? -q.x / ${glf(SKIRT)} : 0.0);
     float ty = sy > 0.0 ? (q.y - 1.0) / ${glf(SKIRT)} : (sy < 0.0 ? -q.y / ${glf(SKIRT)} : 0.0);
-    // Is that border the cube's silhouette?
-    float ex = sx > 0.0 ? aEdge.y : aEdge.x;
-    float ey = sy > 0.0 ? aEdge.w : aEdge.z;
+    // As cubies separate, every tile rim becomes an exposed border. Round the
+    // coating over that tile's rim instead of keeping a stretched face-wide shell.
+    vec4 edges = mix(aEdge, vec4(1.0), smoothstep(0.0, 0.15, uCubeGap));
+    float ex = sx > 0.0 ? edges.y : edges.x;
+    float ey = sy > 0.0 ? edges.w : edges.z;
 
     // The flat patch. On an edge border it runs out to the wrap's axis.
-    vec2 lo = vec2(aExtent.x + aEdge.x * ${glf(EDGE_PAD)}, aExtent.z + aEdge.z * ${glf(EDGE_PAD)});
-    vec2 hi = vec2(aExtent.y + aEdge.y * ${glf(EDGE_PAD)}, aExtent.w + aEdge.w * ${glf(EDGE_PAD)});
+    vec2 lo = vec2(aExtent.x + edges.x * ${glf(EDGE_PAD)}, aExtent.z + edges.z * ${glf(EDGE_PAD)});
+    vec2 hi = vec2(aExtent.y + edges.y * ${glf(EDGE_PAD)}, aExtent.w + edges.w * ${glf(EDGE_PAD)});
     vec2 cq = clamp(q, 0.0, 1.0);
     vec2 base = vec2(mix(-lo.x, hi.x, cq.x), mix(-lo.y, hi.y, cq.y));
     // On a seam border the skirt folds flat onto the border (zero-area triangles).
@@ -236,7 +239,9 @@ const vertexShader = /* glsl */ `
     vNormal = n;
     vFaceN = cellN;
     vLocal = base;
-    vFaceUV = vec2(dot(C, cellX), dot(C, cellY));
+    // Recover the unexpanded lattice for seam patterns; local tile offsets and
+    // ripple height stay in world units, while the cubie centres move apart.
+    vFaceUV = vec2(dot(cellOrigin, cellX), dot(cellOrigin, cellY)) / (1.0 + uCubeGap) + base;
     vRim = max(ex * tx, ey * ty);
     vArrive = flood;
     vDepth = depth;
@@ -709,7 +714,7 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDe
         uWormBody,
         // A fused layer keeps its own original sweep as the second arrives.
         uClaimOrigin: { value: new THREE.Vector4() },
-        uCubeHalf
+        uCubeHalf, uCubeGap
       },
       vertexShader,
       fragmentShader,
@@ -746,7 +751,7 @@ export function getReactionSurfaceMaterial(recipeId, look, pattern) {
         uWormHead,
         uWormBody,
         uClaimOrigin: { value: new THREE.Vector4() },
-        uCubeHalf
+        uCubeHalf, uCubeGap
       },
       vertexShader,
       fragmentShader,
@@ -763,11 +768,12 @@ export function getReactionSurfaceMaterial(recipeId, look, pattern) {
 }
 
 /** The reaction coat over every cover cell: the same shell, the recipe's material. */
-export function ReactionSurfaceSkin({ recipe, look, pattern, count, cellData, meshRef }) {
+export function ReactionSurfaceSkin({ recipe, look, pattern, count, cellData, meshRef, quality }) {
   const material = useMemo(() => getReactionSurfaceMaterial(recipe, look, pattern), [recipe, look, pattern]);
+  const detail = quality?.cellDetail ?? 1;
   const geometry = useMemo(
-    () => attachCellAttributes(getShellGeometry(...RESOLUTION.reaction).clone(), cellData),
-    [cellData]
+    () => attachCellAttributes(getShellGeometry(Math.max(2, Math.round(10 * Math.sqrt(detail))), detail < 1 ? 1 : 3).clone(), cellData),
+    [cellData, detail]
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <instancedMesh ref={meshRef} args={[geometry, material, count]} frustumCulled={false} raycast={() => null} />;
@@ -787,10 +793,11 @@ export function ElementalSurfaceSkin({ element, color, accent, count, cellData, 
     [element, color, accent, highDetail]
   );
 
+  const detail = quality?.cellDetail ?? 1;
   const geometry = useMemo(() => {
     const [inner, skirt] = RESOLUTION[element] ?? RESOLUTION.water;
-    return attachCellAttributes(getShellGeometry(inner, skirt).clone(), cellData);
-  }, [element, cellData]);
+    return attachCellAttributes(getShellGeometry(Math.max(2, Math.round(inner * Math.sqrt(detail))), detail < 1 ? 1 : skirt).clone(), cellData);
+  }, [element, cellData, detail]);
 
   // Ours to dispose — the clone is per mount. The cached source geometry and the
   // cached material outlive it and must not be touched.
