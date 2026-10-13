@@ -284,10 +284,10 @@ export function WormBody({ worm, size }) {
         fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
         worm.tunnelHeadScale *= rideFit.current.scale;
         worm.tunnelHeadShift = rideFit.current.shift;
-        // Portal arrival (StoryArrival): the head climbs out of the mouth along the
-        // body's own path and every bead trails it by the same offset.
+        // Portal arrival (StoryArrival): the head pops out of a portal on its own
+        // tile and the body uncoils behind it; `tuck` of it is still in the hole.
         const arrival = worm.arrival?.active ? worm.arrival : null;
-        const arrivalOffset = arrival ? arrival.offset : 0;
+        const arrivalTuck = arrival ? arrival.tuck : 0;
         if (arrival) worm.tunnelHeadScale *= arrival.headGrow;
         const headAnchor = arrival ? arrival.headPos : _bodyHeadPos;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
@@ -512,13 +512,15 @@ export function WormBody({ worm, size }) {
                 let targetDist;
                 if (_isInch) {
                     inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove, _inchShape);
-                    targetDist = _inchGait.dist + arrivalOffset;
+                    targetDist = _inchGait.dist;
                     _inchArch = _inchGait.arch;
                 } else {
-                    targetDist = (sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING) + arrivalOffset;
+                    targetDist = sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING;
                 }
 
                 beadDist = targetDist;
+                // Arriving: the body slides back out of the hole onto its trail.
+                if (arrival) targetDist = Math.max(0, targetDist - arrivalTuck);
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
 
@@ -747,7 +749,7 @@ export function WormBody({ worm, size }) {
             }
             if (arrival && i !== 0) {
                 // Still down in the portal, rising out of it, or leaping clear of the lip.
-                const bead = arrivalBeadInto(_arrivalBead, beadDist, arrival.mouth, arrivalOffset);
+                const bead = arrivalBeadInto(_arrivalBead, beadDist, arrivalTuck);
                 if (bead.grow < 0.002) continue;
                 _wormDummy.scale.multiplyScalar(bead.grow);
                 _wormDummy.position.addScaledVector(_bodyCloneNormal, bead.lift);
