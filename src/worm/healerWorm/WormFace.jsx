@@ -12,17 +12,16 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
-import { getTunnelWorldPosSmoothInto, getWindWorldPosInto } from '../wormLogic.js';
-import { tunnelTraversalT } from '../../utils/tunnelPath.js';
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
-import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD, windoutHeadS } from './constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, mobiHeadFrameInto, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
-import { rocketOrbitT, rocketOrbitInto, rocketFrameInto } from './rocketOrbit.js';
+import { headFrameInto } from './headFrame.js';
+import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // Head radius, matching WormBody's head scale.
 // Book keeps its authored head; round characters share the larger body head.
@@ -34,11 +33,8 @@ const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, n
 // ─── Worm Face (eyes + pupils + smile) ────────────────────────────────────────
 const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
-const _rocketFaceNormal = new THREE.Vector3();
+const _faceNormal = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
-const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent during enter/exit
-const _faceTunnelBehind = new THREE.Vector3();
-const _faceFlightTurn = new THREE.Quaternion();
 const _mobiRideAxis = new THREE.Vector3();
 const _mobiHeadPos = new THREE.Vector3();
 const _mobiHeadForward = new THREE.Vector3();
@@ -105,42 +101,14 @@ export function WormFace({ worm, size }) {
         const phase = worm.phase.current;
         const inTransit = (phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current;
 
-        let normal;
+        headFrameInto(_faceForward, _faceNormal, worm, size);
+        let normal = _faceNormal;
         if (phase === 'falling' && worm.cautionFall?.current) {
             _faceHeadPos.copy(worm.headInterpPos.current);
-            normal = worm.currentNormal.current;
-            _faceForward.copy(worm.cautionFall.current.forward);
         } else if (inTransit) {
             // During entering/tunnel/exiting/windout the head is driven by getTunnelWorldPosSmoothInto
             // or getWindWorldPosInto. Read headInterpPos/currentNormal which are always current.
             _faceHeadPos.copy(worm.headInterpPos.current);
-            normal = worm.currentNormal.current;
-
-            if (phase === 'windout' || phase === 'windup') {
-                // Look along the mouth handoff itself: round a raised pad's coil
-                // and then down into the mouth (up out of it on exit). A fixed
-                // span keeps the direction defined at both ends of the curve.
-                const exiting = phase === 'windout';
-                const side = exiting ? 'exit' : 'entry';
-                const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
-                const step = exiting ? -0.03 : 0.03;
-                const ahead = THREE.MathUtils.clamp((exiting ? windoutHeadS(tp) : tp) + step, 0, 1);
-                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, side, ahead, size);
-                getWindWorldPosInto(_faceTunnelBehind, worm.activeTunnel.current, side, THREE.MathUtils.clamp(ahead - step, 0, 1), size);
-                _faceForward.subVectors(_faceTunnelAhead, _faceTunnelBehind);
-                if (_faceForward.lengthSq() < 1e-12) _faceForward.copy(normal).multiplyScalar(exiting ? 1 : -1);
-                _faceForward.normalize();
-            } else {
-                // Derive forward from the tunnel tangent at the current parametric position.
-                const tp = worm.tunnelProgress.current;
-                const t = tunnelTraversalT(phase, tp);
-                const tAhead = Math.min(t + 0.02, 1.0);
-                getTunnelWorldPosSmoothInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
-                _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
-                if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
-                _faceForward.normalize();
-            }
-
             // Head rides the ribbon/spiral centerline; the layout places the face
             // on the head sphere from its centre.
         } else if (worm.padFlight?.current) {
@@ -148,15 +116,9 @@ export function WormFace({ worm, size }) {
             // interpolation still points at the tile the jump left from, which
             // left the eyes on the floor while the head flew. Face the landing
             // heading, turned with the flight's normal across a cube edge.
-            const flight = worm.padFlight.current;
-            normal = worm.currentNormal.current;
             bodyPathHeadInto(_faceHeadPos, worm);
-            _faceForward.copy(flight.heading).applyQuaternion(_faceFlightTurn.setFromUnitVectors(flight.endNormal, normal));
         } else {
             const { dirKey } = worm.pos.current;
-            normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
-            const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
-            _faceForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
 
             // Interpolated head world pos (copy into scratch — no .clone())
             const prev = worm.prevWorldPos.current;
@@ -182,8 +144,6 @@ export function WormFace({ worm, size }) {
             // One live anchor for the body, face, glasses and hat at corners.
             bodyPathHeadInto(_faceHeadPos, worm);
             const lift = rocketOrbitT(true, worm.rocketT.current, worm.rocketFlight?.current);
-            normal = _rocketFaceNormal.copy(worm.currentNormal.current);
-            rocketFrameInto(_faceForward, normal, _faceHeadPos, size, lift);
             rocketOrbitInto(_faceHeadPos, size, lift);
         }
 
@@ -191,8 +151,6 @@ export function WormFace({ worm, size }) {
         const arrival = !inTransit && worm.arrival?.active ? worm.arrival : null;
         if (arrival) {
             _faceHeadPos.copy(arrival.headPos);
-            normal = arrival.headNormal;
-            _faceForward.copy(arrival.headForward);
         }
 
         const state = useGameStore.getState();
@@ -225,7 +183,7 @@ export function WormFace({ worm, size }) {
             rocketOrbitInto(mobi.group.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             if (!inTransit && worm.rocketActive.current) {
                 mobi.group.position.copy(_faceHeadPos);
-                normal = _rocketFaceNormal;
+                normal = _faceNormal;
             }
             if (!inTransit && liveRotation.active) {
                 const { x, y, z } = worm.pos.current;

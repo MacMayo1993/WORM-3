@@ -56,6 +56,7 @@ import { inchBodyRadius, inchGaitInto, makeInchGaitState, advanceInchGaitState }
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
+import { headFrameInto } from './headFrame.js';
 import { arrivalBeadInto } from './storyArrival.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -84,6 +85,7 @@ const _bookHeadDummy = new THREE.Object3D();
 // frame (a 1200-segment body would otherwise allocate 1200 objects a frame).
 const _inchGait = { dist: 0, arch: 0 };
 const _bodyHeadPos = new THREE.Vector3();
+const _prismHeadForward = new THREE.Vector3(), _prismHeadNormal = new THREE.Vector3();
 const _arrivalBead = { grow: 1, lift: 0 };
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -498,8 +500,8 @@ export function WormBody({ worm, size }) {
             blendTunnelBodyProfile(rideProfile.current, null);
 
             if (i === 0) {
-                // Head — reset quaternion every frame: body segments (below) rotate this
-                // same shared scratch object for book worm, and the head never re-orients.
+                // Reset the shared segment scratch before applying a directional
+                // character's head frame; round heads keep the identity rotation.
                 _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_wormDummy.position, size, orbitT);
@@ -512,6 +514,11 @@ export function WormBody({ worm, size }) {
                     bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
                     _wigglePrev.copy(_wormDummy.position); wigglePrevValid = !_bodyTransit;
+                }
+                if (_isPrism) {
+                    headFrameInto(_prismHeadForward, _prismHeadNormal, worm, size);
+                    bodyFrameInto(_bookBasisMat, _prismHeadForward, _prismHeadNormal, _bookX, _bookY, _bookZ);
+                    _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
                 }
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
