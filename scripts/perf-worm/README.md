@@ -24,6 +24,22 @@ That config is the deploy config, unminified (so profiles keep function names) w
 
 ## Modes
 
+### Tunnel camera clearance regression
+
+```bash
+CHROMIUM=/path/to/chrome node scripts/perf-worm/camera-clearance.mjs
+```
+
+Runs the production clearance GLSL in WebGL without loading the game. Its 448
+pixel checks cover every direction around the lens, four camera rolls, the
+forward corridor, distant track and adjacent routes, inactive rides, and mirror
+captures. Both opaque bands and the transparent veil are checked. The former
+below-camera exemption fails this regression; nearby floor fragments must clear
+even when the camera banks differently from the ribbon. This is a visibility
+test, not a GPU performance measurement.
+
+### Performance modes
+
 ```bash
 node scripts/perf-worm/run.mjs --mode=frames    --url=http://localhost:4173/WORM-3/ --ms=45000
 node scripts/perf-worm/run.mjs --mode=frames    --url=... --throttle=4          # mid-range-phone CPU proxy
