@@ -76,6 +76,20 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     for (const part of halves[0].parent.children) {
       expect(part.material.uniforms.uCameraClearance).toBe(clearance);
     }
+    // Every ribbon, styled half, rail and veil must clear the actual moved and
+    // banked lens, not the rest frame or a mirror probe's cameraPosition.
+    const camera = store.getState().camera;
+    camera.position.set(1.2, -0.4, 0.7);
+    camera.rotation.set(0.4, -0.8, 1.1);
+    frame();
+    const lens = halves[0].material.uniforms.uTunnelCameraPosition;
+    const ahead = halves[0].material.uniforms.uCameraAhead;
+    expect(lens.value.distanceTo(camera.getWorldPosition(new THREE.Vector3()))).toBeLessThan(1e-10);
+    expect(ahead.value.distanceTo(camera.getWorldDirection(new THREE.Vector3()))).toBeLessThan(1e-10);
+    for (const part of halves[0].parent.children) {
+      expect(part.material.uniforms.uTunnelCameraPosition).toBe(lens);
+      expect(part.material.uniforms.uCameraAhead).toBe(ahead);
+    }
     const intact = halves[0].geometry.attributes.position.version;
     tunnelState.active = false; frame();
     expect(clearance.value).toBe(0);

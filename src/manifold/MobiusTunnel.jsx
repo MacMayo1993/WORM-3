@@ -381,7 +381,7 @@ const MobiusTunnel = ({
     const state = useGameStore.getState();
     if (wormMode && tunnelState.active && _state.camera.getWorldDirection) {
       _state.camera.getWorldDirection(tunnelCameraUniforms.uCameraAhead.value);
-      tunnelCameraUniforms.uCameraUp.value.set(0, 1, 0).applyQuaternion(_state.camera.quaternion);
+      _state.camera.getWorldPosition(tunnelCameraUniforms.uTunnelCameraPosition.value);
     }
     syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
