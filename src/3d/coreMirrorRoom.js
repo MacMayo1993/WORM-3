@@ -8,7 +8,7 @@ import { createPlayStickerGeometry } from './rubiksPiece.js';
 // mirror is stained with the colour of the core sticker it sits behind (the
 // cube's live state, as the core shows it). What they reflect is captured live:
 // a cube camera at the room's centre renders the room (worm, bands, lightning
-// and the other walls) every frame the room is open, and every mirror samples it
+// and the other walls) on a bounded capture clock, and every mirror samples it
 // box-projected onto the room's own walls, so a reflection sits where a flat
 // mirror would put it rather than floating at infinity. The capture alternates
 // between two targets, so the walls reflect each other's last frame without a
@@ -166,14 +166,15 @@ const _scale = new THREE.Vector3();
 export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType) {
   const targets = [0, 1].map(() => new THREE.WebGLCubeRenderTarget(resolution, { type, generateMipmaps: false }));
   const camera = new THREE.CubeCamera(0.01, 60, targets[0]);
-  let next = 0, frame = 0;
+  let next = 0, elapsed = 0;
   return {
     camera,
     /**
      * Capture the room around `room` (its group) and point the mirrors at the
-     * result. `every` > 1 captures on that fraction of frames only.
+     * result. Cadence is time-based so high-refresh displays do not multiply
+     * the six-view cost; all six faces are still published together.
      */
-    capture(renderer, scene, room, every = 1) {
+    capture(renderer, scene, room, { delta = Infinity, interval = 0 } = {}) {
       room.group.getWorldPosition(_center);
       room.group.getWorldScale(_scale);
       const half = CORE_MIRROR_HALF * _scale.x;
@@ -182,7 +183,9 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       room.uniforms.uMirrorBoxMax.value.copy(_center).addScalar(half);
       // Only a real renderer can capture (it names its coordinate system).
       if (renderer?.coordinateSystem === undefined) return;
-      if (frame++ % every !== 0 && room.uniforms.uMirrorEnv.value) return;
+      elapsed += Math.max(0, delta);
+      if (elapsed + 1e-6 < interval && room.uniforms.uMirrorEnv.value) return;
+      elapsed = Number.isFinite(elapsed) && interval > 0 ? elapsed % interval : 0;
       camera.renderTarget = targets[next];
       // The walls are opaque: nothing past the room's far corner can show in a
       // reflection, so the capture culls the rest of the cube and the sky.
@@ -192,7 +195,27 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       }
       camera.position.copy(_center);
       camera.updateMatrixWorld();
-      camera.update(renderer, scene);
+      // CubeCamera renders six views of one pose. Updating the whole scene and
+      // rebuilding shadows for each face repeats identical work. Keep the main
+      // view's shadow request intact, including when a capture throws.
+      const autoWorld = scene.matrixWorldAutoUpdate;
+      const shadows = renderer.shadowMap;
+      const autoShadow = shadows?.autoUpdate, shadowDirty = shadows?.needsUpdate;
+      const target = renderer.getRenderTarget();
+      const face = renderer.getActiveCubeFace?.() ?? 0;
+      const mip = renderer.getActiveMipmapLevel?.() ?? 0;
+      const xr = renderer.xr.enabled;
+      try {
+        if (autoWorld) scene.updateMatrixWorld();
+        scene.matrixWorldAutoUpdate = false;
+        if (shadows) { shadows.autoUpdate = false; shadows.needsUpdate = false; }
+        camera.update(renderer, scene);
+      } finally {
+        scene.matrixWorldAutoUpdate = autoWorld;
+        if (shadows) { shadows.autoUpdate = autoShadow; shadows.needsUpdate = shadowDirty; }
+        renderer.setRenderTarget(target, face, mip);
+        renderer.xr.enabled = xr;
+      }
       room.uniforms.uMirrorEnv.value = targets[next].texture;
       room.uniforms.uMirrorLive.value = 1;
       next = 1 - next;

@@ -13,7 +13,8 @@ export const tunnelCameraUniforms = {
 // WORM ride clear what comes close enough to the lens to fill the screen (the
 // band curling up round it as it twists, a wall right ahead), except what lies
 // below it: the track under the rider always stays, so it is seen riding the
-// band. The screen-space dissolve needs no transparent pass.
+// band. A geometric cut keeps that opening stable as the camera moves, without
+// a screen-space stipple crawling across the track or an extra blending pass.
 //
 // Bands are cut away inside the antipodal core (it is solid), except the one
 // being ridden (uCoreClipOff): that one runs through the mirror room carved
@@ -40,7 +41,8 @@ export const tunnelCameraClearanceGLSL = `
     if ((uCoreClipOff < 0.5 && outsideTunnelCore(worldPoint) < 0.5) || insideCautionOpening(worldPoint)) discard;
     if (uCameraClearance < 0.5) return;
     float visibility = tunnelCameraVisibility(worldPoint);
-    float grain = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-    if (visibility <= grain) discard;
+    // A single world-space contour replaces the noisy pixel dissolve. The
+    // transparent veil still uses continuous visibility for its soft boundary.
+    if (visibility < 0.5) discard;
   }
 `;

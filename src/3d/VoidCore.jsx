@@ -346,7 +346,7 @@ function VoidCore({ cubieRefs = null }) {
         probe.capture(gl, scene, mirrors);
         mirrors.group.visible = false;
       } else if (mirrors.group.visible) {
-        probe.capture(gl, scene, mirrors, isMobile || state.perfReducedFX ? 2 : 1);
+        probe.capture(gl, scene, mirrors, { delta: rawDt, interval: state.perfReducedFX ? 1 / 20 : 1 / 30 });
       }
     }
     // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.

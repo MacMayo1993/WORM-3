@@ -14,6 +14,7 @@ import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
 import { CORE_HALF } from '../3d/antipodalCore.js';
 import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
 extend(THREE);
+const interiorTile = (scene, key) => scene.getObjectByName('tunnel-interior-tiles').children.find(mesh => mesh.userData.tileKeys.includes(key));
 
 it('opens both backs and core materials, retains the tail passage, and restores a clean exterior', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,7 +43,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     store.getState().camera.position.set(0, 0, 4);
     await frame();
     expect(interior.visible).toBe(true);
-    expect(scene.getObjectByName('tunnel-interior-0-1-1-NX').visible).toBe(true);
+    expect(interiorTile(scene, '0-1-1-NX').visible).toBe(true);
     expect(tunnelCoreClipUniforms.uTunnelCoreHalf.value).toBeCloseTo(CORE_HALF + .002);
     worm.phase.current = 'tunnel';
     store.getState().camera.position.set(0, 0, 1);
@@ -73,7 +74,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     recoloured[2][1][1].stickers.PX.curr = 1;
     await act(async () => useGameStore.setState({ cubies: recoloured }));
     expect(Array.from(mirrors.instanceColor.array)).not.toEqual(tints);
-    const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX').material;
+    const inner = interiorTile(scene, '0-1-1-NX').material;
     const cached = getTileStyleMaterial('checkerboard', FACE_COLORS[5], false, null, FACE_COLORS[2]);
     expect(inner).not.toBe(cached);
     expect(cached.userData.portalCutout).toBeUndefined();
