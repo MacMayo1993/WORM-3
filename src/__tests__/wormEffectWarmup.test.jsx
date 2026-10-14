@@ -32,7 +32,7 @@ it('retains warmed programs across events, warms changed scene variants, and dis
   root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
   let store;
   // The run-start scene compile and the fall-dissolve warm are checked at the end.
-  useGameStore.setState({ wormGamePhase: 'active', wormAlive: false });
+  useGameStore.setState({ wormGamePhase: 'active', wormAlive: false, wormStoryLevel: null });
   try {
     await act(async () => { store = root.render(<PickupMaterialProvider><WormEffectWarmup body={body} /></PickupMaterialProvider>); });
     store.getState().advance(.01);
@@ -71,6 +71,17 @@ it('retains warmed programs across events, warms changed scene variants, and dis
     store.getState().advance(.9); store.getState().advance(1);
     expect(gl.compile).toHaveBeenCalledTimes(11);
     expect(gl.compile.mock.calls[10][0]).toBe(body.current);
+    // Story runs skip scrambling. Warm their mounted interior behind the ready
+    // card too, once the authored board is staged, and never again after Start.
+    useGameStore.setState({ wormRunId: before.wormRunId + 2, wormGamePhase: 'active',
+      wormStoryLevel: 1, wormStoryReady: false, wormStoryStarted: false });
+    store.getState().advance(1.1); expect(gl.compile).toHaveBeenCalledTimes(11);
+    useGameStore.setState({ wormStoryReady: true });
+    store.getState().advance(1.2); store.getState().advance(1.3);
+    expect(gl.compile).toHaveBeenCalledTimes(12);
+    expect(gl.compile.mock.calls[11][0]).toBe(store.getState().scene);
+    useGameStore.setState({ wormStoryStarted: true });
+    store.getState().advance(1.4); expect(gl.compile).toHaveBeenCalledTimes(12);
     await act(async () => root.unmount());
     disposed.forEach(spy => expect(spy).toHaveBeenCalledTimes(1));
     kept.forEach(spy => expect(spy).not.toHaveBeenCalled());

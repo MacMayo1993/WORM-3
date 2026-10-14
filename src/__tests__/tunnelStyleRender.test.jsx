@@ -15,6 +15,7 @@ import { FACE_COLORS } from '../utils/constants.js';
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 
 extend(THREE);
+const interiorTile = (scene, key) => scene.getObjectByName('tunnel-interior-tiles').children.find(mesh => mesh.userData.tileKeys.includes(key));
 
 it('renders a solid core, styled halves, and matching live antipodal backs inside and outside transit', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -63,10 +64,11 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const cached = getTileStyleMaterial('circuit', FACE_COLORS[2], false, null, FACE_COLORS[5]);
     expect(cached.side).toBe(THREE.FrontSide); // Band customization must not mutate tiles.
     const back = scene.getObjectByName('sticker-antipodal-back');
-    const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX');
+    const inner = () => interiorTile(scene, '0-1-1-NX');
     expect(back.material).toBe(cached);
-    expect(inner.material).toBe(cached);
-    expect(inner.visible).toBe(true);
+    expect(inner().material.uniforms.baseColor.value).toEqual(cached.uniforms.baseColor.value);
+    expect(inner().material.uniforms.time).toBe(cached.uniforms.time);
+    expect(inner().visible).toBe(true);
 
     tunnelState.active = true; tunnelState.activeTunnelId = 'a|b'; frame();
     const clearance = halves[0].material.uniforms.uCameraClearance;
@@ -107,13 +109,13 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(disposed).toHaveBeenCalledOnce();
     expect(halves[0].geometry.attributes.position.version).toBe(version);
     expect(back.material).toBe(getTileStyleMaterial('wood', FACE_COLORS[2], false, null, FACE_COLORS[5]));
-    expect(inner.material).toBe(back.material);
+    expect(inner().material.uniforms.baseColor.value).toEqual(back.material.uniforms.baseColor.value);
     expect(scene.getObjectByName('tunnel-styled-half-0').material.name).toBe('tunnel-tile-0-polkaDots');
 
     cubies = flipStickerPair(cubies, 3, 0, 1, 1, 'NX', buildManifoldGridMap(cubies, 3));
     await act(async () => { useGameStore.setState({ cubies }); root.render(draw('wood', 'polkaDots')); }); frame();
     expect(back.material.uniforms.baseColor.value.getHexString()).toBe(FACE_COLORS[5].slice(1).toLowerCase());
-    expect(inner.material).toBe(back.material); // Healing refreshes the current back during transit too.
+    expect(inner().material.uniforms.baseColor.value).toEqual(back.material.uniforms.baseColor.value); // Healing refreshes the current back during transit too.
 
     await act(async () => {
       useGameStore.setState({ wormHealerMode: false });

@@ -72,3 +72,49 @@ it('box-projects reflections onto the room as it is placed and scaled in the wor
     expect(room.uniforms.uMirrorEnv.value).toBe(draws.at(-1)[0]);
   } finally { room.dispose(); probe.dispose(); }
 });
+
+it('bounds captures by elapsed time, including high-refresh screens, and publishes complete cubes', () => {
+  const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
+  const scene = new THREE.Scene();
+  let draws = 0;
+  const renderer = { coordinateSystem: THREE.WebGLCoordinateSystem, xr: { enabled: false },
+    getRenderTarget: () => null, setRenderTarget() {}, getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+    render() { draws++; } };
+  try {
+    // Initial capture is unconditional, so there is never an uninitialized face.
+    probe.capture(renderer, scene, room, { delta: 0, interval: 1 / 30 });
+    expect(draws).toBe(6);
+    for (let i = 0; i < 120; i++) probe.capture(renderer, scene, room, { delta: 1 / 120, interval: 1 / 30 });
+    expect(draws).toBe(31 * 6);
+    expect(room.uniforms.uMirrorLive.value).toBe(1);
+  } finally { room.dispose(); probe.dispose(); }
+});
+
+it('updates one scene pose for six views and restores pending main-view shadows and render state on errors', () => {
+  const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
+  const scene = new THREE.Scene();
+  let updates = 0, draws = 0, target = null, face = 0, mip = 0;
+  const update = scene.updateMatrixWorld.bind(scene);
+  scene.updateMatrixWorld = (...args) => { updates++; update(...args); };
+  const shadows = { autoUpdate: true, needsUpdate: true };
+  const renderer = { coordinateSystem: THREE.WebGLCoordinateSystem, xr: { enabled: true }, shadowMap: shadows,
+    getRenderTarget: () => target, getActiveCubeFace: () => face, getActiveMipmapLevel: () => mip,
+    setRenderTarget(t, f, m) { target = t; face = f; mip = m; },
+    render() {
+      draws++;
+      expect(scene.matrixWorldAutoUpdate).toBe(false);
+      expect(shadows).toEqual({ autoUpdate: false, needsUpdate: false });
+      if (draws === 8) throw Error('capture interrupted');
+    } };
+  try {
+    probe.capture(renderer, scene, room);
+    expect(updates).toBe(1); expect(draws).toBe(6);
+    const texture = room.uniforms.uMirrorEnv.value;
+    expect(() => probe.capture(renderer, scene, room)).toThrow('capture interrupted');
+    expect(room.uniforms.uMirrorEnv.value).toBe(texture); // no partial cube is published
+    expect(scene.matrixWorldAutoUpdate).toBe(true);
+    expect(shadows).toEqual({ autoUpdate: true, needsUpdate: true });
+    expect(renderer.xr.enabled).toBe(true);
+    expect([target, face, mip]).toEqual([null, 0, 0]);
+  } finally { room.dispose(); probe.dispose(); }
+});

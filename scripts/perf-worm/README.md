@@ -63,7 +63,7 @@ pass between windows. Any WebGL shader compilation errors fail the run.
 - `--throttle=4` is Chrome's CPU throttling, the usual stand-in for a mid-range phone. It says nothing about that phone's GPU or thermals.
 - Shader links are counted on the main thread. On a real device the driver compile runs on top, so each link costs more than it does here.
 - Runs retry automatically after a death. `phases` shows how many frames fell in each state (`gamePhase|wormPhase|turning|element|FX tier`), so a window that wandered into the death screen is visible.
-- Tunnel rides are not exercised: the scripted worm never deliberately jumps onto a raised flipped tile.
+- The `run.mjs` surface workload does not deliberately enter tunnels; use `travel.mjs` below for in-cube traversal.
 
 ## Corrections after review
 
@@ -105,3 +105,28 @@ event workload. Compare
 separate production builds with the same fixture. Shader links are the primary
 result: software WebGL, background work and initialization differences limit CPU
 comparisons, and these measurements cannot establish physical-device FPS.
+
+## In-cube travel
+
+`travel.mjs` starts its own preview server (useful in isolated shell/network
+sessions), stages a solved story board with a raised pair at the worm's head,
+then calls the real portal-entry transition and records the complete ride.
+Build with `vite.perf.config.mjs` first. It uses local `playwright-core`, or
+`$PLAYWRIGHT`, and `$CHROMIUM` if supplied.
+
+```bash
+node scripts/perf-worm/travel.mjs --out=/tmp/travel.json
+node scripts/perf-worm/travel.mjs --size=10 --out=/tmp/travel10.json
+node scripts/perf-worm/travel.mjs --pairs=5 --patterns --shots=/tmp/travel-shots
+```
+
+The default is a seeded 3×3 board, one pair, full FX and a 1280×800 viewport.
+`--size=10` stages the same controlled fixture on a 10×10 board; `--pairs` adds other live connections.
+The script asserts entry, every travel phase, survival and shader compilation.
+Per-phase output includes CPU p50/p95, submitted draws/triangles and shader
+links; raw instrumented frames are retained in the JSON. Draw suppression is
+on by default; `--draw` measures real rendering on a GPU-equipped machine.
+`--shots` pauses at three ride poses and enables real draws for screenshots;
+those runs are explicitly marked and must not be used for timing comparisons.
+`--shot-dpr=0.5` lowers only screenshot resolution for software WebGL.
+Run before/after builds sequentially, without other benchmarks or builds running.

@@ -117,7 +117,9 @@ const fragmentShader = `
     float seam = 1.0 - smoothstep(0.0, 0.14, coreDistance);
     col += hot * seam * railHalo * 0.08;
     float coreWindow = smoothstep(0.10, 0.24, coreDistance);
-    float wall = (hoop * 0.10 + rail * 0.035 + spiral * 0.05) * coreWindow;
+    // Depth stations carry the route; keep the moving spiral subordinate so
+    // the worm and the mirrored room remain the focal points without bloom.
+    float wall = (hoop * 0.17 + rail * 0.07 + spiral * 0.025) * coreWindow;
     float alpha = wall * mouth * uOpacity;
     if (alpha < 0.008) discard;
     gl_FragColor = vec4(col, alpha);
@@ -251,7 +253,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     slot.opacity += (target - slot.opacity) * Math.min(1, delta * lerp);
 
     const st = useGameStore.getState();
-    if (!st.wormPaused && st.wormAlive && !prefersReducedMotion()) uniforms.uTime.value += Math.min(delta, 0.05);
+    if (!st.wormPaused && st.wormAlive && !st.settings?.reducedMotion && !prefersReducedMotion()) uniforms.uTime.value += Math.min(delta, 0.05);
     uniforms.uOpacity.value = slot.opacity;
 
     if (!meshRef.current) return;

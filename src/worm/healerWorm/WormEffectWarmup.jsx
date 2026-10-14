@@ -118,11 +118,12 @@ export default function WormEffectWarmup({ body }) {
   // Pooled effects that already sit hidden in the scene (pad energy, burrows,
   // wormhole rings, combat rigs) compile on their first appearance otherwise.
   // Compile the live scene once per run and look, while the board is still
-  // scrambling and a long frame cannot be felt; never in the middle of play.
+  // scrambling or behind a story briefing; never in the middle of play.
   useFrame(() => {
     if (warmed.current === null) return;
     const s = useGameStore.getState();
-    if (s.wormGamePhase !== 'scrambling') return;
+    const storyBriefing = s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted;
+    if (s.wormGamePhase !== 'scrambling' && !storyBriefing) return;
     const key = `${warmed.current}|${s.wormRunId}|${s.size}`;
     if (sceneWarmed.current === key) return;
     sceneWarmed.current = key;
