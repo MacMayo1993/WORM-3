@@ -11,6 +11,7 @@ export function fusionFeedback(recipe, buffs) {
 }
 
 export function elementalFeedback(type, buffs, fusion = null) {
+    const ability = buffs.elementalAbilities;
     const momentum = buffs.rocketActive ? 0 : Math.max(0, Math.min(1, buffs.waterMomentum || 0));
     // A fused pair's own rule leads the readout (elementalFusion.js).
     if (fusion === 'water-air') return { text: 'Keep momentum in flight · Airborne speed up to +40%', fraction: momentum };
@@ -18,15 +19,15 @@ export function elementalFeedback(type, buffs, fusion = null) {
     if (fusion === 'fire-air') return { text: 'Hot-tile takeoff: +1 tile · +1.2 lift', fraction: 0 };
     if (fusion === 'air-fire') return { text: 'Jump: rain 6-second fire trails beneath you', fraction: 0 };
     if (fusion === 'grass-air') return { text: 'Spring launch: stun enemies within 2 steps', fraction: buffs.springReady ? 1 : 0 };
-    if (fusion === 'air-grass') return { text: 'Land: grow a charged 12-second spring pad', fraction: buffs.springReady ? 1 : 0 };
+    if (fusion === 'air-grass') return { text: 'Land: grow 3 buds + a charged spring', fraction: buffs.springReady ? 1 : 0 };
     if (fusion === 'ice-air') return { text: 'Jump: leave 7-second frost beneath you', fraction: 0 };
     if (fusion === 'air-ice') return { text: 'Free steering · Takeoff freezes a 2-tile cross', fraction: 0 };
     if (fusion === 'lightning-air') return { text: buffs.staticT > 0 ? 'GUST! · +35% speed · Harmless strikes' : 'Strikes become safe gusts and speed bursts', fraction: buffs.staticT > 0 ? 1 : 0 };
     if (fusion === 'air-lightning') return { text: 'Land: discharge a lethal cross · Dodge storm marks', fraction: 0 };
     if (fusion === 'slipstream') return { text: `Slipstream +${Math.round(momentum * 40)}% · Turns keep momentum`, fraction: momentum };
-    if (fusion === 'quench') return { text: 'Obsidian blocks blasts · Turns on it keep momentum', fraction: momentum };
-    if (fusion === 'steam') return { text: 'Steam trail scalds enemies · Puts out bombs', fraction: 0 };
-    if (fusion === 'wildfire') return { text: buffs.springReady ? 'SPRING READY · Landing bursts into flame' : `${buffs.springCount || 0} springs · Spring landings burn`, fraction: buffs.springReady ? 1 : 0 };
+    if (fusion === 'quench') return { text: 'Dash lays Obsidian · Turns on it keep momentum', fraction: momentum };
+    if (fusion === 'steam') return { text: 'Steam gathers burning orbs within 2 tiles · Puts out bombs', fraction: 0 };
+    if (fusion === 'wildfire') return { text: buffs.springReady ? 'SPRING READY · Dash plants seeds; landings burn' : `${buffs.springCount || 0} springs · Dash plants seeds`, fraction: buffs.springReady ? 1 : 0 };
     if (fusion === 'thunderpad') return { text: buffs.springReady ? 'SPRING READY · A struck pad launches rocket-high' : 'Lightning charges your spring pads', fraction: buffs.springReady ? 1 : 0 };
     const springs = buffs.springReady ? 'SPRING READY' : `${buffs.springCount || 0} springs`;
     const pads = buffs.springReady ? 1 : 0;
@@ -40,17 +41,17 @@ export function elementalFeedback(type, buffs, fusion = null) {
     if (fusion === 'frozen-wake') return { text: 'Tiles you leave freeze · Bombs on them stop', fraction: 0 };
     if (fusion === 'meltdown') return { text: buffs.meltdownT > 0 ? 'DASH! · Slides melt bombs' : 'Slides end in a dash · Melt bombs', fraction: buffs.meltdownT > 0 ? 1 : 0 };
     if (fusion === 'frostbloom') return { text: `${springs} · Landings freeze the 3×3`, fraction: pads };
-    if (fusion === 'static') return { text: buffs.staticT > 0 ? 'DISCHARGE! · +35% speed' : 'Strikes near your head become speed', fraction: buffs.staticT > 0 ? 1 : 0 };
+    if (fusion === 'static') return { text: buffs.staticT > 0 ? 'DISCHARGE! · +35% speed' : 'Finish a drift: chain-collect orbs', fraction: buffs.staticT > 0 ? 1 : 0 };
     if (fusion === 'current') return { text: momentum >= 0.8 ? 'CHARGED · Strikes on you arc away' : `Momentum ${Math.round(momentum * 100)}% · Reach 80% to conduct`, fraction: momentum };
     if (fusion === 'firestorm') return { text: 'Strikes ignite a cross of fire', fraction: 0 };
     if (fusion === 'cryostorm') return { text: 'Slow marks · Strikes freeze, never hurt you', fraction: 0 };
     if (fusion === 'grounded') return { text: 'Strikes grow charged pads · Body is safe', fraction: 0 };
-    if (type === 'air') return { text: 'UPDRAFT · Jumps +35% farther · +40% higher', fraction: 0 };
-    if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · Turns slow you`, fraction: momentum };
-    if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Jump for a longer leap' : `${buffs.springCount || 0} springs · Land to grow one`, fraction: buffs.springReady ? 1 : 0 };
-    if (type === 'fire') return { text: 'Shield tiles block blasts · Flames still hurt', fraction: 0 };
-    if (type === 'ice') return { text: 'Slide to the next tile · Jump to steer sooner', fraction: 0 };
-    return { text: 'Marked tiles strike · Get off them, or jump', fraction: 0 };
+    if (type === 'air') return { text: ability?.gliding ? 'GLIDING · Release Jump to descend' : 'UPDRAFT · Hold Jump to glide · Steer in the air', fraction: 0 };
+    if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · ${momentum >= 0.8 ? 'WAVE READY · Sweeps both sides' : 'Build momentum to sweep'}`, fraction: momentum };
+    if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Land to plant · Harvest gold buds' : `${buffs.springCount || 0} springs · ${ability?.gardenBudget ?? 0} buds left to plant`, fraction: buffs.springReady ? 1 : 0 };
+    if (type === 'fire') return { text: `${ability?.fireReady ? 'FLAME DASH READY · Boost' : `Heat ${ability?.heat?.size ?? 0}/6`} · ${ability?.fireBonus ?? 0} double-growth pickups left · Flames still hurt`, fraction: ability?.fireReady ? 1 : (ability?.heat?.size ?? 0) / 6 };
+    if (type === 'ice') return { text: `${ability?.icePhaseT > 0 ? 'SHELL BROKEN · Passing through body' : ability?.iceShield ? 'ICE SHELL READY' : 'Shell spent'} · Turn after a slide for +25%`, fraction: ability?.iceShield ? 1 : 0 };
+    return { text: `CHAIN ${ability?.lightningT > 0 ? `${ability.lightningT.toFixed(1)}s` : 'READY'} · Up to 3 orbs · Your storm is safe`, fraction: 1 - (ability?.lightningT ?? 0) / 4 };
 }
 export const patchOpacity = ttl => Math.min(1, Math.max(0, ttl / 0.6));
 export const springStretch = (ttl, reducedMotion) => reducedMotion ? 1 : 0.88 + 0.12 * Math.sin((8 - ttl) * 5);

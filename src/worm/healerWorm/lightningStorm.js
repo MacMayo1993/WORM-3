@@ -2,8 +2,8 @@
 //
 // The Lightning orb's storm, as pure state so it can be reasoned about and tested away
 // from the renderer and the mode. While the wash is up the sky marks a tile, charges it
-// for STORM.telegraph seconds, and then strikes it: a head under the bolt dies, a body
-// segment under it is cut off there, an enemy near it is killed, and a bare tile is
+// for STORM.telegraph seconds, and then strikes it: the owner is protected, an
+// enemy near it is killed, and a bare tile is
 // flipped into a charged wormhole. Everything the bolt does lives in HealerWormMode and
 // the crawler; this module only decides WHEN and WHERE, from an injected random source.
 //

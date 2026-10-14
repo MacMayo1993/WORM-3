@@ -1,0 +1,189 @@
+// Enemy-independent elemental abilities. All clocks and budgets belong to the
+// simulation; rendering reads this state without driving gameplay or store churn.
+import { hasElement, activeFusion } from './elementalFusion.js';
+import { addElementalPatch, postFusionBurst } from './elementalGameplay.js';
+import { collectManifoldRing, getNextSurfacePosition, turnWorm } from '../wormLogic.js';
+import { makeGrowthOrb } from './orbSpawning.js';
+import { CASCADE_FLIGHT } from './orbCascade.js';
+import { ORB_SEGMENT_GROWTH } from './constants.js';
+
+export const ELEMENT_ABILITIES = Object.freeze({
+    heatTiles: 6, fireDash: 0.75, fireBonus: 6, gardenBudget: 6,
+    gardenRipen: 1.5, lightningCooldown: 4, chainCount: 3,
+    driftDuration: 0.55, icePhase: 1.2, glideTiles: 1.2,
+});
+const keyOf = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
+const tileOf = key => { const [x, y, z, dirKey] = key.split(','); return { x: +x, y: +y, z: +z, dirKey }; };
+export function makeElementalAbilities() {
+    return { heat: new Set(), fireReady: false, fireDashT: 0, fireBonus: 0,
+        gardenBudget: 0, lightningT: 0, chainPending: false, scanT: 0,
+        iceShield: false, icePhaseT: 0, driftT: 0, jumpHeld: false,
+        glideLeft: 0, gliding: false, events: [], seq: 0 };
+}
+export function abilityEvent(sim, kind, tiles = [sim.pos]) {
+    const a = sim.elementalAbilities;
+    a.events.push({ id: ++a.seq, kind, tiles: tiles.map(t => ({ x: t.x, y: t.y, z: t.z, dirKey: t.dirKey })), ttl: 0.65 });
+    if (a.events.length > 12) a.events.shift();
+}
+export const ripeOrb = orb => (!orb.garden || orb.garden.remaining <= 0)
+    && (!orb.cascade || orb.cascade.age >= CASCADE_FLIGHT);
+
+export function growGarden(sim, size, ctx, count = 2, origin = sim.pos) {
+    const a = sim.elementalAbilities;
+    if (!size || !a.gardenBudget || !hasElement(sim, 'grass')) return 0;
+    const blocked = new Set([...sim.powerups, ...sim.specials, sim.pos,
+        ...(sim.orbCascadeBombTiles ?? [])].map(keyOf));
+    const cubies = ctx.getCubies?.();
+    const fusion = activeFusion(sim);
+    let planted = 0;
+    for (const key of collectManifoldRing(origin.x, origin.y, origin.z, origin.dirKey, size, 1)) {
+        if (blocked.has(key)) continue;
+        const tile = tileOf(key), sticker = cubies?.[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey];
+        if (!sticker || sticker.curr !== sticker.orig) continue;
+        sim.powerups.push(makeGrowthOrb(tile, { garden: { remaining: ELEMENT_ABILITIES.gardenRipen, ember: fusion === 'emberseed' } }));
+        blocked.add(key); a.gardenBudget--; planted++;
+        if (planted >= count || !a.gardenBudget) break;
+    }
+    if (planted) { abilityEvent(sim, 'garden', [origin]); ctx.onPowerupsChanged?.(sim.powerups.slice()); }
+    return planted;
+}
+export function igniteNearbyOrbs(sim, size) {
+    if (!size || !hasElement(sim, 'fire') || !sim.elementalAbilities.fireBonus) return;
+    const near = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 1);
+    // At most six burning pickups exist at once, matching the bonus budget.
+    let room = sim.elementalAbilities.fireBonus - sim.powerups.filter(o => o.ignited).length;
+    for (const orb of sim.powerups) if (room > 0 && !orb.ignited && ripeOrb(orb) && near.has(keyOf(orb))) {
+        orb.ignited = true; room--;
+    }
+}
+export function claimElementalAbility(sim, type, size, ctx) {
+    const a = sim.elementalAbilities;
+    if (type === 'fire') { a.fireReady = true; a.heat.clear(); a.fireBonus = ELEMENT_ABILITIES.fireBonus; }
+    if (type === 'water') sim.waterMomentum = 1;
+    if (type === 'grass') {
+        // A new Earth pickup refreshes the budget, but already-growing buds count
+        // against it. Fusion refreshes from other elements never refill it.
+        a.gardenBudget = Math.max(0, ELEMENT_ABILITIES.gardenBudget - sim.powerups.filter(o => o.garden).length);
+        if (size) { addElementalPatch(sim, sim.pos, 'grass'); growGarden(sim, size, ctx); }
+    }
+    if (type === 'ice') a.iceShield = true;
+    if (type === 'lightning') { a.lightningT = 0; a.scanT = 0; }
+    if (activeFusion(sim) === 'emberseed') for (const orb of sim.powerups) if (orb.garden) orb.garden.ember = true;
+    igniteNearbyOrbs(sim, size);
+}
+export function startFlameDash(sim, size) {
+    const a = sim.elementalAbilities;
+    if (!hasElement(sim, 'fire') || !a.fireReady || a.fireDashT > 0 || sim.rocketActive || sim.isJumping) return false;
+    a.fireReady = false; a.heat.clear(); a.fireDashT = ELEMENT_ABILITIES.fireDash;
+    igniteNearbyOrbs(sim, size); abilityEvent(sim, 'fire');
+    return true;
+}
+export function elementalStep(sim, size, ctx) {
+    const a = sim.elementalAbilities;
+    if (hasElement(sim, 'fire')) {
+        if (!a.fireReady) { a.heat.add(keyOf(sim.pos)); if (a.heat.size >= ELEMENT_ABILITIES.heatTiles) a.fireReady = true; }
+        igniteNearbyOrbs(sim, size);
+        if (a.fireDashT > 0) {
+            const fusion = activeFusion(sim);
+            if (fusion === 'wildfire') growGarden(sim, size, ctx, 1);
+            if (fusion === 'quench') addElementalPatch(sim, sim.pos, 'fire', { obsidian: true, ttl: 8 });
+        }
+    }
+}
+export function elementalLanding(sim, size, ctx) {
+    if (hasElement(sim, 'grass')) growGarden(sim, size, ctx, activeFusion(sim) === 'air-grass' ? 3 : 2);
+}
+export function elementalDrift(sim) {
+    if (!hasElement(sim, 'ice') || sim.isJumping) return;
+    sim.elementalAbilities.driftT = ELEMENT_ABILITIES.driftDuration;
+    abilityEvent(sim, 'ice');
+    if (activeFusion(sim) === 'static') { sim.elementalAbilities.chainPending = true; sim.elementalAbilities.scanT = 0; }
+}
+export function spendIceShield(sim) {
+    const a = sim.elementalAbilities;
+    if (a.icePhaseT > 0) return true;
+    if (!hasElement(sim, 'ice') || !a.iceShield) return false;
+    a.iceShield = false; a.icePhaseT = ELEMENT_ABILITIES.icePhase;
+    abilityEvent(sim, 'shatter');
+    return true;
+}
+export function fireOrbBonus(sim, orb) {
+    if (!hasElement(sim, 'fire') || !orb.ignited || sim.elementalAbilities.fireBonus <= 0) return 0;
+    sim.elementalAbilities.fireBonus--;
+    return ORB_SEGMENT_GROWTH;
+}
+// Water sweeps its two neighbouring lanes. Air widens airborne reach on the
+// actual cube surface, including across seams, rather than a world-space ball.
+export function elementalPickupReach(sim, size) {
+    if (hasElement(sim, 'air') && sim.isJumping && !sim.rocketActive)
+        return collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 1);
+    if (hasElement(sim, 'water') && sim.waterMomentum >= 0.8 && !sim.isJumping) {
+        const reach = new Set([keyOf(sim.pos)]);
+        for (const side of ['left', 'right']) {
+            const tile = getNextSurfacePosition(sim.pos, turnWorm(sim.moveDir, side), size);
+            if (tile) reach.add(keyOf(tile));
+        }
+        return reach;
+    }
+    return null;
+}
+export function chainTargets(sim, size) {
+    const chosen = [], used = new Set();
+    let origin = sim.pos;
+    for (let i = 0; i < ELEMENT_ABILITIES.chainCount; i++) {
+        const near = collectManifoldRing(origin.x, origin.y, origin.z, origin.dirKey, size, i ? 2 : 3);
+        const target = sim.powerups.find(o => ripeOrb(o) && !used.has(o) && near.has(keyOf(o)));
+        if (!target) break;
+        chosen.push(target); used.add(target); origin = target;
+    }
+    return chosen;
+}
+export function tickElementalAbilities(sim, delta, size, ctx, collect) {
+    if (sim.phase !== 'crawling') return;
+    const a = sim.elementalAbilities;
+    for (const key of ['fireDashT', 'driftT', 'icePhaseT', 'lightningT', 'scanT']) a[key] = Math.max(0, a[key] - delta);
+    for (let i = a.events.length - 1; i >= 0; i--) { a.events[i].ttl -= delta; if (a.events[i].ttl <= 0) a.events.splice(i, 1); }
+    if (!hasElement(sim, 'fire')) { a.fireReady = false; a.fireDashT = 0; for (const o of sim.powerups) o.ignited = false; }
+    if (!hasElement(sim, 'ice')) { a.iceShield = false; a.driftT = 0; }
+    if (!hasElement(sim, 'air')) { a.gliding = false; a.glideLeft = 0; }
+    let changed = false;
+    for (const orb of sim.powerups) if (orb.garden?.remaining > 0) {
+        orb.garden.remaining = Math.max(0, orb.garden.remaining - delta);
+        if (orb.garden.remaining === 0) {
+            changed = true;
+            // Emberseed ripens into a small shower of the already-budgeted buds:
+            // no extra spawn or recursive rewards, and the familiar cascade FX.
+            if (orb.garden.ember) {
+                growGarden(sim, size, ctx, 2, orb);
+                orb.cascade = { kind: 'garden', origin: { x: orb.x, y: orb.y, z: orb.z, dirKey: orb.dirKey }, age: 0 };
+                abilityEvent(sim, 'fire', [orb]);
+            }
+        }
+    }
+    if (changed) ctx.onPowerupsChanged?.(sim.powerups.slice());
+    if (!hasElement(sim, 'lightning')) a.chainPending = false;
+    if (size && hasElement(sim, 'lightning') && (a.chainPending || a.lightningT === 0) && a.scanT === 0) {
+        a.scanT = 0.2;
+        const targets = chainTargets(sim, size);
+        // Discharges also act against nearby enemies and bombs on boards without food.
+        {
+            collect(sim, size, ctx, targets, 'lightning');
+            a.chainPending = false; a.lightningT = ELEMENT_ABILITIES.lightningCooldown;
+            const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 2);
+            postFusionBurst(sim, { kind: 'element-discharge', tile: { ...sim.pos }, tiles: [...reach], defuse: true, hit: 'kill' });
+        }
+    }
+}
+// Slowing only the apex preserves position and velocity on release. The finite
+// budget is measured in tile travel, so Boost cannot create an unlimited flight.
+export function airJumpAdvance(sim, tileTravel) {
+    const a = sim.elementalAbilities;
+    a.gliding = hasElement(sim, 'air') && a.jumpHeld && a.glideLeft > 0 && sim.jumpT >= 0.35 && sim.jumpT < 0.7 && !sim.rocketActive;
+    const held = a.gliding ? Math.min(tileTravel, a.glideLeft) : 0;
+    a.glideLeft -= held;
+    return (tileTravel - held * 0.75) / sim.jumpSpan;
+}
+export function elementalSpeedBonus(sim) {
+    const a = sim.elementalAbilities;
+    return hasElement(sim, 'ice') && a.driftT > 0 ? 0.25 : 0;
+}

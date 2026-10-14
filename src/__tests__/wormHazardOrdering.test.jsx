@@ -14,6 +14,8 @@ import { storyLevel } from '../worm/story/levels.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
+import { combatBridge, makeCombat, makeEnemy } from '../worm/combat/portalCombat.js';
+import { tickElementalAbilities } from '../worm/healerWorm/elementalAbilities.js';
 
 let frameCb, worm, tree;
 const scene = {};
@@ -73,10 +75,42 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  combatBridge.current = null;
   wormBuffs.elementalT = 0;
   resetLiveRotation();
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+});
+
+it.each(['story', 'combat'])('resolves Lightning discharge once before the %s hazard-scheduler return', mode => {
+  expect(storyLevel(84).rotateEvery).toBeFalsy();
+  act(() => useGameStore.setState({ wormStoryLevel: mode === 'story' ? 84 : null,
+    wormCombatMode: mode === 'combat', wormStoryStarted: true, wormPaused: false }));
+  const combat = makeCombat(3, sim.pos);
+  combat.ambient = mode === 'story';
+  const enemy = makeEnemy(combat); enemy.emerging = 0;
+  const distant = makeEnemy(combat); distant.emerging = 0;
+  distant.tile = { x: 0, y: 0, z: 0, dirKey: 'NZ' };
+  combat.enemies.push(enemy, distant); combatBridge.current = combat;
+  const { bombsRef } = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const bomb = { id: 87, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };
+  bombsRef.current.push(bomb); worm.recordStoryBomb = vi.fn();
+  sim.elementalType = 'lightning'; sim.elementalT = 10;
+  // Generate the real sim discharge, then let the mounted mode consume it.
+  tickElementalAbilities(sim, 0.01, 3, {}, vi.fn());
+  expect(sim.fusionBursts.at(-1).kind).toBe('element-discharge');
+  const coins = useGameStore.getState().parityPoints;
+  act(() => useGameStore.setState({ wormPaused: true })); tick();
+  expect(combat.kills).toBe(0); expect(bombsRef.current).toContain(bomb);
+  act(() => useGameStore.setState({ wormPaused: false })); tick();
+  expect(combat.enemies).toEqual([distant]); expect(combat.kills).toBe(1);
+  expect(bombsRef.current).not.toContain(bomb);
+  expect(sim.orbCascades).toHaveLength(1);
+  expect(worm.recordStoryBomb).toHaveBeenCalledTimes(mode === 'story' ? 1 : 0);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (mode === 'story' ? 0 : 12));
+  tick(2);
+  expect(combat.kills).toBe(1); expect(sim.orbCascades).toHaveLength(1);
+  expect(rotate).not.toHaveBeenCalled();
 });
 
 it('opens the authored WORM demo board without a scramble or countdown', () => {
@@ -456,10 +490,10 @@ it('Rainwind douses bombs in its landing burst once, while Sea Breeze leaves the
   tick(); expect(useGameStore.getState().parityPoints).toBe(coins+12);
 });
 
-it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s changes whether marked strikes harm the worm', (base,catalyst,safe) => {
+it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s protects the owner while preserving the ordered storm reaction', (base,catalyst,safe) => {
   sim.elementalPair = base; sim.elementalType = catalyst; sim.elementalT = wormBuffs.elementalT = 10;
   tick(28);
-  expect(useGameStore.getState().wormAlive).toBe(safe);
+  expect(useGameStore.getState().wormAlive).toBe(true);
   if (safe) {
     expect(checkBlastHitWorm).not.toHaveBeenCalled();
     expect(sim.staticT).toBeGreaterThan(0);
@@ -468,7 +502,7 @@ it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s chang
 
 it.each([
   ['landing', null], ['ignition', null], ['landing', 9], ['ignition', 9],
-])('Rainwind %s grants no bomb rewards after an old fatal strike (story %s)', async (reaction, level) => {
+])('Rainwind %s rewards its defuse once after an old friendly strike (story %s)', async (reaction, level) => {
   const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
   const { igniteFusion } = await import('../worm/healerWorm/fusionIgnition.js');
   worm.recordStoryBomb = vi.fn();
@@ -488,14 +522,16 @@ it.each([
   else igniteFusion(sim, 'air-water', 3);
   const coins = useGameStore.getState().parityPoints;
   expect(useGameStore.getState().wormAlive).toBe(true);
-  tick(); // runStorm kills before runFusionBurst tries the queued Rainwind defuse.
-  expect(useGameStore.getState().wormAlive).toBe(false);
+  tick(); // The previously marked bolt is still friendly after the fusion changes.
+  expect(useGameStore.getState().wormAlive).toBe(true);
   expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
-  expect(bombsRef.current).toContain(bomb);
-  expect(bomb.fuse).toBe(4);
-  expect(useGameStore.getState().parityPoints).toBe(coins);
-  expect(worm.recordStoryBomb).not.toHaveBeenCalled();
-  expect(sim.orbCascades).toHaveLength(0);
+  expect(bombsRef.current).not.toContain(bomb);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (level ? 0 : 12));
+  expect(worm.recordStoryBomb).toHaveBeenCalledTimes(level ? 1 : 0);
+  expect(sim.orbCascades).toHaveLength(1);
+  tick();
+  expect(sim.orbCascades).toHaveLength(1);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (level ? 0 : 12));
 });
 
 it('does not skip the arrival on a delayed frame or run hazards while its pause menu is open', () => {

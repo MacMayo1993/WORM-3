@@ -56,14 +56,14 @@ function PowerupOrbsImpl({ size, worm = null }) {
         let sig = wormPowerups.length + '|';
         for (const p of wormPowerups) {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
-            sig += `${p.spawnId ?? ""}:${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0};`;
+            sig += `${p.spawnId ?? ""}:${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0}:${p.garden?.remaining > 0 ? "bud" : "ripe"};`;
         }
         return sig;
     }, [wormPowerups, cubies]);
 
     const orbs = useMemo(() => {
         if (!wormPowerups || !cubies) return [];
-        return wormPowerups.map(p => {
+        return wormPowerups.filter(p => !p.garden || p.garden.remaining <= 0).map(p => {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
             const faceId = sticker?.curr ?? 0;
             // Orbs on flipped tiles hover above the surface — worm must jump to collect

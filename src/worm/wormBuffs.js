@@ -19,6 +19,7 @@ export const wormBuffs = {
   jumpRescueT: 0,
   signature: null,
   tunnelNeeds: null,
+  elementalAbilities: null,
   waterMomentum: 0,
   springReady: false,
   springCount: 0,
@@ -64,6 +65,7 @@ export function resetWormBuffs() {
   wormBuffs.jumpRescueT = 0;
   wormBuffs.signature = null;
   wormBuffs.tunnelNeeds = null;
+  wormBuffs.elementalAbilities = null;
   wormBuffs.waterMomentum = 0;
   wormBuffs.springReady = false;
   wormBuffs.springCount = 0;

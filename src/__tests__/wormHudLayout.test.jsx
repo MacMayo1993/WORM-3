@@ -5,6 +5,7 @@ import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import CaptureChrome from '../components/capture/CaptureChrome.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
+import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { feel } from '../utils/feel.js';
 vi.mock('../utils/feel.js', async original => ({ ...await original(), feel: vi.fn(), resumeFeel: vi.fn() }));
@@ -190,7 +191,7 @@ it('shows element timers and momentum in the compact chip and instructions only 
   act(() => chip.click());
   expect(useGameStore.getState().wormPaused).toBe(true);
   expect(host.querySelector('.worm-pause-card').textContent).toContain('Momentum +20%');
-  expect(host.querySelector('.worm-pause-card').textContent).toContain('turning sheds momentum');
+  expect(host.querySelector('.worm-pause-card').textContent).toContain('Turns retain 65% momentum');
   act(() => vi.advanceTimersByTime(2000));
   expect(chip.textContent).toContain('10s');
   act(() => host.querySelector('.worm-pause-resume').click());
@@ -383,4 +384,24 @@ it('lets the arrival pause and resume without releasing gameplay early', () => {
   expect(document.querySelector('.worm-countdown--arrival')).not.toBeNull();
   act(() => useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false }));
   expect(host.querySelector('.worm-instrument').hasAttribute('data-arriving')).toBe(false);
+});
+
+it('holds and releases glide through the touch Jump button and uses Fire during Boost cooldown', () => {
+  const turns = vi.fn(); setWormTurnCallback(turns);
+  wormBuffs.elementalAbilities = { fireReady: true };
+  useGameStore.setState({ wormBoostState: 'cooldown' });
+  renderPhase('crawling'); act(() => vi.advanceTimersByTime(110));
+  const jump = host.querySelector('.worm-jump');
+  act(() => jump.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(turns.mock.calls.map(([action]) => action)).toEqual(['jump-hold', 'jump']);
+  act(() => jump.dispatchEvent(new Event('pointerup', { bubbles: true })));
+  expect(turns).toHaveBeenLastCalledWith('jump-release');
+  act(() => jump.dispatchEvent(new Event('pointercancel', { bubbles: true })));
+  expect(turns).toHaveBeenLastCalledWith('jump-release');
+  const boost = host.querySelector('[aria-label="Boost"]');
+  expect(boost.textContent).toContain('Flame dash');
+  expect(boost.getAttribute('aria-disabled')).toBe('false');
+  act(() => boost.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(turns).toHaveBeenLastCalledWith('boost');
+  wormBuffs.elementalAbilities = null; setWormTurnCallback(null);
 });
