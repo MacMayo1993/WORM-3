@@ -344,7 +344,7 @@ function travelUntil(done) {
   expect(state().wormAlive, JSON.stringify(state().wormDeathDetails)).toBe(true);
   expect(done(), state().wormStoryProgress).toBeTruthy();
 }
-it.each([2, 5, 6])('can collect the resources and heal every authored pair for level %i through real movement', id => {
+it.each([2, 5, 6])('can reach the healing target for level %i through real movement', id => {
   begin(id);
   // Scheduler assertions live in wormHazardOrdering; this exercises the actual
   // routes, deposits, transit and replenishing supply without substituting heal calls.
@@ -361,7 +361,9 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
     seek(mouth, () => state().wormTunnelCount > before);
     travelUntil(() => state().wormHealedCount >= pair + 1);
   }
-  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(0);
+  // Healing levels retain the spare choice through the final required heal.
+  // Replenishment now stops; the remaining physical pair can be cleared.
+  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(id === 2 ? 0 : 1);
   if (id === 2) {
     // Healing can spend food before the peak-length target. Claim the clear.
     if (!state().wormStoryResult) {

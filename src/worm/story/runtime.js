@@ -229,6 +229,7 @@ export function stageStory(sim, size, level, character) {
   // so heals can chain (see replenishStoryTunnel).
   const chainHeals = !!level.mechanics?.multiHeals;
   const practice = { ...base, pendingMouths, retryMouths: mouthKeys.slice(0, 2), tunnelGoals, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
+    healTarget: ['collector', 'restore', 'mastery'].includes(level.kind) ? level.target : null,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set(),
@@ -285,6 +286,15 @@ export function replenishStoryOrbs(sim, practice, state, size, delta) {
   return added;
 }
 
+// Queued mouths supply repair/chain goals; they are not holes in the cube yet.
+// Once that work is earned, do not require extra repairs just because an unused
+// mouth is waiting under food or the body. Traversal levels still need their
+// distinct pairs, and already-open pairs still count until actually healed.
+function storyRepairSupplyComplete(sim, practice) {
+  return practice.healTarget != null && sim.healed >= practice.healTarget &&
+    Object.entries(practice.tunnelGoals ?? {}).every(([key, target]) => (practice.mechanics[key] ?? 0) >= target);
+}
+
 export function storyMetrics(sim, practice, level, state, activeTunnels, delta) {
   practice.elapsed += Math.min(Math.max(delta, 0), 0.1);
   const cutting = sim.cutFocusT > 0;
@@ -311,7 +321,8 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
       (Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target) ? activeTunnels[0] : null))?.tunnel.entry ?? null : null,
     bodyJumps: practice.bodyJumps, landed: !sim.isJumping && sim.phase === 'crawling',
     rotations: state.rotationEpoch - practice.rotationEpoch,
-    rotationSettled: !state.animState && !liveRotation.active, remaining: activeTunnels.length + (practice.pendingMouths?.length ?? 0),
+    rotationSettled: !state.animState && !liveRotation.active,
+    remaining: activeTunnels.length + (storyRepairSupplyComplete(sim, practice) ? 0 : (practice.pendingMouths?.length ?? 0)),
   };
 }
 
@@ -331,6 +342,10 @@ export function storyTunnelPassagesBlock(sim, practice) {
 }
 
 export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
+  if (storyRepairSupplyComplete(sim, practice)) {
+    if (practice.pendingMouths?.length) practice.pendingMouths.length = 0;
+    return null;
+  }
   if (!sim.alive || state.wormPaused || sim.phase !== 'crawling' || storyTunnelPassagesBlock(sim, practice) ||
       sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.jumpRescueHeld || sim.elementalFocusT > 0 ||
       state.animState || liveRotation.active || activeCount >= 2) return null;
@@ -342,20 +357,46 @@ export function replenishStoryTunnel(sim, practice, state, size, activeCount = g
       Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target)) {
     practice.pendingMouths = [...(practice.retryMouths ?? [])];
   }
-  if (!practice.pendingMouths?.length) return null;
+  // Healing goals need a renewable supply, including the last required heal.
+  // Keep two choices available instead of draining the finite authored queue.
+  const needsHealing = (practice.healTarget != null && sim.healed < practice.healTarget) ||
+    ['ringHeals', 'multiHeals'].some(key => (practice.mechanics[key] ?? 0) < (practice.tunnelGoals?.[key] ?? 0));
+  if (!practice.pendingMouths?.length && !needsHealing) return null;
+  if (!practice.pendingMouths?.length && activeCount === 0 && sim.tunnelPassages.length) return null;
   const map = buildManifoldGridMap(state.cubies, size);
   const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
   occupied.add(tileKey(sim.pos));
   if (sim.prevTile) occupied.add(tileKey(sim.prevTile));
   for (let i=0; i<Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail,i));
-  for (let i=0; i<practice.pendingMouths.length; i++) {
+  const openPair = pos => {
+    if (!pos || occupied.has(tileKey(pos))) return null;
+    const sticker = state.cubies[pos.x][pos.y][pos.z].stickers[pos.dirKey];
+    const twin = findAntipodalStickerByGrid(map, sticker, size);
+    if (sticker.curr !== sticker.orig || !twin || twin.sticker.curr !== twin.sticker.orig ||
+        occupied.has(tileKey(twin))) return null;
+    const key = [tileKey(pos), tileKey(twin)].sort().join('|');
+    // Never reuse a collapsing route, or one still retained by a healing tail.
+    if (sim.voidTunnelKeys.has(key) || sim.ringHealedTunnelKeys.has(key) ||
+        sim.tunnelPassages.some(p => p.tunnelKey === key || p.heal?.tunnelKey === key)) return null;
+    return flipStickerPair(state.cubies,size,pos.x,pos.y,pos.z,pos.dirKey,map);
+  };
+  for (let i=0; i<(practice.pendingMouths?.length ?? 0); i++) {
     const pos = findStickerByStableKey(state.cubies,size,practice.pendingMouths[i],map);
-    if (!pos || occupied.has(tileKey(pos))) continue;
-    const cubies = flipStickerPair(state.cubies,size,pos.x,pos.y,pos.z,pos.dirKey,map);
-    const pair = getActiveTunnels(cubies,size).find(t => tileKey(t.entry) === tileKey(pos) || tileKey(t.exit) === tileKey(pos));
-    if (!pair || occupied.has(tileKey(pair.entry)) || occupied.has(tileKey(pair.exit))) continue;
+    const cubies = openPair(pos);
+    if (!cubies) continue;
     practice.pendingMouths.splice(i,1);
     return cubies;
+  }
+  if (needsHealing) {
+    // A queued mouth can be covered by food or a long body indefinitely. Use a
+    // safe pair elsewhere, consuming that queue slot so it adds no hidden debt.
+    const retry = (practice.retryMouths ?? []).map(key => findStickerByStableKey(state.cubies, size, key, map));
+    for (const pos of [...retry, ...getAllSurfaceTiles(size)]) {
+      const cubies = openPair(pos);
+      if (!cubies) continue;
+      practice.pendingMouths?.shift();
+      return cubies;
+    }
   }
   return null;
 }

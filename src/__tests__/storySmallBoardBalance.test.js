@@ -46,6 +46,7 @@ function exhausted(id) {
     for (const mouth of [pair.entry, pair.exit]) {
       state.cubies = healSticker(state.cubies, size, mouth.x, mouth.y, mouth.z, mouth.dirKey);
     }
+    sim.healed++;
   };
   const refill = () => {
     const next = replenishStoryTunnel(sim, p, state, size);
@@ -54,6 +55,9 @@ function exhausted(id) {
   };
   // Miss every chain. Exhaust all authored pairs without firing the final refill.
   for (let i = 0; i < level.target; i++) { seal(); if (i + 1 < level.target) refill(); }
+  // Renewable healing supply leaves a spare pair; clear it without another
+  // refill to exercise the empty-network retry and completion paths below.
+  while (getActiveTunnels(state.cubies, size).length) seal();
   expect(getActiveTunnels(state.cubies, size)).toHaveLength(0);
   expect(p.pendingMouths).toHaveLength(0);
   return { level, size, sim, p, state, seal, refill };
@@ -89,7 +93,7 @@ it.each(['tail', 'pause', 'rotation', 'animation', 'heal', 'cut', 'rescue', 'rev
     expect(p.pendingMouths).toHaveLength(0);
   });
 
-it('follows rotated retry mouths and waits for pickups at both endpoints', () => {
+it('follows rotated retry mouths and uses another pair when their twins hold pickups', () => {
   const { p, sim, state, size, refill } = exhausted(54);
   state.cubies = rotateSliceCubies(state.cubies, size, 'row', 1, 1);
   // The turned row carries a mouth's twin onto the start tile; a worm standing
@@ -101,10 +105,14 @@ it('follows rotated retry mouths and waits for pickups at both endpoints', () =>
     const mouth = findStickerByStableKey(state.cubies, size, key, map);
     return findAntipodalStickerByGrid(map, state.cubies[mouth.x][mouth.y][mouth.z].stickers[mouth.dirKey], size);
   });
-  expect(refill()).toBeNull();
-  expect(p.pendingMouths).toHaveLength(2);
+  const blocked = new Set(sim.powerups.map(t => `${t.x},${t.y},${t.z},${t.dirKey}`));
+  expect(refill()).not.toBeNull();
+  for (const pair of getActiveTunnels(state.cubies, size)) for (const t of [pair.entry, pair.exit]) {
+    expect(blocked.has(`${t.x},${t.y},${t.z},${t.dirKey}`)).toBe(false);
+  }
+  expect(p.pendingMouths).toHaveLength(1);
   sim.powerups = [];
-  expect(refill()).not.toBeNull(); expect(refill()).not.toBeNull();
+  expect(refill()).not.toBeNull();
   expect(getActiveTunnels(state.cubies, size)).toHaveLength(2);
 });
 
