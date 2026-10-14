@@ -26,7 +26,7 @@ import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { coreZoomLimit, CORE_HALF } from '../3d/antipodalCore.js';
-import { tunnelPathArcPointInto, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
+import { tunnelPathArcPointInto, tunnelTraversalT, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
@@ -103,7 +103,11 @@ describe('tunnel camera phase transitions', () => {
     }
   });
 
-  it('uses the exit aperture before moving sideways on every face', () => {
+  // The exit used to blend the lens out ahead of the worm, flying it through
+  // the head halfway up the arm. It now trails the head all the way to the mouth
+  // (windout then cuts outside), keeping the worm ahead of it and in view.
+  it('follows the head up the exit arm without ever reaching it, on every face', () => {
+    const head = new THREE.Vector3(), ahead = new THREE.Vector3(), toHead = new THREE.Vector3();
     for (const size of [3, 5, 15]) {
       const m = Math.floor(size / 2), n = size - 1;
       const tile = key => ({
@@ -114,26 +118,20 @@ describe('tunnel camera phase transitions', () => {
       for (const key of Object.keys(FACE_NORMALS)) {
         const opposite = (key[0] === 'P' ? 'N' : 'P') + key[1];
         const tunnel = { entry: tile(opposite), exit: tile(key) };
-        const exit = getTunnelWorldPosInto(new THREE.Vector3(), tunnel, 1, size);
-        const normal = FACE_NORMALS[key];
         const pose = makeTunnelCamPose();
-        let checkedMouth = false;
         let previous = null;
         for (let i = 0; i <= 1000; i++) {
-          tunnelExitPoseInto(pose, tunnel, i / 1000, size);
+          const p = i / 1000;
+          tunnelExitPoseInto(pose, tunnel, p, size);
           expect([...pose.cam, ...pose.look, ...pose.up].every(Number.isFinite)).toBe(true);
-          expect(pose.look.distanceTo(pose.cam)).toBeGreaterThan(.01);
-          if (previous) expect(pose.cam.distanceTo(previous)).toBeLessThan(0.15);
+          if (previous) expect(pose.cam.distanceTo(previous)).toBeLessThan(0.05);
           previous = pose.cam.clone();
-          const delta = pose.cam.clone().sub(exit);
-          const height = delta.dot(normal);
-          if (Math.abs(height) < 0.1) {
-            checkedMouth = true;
-            expect(delta.addScaledVector(normal, -height).length()).toBeLessThan(0.08);
-          }
+          getTunnelWorldPosInto(head, tunnel, tunnelTraversalT('exiting', p), size);
+          toHead.subVectors(head, pose.cam);
+          expect(toHead.length()).toBeGreaterThan(0.5);
+          ahead.subVectors(pose.look, pose.cam).normalize();
+          expect(ahead.angleTo(toHead)).toBeLessThan(THREE.MathUtils.degToRad(35));
         }
-        expect(checkedMouth).toBe(true);
-        expect(tunnelCameraInside(pose.cam, size, 'exiting')).toBe(false);
       }
     }
   });

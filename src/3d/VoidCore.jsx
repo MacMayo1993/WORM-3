@@ -36,6 +36,7 @@ import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
 import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
+import { mirrorSubjects, warmMirrorPrograms } from './mirrorSubjects.js';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from './coreMirrorRoom.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
@@ -343,10 +344,13 @@ function VoidCore({ cubieRefs = null }) {
         probeWarmed.current = warmKey;
         mirrors.group.visible = true;
         gl.compile?.(mirrors.group, camera, scene);
+        // The capture draws into a render target, a program variant of its own.
+        warmMirrorPrograms(gl, scene, [...mirrorSubjects(), mirrors.group]);
         probe.capture(gl, scene, mirrors);
         mirrors.group.visible = false;
       } else if (mirrors.group.visible) {
-        probe.capture(gl, scene, mirrors, { delta: rawDt, interval: state.perfReducedFX ? 1 / 20 : 1 / 30 });
+        const light = isMobile || state.perfReducedFX;
+        probe.capture(gl, scene, mirrors, { delta: rawDt, interval: light ? 1 / 20 : 1 / 30, faces: light ? 2 : 3 });
       }
     }
     // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.

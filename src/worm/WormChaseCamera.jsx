@@ -46,6 +46,8 @@ import {
 } from './healerWorm/constants.js';
 import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
+import { getStickerWorldPos as tileWorldPos } from '../game/coordinates.js';
+import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { getTunnelWorldPosInto, padCoilHeadingInto } from './wormLogic.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -111,6 +113,11 @@ export function aimCamera(camera, eye, look, upHint, alpha) {
 }
 
 const FACE_TRANS_DURATION = 0.25;
+// Which axis a surface point or face normal lies along (0 x, 1 y, 2 z).
+const dominantAxis = v => {
+  const x = Math.abs(v.x), y = Math.abs(v.y), z = Math.abs(v.z);
+  return x >= y && x >= z ? 0 : y >= z ? 1 : 2;
+};
 // Victory flourish: radians/sec the camera orbits the solved cube (~10s per revolution).
 const SOLVED_ORBIT_SPEED = 0.6;
 const _entryTileCenter = new THREE.Vector3();
@@ -191,6 +198,13 @@ export function frameSurfaceCamera(camera, portraitFactor, head = null, anchorY 
 }
 
 const _desktopAim = new THREE.Vector3();
+// Windout's shot: the chase crawling resumes from, at the tile the head lands on.
+const _windoutHeadEnd = new THREE.Vector3();
+const _windoutCam = new THREE.Vector3();
+const _windoutLook = new THREE.Vector3();
+const _handoffQuat = new THREE.Quaternion();
+// Seconds the lens takes to glide from a tunnel's exit shot onto the chase.
+const TUNNEL_HANDOFF_GLIDE = 1;
 
 export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const { camera, gl, size: viewportSize } = useThree();
@@ -214,6 +228,8 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const sliceFreezeTRef = useRef(0);          // elapsed settle time of that freeze
     const phaseStartPose = useRef(makeTunnelCamPose());
     const phaseStartVel = useRef(new THREE.Vector3());    // lens velocity when the phase began
+    const lastLens = useRef({ cam: new THREE.Vector3(), quat: new THREE.Quaternion() }); // the lens last frame
+    const handoff = useRef({ t: 0, cam: new THREE.Vector3(), quat: new THREE.Quaternion() }); // exit shot → chase
     const camVelRef = useRef(new THREE.Vector3());
     const lastCamPosRef = useRef(new THREE.Vector3());
     const lastCamDeltaRef = useRef(0);
@@ -679,6 +695,13 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
 
             if (worm.prevWorldPos.current && worm.curWorldPos.current) {
                 _rawForward.subVectors(worm.curWorldPos.current, worm.prevWorldPos.current);
+                // Along the face: a step down off a raised pad (every tunnel exit)
+                // tilted the heading into the face, pushed the chase out from the
+                // cube while it lasted, then snapped it back in on touchdown. A
+                // step over a cube edge keeps its diagonal, as the edge swing expects.
+                if (dominantAxis(worm.prevWorldPos.current) === dominantAxis(_rawNormal)) {
+                    _rawForward.addScaledVector(_rawNormal, -_rawForward.dot(_rawNormal));
+                }
                 if (_rawForward.lengthSq() < 0.0001) {
                     const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
                     _rawForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
@@ -827,6 +850,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             // over ~0.7s instead of yanking it, so the worm doesn't pop straight to gameplay.
             if (prevPhaseRef.current !== 'crawling') {
                 postTunnelEaseRef.current = 0.7;
+                // Only out of a windout: its shot is the lens the player last saw.
+                handoff.current.t = prevPhaseRef.current === 'windout' ? TUNNEL_HANDOFF_GLIDE : 0;
+                handoff.current.cam.copy(lastLens.current.cam);
+                handoff.current.quat.copy(lastLens.current.quat);
             }
             let crawlK = CAM_LERP;
             if (postTunnelEaseRef.current > 0) {
@@ -868,6 +895,19 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                     lookAtRef.current.copy(camera.position).addScaledVector(platformFrame.current.direction,
                         camera.position.distanceTo(_mobileHeadWorld));
                 }
+            }
+            // Back from a tunnel: glide from the exit shot onto the chase, so
+            // nothing the chase adds on its first frames (its board framing, the
+            // pad shot) can jump the view.
+            if (handoff.current.t > 0) {
+                handoff.current.t = Math.max(0, handoff.current.t - delta);
+                const w = diveEase(1 - handoff.current.t / TUNNEL_HANDOFF_GLIDE);
+                camera.position.lerpVectors(handoff.current.cam, camera.position, w);
+                _handoffQuat.copy(camera.quaternion);
+                camera.quaternion.slerpQuaternions(handoff.current.quat, _handoffQuat, w);
+                camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+                // Phones keep the head centred on every frame.
+                if (mobile && !cutBeat) frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
             }
             // Rocket rumble: a kick at ignition, a faint engine buzz, a thump at
             // touchdown. Applied last and never fed back into camPosRef, so the chase
@@ -928,34 +968,46 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             applyTunnelPose(_rails, 1 - Math.exp(-10 * delta));
         } else if (phase === 'windout') {
             const tunnel = worm.activeTunnel.current;
-            const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
             tunnelState.active = true;
             tunnelState.t = 1;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
             tunnelState.tunnel = tunnel;
-            const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
-            const fwd = DIR_FORWARD[tunnel.exit.dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
-            _camForward.fromArray(fwd);
-            _rails.cam.copy(worm.headInterpPos.current)
+            // A pipe exit: the lens followed the head up the exit arm, and cuts here
+            // to the chase position crawling resumes from, watching the worm pop
+            // out of the hole (TunnelTransitOverlay marks the cut). Flying out
+            // instead meant climbing past the worm in the mouth, losing it from the
+            // shot and swinging half a turn.
+            const exit = tunnel.exit;
+            const extN = FACE_NORMALS[exit.dirKey] ?? FACE_NORMALS.PY;
+            // Where the sim puts the head when windout ends (wormSim.js).
+            if (tunnel.padHeight > 0) {
+                _windoutHeadEnd.fromArray(tileWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, tunnel.padExpansion))
+                    .addScaledVector(extN, WORM_PAD_HEIGHT);
+            } else _windoutHeadEnd.copy(worm.curWorldPos.current ?? worm.headInterpPos.current);
+            _camForward.fromArray(DIR_FORWARD[exit.dirKey]?.[worm.moveDir.current] ?? [0, 1, 0]);
+            _windoutCam.copy(_windoutHeadEnd)
                 .addScaledVector(extN, camHeight + rakeLift)
                 .addScaledVector(_camForward, -camBack * rakeTuck);
-            _rails.look.copy(worm.headInterpPos.current).addScaledVector(_camForward, rakeAhead)
-                .multiplyScalar(1 - CAM_CENTER_BIAS);
-            if (mobile) _rails.look.copy(_mobileHeadWorld);
-            _rails.up.copy(horizonMode === 'face' ? extN : _WORLD_UP);
-            if (horizonMode !== 'face' && extN.y < -0.8) _rails.up.negate();
-            // Start at the actual exit pose; the existing post-tunnel crawl
-            // easing completes the camera move after control has returned.
-            blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
-                diveEase(tp * tunnelHandoffSeconds(tunnel) / 0.7));
-            applyTunnelPose(transitionPose.current);
-            if (mobile) {
-                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
-                lookAtRef.current.copy(_mobileHeadWorld);
-                camUpRef.current.copy(camera.up);
-            }
+            _windoutLook.copy(_windoutHeadEnd).addScaledVector(_camForward, rakeAhead);
+            // Phones keep the live head centred, as everywhere else.
+            if (mobile) _windoutLook.copy(_mobileHeadWorld);
+            else _windoutLook.multiplyScalar(1 - CAM_CENTER_BIAS);
+            _camUp.copy(horizonMode === 'face' ? extN : _WORLD_UP);
+            if (horizonMode !== 'face' && extN.y < -0.8) _camUp.negate();
+            camera.position.copy(_windoutCam);
+            aimCamera(camera, _windoutCam, _windoutLook, _camUp, 1);
+            // Aimed at the hole the worm pops out of (the live head on phones, as
+            // ever); crawling's hand-back then glides onto the board framing.
+            frameSurfaceCamera(camera, portraitFactor, mobile ? _mobileHeadWorld : _windoutHeadEnd);
+            camPosRef.current.copy(_windoutCam);
+            lookAtRef.current.copy(_windoutLook);
+            camUpRef.current.copy(camera.up);
         }
 
+        // What the lens actually showed this frame: crawling's return from a
+        // tunnel blends from it, whatever the chase computes on its first frames.
+        lastLens.current.cam.copy(camera.position);
+        lastLens.current.quat.copy(camera.quaternion);
         prevPhaseRef.current = phase;
     }, -0.25); // After simulation (-0.5), before body/effects (0); retain automatic rendering.
 

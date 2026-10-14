@@ -24,6 +24,20 @@ That config is the deploy config, unminified (so profiles keep function names) w
 
 ## Modes
 
+### Tunnel ride camera trace
+
+```bash
+CHROMIUM=/path/to/chrome node scripts/perf-worm/ride-camera.mjs --size=5 [--attrib] [--mobile] [--raw=frames.json] \
+  [--shots=dir --shot-list=windout:0.02,windout:0.6] [--profile=4000] [--longtasks]
+```
+
+Starts a real raised-pad ride once the run is live (so the scramble's own warm-up is not counted) and records every frame
+of it: sim phase and progress, the lens pose, the head, the frame's CPU cost and shader links. Per phase it prints the
+largest per-frame lens move and turn, how far the head strays from the view axis, the worst frame and the links;
+`--attrib` names each link's owner and logs every `renderer.compile` over 5 ms with its caller; `--shots` freezes the ride
+at each `phase:progress` and films it with real draws (slow: the clock keeps running while SwiftShader renders, so a
+shot of a short phase can land later than its label); `--profile` takes a CPU profile of the crawl after the ride.
+
 ### Tunnel camera clearance regression
 
 ```bash

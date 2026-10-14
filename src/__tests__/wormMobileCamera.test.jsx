@@ -556,3 +556,65 @@ it.each(['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'])('frames the arrival face-first out
   useGameStore.setState({ wormGamePhase: 'active' }); tick();
   expect(scene.camera.position.distanceTo(settled)).toBeLessThan(0.2);
 });
+
+// The exit used to fly the lens out of the mouth ahead of the worm (through its
+// head), park it looking back at the hole, swing it half a turn in windout and
+// snap it again on the first crawling frame. Now the lens trails the head up the
+// arm, cuts once as windout starts to the chase crawling resumes from, and the
+// hand-back is still.
+it.each([3, 5, 15])('leaves a raised wormhole with one cut onto the chase it resumes on a %s cube', size => {
+  for (const mobile of [true, false]) {
+    scene.mobile = mobile;
+    const worm = makeWorm(size, 'PY');
+    const tunnel = { entry: tileOnFace(size, 'PY'), exit: tileOnFace(size, 'NY'),
+      padExpansion: wormRaisedAmount(size), padHeight: WORM_PAD_HEIGHT };
+    render(worm, size, `exit-${mobile}`); tick();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    worm.activeTunnel.current = tunnel;
+    const lens = () => ({ cam: scene.camera.position.clone(), quat: scene.camera.quaternion.clone() });
+    const step = (a, b) => ({ move: a.cam.distanceTo(b.cam), turn: a.quat.angleTo(b.quat) * 180 / Math.PI });
+    worm.phase.current = 'exiting';
+    let previous = null;
+    const armFrames = Math.round(tunnelArmSeconds(tunnel) * 60);
+    let speed = null;
+    for (let frame = 0; frame <= armFrames; frame++) {
+      worm.tunnelProgress.current = frame / armFrames;
+      getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT('exiting', frame / armFrames), size);
+      tick();
+      const now = lens();
+      // The lens keeps pace with the head (fast on a long 15×15 arm), smoothly.
+      if (previous && frame > 1) {
+        const { move } = step(previous, now);
+        if (speed !== null) expect(Math.abs(move - speed)).toBeLessThan(0.03);
+        speed = move;
+      }
+      previous = now;
+    }
+    worm.phase.current = 'windout';
+    worm.currentNormal.current.copy(FACE_NORMALS.NY);
+    const shots = [], windFrames = Math.round(tunnelHandoffSeconds(tunnel) * 60);
+    for (let frame = 0; frame <= windFrames; frame++) {
+      worm.tunnelProgress.current = frame / windFrames;
+      getWindWorldPosInto(worm.headInterpPos.current, tunnel, 'exit', frame / windFrames, size);
+      tick();
+      shots.push(lens());
+    }
+    // One cut, then a held shot: it only tilts as the lens relaxes from the
+    // tunnel's wide angle (and phones re-centre on the coiling head).
+    for (let i = 1; i < shots.length; i++) {
+      const { move, turn } = step(shots[i - 1], shots[i]);
+      expect(move).toBeLessThan(1e-6);
+      if (!mobile) expect(turn).toBeLessThan(0.2);
+    }
+    worm.phase.current = 'crawling';
+    worm.pos.current = tunnel.exit;
+    previous = shots.at(-1);
+    for (let frame = 0; frame < 60; frame++) {
+      tick();
+      const now = lens(), { move, turn } = step(previous, now);
+      expect(move).toBeLessThan(0.05);
+      expect(turn).toBeLessThan(1.5);
+      previous = now;
+    }
+  }
+});
