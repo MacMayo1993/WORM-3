@@ -114,19 +114,22 @@ export default function WormSwipeControls({ onTurn, worm }) {
             if (e.key === ' ') {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                onTurn('jump');
+                if (!e.repeat) onTurn('jump-hold');
+                const airActive = worm.elementalT?.current > 0 && (worm.elementalType?.current === 'air' || worm.elementalPair?.current === 'air');
+                if (!e.repeat || !airActive) onTurn('jump');
             }
         };
         const stopFire = () => { cancelFire(); firing = false; onTurn('fire-stop'); };
+        const releaseControls = () => { onTurn('jump-release'); stopFire(); };
         const onTouchMove = e => {
             const t = e.touches[0], origin = touchStart.current;
             if (e.touches.length !== 1 || (origin && t && Math.hypot(t.clientX - origin.x, t.clientY - origin.y) > 12)) cancelFire();
         };
-        const cancelTouch = () => { touchStart.current = null; stopFire(); };
-        const onKeyUp = e => { if (e.key.toLowerCase() === 'f') stopFire(); };
+        const cancelTouch = () => { touchStart.current = null; releaseControls(); };
+        const onKeyUp = e => { if (e.key === ' ') onTurn('jump-release'); if (e.key.toLowerCase() === 'f') stopFire(); };
         const unsubscribeCapture = useGameStore.subscribe(s => s.captureMode, cancelTouch);
         window.addEventListener('keyup', onKeyUp);
-        window.addEventListener('blur', stopFire);
+        window.addEventListener('blur', releaseControls);
         window.addEventListener('touchmove', onTouchMove, { passive: true });
         window.addEventListener('touchcancel', cancelTouch);
         window.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -134,16 +137,16 @@ export default function WormSwipeControls({ onTurn, worm }) {
         window.addEventListener('keydown', onKey, { capture: true });
         return () => {
             unsubscribeCapture();
-            stopFire();
+            releaseControls();
             window.removeEventListener('keyup', onKeyUp);
-            window.removeEventListener('blur', stopFire);
+            window.removeEventListener('blur', releaseControls);
             window.removeEventListener('touchmove', onTouchMove);
             window.removeEventListener('touchcancel', cancelTouch);
             window.removeEventListener('touchstart', onTouchStart);
             window.removeEventListener('touchend', onTouchEnd);
             window.removeEventListener('keydown', onKey, { capture: true });
         };
-    }, [onTurn, emitDirection, wormControlMode]);
+    }, [onTurn, emitDirection, wormControlMode, worm]);
 
     return null;
 }

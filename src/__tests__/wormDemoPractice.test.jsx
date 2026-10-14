@@ -292,12 +292,8 @@ it.each(['rocket', 'magnet', 'water', 'fire', 'lightning'])('stages and complete
 it('teaches ice jumping and a real nature spring consumption', () => {
   lesson('ice'); until(() => state().wormElementalTheme === 'ice'); frames(35); input('jump'); until(() => state().demoWormComplete);
   lesson('grass'); until(() => state().wormElementalTheme === 'grass'); frames(35);
-  input('jump'); until(() => worm.isJumping.current);
-  expect(state().demoWormComplete).toBe(false);
-  until(() => !worm.isJumping.current);
-  expect(worm.elementalPatches.current.size).toBeGreaterThan(0);
-  expect(state().demoWormComplete).toBe(false);
-  input('jump'); until(() => state().demoWormComplete); expect(worm.jumpSpan.current).toBeGreaterThan(2);
+  input('jump'); until(() => state().demoWormComplete);
+  expect(worm.jumpSpan.current).toBeGreaterThan(2); // Earth now grants a spring immediately on pickup.
 });
 it('teaches the real Light Trail and waits until it paints behind the tail', () => {
   input('signature'); frames(3); expect(worm.signature.current.seq).toBe(0);

@@ -664,6 +664,7 @@ export function useWormCrawler(size, cubies) {
         // per-frame refresh costs nothing and freezes whenever the sim does.
         wormBuffs.tunnelNeeds = tunnelReadout(sim, sizeRef.current, ctxRef.current);
         wormBuffs.signature = sim.alive ? signatureReadout(sim, sizeRef.current, ctxRef.current) : null;
+        wormBuffs.elementalAbilities = sim.alive ? sim.elementalAbilities : null;
         wormBuffs.waterMomentum = sim.waterMomentum;
         const tile = sim.pos;
         wormBuffs.springReady = !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead
@@ -696,6 +697,7 @@ export function useWormCrawler(size, cubies) {
             }
             return;
         }
+        if (dir === 'jump-release') { queueTurnSim(sim, dir); return; }
         if (dir === 'fire-stop') { if (c) c.fireHeld = false; return; }
         if (state.wormPaused || !sim.alive) return;
         // Watch-only lessons use the real simulation while withholding player
@@ -863,6 +865,8 @@ export function useWormCrawler(size, cubies) {
             rewardBombDisarm: tile => queueOrbCascade(simRef.current, 'bomb', tile),
             signature: f('signature'),
             elementalPatches: f('elementalPatches'),
+            elementalAbilities: f('elementalAbilities'),
+            timeAlive: f('timeAlive'),
             pos: f('pos'),
             moveDir: f('moveDir'),
             phase: f('phase'),

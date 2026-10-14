@@ -498,8 +498,8 @@ describe('fusion ignition', () => {
     expect(steamTiles(steam).size).toBe(lastBurst(steam).tiles.length);
     expect(lastBurst(steam).tiles.length).toBeGreaterThan(9);
     const bloom = sizedFuse('water', 'grass').sim;
-    expect([...bloom.elementalPatches.values()].filter(p => p.type === 'grass')).toHaveLength(8);
-    expect(at(bloom)).toBeUndefined();
+    expect([...bloom.elementalPatches.values()].filter(p => p.type === 'grass')).toHaveLength(9);
+    expect(at(bloom)).toMatchObject({ type: 'grass' }); // Earth now grants an immediately usable launch.
     const ember = sizedFuse('grass', 'fire').sim;
     expect([...ember.elementalPatches.values()].filter(p => p.ember)).toHaveLength(4);
   });

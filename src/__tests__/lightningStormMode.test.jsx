@@ -126,11 +126,10 @@ describe('the lightning storm in the mode', () => {
     expect(storm.flashes).toHaveLength(1);
   });
 
-  it('kills a head under the bolt', () => {
+  it('protects its owner even when the head moves under a marked bolt', () => {
     mark(head());
     tick(1, 0.1);
-    expect(useGameStore.getState().wormAlive).toBe(false);
-    expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'lightning' });
+    expect(useGameStore.getState().wormAlive).toBe(true);
     expect(worm.strikeTile).not.toHaveBeenCalled();
   });
 
@@ -141,14 +140,15 @@ describe('the lightning storm in the mode', () => {
     expect(useGameStore.getState().wormAlive).toBe(true);
   });
 
-  it('cuts the tail off where the bolt lands on the body', () => {
+  it('preserves the entire tail when a marked bolt lands on the body', () => {
     sim.pos = { x: 1, y: 1, z: 2, dirKey: 'PZ' };
     sim.tailLength = 60;
     ttReset(sim.tileTrail, '1,1,2,PZ'); ttPush(sim.tileTrail, '0,1,2,PZ'); ttPush(sim.tileTrail, '0,0,2,PZ');
     mark({ x: 0, y: 1, z: 2, dirKey: 'PZ' });
     tick(1, 0.1);
     expect(useGameStore.getState().wormAlive).toBe(true);
-    expect(worm.cutFocusT.current).toBeGreaterThan(0);
+    expect(worm.cutFocusT.current).toBe(0);
+    expect(sim.tailLength).toBe(60);
     expect(worm.strikeTile).not.toHaveBeenCalled();
   });
 

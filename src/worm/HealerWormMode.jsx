@@ -1,3 +1,4 @@
+import { ElementalAbilityEffects } from './healerWorm/ElementalAbilityEffects.jsx';
 import { StoryArrival } from './healerWorm/StoryArrival.jsx';
 import { STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS, storyArrivalPose } from './healerWorm/storyArrival.js';
 import { prefersReducedMotion } from '../utils/device.js';
@@ -281,7 +282,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 for (const orb of worm.specials.current) avoid.add(tileKeyOf(orb));
                 for (const bomb of bombsRef.current) avoid.add(tileKeyOf(bomb.tile));
                 for (const spot of storm.spots) avoid.add(tileKeyOf(spot.tile));
-                const spareBody = fusion === 'conductor' || fusion === 'plasma';
+                const spareBody = true;
                 if (spareBody) for (const k of body) if (k) avoid.add(k);
                 if (fusion === 'plasma') for (const [k, patch] of patches) if (patch.type === 'fire') avoid.add(k);
                 let pads = null;
@@ -339,20 +340,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 hit = null; spared = true;
                 worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL });
             }
-            if (hit) {
-                const histEntry = hit.type === 'cut' ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE) : null;
-                const hitPos = histEntry ? histEntry.pos.toArray() : worm.headInterpPos.current.toArray();
-                thunkRef.current = { active: true, pos: hitPos, kind: hit.type === 'death' ? 'struck' : 'struck-cut' };
-                if (hit.type === 'death') {
-                    deathThunkFiredRef.current = true;
-                    worm.killWorm({ reason: 'lightning' });
-                } else {
-                    severAndScatter(hit.cutTrailIdx, hitPos);
-                    worm.cutFocusT.current = CUT_FOCUS_DURATION;
-                    worm.cutFocusPos.current = hitPos;
-                    worm.cutFocusSlice.current = null;
-                }
-            }
+            // The storm belongs to the pickup owner. Never cut or kill that worm,
+            // including a mark that lands after the elemental timer runs out.
+            if (hit) { hit = null; spared = true; worm.feel('boost'); }
             if (combatBridge.current) strikeEnemies(combatBridge.current, reach);
             // Firestorm: the strike ignites a cross of fire two tiles each way (a firebreak
             // that speeds fuses, like the trail), and enemies inside it burn.
@@ -404,7 +394,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // A bomb put out by a fusion (Current's arc): the same reward and credit as a disarm.
     const putOutBomb = (bomb, store) => {
-        // A telegraphed storm strike may have killed the worm earlier this frame.
+        // Another hazard may have killed the worm earlier this frame.
         // Recheck the live store before removing bombs or granting any rewards.
         if (!useGameStore.getState().wormAlive) return;
         const index = bombsRef.current.indexOf(bomb);
@@ -432,7 +422,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const resolveFusionBurst = burst => {
         // A fusion's ignition (fusionIgnition.js): its ground is already laid in the sim;
         // here the enemies in reach take its hit and fire recipes put flames up.
-        if (burst.kind === 'ignite' || burst.kind === 'air-reaction') {
+        if (burst.kind === 'ignite' || burst.kind === 'air-reaction' || burst.kind === 'element-discharge') {
             const reach = new Set(burst.tiles);
             if (burst.defuse) {
                 const store = useGameStore.getState();
@@ -1039,7 +1029,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
-            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /></group>
+            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><ElementalAbilityEffects worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /></group>
             {/* Keep the equipped body/face and their programs through retries. The
                 hidden scramble frame also prepares their instanced attributes. */}
             <StoryArrival worm={worm} elapsed={spawnTimerRef}>

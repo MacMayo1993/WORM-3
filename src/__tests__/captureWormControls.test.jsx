@@ -57,3 +57,23 @@ it('leaves keyboard input on camera buttons to the UI', () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
   expect(turn).toHaveBeenCalledWith('jump');
 });
+it('holds Air glide independently of fire and releases it on Space-up or blur', () => {
+  const worm = { elementalType: { current: 'air' }, elementalPair: { current: null }, elementalT: { current: 10 } };
+  act(() => root.render(<WormSwipeControls onTurn={turn} worm={worm} />));
+  turn.mockClear();
+  const key = (type, value, repeat = false) => act(() => window.dispatchEvent(new KeyboardEvent(type, { key: value, repeat, bubbles: true })));
+  key('keydown', ' ');
+  key('keydown', ' ', true);
+  expect(turn.mock.calls.filter(([action]) => action === 'jump')).toHaveLength(1);
+  expect(turn).toHaveBeenCalledWith('jump-hold');
+  key('keyup', 'f');
+  expect(turn).toHaveBeenCalledWith('fire-stop');
+  expect(turn).not.toHaveBeenCalledWith('jump-release');
+  key('keyup', ' ');
+  expect(turn).toHaveBeenLastCalledWith('jump-release');
+  turn.mockClear();
+  key('keydown', ' ');
+  act(() => window.dispatchEvent(new Event('blur')));
+  expect(turn).toHaveBeenCalledWith('jump-release');
+  expect(turn).toHaveBeenCalledWith('fire-stop');
+});

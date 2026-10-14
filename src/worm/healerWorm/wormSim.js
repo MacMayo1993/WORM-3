@@ -1,3 +1,4 @@
+import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb, ELEMENT_ABILITIES } from './elementalAbilities.js';
 import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
@@ -280,6 +281,7 @@ export function makeWormSim(size) {
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
+        elementalAbilities: makeElementalAbilities(),
         slamResolved: 0,   // the last Spring landing whose orbs were taken (signature.slam.seq)
         waterMomentum: 0,
         viewPower: null,
@@ -470,6 +472,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
+    sim.elementalAbilities = makeElementalAbilities();
     sim.slamResolved = 0;
     sim.waterMomentum = 0;
     sim.viewPower = null;
@@ -579,6 +582,7 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.jumpBase = jumpLiftOf(sim);
     sim.isJumping = true;
     sim.jumpT = 0.001;
+    sim.elementalAbilities.glideLeft = ELEMENT_ABILITIES.glideTiles;
     sim.jumpCount += 1;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
@@ -643,6 +647,7 @@ function crawlProgressDistance(sim, from, to) {
 
 /** Tile trails are broad phase only: test the occupied body, including inch arches. */
 export function hasJumpClearance(sim, progress = sim.interpT) {
+    if (sim.elementalAbilities.icePhaseT > 0) return true;
     const normal = evaluatePosAndNormal(sim, progress, _evalHPos);
     collisionHead.copy(_evalHPos).addScaledVector(normal, WORM_LIFT + jumpLiftOf(sim));
     const history = sim.stepHistory;
@@ -746,6 +751,7 @@ export function startElemental(sim, ctx, type, size = 0) {
     sim.elementalPair = next.pair;
     sim.elementalT = ELEMENTAL_DURATION;
     sim.elementalMaxT = ELEMENTAL_DURATION;
+    claimElementalAbility(sim, type, size, ctx);
     // Where the element enters the world. The orb is claimed by the head, so the
     // head's tile IS the claim point; the skin sweeps outward from it. Snapshotted
     // rather than referenced, since sim.pos keeps moving once the beat ends.
@@ -870,6 +876,7 @@ function tickCautionRescue(sim, delta, size, ctx) {
 function tickJumpRescue(sim, delta, size, ctx) {
     const candidate = sim.pendingSelfCollision;
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
+        !(hasElement(sim, 'ice') && sim.elementalAbilities.iceShield) && sim.elementalAbilities.icePhaseT <= 0 &&
         !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
         !sim.pendingTunnelTrigger && !sim.pendingVoidKill &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
@@ -911,6 +918,8 @@ function tickJumpRescue(sim, delta, size, ctx) {
 }
 
 export function queueTurn(sim, dir) {
+    if (dir === 'jump-release') { sim.elementalAbilities.jumpHeld = false; return; }
+    if (dir === 'jump-hold') { if (sim.alive) sim.elementalAbilities.jumpHeld = true; return; }
     if (!sim.alive || sim.phase === 'falling') return;
     if (sim.signature.sweep) return;
     if (sim.jumpRescueT > 0) {
@@ -928,6 +937,9 @@ export function queueTurn(sim, dir) {
 
 export function killWormSim(sim, ctx, details = null) {
     if (!sim.alive) return;
+    if ((details?.reason === 'self' || details?.reason === 'self-collision') && spendIceShield(sim)) {
+        clearJumpRescue(sim, ctx); sim.pendingSelfCollision = null; ctx.feel('heal'); return;
+    }
     clearJumpRescue(sim, ctx);
     sim.alive = false;
     sim.phase = 'dead';
@@ -1153,20 +1165,28 @@ const _magnetReach = new Set();
 // active the reach widens to a MAGNET_RADIUS manifold ring, which wraps around face
 // edges — and the pull also plucks hovering orbs off flipped tiles that would
 // otherwise need a jump.
-function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = false) {
+function collectElementalTargets(sim, size, ctx, targets, kind) {
+    abilityEvent(sim, kind, [sim.pos, ...targets, sim.pos]);
+    const { x, y, z, dirKey } = sim.pos;
+    tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, false, new Set(targets));
+}
+
+function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = false, forcedOrbs = null) {
     if (sim.powerups.length === 0) return;
     const magnetActive = !sweepContact && sim.magnetT > 0;
     const reach = magnetActive
         ? collectManifoldRing(x, y, z, dirKey, size, sim.magnetT > 0 ? MAGNET_RADIUS : 1, _magnetReach)
-        : null;
+        : !sweepContact ? elementalPickupReach(sim, size) : null;
+    const steamReach = !sweepContact && activeFusion(sim) === 'steam'
+        ? collectManifoldRing(x, y, z, dirKey, size, 2) : null;
     const headKey = `${x},${y},${z},${dirKey}`;
     let collectedAny = false;
 
     for (let puIdx = 0; puIdx < sim.powerups.length; puIdx++) {
         const pickedUp = sim.powerups[puIdx];
-        if (pickedUp.cascade && pickedUp.cascade.age < CASCADE_FLIGHT) continue;
+        if (!ripeOrb(pickedUp)) continue;
         const puKey = `${pickedUp.x},${pickedUp.y},${pickedUp.z},${pickedUp.dirKey}`;
-        if (reach ? !reach.has(puKey) : puKey !== headKey) continue;
+        if (forcedOrbs ? !forcedOrbs.has(pickedUp) : !(reach?.has(puKey) || puKey === headKey || (pickedUp.ignited && steamReach?.has(puKey)))) continue;
 
         // Read fresh cubies rather than any tick-scope snapshot: spawnWormholePair() may
         // have flipped a sticker pair earlier in the same tick, and a rotation commit may
@@ -1176,7 +1196,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // Orbs on flipped tiles hover above the surface — worm must jump to reach them,
         // unless the magnet is dragging them down.
         const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-        if (tileIsFlipped && !sim.isJumping && !magnetActive && !sweepContact) continue; // out of reach
+        if (tileIsFlipped && !sim.isJumping && !magnetActive && !sweepContact && !forcedOrbs && !(pickedUp.ignited && steamReach?.has(puKey))) continue; // out of reach
         // The orb credits its body's colour: the antipode of the tile it sits on.
         const refracted = refractPickup(sim, ctx, pickedSticker ? orbCreditFace(pickedSticker.curr) : 0);
         const pickedFaceId = refracted.faceId;
@@ -1187,7 +1207,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // read the same (new) combo level.
         sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
         sim.lastOrbTime = sim.timeAlive;
-        applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId, ORB_SEGMENT_GROWTH + refracted.bonus);
+        applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId, ORB_SEGMENT_GROWTH + refracted.bonus + fireOrbBonus(sim, pickedUp));
         if (sim.magnetT > 0 && puKey !== headKey) ctx.onStoryMechanic?.('magnetOrbs');
         sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray(), combo: sim.orbCombo };
         // Reward is immediate. The renderer consumes a short gulp on the head
@@ -1206,7 +1226,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        if (ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade) sim.powerups.splice(puIdx--, 1);
+        if (ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
         else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
         collectedAny = true;
     }
@@ -1790,7 +1810,7 @@ const PHASE_HANDLERS = {
 
             // Apply pending turn — RELATIVE to current heading
             if (iceHoldsTurn(sim, delta, STEP_SEC)) {
-                if (sim.pendingTurns.length > 0) sim.iceHeldTurn = true;
+                if (sim.pendingTurns.some(t => t !== 'jump' && t !== 'boost')) sim.iceHeldTurn = true;
                 const action = sim.pendingTurns.findIndex(t => t === 'jump' || t === 'boost');
                 if (action > 0) sim.pendingTurns.unshift(sim.pendingTurns.splice(action, 1)[0]);
             }
@@ -1818,7 +1838,9 @@ const PHASE_HANDLERS = {
                     sim.pendingTurns.shift();
                     if (t === 'boost') {
                         // Ignore if already boosting or recharging.
-                        if (sim.boostActiveT <= 0 && sim.boostCooldownT <= 0) {
+                        if (!liveRotation.active && !sim.restRead && startFlameDash(sim, size)) {
+                            ctx.feel('boost');
+                        } else if (sim.boostActiveT <= 0 && sim.boostCooldownT <= 0) {
                             sim.boostActiveT = BOOST_DURATION;
                             ctx.onBoostState('active');
                             ctx.feel('boost');
@@ -1851,7 +1873,8 @@ const PHASE_HANDLERS = {
                         }
                     }
                     if (sim.moveDir !== previousDirection) {
-                        if (turnShedsMomentum(sim)) sim.waterMomentum *= 0.35;
+                        if (turnShedsMomentum(sim)) sim.waterMomentum *= 0.65;
+                        if (sim.iceHeldTurn) elementalDrift(sim);
                         // Meltdown: the slide ends in a dash, and the tile it ended on
                         // melts (fire that puts out a bomb sitting there).
                         if (sim.iceHeldTurn && activeFusion(sim) === 'meltdown') {
@@ -2049,7 +2072,9 @@ const PHASE_HANDLERS = {
                 sim.prevDirKey = sim.pos.dirKey;
                 // Snapshot the tile we're leaving as the interpolation source so a
                 // mid-step slice rotation can ride/commit it correctly.
-                if (!liveRotation.active && !sim.restRead) airFusionStep(sim);
+                if (!liveRotation.active && !sim.restRead) {
+                    airFusionStep(sim); elementalStep(sim, size, ctx);
+                }
                 if (hasElement(sim, 'fire') && !sim.isJumping && !liveRotation.active && !sim.restRead) {
                     addElementalPatch(sim, sim.pos, 'fire');
                 }
@@ -2550,6 +2575,8 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
 
     tickElementalGameplay(sim, delta, size);
+    // Moving layers defer targeting and growing until tile identities commit.
+    if (!liveRotation.active && !sim.restRead) tickElementalAbilities(sim, delta, size, ctx, collectElementalTargets);
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
     // Throttle follows the same smooth flight phase as the rendered body.
     // Flight stays capped even with an ordinary boost. Restore ground speed only
@@ -2559,7 +2586,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
     const handoff = 1 - (sim.rocketBoostHandoffT ?? 0) / ROCKET_BOOST_HANDOFF;
     const groundBlend = handoff * handoff * (3 - 2 * handoff);
-    const groundSpeed = boostMult * (1 + waterSpeedBonus(sim) * sim.waterMomentum + fusionSpeedBonus(sim));
+    const groundSpeed = Math.max(boostMult, hasElement(sim, 'fire') && sim.elementalAbilities.fireDashT > 0 ? 1.5 : 1) * (1 + waterSpeedBonus(sim) * sim.waterMomentum + fusionSpeedBonus(sim) + elementalSpeedBonus(sim));
     const speedMult = sim.rocketActive
         ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle
         : rocketBase + (groundSpeed - rocketBase) * groundBlend;
@@ -2650,7 +2677,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.isJumping) {
         // Tie jump progress to tile-traverse progress so the speed slider never changes
         // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
-        sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
+        sim.jumpT += airJumpAdvance(sim, delta / STEP_SEC);
         if (sim.springBouncePending && sim.jumpT >= 0.45) {
             sim.springBouncePending = false;
             // A manual second jump takes precedence; never grant a third jump.
@@ -2697,7 +2724,8 @@ export function stepWormSim(sim, delta, size, ctx) {
             if (hasElement(sim, 'grass') && settled) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }
-            if (settled) airFusionLanding(sim, size);
+            if (settled) { airFusionLanding(sim, size); elementalLanding(sim, size, ctx); }
+            sim.elementalAbilities.gliding = false;
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
@@ -2911,6 +2939,11 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
 
     // Rotate the worm's logical grid position so it stays on its tile.
     rotateElementalPatches(sim, rotateByOwnLayer);
+    sim.elementalAbilities.heat = new Set([...sim.elementalAbilities.heat].map(key => {
+        const [x, y, z, dirKey] = key.split(',');
+        return tileKey(rotateByOwnLayer({ x: +x, y: +y, z: +z, dirKey }));
+    }));
+    for (const event of sim.elementalAbilities.events) event.tiles = event.tiles.map(rotateByOwnLayer);
 
     // rotateByOwnLayer returns the SAME object when the tile wasn't on any turning
     // plane, so `newPos !== oldPos` is an exact "did this tile ride" test.

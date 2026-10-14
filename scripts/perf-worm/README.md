@@ -146,3 +146,16 @@ on by default; `--draw` measures real rendering on a GPU-equipped machine.
 those runs are explicitly marked and must not be used for timing comparisons.
 `--shot-dpr=0.5` lowers only screenshot resolution for software WebGL.
 Run before/after builds sequentially, without other benchmarks or builds running.
+
+## Elemental ability smoke check
+
+```bash
+npx vite build --config scripts/perf-worm/vite.perf.config.mjs
+CHROMIUM=/path/to/chrome node scripts/perf-worm/elements.mjs
+```
+
+Stages each of the six elements on an enemy-free 5×5 board using the production
+simulation and pickup callbacks. It freezes each resulting pose, checks that its
+bounded feedback batches draw, captures screenshots in `/tmp/worm-elements`
+(override with `SHOTS`), and fails on JavaScript or shader errors. The fixed
+camera is test-only. Software WebGL captures are visibility checks, not FPS data.

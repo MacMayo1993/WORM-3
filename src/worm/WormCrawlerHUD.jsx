@@ -1031,6 +1031,11 @@ function FusionBanner() {
 function BoostButton({ wormAlive }) {
     const boostState = useGameStore(s => s.wormBoostState ?? 'ready');
     const [fillPct, setFillPct] = useState(100);
+    const [fireReady, setFireReady] = useState(false);
+    useEffect(() => {
+        const id = setInterval(() => setFireReady(!!wormBuffs.elementalAbilities?.fireReady), 100);
+        return () => clearInterval(id);
+    }, []);
 
     useEffect(() => {
         if (boostState !== 'cooldown') {
@@ -1048,7 +1053,7 @@ function BoostButton({ wormAlive }) {
     }, [boostState]);
 
     const handleBoost = () => {
-        if (!wormAlive || boostState !== 'ready') return;
+        if (!wormAlive || (boostState !== 'ready' && !fireReady)) return;
         callWormTurn('boost');
     };
 
@@ -1065,7 +1070,7 @@ function BoostButton({ wormAlive }) {
         border: `1px solid ${BORDER}`, cursor: 'default', color: TEXT_MUTED,
     };
 
-    const style = boostState === 'active' ? activeStyle
+    const style = fireReady ? { ...readyStyle, color: '#ffb45e', borderColor: '#ff8a40' } : boostState === 'active' ? activeStyle
         : boostState === 'cooldown' ? cooldownStyle
         : readyStyle;
 
@@ -1076,13 +1081,13 @@ function BoostButton({ wormAlive }) {
             className={`worm-action worm-boost${boostState === 'cooldown' ? '' : ' worm-hud-key'}`}
             style={style}
             aria-label="Boost"
-            aria-disabled={!wormAlive || boostState !== 'ready'}
-            title={boostState === 'cooldown' ? 'Boost recharging' : 'Boost'}
+            aria-disabled={!wormAlive || (boostState !== 'ready' && !fireReady)}
+            title={fireReady ? 'Flame dash ready' : boostState === 'cooldown' ? 'Boost recharging' : 'Boost'}
         >
             {boostState === 'cooldown' && (
                 <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%`, background: withAlpha(HUD_ACCENT, 0.18) }} />
             )}
-            <span style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}><BoltIcon size={20} /><span style={{ fontSize: 10 }}>Boost</span></span>
+            <span style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}><BoltIcon size={20} /><span style={{ fontSize: 10 }}>{fireReady ? 'Flame dash' : 'Boost'}</span></span>
         </button>
     );
 }
@@ -1452,7 +1457,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                             <div className="worm-jump-slot">
                                 {jumpRescue && <JumpRescueCue caution={cautionRescue} watching={previewLesson} />}
                                 <button
-                                    onPointerDown={handleJumpAction}
+                                    onPointerDown={e => { e.currentTarget.setPointerCapture?.(e.pointerId); callWormTurn('jump-hold'); handleJumpAction(); }}
+                                    onPointerUp={() => callWormTurn('jump-release')}
+                                    onPointerCancel={() => callWormTurn('jump-release')}
+                                    onLostPointerCapture={() => callWormTurn('jump-release')}
                                     onClick={e => { if (e.detail === 0) handleJumpAction(); }}
 
                                     className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}

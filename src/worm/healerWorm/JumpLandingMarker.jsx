@@ -23,8 +23,11 @@ export function JumpLandingMarker({ worm, size }) {
             mesh.scale.setScalar(0.8 + 0.2 * (1 - flight.t));
             return;
         }
+        const ability = worm.elementalAbilities?.current;
+        const glide = ability?.jumpHeld && worm.jumpT.current < 0.7 ? (ability.glideLeft || 0) * 0.75 : 0;
+        mesh.material.color.set(glide > 0 ? '#b9f5ed' : '#fff4b0');
         const tile = jumpLandingTile(worm.pos.current, worm.moveDir.current, size,
-            worm.interpT.current, worm.jumpT.current, worm.jumpSpan.current);
+            worm.interpT.current + glide, worm.jumpT.current, worm.jumpSpan.current);
         const normal = FACE_NORMALS[tile.dirKey];
         mesh.position.fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0))
             .addScaledVector(normal, 0.045);

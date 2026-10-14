@@ -92,7 +92,8 @@ it('Stormwind discharges a lethal cross on landing; Thunderhead does not', () =>
   land(storm.sim,storm.ctx); land(thunder.sim,thunder.ctx);
   expect(storm.sim.fusionBursts.at(-1)).toMatchObject({recipe:'air-lightning',hit:'kill',lightning:true});
   expect(storm.sim.fusionBursts.at(-1).tiles).toHaveLength(9);
-  expect(thunder.sim.fusionBursts).toHaveLength(0);
+  expect(thunder.sim.fusionBursts.filter(b => b.kind === 'air-reaction')).toHaveLength(0);
+  expect(thunder.sim.fusionBursts.filter(b => b.kind === 'element-discharge')).toHaveLength(1);
 });
 it('a third element and expiry immediately stop the previous Air reaction', () => {
   const {sim,ctx} = setup('air','fire'); sim.isJumping = true;
@@ -111,7 +112,9 @@ it('paused simulation cannot repeat landing bursts or air trails', () => {
   for (let i=0;i<10;i++) stepWormSim(sim,0.05,SIZE,ctx);
   expect(sim.fusionBursts).toHaveLength(0);
   ctx.isPaused = () => false; land(sim,ctx);
-  expect(sim.fusionBursts).toHaveLength(1);
+  expect(sim.fusionBursts.filter(b => b.kind === 'air-reaction')).toHaveLength(1);
+  expect(sim.fusionBursts.filter(b => b.kind === 'element-discharge')).toHaveLength(1);
   stepWormSim(sim,0.01,SIZE,ctx);
-  expect(sim.fusionBursts).toHaveLength(1);
+  expect(sim.fusionBursts.filter(b => b.kind === 'air-reaction')).toHaveLength(1);
+  expect(sim.fusionBursts.filter(b => b.kind === 'element-discharge')).toHaveLength(1);
 });

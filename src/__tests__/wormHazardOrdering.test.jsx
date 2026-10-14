@@ -456,10 +456,10 @@ it('Rainwind douses bombs in its landing burst once, while Sea Breeze leaves the
   tick(); expect(useGameStore.getState().parityPoints).toBe(coins+12);
 });
 
-it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s changes whether marked strikes harm the worm', (base,catalyst,safe) => {
+it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s protects the owner while preserving the ordered storm reaction', (base,catalyst,safe) => {
   sim.elementalPair = base; sim.elementalType = catalyst; sim.elementalT = wormBuffs.elementalT = 10;
   tick(28);
-  expect(useGameStore.getState().wormAlive).toBe(safe);
+  expect(useGameStore.getState().wormAlive).toBe(true);
   if (safe) {
     expect(checkBlastHitWorm).not.toHaveBeenCalled();
     expect(sim.staticT).toBeGreaterThan(0);
@@ -468,7 +468,7 @@ it.each([['lightning','air',true], ['air','lightning',false]])('%s then %s chang
 
 it.each([
   ['landing', null], ['ignition', null], ['landing', 9], ['ignition', 9],
-])('Rainwind %s grants no bomb rewards after an old fatal strike (story %s)', async (reaction, level) => {
+])('Rainwind %s rewards its defuse once after an old friendly strike (story %s)', async (reaction, level) => {
   const { airFusionLanding } = await import('../worm/healerWorm/airFusionGameplay.js');
   const { igniteFusion } = await import('../worm/healerWorm/fusionIgnition.js');
   worm.recordStoryBomb = vi.fn();
@@ -488,14 +488,16 @@ it.each([
   else igniteFusion(sim, 'air-water', 3);
   const coins = useGameStore.getState().parityPoints;
   expect(useGameStore.getState().wormAlive).toBe(true);
-  tick(); // runStorm kills before runFusionBurst tries the queued Rainwind defuse.
-  expect(useGameStore.getState().wormAlive).toBe(false);
+  tick(); // The previously marked bolt is still friendly after the fusion changes.
+  expect(useGameStore.getState().wormAlive).toBe(true);
   expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
-  expect(bombsRef.current).toContain(bomb);
-  expect(bomb.fuse).toBe(4);
-  expect(useGameStore.getState().parityPoints).toBe(coins);
-  expect(worm.recordStoryBomb).not.toHaveBeenCalled();
-  expect(sim.orbCascades).toHaveLength(0);
+  expect(bombsRef.current).not.toContain(bomb);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (level ? 0 : 12));
+  expect(worm.recordStoryBomb).toHaveBeenCalledTimes(level ? 1 : 0);
+  expect(sim.orbCascades).toHaveLength(1);
+  tick();
+  expect(sim.orbCascades).toHaveLength(1);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (level ? 0 : 12));
 });
 
 it('does not skip the arrival on a delayed frame or run hazards while its pause menu is open', () => {
