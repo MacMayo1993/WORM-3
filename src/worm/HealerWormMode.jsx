@@ -644,6 +644,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             return;
         }
 
+        // Sim gameplay bursts also belong to stories and combat arenas that have
+        // no ordinary hazard schedule. Keep them frozen during pause/end screens.
+        if (gameModePhaseRef.current === 'active' && store.wormAlive && !store.wormPaused && !store.wormStoryResult) {
+            runFusionBurst();
+        }
+
         // Story objectives own their ending; later challenges repeat the warned slice cycle.
         if (store.wormStoryLevel && (!story?.rotateEvery || store.wormStoryResult)) { resetRotationClock(); return; }
 
@@ -683,7 +689,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
         runStorm(store, delta);
-        runFusionBurst();
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
         // A head that changed sides of the turning layer early in the turn is
         // resolved as if it had been there when the turn fired. This must run

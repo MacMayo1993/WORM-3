@@ -14,6 +14,8 @@ import { storyLevel } from '../worm/story/levels.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
+import { combatBridge, makeCombat, makeEnemy } from '../worm/combat/portalCombat.js';
+import { tickElementalAbilities } from '../worm/healerWorm/elementalAbilities.js';
 
 let frameCb, worm, tree;
 const scene = {};
@@ -73,10 +75,42 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  combatBridge.current = null;
   wormBuffs.elementalT = 0;
   resetLiveRotation();
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+});
+
+it.each(['story', 'combat'])('resolves Lightning discharge once before the %s hazard-scheduler return', mode => {
+  expect(storyLevel(84).rotateEvery).toBeFalsy();
+  act(() => useGameStore.setState({ wormStoryLevel: mode === 'story' ? 84 : null,
+    wormCombatMode: mode === 'combat', wormStoryStarted: true, wormPaused: false }));
+  const combat = makeCombat(3, sim.pos);
+  combat.ambient = mode === 'story';
+  const enemy = makeEnemy(combat); enemy.emerging = 0;
+  const distant = makeEnemy(combat); distant.emerging = 0;
+  distant.tile = { x: 0, y: 0, z: 0, dirKey: 'NZ' };
+  combat.enemies.push(enemy, distant); combatBridge.current = combat;
+  const { bombsRef } = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const bomb = { id: 87, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };
+  bombsRef.current.push(bomb); worm.recordStoryBomb = vi.fn();
+  sim.elementalType = 'lightning'; sim.elementalT = 10;
+  // Generate the real sim discharge, then let the mounted mode consume it.
+  tickElementalAbilities(sim, 0.01, 3, {}, vi.fn());
+  expect(sim.fusionBursts.at(-1).kind).toBe('element-discharge');
+  const coins = useGameStore.getState().parityPoints;
+  act(() => useGameStore.setState({ wormPaused: true })); tick();
+  expect(combat.kills).toBe(0); expect(bombsRef.current).toContain(bomb);
+  act(() => useGameStore.setState({ wormPaused: false })); tick();
+  expect(combat.enemies).toEqual([distant]); expect(combat.kills).toBe(1);
+  expect(bombsRef.current).not.toContain(bomb);
+  expect(sim.orbCascades).toHaveLength(1);
+  expect(worm.recordStoryBomb).toHaveBeenCalledTimes(mode === 'story' ? 1 : 0);
+  expect(useGameStore.getState().parityPoints).toBe(coins + (mode === 'story' ? 0 : 12));
+  tick(2);
+  expect(combat.kills).toBe(1); expect(sim.orbCascades).toHaveLength(1);
+  expect(rotate).not.toHaveBeenCalled();
 });
 
 it('opens the authored WORM demo board without a scramble or countdown', () => {

@@ -24,7 +24,10 @@ export function JumpLandingMarker({ worm, size }) {
             return;
         }
         const ability = worm.elementalAbilities?.current;
-        const glide = ability?.jumpHeld && worm.jumpT.current < 0.7 ? (ability.glideLeft || 0) * 0.75 : 0;
+        const airActive = worm.elementalT?.current > 0
+            && (worm.elementalType?.current === 'air' || worm.elementalPair?.current === 'air');
+        const glide = airActive && !worm.rocketActive?.current && ability?.jumpHeld && worm.jumpT.current < 0.7
+            ? (ability.glideLeft || 0) * 0.75 : 0;
         mesh.material.color.set(glide > 0 ? '#b9f5ed' : '#fff4b0');
         const tile = jumpLandingTile(worm.pos.current, worm.moveDir.current, size,
             worm.interpT.current + glide, worm.jumpT.current, worm.jumpSpan.current);
