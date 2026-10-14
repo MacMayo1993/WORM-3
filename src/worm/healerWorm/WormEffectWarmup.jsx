@@ -20,6 +20,7 @@ import { ELEMENTAL_TYPES } from './elementalDefs.js';
 import { elementalOrbMaterials } from './elementalOrbMaterials.js';
 import { warmOrbReveal } from '../orbReveal.js';
 import { warmCautionDissolve } from './cautionDissolve.js';
+import { compileOffscreen } from '../../3d/mirrorSubjects.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
 
 // Keep one owner of each transient program for this WORM session. Real portal
@@ -128,6 +129,10 @@ export default function WormEffectWarmup({ body }) {
     if (sceneWarmed.current === key) return;
     sceneWarmed.current = key;
     gl.compile(scene, camera, scene);
+    // Desktop draws the surface through the AO composer's render target, a
+    // program variant of its own, so the interior and core revealed at a ride's
+    // windup would otherwise link theirs there. The ride itself draws on screen.
+    if (!isMobile) compileOffscreen(gl, scene, camera, scene);
   });
 
   // The caution fall dissolves every worm material (cautionDissolve.js); its

@@ -230,6 +230,9 @@ export const makeTunnelPath = () => {
     legT: [0, 0, 0, 0, 0, 0],
     legT0: [0, 0, 0, 0, 0, 0],
     legArc0: [0, 0, 0, 0, 0, 0],
+    // Pace (arc per unit t) at each leg's start and end: see tunnelPathTToArc.
+    legM0: [0, 0, 0, 0, 0, 0],
+    legM1: [0, 0, 0, 0, 0, 0],
     // Outward unit normals of the two mouths, kept so samplers can extrapolate off
     // the ends of the path (a camera trailing the head is outside the cube before
     // the head has gone in, and again after it comes out).
@@ -355,7 +358,32 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
     path.legT0[i] = t0;
     t0 += path.legT[i];
   }
+  setLegPaces(path);
   return path;
+}
+
+/**
+ * Pace (arc per unit t) at each leg's ends. Each leg keeps its span of t: the
+ * throats still hold the worm on the tile's axis at their own steady pace and
+ * the core crossing is still slow and steady (it scales with the swollen core,
+ * so it must stay linear). The curved shoulders between them now ease from one
+ * pace to the other instead of switching in a frame: the worm, and the lens
+ * trailing it, used to slam from the shoulder's pace to the core's (three times
+ * slower on a 5×5, fourteen on a 15×15) and shoot back out the far side.
+ */
+const legPace = (path, i) => (path.legT[i] > 0 ? path.legLen[i] / path.legT[i] : 0);
+function setLegPaces(path) {
+  for (let i = 0; i < LEG_COUNT; i++) path.legM0[i] = path.legM1[i] = legPace(path, i);
+  // Cubic Hermite stays monotone while its end paces are at most three times its mean.
+  const ease = (leg, from, to) => {
+    const limit = 3 * legPace(path, leg);
+    if (!(limit > 0)) return;
+    if (from > 0) path.legM0[leg] = Math.min(from, limit);
+    if (to > 0) path.legM1[leg] = Math.min(to, limit);
+  };
+  const crossIn = legPace(path, 2) || legPace(path, 3), crossOut = legPace(path, 3) || legPace(path, 2);
+  ease(1, legPace(path, 0), crossIn);
+  ease(4, crossOut, legPace(path, 5));
 }
 
 // Evaluate a cubic and invert its small arc table without allocating. Every
@@ -398,18 +426,20 @@ function legIndexForT(path, t) {
 
 /** Write the world position at traversal parameter t (0 = entry mouth, 1 = exit mouth). */
 export function tunnelPathPointInto(out, path, t) {
-  const c = t < 0 ? 0 : t > 1 ? 1 : t;
-  const i = legIndexForT(path, c);
-  const f = path.legT[i] > 0 ? Math.min(1, Math.max(0, (c - path.legT0[i]) / path.legT[i])) : 0;
-  return legPointInto(out, path, i, legParameter(path, i, f));
+  return tunnelPathArcPointInto(out, path, tunnelPathTToArc(path, t));
 }
 
 /** Convert traversal parameter t to world arc-length along the path. */
 export function tunnelPathTToArc(path, t) {
   const c = t < 0 ? 0 : t > 1 ? 1 : t;
   const i = legIndexForT(path, c);
-  const f = path.legT[i] > 0 ? Math.min(1, Math.max(0, (c - path.legT0[i]) / path.legT[i])) : 0;
-  return path.legArc0[i] + path.legLen[i] * f;
+  const h = path.legT[i];
+  if (!(h > 0)) return path.legArc0[i];
+  const f = Math.min(1, Math.max(0, (c - path.legT0[i]) / h));
+  // Cubic Hermite between the leg's ends at the paces setLegPaces chose.
+  const f2 = f * f, f3 = f2 * f;
+  return path.legArc0[i] + path.legLen[i] * (3 * f2 - 2 * f3)
+    + h * (path.legM0[i] * (f3 - 2 * f2 + f) + path.legM1[i] * (f3 - f2));
 }
 
 /** Write the world position at a given world arc-length (clamped to the path). */

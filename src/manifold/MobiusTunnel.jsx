@@ -9,7 +9,8 @@ import { prefersReducedMotion } from '../utils/device.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { addMirrorSubject, removeMirrorSubject, warmMirrorPrograms } from '../3d/mirrorSubjects.js';
 import { burrowPair } from '../worm/burrowBridge.js';
 import * as THREE from 'three';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
@@ -290,6 +291,12 @@ const MobiusTunnel = ({
   const styled = style1 !== 'solid' || style2 !== 'solid';
   const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
+  // The band being ridden is reflected by the core's mirror room (mirrorSubjects.js).
+  const rootRef = useRef();
+  const mirrored = useRef({ ridden: false, warmed: false });
+  const gl = useThree(s => s.gl);
+  const scene = useThree(s => s.scene);
+  useEffect(() => () => { if (rootRef.current) removeMirrorSubject(rootRef.current); }, []);
   const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(WORM_IDLE_OPACITY);
@@ -391,6 +398,23 @@ const MobiusTunnel = ({
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
     // The band being ridden runs on through the core's mirror room.
     uniforms.uCoreClipOff.value = wormMode && tunnelState.active && tunnelState.activeTunnelId === tunnelId ? 1 : 0;
+    const mirror = mirrored.current, root = rootRef.current;
+    if (root && wormMode) {
+      // Link the variants a ride draws the band with when it appears (with its
+      // own programs), not in the frame the worm dives in: on screen (desktop's
+      // AO composer, which the surface draws through, is off for the ride) and in
+      // the mirror room's capture.
+      if (!mirror.warmed) {
+        mirror.warmed = true;
+        gl.compile?.(root, _state.camera, scene);
+        warmMirrorPrograms(gl, scene, [root]);
+      }
+      const ridden = uniforms.uCoreClipOff.value > 0;
+      if (ridden !== mirror.ridden) {
+        mirror.ridden = ridden;
+        if (ridden) addMirrorSubject(root); else removeMirrorSubject(root);
+      }
+    }
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
     if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
@@ -638,7 +662,7 @@ const MobiusTunnel = ({
   });
 
   return (
-    <group>
+    <group ref={rootRef}>
       {/* The solid Möbius spine stays readable inside the intro-inspired open curls.
           frustumCulled is off here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes

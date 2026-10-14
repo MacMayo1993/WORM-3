@@ -5,9 +5,9 @@
  * Reads most state directly from useGameStore to reduce prop drilling.
  */
 
-import React, { Suspense, useEffect, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import ErrorBoundary3D from './ErrorBoundary3D.jsx';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { CUBE_LIGHT_RIG, usesCubeLightRig, needsCubeReflections } from './cubeLighting.js';
@@ -70,6 +70,19 @@ function SceneFog({ enabled }) {
  *   teachModeActive  — from useTeachMode
  *   layerHighlight   — from teachMode.layerHighlight
  */
+// Reduced FX and tunnel rides redraw the shadow map every fourth frame instead
+// of every frame; the light still casts, so no program changes.
+function ShadowCadence({ slow }) {
+  const gl = useThree(s => s.gl);
+  const frame = useRef(0);
+  useEffect(() => () => { gl.shadowMap.autoUpdate = true; }, [gl]);
+  useFrame(() => {
+    gl.shadowMap.autoUpdate = !slow;
+    if (slow && frame.current++ % 4 === 0) gl.shadowMap.needsUpdate = true;
+  });
+  return null;
+}
+
 export default function GameScene({
   // 8 ephemeral callbacks
   onMove,
@@ -133,7 +146,12 @@ export default function GameScene({
   // shadow-map render pass is the cost, so we gate it off on mobile and whenever the
   // PerformanceMonitor has flagged a sustained frame-rate decline. Wireframe/glass modes
   // skip it too — their translucent bodies don't read shadows usefully.
-  const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
+  // The light keeps casting whatever the quality tier: castShadow is part of every
+  // lit program's key, so toggling it when the PerformanceMonitor declines (most
+  // often mid tunnel ride) relinked the whole scene in one frame. Reduced FX and
+  // rides refresh the shadow map less often instead (ShadowCadence).
+  const shadowsAvailable = !isMobile && visualMode !== 'wireframe' && visualMode !== 'glass';
+  const shadowsOn = shadowsAvailable && !perfReducedFX;
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -141,6 +159,10 @@ export default function GameScene({
   // AO shares the shadow capability gate. Its half-resolution pass is for opaque
   // cubie seams. Inside the translucent bore
   // it adds speckled shadows from surfaces that the camera is looking through.
+  // The composer stays mounted and is only switched off: mounting it sets the
+  // renderer's tone mapping and draws the scene through a render target, both
+  // part of every program's key, so unmounting it for each ride relinked the
+  // scene going in and again coming out, and rebuilt the AO passes every time.
   const aoEnabled = shadowsOn && !wormholePhaseActive;
   // Antipodal PiP is shown only when the player toggles it on (in any mode), and is
   // suppressed during wormhole travel where the dedicated tunnel camera takes over.
@@ -194,7 +216,7 @@ export default function GameScene({
         position={menuRig ? CUBE_LIGHT_RIG.key.position : [5, 8, 5]}
         color={menuRig ? CUBE_LIGHT_RIG.key.color : '#ffffff'}
         intensity={menuRig ? CUBE_LIGHT_RIG.key.intensity : visualMode === 'wireframe' ? 0.3 : 1.6}
-        castShadow={shadowsOn}
+        castShadow={shadowsAvailable}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.025}
@@ -352,8 +374,11 @@ export default function GameScene({
           two-camera pass) which an EffectComposer cannot share, so AO and the PiP are
           mutually exclusive — toggling the PiP on gracefully drops AO for that view.
           Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
-      {aoEnabled && !shouldShowAntipodalPiP && !showCutawayLens && (
-        <Suspense fallback={null}><SceneEffects kind="game" /></Suspense>
+      {shadowsAvailable && <ShadowCadence slow={!shadowsOn || wormholePhaseActive} />}
+      {shadowsAvailable && (
+        <Suspense fallback={null}>
+          <SceneEffects kind="game" enabled={aoEnabled && !shouldShowAntipodalPiP && !showCutawayLens} />
+        </Suspense>
       )}
     </>
   );

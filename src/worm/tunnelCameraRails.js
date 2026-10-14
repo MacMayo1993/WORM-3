@@ -126,16 +126,26 @@ const _headPoint = new THREE.Vector3();
 // on the same curve so pulling back cannot cut across either core aperture.
 // Growing the trail by at most 40% of distance travelled prevents a backward
 // camera move while the worm regains its full width on the outward arm.
+// A minimum whose slope never jumps: where one trailing rule hands over to the
+// other the lens changes pace over a stretch instead of in one frame (a hard
+// min jolted it by half again on corner-tile routes).
+const TRAIL_BLEND = 0.4;
+function smoothMin(a, b) {
+  const h = Math.max(TRAIL_BLEND - Math.abs(a - b), 0) / TRAIL_BLEND;
+  return Math.min(a, b) - h * h * TRAIL_BLEND * 0.25;
+}
+
 export function cameraArcForHead(path, tHead, size) {
   const headArc = tunnelPathTToArc(path, tHead);
   tunnelPathArcPointExtendedInto(_headPoint, path, headArc);
   const close = Math.max(.9, tunnelDockWidth(size) * 6) + _headPoint.length() * .4;
   const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
-  const trail = THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
+  const back = backForHead(tHead, size);
+  const trail = THREE.MathUtils.lerp(back, smoothMin(back, close), follow);
   // Follow closely through the outer mouth, then let the head pull away to the
   // wider mirror-room framing. A full trailing distance at the first frame
   // keeps the lens outside until the head is already deep in the entry arm.
-  return headArc - Math.min(trail, 0.18 + headArc * 0.5);
+  return headArc - Math.max(0, smoothMin(trail, 0.18 + headArc * 0.5));
 }
 
 function cameraRideHeight(point, arc, tHead, size) {
@@ -285,9 +295,6 @@ export function blendTunnelPosesInto(out, from, to, t) {
   return out;
 }
 
-const _exitRail = makeTunnelCamPose();
-const _exitOutside = makeTunnelCamPose();
-const _exitSideRail = new THREE.Vector3();
 const _entryRide = makeTunnelCamPose();
 const _entryStart = makeTunnelCamPose();
 const _entryRideUp = new THREE.Vector3();
@@ -344,33 +351,16 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   return out;
 }
 
-/** One exit shot shared by exiting's endpoint and windout's starting pose. */
+/**
+ * Exiting trails the head up the exit arm on the same rail as the rest of the
+ * ride. It used to blend the lens out to a shot beside the mouth, which flew it
+ * through the worm's head halfway up the arm and left it looking back at the
+ * hole, so windout then had to swing it half a turn onto the chase. The lens
+ * now follows the head up the arm and, as the head reaches the mouth, cuts to
+ * the chase pose crawling resumes from (WormChaseCamera's windout): there is no
+ * room in the mouth to fly a lens round the worm, and climbing past it lost the
+ * worm from the shot for a quarter of a second while it looked at the sky.
+ */
 export function tunnelExitPoseInto(out, tunnel, progress, size) {
-  const p = THREE.MathUtils.clamp(progress, 0, 1);
-  const tHead = tunnelTraversalT('exiting', p);
-  tunnelCamPoseInto(_exitRail, tunnel, tHead, size);
-  const blend = diveEase((p - 0.50) / 0.50);
-  _exitSideRail.set(0, 1, 0).cross(_camPath.nEnd);
-  if (_exitSideRail.lengthSq() < 1e-8) _exitSideRail.set(1, 0, 0);
-  _exitSideRail.normalize();
-  const outsideDistance = 1.7 + size * 0.34;
-  _exitOutside.cam.copy(_camPath.vEnd).addScaledVector(_camPath.nEnd, outsideDistance)
-    .addScaledVector(_exitSideRail, 1.2 + size * 0.22);
-  _exitOutside.look.copy(_camPath.vEnd);
-  _exitOutside.up.copy(_camPath.nEnd);
-  blendTunnelPosesInto(out, _exitRail, _exitOutside, blend);
-
-  // Move along the actual route until the lens clears the mouth. Only then
-  // introduce the side offset; a straight chord cuts through neighbouring tiles.
-  const arc = THREE.MathUtils.lerp(cameraArcForHead(_camPath, tHead, size),
-    _camPath.total + outsideDistance, blend);
-  const sideBlend = diveEase((arc - _camPath.total - 0.35) / (outsideDistance - 0.35));
-  _poseDir.subVectors(out.look, out.cam);
-  cameraArcPointInto(out.cam, _camPath, arc);
-  // The exit blend changes the LENS arc. Apply core clearance at that actual
-  // position too: on small boards the head exits while the camera is in the core.
-  out.cam.addScaledVector(_exitRail.up, cameraRideHeight(out.cam, arc, tHead, size) * (1 - blend))
-    .addScaledVector(_exitSideRail, (1.2 + size * 0.22) * sideBlend);
-  out.look.copy(out.cam).add(_poseDir);
-  return out;
+  return tunnelCamPoseInto(out, tunnel, tunnelTraversalT('exiting', THREE.MathUtils.clamp(progress, 0, 1)), size);
 }

@@ -46,6 +46,16 @@ export default function TunnelTransitOverlay() {
     wormPhase === 'tunnel' || wormPhase === 'exiting' || wormPhase === 'windout'
   );
 
+  // The exit is a cut (WormChaseCamera's windout): the lens follows the head up
+  // the tube, then cuts outside as the worm pops out of the hole. A bloom in the
+  // exit tile's colour marks it, as the punch marks the dive in.
+  const exitCutRef = useRef(0);
+  const prevPhaseRef = useRef(wormPhase);
+  if (prevPhaseRef.current !== wormPhase) {
+    if (wormPhase === 'windout') exitCutRef.current = 1;
+    prevPhaseRef.current = wormPhase;
+  }
+  const exitRef = useRef(null);
   const vignetteRef = useRef(null);
   const fringeRef = useRef(null);
   const seamRef = useRef(null);
@@ -66,11 +76,17 @@ export default function TunnelTransitOverlay() {
       ampRef.current += (target - ampRef.current) * (1 - Math.exp(-dt * (target > ampRef.current ? FADE_IN : FADE_OUT)));
       const amp = ampRef.current;
 
+      // Faster than the overlay's own release: a flash, not a fade.
+      exitCutRef.current = Math.max(0, exitCutRef.current - dt / 0.35);
+      if (exitRef.current) {
+        const cut = exitCutRef.current;
+        exitRef.current.style.opacity = String(reduced ? 0 : cut * cut * 0.55);
+      }
       if (amp < 0.004) {
         if (vignetteRef.current) vignetteRef.current.style.opacity = '0';
         if (fringeRef.current) fringeRef.current.style.opacity = '0';
         if (seamRef.current) seamRef.current.style.opacity = '0';
-        if (!isActive) { rafRef.current = null; return; }
+        if (!isActive && exitCutRef.current <= 0) { rafRef.current = null; return; }
       } else {
         const t = tunnelState.t ?? 0;
         // Squeeze hardest at the Möbius midpoint, where the band's orientation
@@ -142,6 +158,16 @@ export default function TunnelTransitOverlay() {
         style={{
           ...base,
           background: `radial-gradient(ellipse at 50% 50%, transparent 25%, ${entryColor}00 38%, ${entryColor}88 51%, ${exitColor}66 57%, transparent 72%)`,
+          mixBlendMode: 'screen',
+        }}
+      />
+      {/* The exit cut's bloom: the exit tile's colour washing in from the rim
+          as the shot jumps from inside the tube to the worm popping out. */}
+      <div
+        ref={exitRef}
+        style={{
+          ...base,
+          background: `radial-gradient(ellipse at 50% 50%, ${exitColor}00 20%, ${exitColor}66 62%, ${exitColor}cc 100%)`,
           mixBlendMode: 'screen',
         }}
       />

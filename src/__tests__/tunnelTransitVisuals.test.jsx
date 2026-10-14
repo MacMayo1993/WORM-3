@@ -35,3 +35,15 @@ it('suppresses the crossing pulse for reduced motion and cancels RAF on unmount'
   act(() => root.render(null));
   expect(vi.getTimerCount()).toBe(0);
 });
+it('marks the exit cut with a bloom in the exit colour that clears on its own', () => {
+  act(() => root.render(<TunnelTransitOverlay />)); frame(100);
+  const bloom = () => Number(host.children[3].style.opacity);
+  expect(bloom()).toBe(0);
+  act(() => useGameStore.setState({ wormPhase: 'exiting' })); frame(100);
+  expect(bloom()).toBe(0);
+  act(() => useGameStore.setState({ wormPhase: 'windout' })); frame(32);
+  expect(bloom()).toBeGreaterThan(0.3);
+  expect(host.children[3].style.background).toContain('62, 219, 255');
+  act(() => useGameStore.setState({ wormPhase: 'crawling' })); frame(600);
+  expect(bloom()).toBe(0);
+});

@@ -99,6 +99,7 @@ import { ThunkEffect, SeveredTail, CollisionGlow } from './healerWorm/impactFx.j
 import { DroppedOrbs } from './healerWorm/DroppedOrbs.jsx';
 import { sampleSeveredTail, wormdKindForDeath } from './healerWorm/wormdFx.js';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
+import { addMirrorSubject } from '../3d/mirrorSubjects.js';
 
 // Scratch vectors used to seed synthetic body history during spawning.
 const _seedPos = new THREE.Vector3();
@@ -109,6 +110,8 @@ const _seedBackDir = new THREE.Vector3();
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
     const reflectionSource = useRef();
     const worm = useWormCrawler(size, cubies);
+    // The core's mirror room reflects the worm (mirrorSubjects.js).
+    useEffect(() => addMirrorSubject(reflectionSource.current), []);
 
     // ── Game phase + scramble state ────────────────────────────────────────────
     // gameModePhaseRef: 'scrambling'|'spawning'|'countdown'|'active'|'finalHealing'|'solved'
