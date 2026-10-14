@@ -1,10 +1,11 @@
 // The antipodal core's seams carry lightning instead of a black plastic frame.
 //
-// Every seam between the miniature's pieces is a live arc: a white-hot core that
-// re-jitters several times a second, a violet glow round it, pulses racing along
-// it, and star flares where four pieces meet. The current sinks down into the
-// grooves and bleeds a soft halo onto the edges of the tiles, so the core reads as
-// a charged cage. The more of the network is alive, the brighter it burns.
+// Every seam between the miniature's pieces is a charged groove that strikes:
+// at any instant a few piece-lengths of seam flash as crisp, forked zigzag bolts
+// a pixel or two wide (sized in screen space, so they stay wires however close
+// the core swells to the lens), a runner of charge races along the lit ones, and
+// sparks jump the junctions where four pieces meet. Between strikes the grooves
+// hold a faint violet line. The more of the network is alive, the brighter it burns.
 //
 // It is a patch on the core's own lit materials (bodies and stickers), so it adds
 // no draw and no geometry. Everything is computed in the shader from the piece's
@@ -56,19 +57,33 @@ float cbJag(float x, float seed) {
 }
 
 // One family of seams. 'across' crosses them (cubie centres on integers, seams
-// half way between), 'along' runs with them. Returns (core, glow, halo).
-vec3 coreSeam(float across, float along, float face, float T) {
+// half way between), 'along' runs with them, 'px' is how much of 'across' one
+// screen pixel covers. Returns (bolt, glow, groove).
+//
+// The bolt is drawn a pixel or two wide at any distance (screen derivatives),
+// so it stays a crisp wire whether the core is a speck across the cube or has
+// swollen round the lens. Each piece-length of seam strikes on its own: most
+// are dark at any instant, a few flash, and a runner of charge races along
+// those that are lit. The groove itself keeps a faint charged line.
+vec3 coreSeam(float across, float along, float face, float px, float T) {
   float seam = floor(across) + 0.5;
   float off = across - seam;
-  float seed = seam * 7.31 + face * 13.7 + floor(T * 9.0) * 1.93;
-  float jit = cbJag(along * 6.0, seed) * 0.035 + cbJag(along * 17.0, seed + 4.1) * 0.012;
-  float d = off - jit;
-  // Each piece-length of seam surges on its own beat; none ever goes fully dark.
-  float surge = 0.55 + 0.45 * cbHash(vec2(seam * 3.7 + floor(along) * 1.3 + face, floor(T * 6.0)));
-  float runner = pow(0.5 + 0.5 * sin(along * 3.1 - T * 11.0 + cbHash(vec2(seam, face)) * 6.2832), 8.0);
-  return vec3(exp(-d * d / 0.00007) * surge * (0.7 + 0.9 * runner),
-              exp(-d * d / 0.0012) * surge * (0.6 + 0.6 * runner),
-              exp(-off * off / 0.007) * (0.5 + 0.5 * surge));
+  float piece = floor(along);
+  float beat = floor(T * 7.0 + cbHash(vec2(seam, piece + face)) * 7.0);
+  float strike = step(0.66, cbHash(vec2(seam * 3.7 + piece * 1.3 + face, beat)));
+  float seed = seam * 7.31 + face * 13.7 + beat * 1.93;
+  // A real zigzag: big kinks every fifth of a piece, fine crackle on top.
+  float jit = cbJag(along * 5.0, seed) * 0.05 + cbJag(along * 23.0, seed + 4.1) * 0.012;
+  float d = abs(off - jit) / max(px, 1e-5);
+  // Fork: a short branch peels off the bolt and dies away from it.
+  float fork = cbJag(along * 9.0, seed + 9.7) * 0.11 * fract(along * 2.5 + cbHash(vec2(seed, 2.0)));
+  float df = abs(off - jit - fork) / max(px, 1e-5);
+  float runner = pow(0.5 + 0.5 * sin(along * 3.1 - T * 14.0 + cbHash(vec2(seam, face)) * 6.2832), 10.0);
+  float flicker = 0.75 + 0.25 * cbHash(vec2(seed, floor(T * 30.0)));
+  float bolt = strike * flicker * (exp(-d * d * 0.7) + 0.55 * exp(-df * df * 1.4) * step(0.55, cbHash(vec2(seed, 5.0))));
+  float glow = strike * flicker * exp(-d * d / 30.0) * 0.35 + runner * strike * exp(-d * d / 12.0) * 0.6;
+  float groove = exp(-off * off / (px * px * 2.5 + 0.00002)) * 0.25;
+  return vec3(bolt, glow, groove);
 }
 
 // haloOnly: a tile's surface takes only the light the arcs throw onto it.
@@ -83,23 +98,22 @@ vec3 coreLightning(float haloOnly) {
   else if (c.y >= c.z) { depth = uCoreShell - c.y; p = q.xz; face = q.y > uCoreCell.y ? 3.0 : 4.0; }
   else { depth = uCoreShell - c.z; p = q.xy; face = q.z > uCoreCell.y ? 5.0 : 6.0; }
   float T = uCoreBoltTime;
-  vec3 a = coreSeam(p.x, p.y, face, T);
-  vec3 b = coreSeam(p.y, p.x, face + 0.5, T);
-  // Junctions where four pieces meet hold the charge, flaring as small stars.
-  vec2 nd = p - (floor(p) + 0.5);
-  // A few junctions at a time burst into a bigger star, like the arcs in the storm.
+  vec2 px = max(fwidth(p), vec2(1e-5));
+  vec3 a = coreSeam(p.x, p.y, face, px.x, T);
+  vec3 b = coreSeam(p.y, p.x, face + 0.5, px.y, T);
+  // Where four pieces meet a strike can jump the junction as a small spark.
+  vec2 nd = (p - (floor(p) + 0.5)) / px;
   float nodeSeed = cbHash(floor(p) + face * 17.0);
-  float twinkle = 0.6 + 0.4 * sin(T * 7.0 + nodeSeed * 6.2832);
-  float burst = step(0.82, cbHash(floor(p) * 1.3 + face + floor(T * 2.0 + nodeSeed)));
-  float reach = mix(1.0, 0.45, burst);
-  float star = (exp(-abs(nd.x) * 70.0 - abs(nd.y) * 6.0 * reach) + exp(-abs(nd.y) * 70.0 - abs(nd.x) * 6.0 * reach))
-             * twinkle * (1.0 + burst * 1.5);
-  float node = exp(-dot(nd, nd) * 300.0);
+  float spark = step(0.8, cbHash(floor(p) * 1.3 + face + floor(T * 5.0 + nodeSeed * 5.0)));
+  float node = spark * exp(-dot(nd, nd) * 0.08);
   float sink = exp(-max(depth, 0.0) * 18.0);
-  float halo = max(a.z, b.z);
-  vec3 light = haloOnly > 0.5
-    ? uCoreBoltColor * halo * 0.25 + uCoreBoltHot * star * 0.35
-    : uCoreBoltHot * (max(a.x, b.x) + node * (1.2 + burst) + star * 0.35) * 3.0 + uCoreBoltColor * ((a.y + b.y + star * 0.8) * 1.5 + halo * 0.35);
+  // On the tiles: only a thin rim of the strike's light along their edges.
+  if (haloOnly > 0.5) {
+    float rim = max(a.y, b.y) * 0.35 + node * 0.2;
+    return uCoreBoltColor * rim * uCoreBoltGain;
+  }
+  float bolt = max(a.x, b.x) + node;
+  vec3 light = uCoreBoltHot * bolt * 2.4 + uCoreBoltColor * ((a.y + b.y) * 1.6 + (a.z + b.z) * 0.5);
   return light * sink * uCoreBoltGain;
 }
 `;

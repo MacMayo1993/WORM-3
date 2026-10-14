@@ -1,4 +1,5 @@
 import { tunnelCoreClipUniforms } from './tunnelCoreClip.js';
+import { tunnelCameraUniforms } from './tunnelCameraClearance.js';
 import { vertexShader, fragmentShader, bumperVertexShader, bumperFragmentShader } from './mobiusTunnelShaders.js';
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
@@ -322,6 +323,8 @@ const MobiusTunnel = ({
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
     uCameraClearance: { value: 0 },
+    uCoreClipOff: { value: 0 },
+    ...tunnelCameraUniforms,
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
     uTileCenterA: { value: new THREE.Vector3() },
@@ -346,6 +349,8 @@ const MobiusTunnel = ({
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
+    uCoreClipOff: uniforms.uCoreClipOff,
+    ...tunnelCameraUniforms,
     uGrowT: uniforms.uGrowT,
     uTime: uniforms.uTime,
     ...tunnelCoreClipUniforms,
@@ -374,12 +379,18 @@ const MobiusTunnel = ({
 
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
+    if (wormMode && tunnelState.active && _state.camera.getWorldDirection) {
+      _state.camera.getWorldDirection(tunnelCameraUniforms.uCameraAhead.value);
+      tunnelCameraUniforms.uCameraUp.value.set(0, 1, 0).applyQuaternion(_state.camera.quaternion);
+    }
     syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
     // All active connections remain in the interior highway. The shader clears
     // only fragments near the lens instead of removing whole alternate routes.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
+    // The band being ridden runs on through the core's mirror room.
+    uniforms.uCoreClipOff.value = wormMode && tunnelState.active && tunnelState.activeTunnelId === tunnelId ? 1 : 0;
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
     if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
