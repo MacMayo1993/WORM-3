@@ -5,7 +5,6 @@ import CautionFallFX from './healerWorm/CautionFallFX.jsx';
 import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
 import WormEffectWarmup from './healerWorm/WormEffectWarmup.jsx';
 import { WormLighting } from './WormLighting.jsx';
-import { CoreWormReflections } from './healerWorm/CoreWormReflections.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
 import { springSlamTiles } from './healerWorm/jumpLanding.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
@@ -1054,7 +1053,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
-            {wormAlive && <CoreWormReflections source={reflectionSource} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
             {wormAlive && <TunnelPortalFX worm={worm} size={size} />}
             {/* Hidden, not unmounted, for the tunnel ride. The camera is inside the

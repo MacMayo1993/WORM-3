@@ -61,15 +61,18 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     const room = scene.getObjectByName('anticube-mirror-room');
     const mirrors = scene.getObjectByName('anticube-mirror-tiles');
     expect(room.visible).toBe(true);
-    expect(mirrors.material.envMap.isCubeTexture).toBe(true);
+    // Live mirrors: a reflection shader fed by the room's own capture.
+    expect(mirrors.material.uniforms.uMirrorEnv).toBeDefined();
+    expect(mirrors.count).toBe(6 * 3 * 3);
     expect(body.userData.portalCutout.uCoreRoomHalf.value).toBeCloseTo(CORE_MIRROR_HALF);
     // Both the mirror faces and the dark grout leave the same passage clear.
     for (const mesh of room.children) expect(mesh.material.userData.portalCutout).toBe(body.userData.portalCutout);
-    const reflection = mirrors.material.envMap;
-    const disposed = vi.fn(); reflection.addEventListener('dispose', disposed);
-    await act(async () => useGameStore.setState({ cubies: makeCubies(3) }));
-    expect(mirrors.material.envMap).not.toBe(reflection);
-    expect(disposed).toHaveBeenCalledOnce();
+    // The stained glass follows the cube state the core shows.
+    const tints = Array.from(mirrors.instanceColor.array);
+    const recoloured = makeCubies(3);
+    recoloured[2][1][1].stickers.PX.curr = 1;
+    await act(async () => useGameStore.setState({ cubies: recoloured }));
+    expect(Array.from(mirrors.instanceColor.array)).not.toEqual(tints);
     const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX').material;
     const cached = getTileStyleMaterial('checkerboard', FACE_COLORS[5], false, null, FACE_COLORS[2]);
     expect(inner).not.toBe(cached);

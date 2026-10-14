@@ -100,12 +100,20 @@ const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
 const _normalA = new THREE.Vector3();
 const _normalB = new THREE.Vector3();
-// Camera-proximity cull while riding a wormhole: fully hidden inside CAM_CULL_HIDE
-// of the lens, back to full size by CAM_CULL_FULL. See the cull block in the
-// segment loop for why the camera ends up inside its own worm at all.
-const CAM_CULL_HIDE = 0.30;
-const CAM_CULL_FULL = 0.52;
+// Camera-proximity cull while riding a wormhole, the same rule the band's camera
+// clearance uses: a bead close to the lens is hidden inside CAM_CULL_HIDE and back
+// to full size by CAM_CULL_FULL (a little further straight ahead), unless it lies
+// below the lens, on the band the rider is seen on; any bead touching the lens
+// (CAM_CULL_TOUCH) goes. See the cull block in the segment loop for why the
+// camera ends up by its own worm.
+const CAM_CULL_HIDE = 0.2;
+const CAM_CULL_FULL = 0.36;
+const CAM_CULL_AHEAD = 0.5;
+const CAM_CULL_TOUCH = 0.1;
 const _camWorldPos = new THREE.Vector3();
+const _camAhead = new THREE.Vector3();
+const _camUp = new THREE.Vector3();
+const _camToBead = new THREE.Vector3();
 // The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
 // the head's world position is already ridden upstream in the main worm useFrame.
 const _pathCursor = makeStepPathCursor();
@@ -272,7 +280,12 @@ export function WormBody({ worm, size }) {
         // chase camera sits well above and behind it, so nothing there needs culling
         // and gating on the phase keeps segments from blinking out during a jump.
         const _transitCull = _bodyTransit || worm.phase.current === 'windup';
-        if (_transitCull) _camWorldPos.copy(state.camera.position);
+        if (_transitCull) {
+            _camWorldPos.copy(state.camera.position);
+            if (state.camera.getWorldDirection) state.camera.getWorldDirection(_camAhead); else _camAhead.set(0, 0, -1);
+            _camUp.set(0, 1, 0);
+            if (state.camera.quaternion) _camUp.applyQuaternion(state.camera.quaternion);
+        }
 
         const _isInch = isInchRef.current;
         const _isGlow = isGlowRef.current;
@@ -766,13 +779,22 @@ export function WormBody({ worm, size }) {
             // plane is a wall of colour across the frame: the shot reads as being
             // inside the worm rather than behind it. Shrink whatever comes that
             // close to nothing, over a band wide enough that it is a fade rather
-            // than a pop.
+            // than a pop. Only what lies ahead of the lens can fill the frame: the
+            // beads beside and under the camera stay, so the whole body is seen
+            // riding the band rather than vanishing round the lens.
             // The head is exempt: it is the subject of the shot, and the camera's
             // own trailing distance keeps it clear of the lens anyway.
             if (_transitCull && i !== 0) {
-                const _camD = _bodyClonePos.distanceTo(_camWorldPos);
-                if (_camD < CAM_CULL_HIDE) continue;
-                if (_camD < CAM_CULL_FULL) _wormDummy.scale.multiplyScalar((_camD - CAM_CULL_HIDE) / (CAM_CULL_FULL - CAM_CULL_HIDE));
+                _camToBead.subVectors(_bodyClonePos, _camWorldPos);
+                const _camD = _camToBead.length();
+                if (_camD < CAM_CULL_TOUCH) continue;
+                const close = 1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_HIDE, CAM_CULL_FULL);
+                const ahead = THREE.MathUtils.smoothstep(_camToBead.dot(_camAhead) / _camD, 0.55, 0.85)
+                    * (1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_FULL, CAM_CULL_AHEAD));
+                const below = THREE.MathUtils.smoothstep(-_camToBead.dot(_camUp) / _camD, 0.3, 0.6);
+                const keep = 1 - Math.max(close, ahead) * (1 - below);
+                if (keep <= 0.001) continue;
+                if (keep < 1) _wormDummy.scale.multiplyScalar(keep);
             }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);

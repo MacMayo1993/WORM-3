@@ -23,7 +23,7 @@ import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
  * cubies.
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -36,7 +36,7 @@ import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
 import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
-import { createCoreReflection, createCoreMirrorRoom } from './coreMirrorRoom.js';
+import { createCoreMirrorRoom, createCoreMirrorProbe } from './coreMirrorRoom.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
@@ -111,14 +111,17 @@ function VoidCore({ cubieRefs = null }) {
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
-  const reflection = useMemo(() => wormMode ? createCoreReflection(cubies, size, faceColors) : null, [wormMode, cubies, size, faceColors]);
-  useEffect(() => () => reflection?.dispose(), [reflection]);
-  const mirrors = useMemo(() => createCoreMirrorRoom(size, passage.uniforms, null), [size, passage]);
-  useLayoutEffect(() => {
-    mirrors.material.envMap = reflection;
-    mirrors.material.needsUpdate = true;
-  }, [mirrors, reflection]);
+  // The mirror room inside the core reflects the room itself, live (coreMirrorRoom.js).
+  const mirrors = useMemo(() => createCoreMirrorRoom(size, passage.uniforms), [size, passage]);
   useEffect(() => () => mirrors.dispose(), [mirrors]);
+  const gl = useThree(s => s.gl);
+  const probe = useMemo(() => {
+    if (!wormMode) return null;
+    const halfFloat = gl.capabilities?.isWebGL2 && (gl.extensions?.has('EXT_color_buffer_float') || gl.extensions?.has('EXT_color_buffer_half_float'));
+    return createCoreMirrorProbe(isMobile ? 128 : 256, halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType);
+  }, [wormMode, gl]);
+  useEffect(() => () => probe?.dispose(), [probe]);
+  const probeWarmed = useRef(null);
   useLayoutEffect(() => {
     antiverse.uniforms.uPalette.value.forEach((color, i) => color.set(faceColors[i + 1]));
   }, [antiverse, faceColors]);
@@ -202,13 +205,15 @@ function VoidCore({ cubieRefs = null }) {
     }
     mesh.instanceColor.array.set(colors.rgb);
     mesh.instanceColor.needsUpdate = true;
+    // Each mirror is stained with the core sticker it sits behind.
+    mirrors.setTints(stickerAt, colors.rgb);
     syncStyledColors();
     fx.current.layoutDirty = true;
-  }, [colors, layout, syncStyledColors]);
+  }, [colors, layout, syncStyledColors, mirrors, stickerAt]);
 
   const motionQuery = useMemo(() => (typeof window === 'undefined' ? null : window.matchMedia?.('(prefers-reduced-motion: reduce)')), []);
 
-  useFrame(({ camera, gl }, rawDt) => {
+  useFrame(({ camera, gl, scene }, rawDt) => {
     const f = fx.current;
     const state = useGameStore.getState();
     const dt = Math.min(rawDt, 0.05);
@@ -329,6 +334,21 @@ function VoidCore({ cubieRefs = null }) {
     }
     passage.uniforms.uPassageRadius.value = coreOpeningRadius(size, f.zoom);
     mirrors.group.visible = wormMode && passage.uniforms.uPassageOpen.value > .5;
+    if (probe) {
+      // Link the room's programs, and every program its capture draws with, while
+      // the board is still hidden behind the scramble or briefing; never mid-ride.
+      const hidden = state.wormGamePhase === 'scrambling' || (!!state.wormStoryLevel && !state.wormStoryStarted);
+      const warmKey = `${state.wormRunId}|${size}`;
+      if (hidden && probeWarmed.current !== warmKey) {
+        probeWarmed.current = warmKey;
+        mirrors.group.visible = true;
+        gl.compile?.(mirrors.group, camera, scene);
+        probe.capture(gl, scene, mirrors);
+        mirrors.group.visible = false;
+      } else if (mirrors.group.visible) {
+        probe.capture(gl, scene, mirrors, isMobile || state.perfReducedFX ? 2 : 1);
+      }
+    }
     // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.
     passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? (CORE_MIRROR_HALF + .001) * f.zoom : 0;
     passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
