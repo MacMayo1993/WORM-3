@@ -97,17 +97,67 @@ describe('enemy-free elemental abilities', () => {
         const another = fixture(); another.claim('ice');
         killWormSim(another.sim, another.ctx, { reason: 'bomb' }); expect(another.sim.alive).toBe(false);
     });
-    it('Air glides only while held, has finite travel and expands airborne collection', () => {
+    it('Air stays airborne while held, resumes descent on release, and expands collection', () => {
         const { sim, claim, ctx } = fixture(); claim('air'); startJump(sim, ctx, size);
-        sim.jumpT = .5; queueTurn(sim, 'jump-hold');
-        const ordinary = .2 / sim.jumpSpan;
-        expect(airJumpAdvance(sim, .2)).toBeCloseTo(ordinary * .25);
+        sim.jumpT = .49; queueTurn(sim, 'jump-hold');
+        sim.jumpT += airJumpAdvance(sim, .2);
+        expect(sim.jumpT).toBe(.5); // never overshoots the apex
+        for (let i = 0; i < 100; i++) expect(airJumpAdvance(sim, .2)).toBe(0);
+        expect(sim.elementalAbilities.flying).toBe(true);
         expect(elementalPickupReach(sim, size).size).toBeGreaterThan(1);
-        queueTurn(sim, 'jump-release'); expect(airJumpAdvance(sim, .2)).toBeCloseTo(ordinary);
-        queueTurn(sim, 'jump-hold'); airJumpAdvance(sim, 3);
-        expect(sim.elementalAbilities.glideLeft).toBe(0);
-        expect(airJumpAdvance(sim, .2)).toBeCloseTo(ordinary);
-        sim.rocketActive = true; expect(elementalPickupReach(sim, size)).toBeNull();
+        queueTurn(sim, 'jump-release');
+        expect(airJumpAdvance(sim, .2)).toBeCloseTo(.2 / sim.jumpSpan);
+        expect(sim.elementalAbilities.flying).toBe(false);
+        sim.jumpT = .7; queueTurn(sim, 'jump-hold');
+        expect(airJumpAdvance(sim, .2)).toBe(0); expect(sim.jumpT).toBe(.7); // no snap when re-held
+        sim.elementalT = 0;
+        expect(airJumpAdvance(sim, .2)).toBeCloseTo(.2 / sim.jumpSpan);
+        sim.elementalT = 10; sim.elementalType = 'fire'; sim.elementalPair = 'air';
+        expect(airJumpAdvance(sim, .2)).toBe(0);
+        sim.rocketActive = true;
+        expect(airJumpAdvance(sim, .2)).toBeCloseTo(.2 / sim.jumpSpan);
+        expect(elementalPickupReach(sim, size)).toBeNull();
+    });
+    it.each([null, 'fire', 'water', 'grass', 'ice', 'lightning'])('holding Jump does not fly without Air (%s)', type => {
+        const { sim, claim, ctx } = fixture(); if (type) claim(type);
+        startJump(sim, ctx, size); sim.jumpT = .5; queueTurn(sim, 'jump-hold');
+        expect(airJumpAdvance(sim, .2)).toBeCloseTo(.2 / sim.jumpSpan);
+        expect(sim.elementalAbilities.flying).toBe(false);
+    });
+    it('flies across surface steps, steers, freezes on pause and lands after release or expiry', () => {
+        for (const end of ['release', 'expiry']) {
+            const { sim, claim, ctx } = fixture(); claim('air');
+            sim.tailLength = 0; sim.selfCollisionGraceSteps = 100;
+            queueTurn(sim, 'jump-hold'); queueTurn(sim, 'jump');
+            tick(sim, ctx, 1.6);
+            expect(sim.jumpT).toBe(.5); expect(sim.isJumping).toBe(true);
+            const before = { ...sim.pos }, time = sim.elementalT;
+            queueTurn(sim, 'turnRight'); tick(sim, ctx, 1);
+            expect(sim.pos).not.toEqual(before); expect(sim.jumpT).toBe(.5);
+            expect(sim.elementalT).toBeLessThan(time);
+            ctx.isPaused = () => true;
+            const paused = sim.elementalT; tick(sim, ctx, 1);
+            expect(sim.elementalT).toBe(paused); expect(sim.jumpT).toBe(.5);
+            ctx.isPaused = () => false;
+            if (end === 'release') queueTurn(sim, 'jump-release'); else sim.elementalT = .01;
+            tick(sim, ctx, 1.6);
+            expect(sim.isJumping).toBe(false); expect(sim.elementalAbilities.flying).toBe(false);
+        }
+    });
+    it('animates a colored pickup burst during the camera beat but freezes it on pause', () => {
+        const { sim, ctx } = fixture();
+        startElemental(sim, ctx, 'air', size);
+        const event = sim.elementalAbilities.events.at(-1);
+        expect(event).toMatchObject({ kind: 'pickup', element: 'air' });
+        const buffTime = sim.elementalT;
+        tick(sim, ctx, .2);
+        expect(event.ttl).toBeLessThan(event.duration);
+        expect(sim.elementalAbilities.visualTime).toBeGreaterThan(0);
+        expect(sim.elementalT).toBe(buffTime);
+        ctx.isPaused = () => true;
+        const ttl = event.ttl, time = sim.elementalAbilities.visualTime;
+        tick(sim, ctx, .2);
+        expect(event.ttl).toBe(ttl); expect(sim.elementalAbilities.visualTime).toBe(time);
     });
     it('freezes ability clocks and maturation while paused or traversing and clears them on reset', () => {
         const { sim, ctx, claim } = fixture(); claim('grass'); claim('fire'); startFlameDash(sim, size);

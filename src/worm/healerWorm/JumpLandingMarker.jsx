@@ -15,6 +15,7 @@ export function JumpLandingMarker({ worm, size }) {
         mesh.visible = worm.phase.current === 'crawling' && worm.isJumping.current
             && !liveRotation.active && !worm.restRead.current;
         if (!mesh.visible) return;
+        mesh.material.color.set('#fff4b0');
         const flight = worm.padFlight?.current;
         if (flight) {
             // A pad flight lands on the pad top, not on the surface-jump tile.
@@ -26,11 +27,14 @@ export function JumpLandingMarker({ worm, size }) {
         const ability = worm.elementalAbilities?.current;
         const airActive = worm.elementalT?.current > 0
             && (worm.elementalType?.current === 'air' || worm.elementalPair?.current === 'air');
-        const glide = airActive && !worm.rocketActive?.current && ability?.jumpHeld && worm.jumpT.current < 0.7
-            ? (ability.glideLeft || 0) * 0.75 : 0;
-        mesh.material.color.set(glide > 0 ? '#b9f5ed' : '#fff4b0');
+        // Holding Air has no fixed destination. Resume the actual landing
+        // prediction immediately on release or expiry, without phantom travel.
+        if (airActive && !worm.rocketActive?.current && ability?.jumpHeld) {
+            mesh.visible = false;
+            return;
+        }
         const tile = jumpLandingTile(worm.pos.current, worm.moveDir.current, size,
-            worm.interpT.current + glide, worm.jumpT.current, worm.jumpSpan.current);
+            worm.interpT.current, worm.jumpT.current, worm.jumpSpan.current);
         const normal = FACE_NORMALS[tile.dirKey];
         mesh.position.fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0))
             .addScaledVector(normal, 0.045);

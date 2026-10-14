@@ -89,7 +89,7 @@ export const ELEMENTAL_DEFS = {
     color: "#b9f5ed", accent: "#ffffff", fogColor: "#143a40", particle: "wind",
     iconPath: "M2 8h13c5 0 5-6 1-6-2 0-3 1-3 2M2 12h17c4 0 4 6 0 6-2 0-3-1-3-2M2 16h7c4 0 4 6 0 6",
     iconAccent: "",
-    description: "Jump farther and higher, steer in flight, and hold Jump to glide briefly. Gather nearby growth orbs while airborne.",
+    description: "Hold Jump to fly while Air lasts; release to land. Steer freely and gather nearby growth orbs in flight.",
   },
   lightning: {
     label: "Lightning",

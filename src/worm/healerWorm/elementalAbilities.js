@@ -10,7 +10,7 @@ import { ORB_SEGMENT_GROWTH } from './constants.js';
 export const ELEMENT_ABILITIES = Object.freeze({
     heatTiles: 6, fireDash: 0.75, fireBonus: 6, gardenBudget: 6,
     gardenRipen: 1.5, lightningCooldown: 4, chainCount: 3,
-    driftDuration: 0.55, icePhase: 1.2, glideTiles: 1.2,
+    driftDuration: 0.55, icePhase: 1.2, pickupDuration: 1.1,
 });
 const keyOf = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
 const tileOf = key => { const [x, y, z, dirKey] = key.split(','); return { x: +x, y: +y, z: +z, dirKey }; };
@@ -18,11 +18,12 @@ export function makeElementalAbilities() {
     return { heat: new Set(), fireReady: false, fireDashT: 0, fireBonus: 0,
         gardenBudget: 0, lightningT: 0, chainPending: false, scanT: 0,
         iceShield: false, icePhaseT: 0, driftT: 0, jumpHeld: false,
-        glideLeft: 0, gliding: false, events: [], seq: 0 };
+        flying: false, visualTime: 0, events: [], seq: 0 };
 }
-export function abilityEvent(sim, kind, tiles = [sim.pos]) {
+export function abilityEvent(sim, kind, tiles = [sim.pos], element = null) {
     const a = sim.elementalAbilities;
-    a.events.push({ id: ++a.seq, kind, tiles: tiles.map(t => ({ x: t.x, y: t.y, z: t.z, dirKey: t.dirKey })), ttl: 0.65 });
+    const duration = kind === 'pickup' ? ELEMENT_ABILITIES.pickupDuration : 0.65;
+    a.events.push({ id: ++a.seq, kind, element, duration, tiles: tiles.map(t => ({ x: t.x, y: t.y, z: t.z, dirKey: t.dirKey })), ttl: duration });
     if (a.events.length > 12) a.events.shift();
 }
 export const ripeOrb = orb => (!orb.garden || orb.garden.remaining <= 0)
@@ -58,6 +59,7 @@ export function igniteNearbyOrbs(sim, size) {
 }
 export function claimElementalAbility(sim, type, size, ctx) {
     const a = sim.elementalAbilities;
+    abilityEvent(sim, 'pickup', [sim.pos], type);
     if (type === 'fire') { a.fireReady = true; a.heat.clear(); a.fireBonus = ELEMENT_ABILITIES.fireBonus; }
     if (type === 'water') sim.waterMomentum = 1;
     if (type === 'grass') {
@@ -138,14 +140,21 @@ export function chainTargets(sim, size) {
     }
     return chosen;
 }
+// Visual-only clock also runs through the pickup camera beat, after the pause
+// guard. It never advances flight, maturity, cooldowns or the buff lifetime.
+export function tickAbilityVisuals(sim, delta) {
+    const a = sim.elementalAbilities;
+    a.visualTime += delta;
+    for (let i = a.events.length - 1; i >= 0; i--) { a.events[i].ttl -= delta; if (a.events[i].ttl <= 0) a.events.splice(i, 1); }
+}
 export function tickElementalAbilities(sim, delta, size, ctx, collect) {
     if (sim.phase !== 'crawling') return;
     const a = sim.elementalAbilities;
     for (const key of ['fireDashT', 'driftT', 'icePhaseT', 'lightningT', 'scanT']) a[key] = Math.max(0, a[key] - delta);
-    for (let i = a.events.length - 1; i >= 0; i--) { a.events[i].ttl -= delta; if (a.events[i].ttl <= 0) a.events.splice(i, 1); }
+    tickAbilityVisuals(sim, delta);
     if (!hasElement(sim, 'fire')) { a.fireReady = false; a.fireDashT = 0; for (const o of sim.powerups) o.ignited = false; }
     if (!hasElement(sim, 'ice')) { a.iceShield = false; a.driftT = 0; }
-    if (!hasElement(sim, 'air')) { a.gliding = false; a.glideLeft = 0; }
+    if (!hasElement(sim, 'air')) a.flying = false;
     let changed = false;
     for (const orb of sim.powerups) if (orb.garden?.remaining > 0) {
         orb.garden.remaining = Math.max(0, orb.garden.remaining - delta);
@@ -174,14 +183,14 @@ export function tickElementalAbilities(sim, delta, size, ctx, collect) {
         }
     }
 }
-// Slowing only the apex preserves position and velocity on release. The finite
-// budget is measured in tile travel, so Boost cannot create an unlimited flight.
+// Hold the jump at its apex while Air lasts. Clamping the advance, rather than
+// resetting jumpT, makes takeoff, release, re-hold and buff expiry continuous.
+// Surface movement and steering continue normally beneath this held arc.
 export function airJumpAdvance(sim, tileTravel) {
     const a = sim.elementalAbilities;
-    a.gliding = hasElement(sim, 'air') && a.jumpHeld && a.glideLeft > 0 && sim.jumpT >= 0.35 && sim.jumpT < 0.7 && !sim.rocketActive;
-    const held = a.gliding ? Math.min(tileTravel, a.glideLeft) : 0;
-    a.glideLeft -= held;
-    return (tileTravel - held * 0.75) / sim.jumpSpan;
+    a.flying = hasElement(sim, 'air') && a.jumpHeld && sim.isJumping && !sim.rocketActive && !sim.padFlight;
+    const advance = tileTravel / sim.jumpSpan;
+    return a.flying ? Math.min(advance, Math.max(0, 0.5 - sim.jumpT)) : advance;
 }
 export function elementalSpeedBonus(sim) {
     const a = sim.elementalAbilities;

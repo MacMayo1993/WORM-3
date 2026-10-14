@@ -32,7 +32,7 @@ try {
     await page.evaluate(`(${fs.readFileSync(path.join(root, 'scripts/perf-worm/inpage.js'), 'utf8')})()`);
     fs.mkdirSync(shots, { recursive: true });
     const results = [];
-    for (const type of ['fire', 'water', 'grass', 'ice', 'air', 'lightning']) {
+    for (const type of (process.env.ELEMENTS?.split(',') || ['fire', 'water', 'grass', 'ice', 'air', 'lightning'])) {
         const result = await page.evaluate(type => {
             const store = window.__store, size = store.getState().size, sim = window.__wormSimRef.current;
             store.setState({ wormPaused: true, wormAlive: true, wormStoryStarted: true, wormGamePhase: 'active', cubies: window.__perfMakeCubies(size), wormSpecials: [], wormElementalTheme: null, wormElementalPartner: null });
@@ -55,7 +55,7 @@ try {
             }
             window.__perf.noDraw = false;
             return { type, alive: sim.alive, heatReady: sim.elementalAbilities.fireReady,
-                dash: sim.elementalAbilities.fireDashT, gliding: sim.elementalAbilities.gliding,
+                dash: sim.elementalAbilities.fireDashT, flying: sim.elementalAbilities.flying,
                 buds: sim.powerups.filter(o => o.garden).length, chainCooldown: sim.elementalAbilities.lightningT };
         }, type);
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
