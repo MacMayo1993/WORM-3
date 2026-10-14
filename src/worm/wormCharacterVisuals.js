@@ -1,22 +1,48 @@
 import * as THREE from 'three';
 
+// Six broad polished faces, bright bevels and pointed ends. The old subdivided
+// icosphere read as another round bead at gameplay scale. Keep this non-indexed
+// so each cut has its own normal/colour, still in the existing instanced draw.
+function createPrismGeometry() {
+  const positions = [], colors = [];
+  const rings = [[-1, 0], [-0.72, 0.68], [-0.28, 0.96], [0.28, 0.96], [0.72, 0.68], [1, 0]];
+  const shades = [0.60, 0.94, 0.72, 0.48, 0.83, 1];
+  const point = (ring, side) => {
+    const [z, radius] = rings[ring], angle = side * Math.PI / 3;
+    return [Math.cos(angle) * radius, Math.sin(angle) * radius, z];
+  };
+  const triangle = (a, b, c, shade) => {
+    positions.push(...a, ...b, ...c);
+    for (let v = 0; v < 3; v++) colors.push(shade, shade, shade);
+  };
+  for (let band = 0; band < rings.length - 1; band++) for (let side = 0; side < 6; side++) {
+    const a = point(band, side), b = point(band, side + 1);
+    const c = point(band + 1, side), d = point(band + 1, side + 1);
+    const shade = band === 1 || band === 3 ? Math.min(1, shades[side] + 0.25) : shades[side];
+    if (band !== 0) triangle(a, b, c, shade);
+    if (band !== rings.length - 2) triangle(b, d, c, shade);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.name = 'prism-cut-crystal';
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // Unit-radius assets: detail stays inside the existing surface/collision envelope.
 // Gameplay instances and picker meshes use the same recipe, with no extra body draws.
 export function createCharacterGeometry(character) {
-  const prism = character === 'prism';
+  if (character === 'prism') return createPrismGeometry();
   // Wiggle draws every link even at maximum length. Eight latitude bands keep
   // that full silhouette near the old thinned body's triangle budget.
-  const geometry = prism ? new THREE.IcosahedronGeometry(1, 1) : new THREE.SphereGeometry(1, character === 'inch' ? 20 : 16, character === 'wiggle' ? 8 : 16);
-  if (!prism && character !== 'inch' && character !== 'wiggle') return geometry;
+  const geometry = new THREE.SphereGeometry(1, character === 'inch' ? 20 : 16, character === 'wiggle' ? 8 : 16);
+  if (character !== 'inch' && character !== 'wiggle') return geometry;
   const p = geometry.attributes.position;
   const colors = [];
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    if (prism) {
-      // Broad jewel planes alternate in value; the moving spectrum supplies hue.
-      const shade = 0.70 + (Math.floor(i / 3) % 5) * 0.075;
-      colors.push(shade, shade, 1);
-    } else if (character === 'wiggle') {
+    if (character === 'wiggle') {
       // A continuous dorsal ribbon and shaded underside, rather than a high
       // contrast colour change at every overlapping bead seam.
       const ribbon = Math.exp(-x * x * 28) * Math.max(0, y);
@@ -48,12 +74,16 @@ export function applyCharacterFinish(material, character) {
     material.roughness = prism ? 0.19 : inch ? 0.48 : 0.38;
     material.clearcoat = prism ? 1 : 0.45;
     material.clearcoatRoughness = 0.16;
-    material.emissiveIntensity = prism ? 0.07 : 0.035;
+    material.emissiveIntensity = prism ? 0.16 : 0.035;
     material.userData.pulse = null;
     if (prism) {
-      material.metalness = 0.28;
-      material.iridescence = 0.8;
+      material.metalness = 0.08;
+      material.iridescence = 0.45;
       material.flatShading = true;
+      material.emissive.set(0xffffff);
+      // Skin bumps/ripples must not soften the authored crystal planes.
+      const shader = material.userData.shader;
+      if (shader) { shader.uniforms.uStyle.value = 0; shader.uniforms.uAmp.value = 0; }
       // Opaque crystal avoids a transmission render pass on mobile.
       material.transmission = 0;
     }
@@ -62,7 +92,10 @@ export function applyCharacterFinish(material, character) {
 }
 
 export function prismColor(out, index, time) {
-  return out.setHSL((0.52 + index * 0.095 + time * 0.035) % 1, 0.78, 0.53);
+  // A stable ice-white head anchors the silhouette; wide spectrum bands move
+  // slowly along the body instead of turning each tiny link a different hue.
+  if (index === 0) return out.set('#c9f4ff');
+  return out.setHSL((0.52 + (index - 1) * 0.045 + time * 0.012) % 1, 0.90, 0.40);
 }
 
 /**
@@ -194,14 +227,18 @@ export function createCharacterAccents(character) {
     }
     tint = skin => feelerMat.color.set(skin.antenna);
   } else if (character === 'prism') {
-    const crystal = mat({ color: '#b9f4ff', emissive: '#37899c', emissiveIntensity: 0.25, roughness: 0.15, metalness: 0.2, flatShading: true });
-    const gem = add(geo(new THREE.OctahedronGeometry(0.19)), crystal, 0, 0.63, 0.76);
-    gem.scale.set(0.7, 1, 0.4);
-    // Crystal horns, set back on the crown's shoulders.
-    const horn = geo(new THREE.OctahedronGeometry(0.2));
+    const crystal = mat({ color: '#e0faff', emissive: '#8edbff', emissiveIntensity: 0.3, roughness: 0.17, metalness: 0.08, flatShading: true });
+    // A broad triangular prism above the eyes, visible even from the chase
+    // camera. Two outward crystals leave the centre hat seat available.
+    const gem = add(geo(new THREE.CylinderGeometry(0.37, 0.37, 0.20, 3)), crystal, 0, 0.64, 0.88);
+    gem.name = 'prism-crest';
+    gem.rotation.x = Math.PI / 2;
+    const horn = geo(new THREE.OctahedronGeometry(1));
     for (const side of [-1, 1]) {
-      const h = add(horn, crystal, side * 0.55, 0.78, 0.3);
-      h.scale.set(0.5, 1.25, 0.5); h.rotation.z = -side * 0.5;
+      const color = side < 0 ? '#67dfff' : '#f29bff';
+      const facet = mat({ color, emissive: color, emissiveIntensity: 0.2, roughness: 0.2, metalness: 0.08, flatShading: true });
+      const h = add(horn, facet, side * 0.66, 0.92, 0.30);
+      h.scale.set(0.23, 0.62, 0.23); h.rotation.z = -side * 0.42;
     }
   }
   return {

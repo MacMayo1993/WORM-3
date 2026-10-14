@@ -32,6 +32,21 @@ describe('character visual safety', () => {
     material.dispose();
   });
 
+  it('keeps crystal cuts outward-facing and below the old 80-triangle bead budget', () => {
+    const geometry = createCharacterGeometry('prism');
+    const p = geometry.attributes.position, n = geometry.attributes.normal;
+    expect(p.count / 3).toBeLessThanOrEqual(80);
+    const center = new THREE.Vector3(), normal = new THREE.Vector3();
+    for (let i = 0; i < p.count; i += 3) {
+      center.set(0, 0, 0);
+      for (let v = 0; v < 3; v++) center.add(new THREE.Vector3().fromBufferAttribute(p, i + v));
+      normal.fromBufferAttribute(n, i);
+      expect(normal.length()).toBeCloseTo(1);
+      expect(normal.dot(center)).toBeGreaterThan(0);
+    }
+    geometry.dispose();
+  });
+
   it('carries head accessories through all six surface frames without reflection', () => {
     for (const axis of ['x', 'y', 'z']) for (const sign of [-1, 1]) {
       const up = new THREE.Vector3(); up[axis] = sign;
@@ -121,7 +136,7 @@ describe('picker character switching', () => {
   it('replaces crystal geometry and material when another character is selected', () => {
     const crystal = draw('prism');
     expect(crystal).toHaveLength(9);
-    expect(crystal[0].geometry.type).toBe('IcosahedronGeometry');
+    expect(crystal[0].geometry.name).toBe('prism-cut-crystal');
     const classic = draw('classic');
     expect(classic[0].geometry.type).toBe('SphereGeometry');
     expect(classic.every(b => !b.material.vertexColors && !b.material.flatShading)).toBe(true);
