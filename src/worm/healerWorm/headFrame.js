@@ -1,12 +1,14 @@
 import * as THREE from 'three';
-import { DIR_FORWARD, FACE_NORMALS, windoutHeadS } from './constants.js';
-import { getTunnelWorldPosSmoothInto, getWindWorldPosInto } from '../wormLogic.js';
+import { DIR_FORWARD, windoutHeadS } from './constants.js';
+import { getTunnelWorldPosSmoothInto, getWindWorldPosInto, restReadProtectsTile } from '../wormLogic.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { tunnelTraversalT } from '../../utils/tunnelPath.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { rocketOrbitT, rocketFrameInto } from './rocketOrbit.js';
 
 const ahead = new THREE.Vector3(), behind = new THREE.Vector3(), anchor = new THREE.Vector3();
 const flightTurn = new THREE.Quaternion();
+const sliceAxis = new THREE.Vector3();
 
 // Shared by the face and directional head geometry. Copy into caller-owned
 // vectors: neither renderer may rotate the simulation's current normal.
@@ -38,9 +40,20 @@ export function headFrameInto(forward, normal, worm, size) {
     const flight = worm.padFlight.current;
     forward.copy(flight.heading).applyQuaternion(flightTurn.setFromUnitVectors(flight.endNormal, normal));
   } else {
-    const { dirKey } = worm.pos.current;
-    normal.copy(FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ);
+    const { x, y, z, dirKey } = worm.pos.current;
+    // rideLiveRotation already supplied the live normal. Only the grid heading
+    // still needs the current tile's signed turn (including non-anchor layers).
     forward.fromArray(DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0]);
+    const restRead = worm.restRead?.current;
+    const protectedCrossing = restRead?.axis === liveRotation.axis && restReadProtectsTile(restRead, x, y, z);
+    if (phase === 'crawling' && !worm.rotationDeparture?.current && !protectedCrossing) {
+      const angle = liveLayerAngle(x, y, z);
+      if (angle !== null) {
+        const axis = liveRotation.axis;
+        sliceAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+        forward.applyAxisAngle(sliceAxis, angle);
+      }
+    }
   }
   if (!inTransit && worm.rocketActive.current) {
     bodyPathHeadInto(anchor, worm);

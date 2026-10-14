@@ -11,14 +11,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
 import { WORM_LIFT, WORM_HEAD_RADIUS } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, mobiHeadFrameInto, MOBI_RADIUS } from '../mobiModel.js';
-import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { headFrameInto } from './headFrame.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
@@ -35,7 +33,6 @@ const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
 const _faceNormal = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
-const _mobiRideAxis = new THREE.Vector3();
 const _mobiHeadPos = new THREE.Vector3();
 const _mobiHeadForward = new THREE.Vector3();
 const _mobiHeadNormal = new THREE.Vector3();
@@ -118,23 +115,9 @@ export function WormFace({ worm, size }) {
             // heading, turned with the flight's normal across a cube edge.
             bodyPathHeadInto(_faceHeadPos, worm);
         } else {
-            const { dirKey } = worm.pos.current;
-
-            // Interpolated head world pos (copy into scratch — no .clone())
-            const prev = worm.prevWorldPos.current;
-            const cur = worm.curWorldPos.current;
-            if (!cur) {
-                const wp = getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
-                    worm.pos.current.z, dirKey, size, 0);
-                _faceHeadPos.set(wp[0], wp[1], wp[2]);
-            } else if (prev && worm.interpT.current < 1) {
-                _faceHeadPos.lerpVectors(prev, cur, worm.interpT.current);
-            } else {
-                _faceHeadPos.copy(cur);
-            }
-            const jumpLiftVal = worm.isJumping.current
-                ? worm.jumpLift() : 0;
-            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
+            // Use the same live anchor as WormBody. Re-interpolating the rest
+            // tiles would leave the eyes behind while the head rides a slice.
+            bodyPathHeadInto(_faceHeadPos, worm);
             // Ride the same orbit the body rides during a rocket burn, so the face
             // stays on the risen head instead of tracking its own face normal.
             rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
@@ -185,15 +168,7 @@ export function WormFace({ worm, size }) {
                 mobi.group.position.copy(_faceHeadPos);
                 normal = _faceNormal;
             }
-            if (!inTransit && liveRotation.active) {
-                const { x, y, z } = worm.pos.current;
-                const angle = liveLayerAngle(x, y, z);
-                if (angle !== null) {
-                    const axis = liveRotation.axis;
-                    _mobiRideAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
-                    _faceForward.applyAxisAngle(_mobiRideAxis, angle);
-                }
-            }
+            // The shared head frame already applies the slice turn once.
             orientMobi(mobi.group, _faceForward, normal);
             const faces = worm.orbPickupFaceIdsRef.current;
             setMobiOrbAppearance(mobi, mobiPalette[faces[faces.length - 1]] || mobiPalette[0]);
