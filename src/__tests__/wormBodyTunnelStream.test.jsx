@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
 import { shPush, shReset, ttPush, ttReset } from '../worm/circularBuffers.js';
-import { checkWormHitBySlice, cutWormTail } from '../worm/wormHelpers.js';
+import { checkWormHitBySlice, cutWormTail, rideLiveRotation } from '../worm/wormHelpers.js';
+import { liveCubies } from '../worm/liveCubies.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
@@ -22,16 +23,29 @@ import { SPRING_COIL_SECONDS } from '../worm/characterAbilities.js';
 let frame, tree;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
 import { WormBody } from '../worm/healerWorm/WormBody.jsx';
+import { WormFace } from '../worm/healerWorm/WormFace.jsx';
 
 // Capture the production instance matrices on the CPU. This exercises the real
 // body cursor, phase handoff and surface projection without a WebGL context.
 function Harness({ worm, size = 3 }) { tree = WormBody({ worm, size }); return null; }
 let sim, worm, host, root, mesh;
+let faceMeshes;
+function FaceHarness({ worm }) {
+  tree = WormFace({ worm, size: 3 });
+  for (const child of React.Children.toArray(tree.props.children)) {
+    if (child.type === 'mesh' && child.ref && !child.ref.current) {
+      const part = new THREE.Mesh(new THREE.SphereGeometry(1, 4, 4), new THREE.MeshBasicMaterial());
+      child.ref.current = part; faceMeshes.push(part);
+    }
+  }
+  return null;
+}
 const route = { entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' } };
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   liveRotation.active = false;
+  liveCubies.refs = null; liveCubies.size = 0; faceMeshes = [];
   sim = makeWormSim(3); resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
   sim.tailLength = 40;
   worm = Object.fromEntries(Object.keys(sim).map(key => [key, {
@@ -47,9 +61,11 @@ beforeEach(() => {
 });
 afterEach(() => {
   resetLiveRotation();
+  liveCubies.refs = null; liveCubies.size = 0;
   wormExpansion.amount = 0;
   act(() => root.unmount()); host.remove();
   mesh.geometry.dispose(); mesh.material.dispose();
+  faceMeshes.forEach(part => { part.geometry.dispose(); part.material.dispose(); });
   vi.unstubAllGlobals(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 function renderPoints() {
@@ -114,6 +130,81 @@ it('uses the Prism entrance frame, then returns to its surface heading', () => {
   expectHeadAxes(worm.arrival.headForward, worm.arrival.headNormal);
   worm.arrival.active = false;
   expectHeadAxes(new THREE.Vector3(...DIR_FORWARD.PZ.right), FACE_NORMALS.PZ);
+});
+
+function rotatingHeadTile(axis, angle) {
+  const axisVector = new THREE.Vector3(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+  // The head rides the second plane, opposite to the published anchor angle.
+  setLiveRotation(axis, [0, 2], [-angle, angle], 0, -angle);
+  sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' }; sim.interpT = 1;
+  sim.prevTile = null; sim.crossingCorner = false;
+  const tile = new THREE.Object3D();
+  tile.quaternion.setFromAxisAngle(axisVector, angle);
+  tile.position.set(1, 1, 1).applyQuaternion(tile.quaternion);
+  liveCubies.size = 3; liveCubies.refs = Array(27).fill(null); liveCubies.refs[26] = tile;
+  return axisVector;
+}
+
+it.each(['col', 'row', 'depth'])('carries Prism through both signed %s slice turns without a commit snap', axis => {
+  selectPrism(); sim.tailLength = 1;
+  for (const sign of [-1, 1]) for (const [heading, components] of Object.entries(DIR_FORWARD.PZ)) {
+    sim.moveDir = heading;
+    let forward, normal;
+    for (const angle of [0, 0.2, 0.7, 1.2, Math.PI / 2].map(a => sign * a)) {
+      const vector = rotatingHeadTile(axis, angle);
+      expect(rideLiveRotation(worm)).toBe(true);
+      forward = new THREE.Vector3(...components).applyAxisAngle(vector, angle);
+      normal = FACE_NORMALS.PZ.clone().applyAxisAngle(vector, angle);
+      expectHeadAxes(forward, normal);
+      expect(sim.currentNormal.distanceTo(normal)).toBeLessThan(1e-9);
+    }
+    // The committed tile/heading encode the same world pose without a live turn.
+    resetLiveRotation(); liveCubies.refs = null;
+    sim.pos.dirKey = Object.keys(FACE_NORMALS).find(key => FACE_NORMALS[key].dot(normal) > 0.999);
+    sim.moveDir = Object.keys(DIR_FORWARD[sim.pos.dirKey]).find(key =>
+      new THREE.Vector3(...DIR_FORWARD[sim.pos.dirKey][key]).dot(forward) > 0.999);
+    expectHeadAxes(forward, normal);
+  }
+});
+
+it.each(['stationary', 'rest-read', 'departing'])('does not apply a slice turn to a %s Prism head', kind => {
+  selectPrism(); sim.tailLength = 1; sim.moveDir = 'right';
+  rotatingHeadTile('row', 0.7);
+  sim.currentNormal.copy(FACE_NORMALS.PZ);
+  if (kind === 'stationary') sim.pos.y = 1;
+  if (kind === 'rest-read') sim.restRead = { axis: 'row', layers: [2] };
+  if (kind === 'departing') sim.rotationDeparture = {};
+  expect(rideLiveRotation(worm)).toBe(false);
+  expectHeadAxes(new THREE.Vector3(1, 0, 0), FACE_NORMALS.PZ);
+});
+
+it('keeps the Prism face attached to the live rotating head anchor', () => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'prism', wormAccessories: {}, wormHat: 'none' });
+    root.render(<FaceHarness worm={worm} />);
+  });
+  sim.moveDir = 'right';
+  rotatingHeadTile('row', 0); rideLiveRotation(worm);
+  act(() => frame({}, 0));
+  const rest = faceMeshes.map(part => part.position.clone());
+  for (const angle of [0.2, 0.7, Math.PI / 2]) {
+    const axis = rotatingHeadTile('row', angle); rideLiveRotation(worm);
+    act(() => frame({}, 0));
+    faceMeshes.forEach((part, i) => expect(part.position.distanceTo(rest[i].clone().applyAxisAngle(axis, angle))).toBeLessThan(1e-6));
+  }
+});
+
+it('applies the shared live head turn to MOBI exactly once', () => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'mobi', wormAccessories: {}, wormHat: 'none' });
+    root.render(<FaceHarness worm={worm} />);
+  });
+  const mobi = React.Children.toArray(tree.props.children).filter(child => child.type === 'primitive')[1].props.object;
+  sim.moveDir = 'right';
+  const axis = rotatingHeadTile('row', 0.7); rideLiveRotation(worm);
+  act(() => frame({}, 0));
+  expect(new THREE.Vector3(0, 0, -1).applyQuaternion(mobi.quaternion).dot(
+    new THREE.Vector3(1, 0, 0).applyAxisAngle(axis, 0.7))).toBeCloseTo(1, 6);
 });
 
 // A route in head-to-tail order, densely sampled just like simulation history.
