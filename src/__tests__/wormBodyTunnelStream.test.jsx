@@ -14,7 +14,7 @@ import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
-import { WORM_LIFT, WORM_HEAD_RADIUS } from '../worm/healerWorm/constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { SPRING_COIL_SECONDS } from '../worm/characterAbilities.js';
@@ -74,6 +74,47 @@ function selectWiggle(size = 3) {
   });
   React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
 }
+
+function selectPrism() {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'prism', wormAccessories: {} });
+    root.render(<Harness worm={worm} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+}
+
+function expectHeadAxes(forward, normal) {
+  renderPoints();
+  const matrix = new THREE.Matrix4(), rotation = new THREE.Matrix4();
+  mesh.getMatrixAt(0, matrix); rotation.extractRotation(matrix);
+  expect(new THREE.Vector3(0, 0, -1).applyMatrix4(rotation).dot(forward)).toBeCloseTo(1, 6);
+  expect(new THREE.Vector3(0, 1, 0).applyMatrix4(rotation).dot(normal)).toBeCloseTo(1, 6);
+  expect(rotation.determinant()).toBeCloseTo(1, 6);
+}
+
+it.each(Object.keys(FACE_NORMALS))('orients the rendered Prism head through all four turns on %s', dirKey => {
+  selectPrism();
+  sim.pos.dirKey = dirKey;
+  sim.currentNormal.copy(FACE_NORMALS[dirKey]);
+  sim.headInterpPos.copy(sim.currentNormal).multiplyScalar(1.52);
+  // One mounted body, successive frames: catch both world-Z locking and a
+  // quaternion inherited from the previous frame's final tail segment.
+  for (const [heading, components] of Object.entries(DIR_FORWARD[dirKey])) {
+    sim.moveDir = heading;
+    expectHeadAxes(new THREE.Vector3(...components), FACE_NORMALS[dirKey]);
+  }
+});
+
+it('uses the Prism entrance frame, then returns to its surface heading', () => {
+  selectPrism(); sim.tailLength = 1;
+  sim.pos.dirKey = 'PZ'; sim.moveDir = 'right';
+  sim.currentNormal.copy(FACE_NORMALS.PZ);
+  worm.arrival = { active: true, headPos: new THREE.Vector3(0, 0, 1.7),
+    headForward: new THREE.Vector3(0, 0, 1), headNormal: new THREE.Vector3(0, 1, 0), headGrow: 1, tuck: 0 };
+  expectHeadAxes(worm.arrival.headForward, worm.arrival.headNormal);
+  worm.arrival.active = false;
+  expectHeadAxes(new THREE.Vector3(...DIR_FORWARD.PZ.right), FACE_NORMALS.PZ);
+});
 
 // A route in head-to-tail order, densely sampled just like simulation history.
 function surfaceRoute(corners, size = 3) {
