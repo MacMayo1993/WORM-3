@@ -1264,6 +1264,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const rescueKind = useGameStore(s => s.wormRescueKind);
     const cautionRescue = jumpRescue && rescueKind === 'caution';
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
+    const airActive = useGameStore(s => !s.wormRocketActive && (s.wormElementalTheme === 'air' || s.wormElementalPartner === 'air'));
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
@@ -1464,12 +1465,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                     onClick={e => { if (e.detail === 0) handleJumpAction(); }}
 
                                     className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
-                                    style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
-                                    aria-label={cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : "Jump over body or vault an edge"}
+                                    style={isPortalReady ? jumpReadyStyle : airActive ? { ...jumpIdleStyle, background: '#b9f5ed', boxShadow: '0 0 18px #b9f5ed88' } : jumpIdleStyle}
+                                    aria-label={cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : airActive ? 'Hold Jump to fly; release to land' : "Jump over body or vault an edge"}
+                                    title={airActive ? 'Hold Jump or Space to fly. Release to land.' : undefined}
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
-                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Jump to ride' : 'Jump'}
+                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Jump to ride' : airActive ? <span style={{ fontSize: 12 }}>Hold to fly</span> : 'Jump'}
                                 </button>
                             </div>
                             <BoostButton wormAlive={controlsEnabled && !jumpRescue} />

@@ -159,3 +159,4 @@ simulation and pickup callbacks. It freezes each resulting pose, checks that its
 bounded feedback batches draw, captures screenshots in `/tmp/worm-elements`
 (override with `SHOTS`), and fails on JavaScript or shader errors. The fixed
 camera is test-only. Software WebGL captures are visibility checks, not FPS data.
+Use `ELEMENTS=air,fire` to capture only selected elements while iterating on effects.

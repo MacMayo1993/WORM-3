@@ -103,7 +103,9 @@ export default function WormSwipeControls({ onTurn, worm }) {
             }
         };
         const onKey = (e) => {
-            if (e.repeat && (e.key !== ' ' || useGameStore.getState().wormJumpRescueActive)) return;
+            // A held key is one press, including after Air expires. Otherwise
+            // repeat would spend a double jump or relaunch instead of landing.
+            if (e.repeat) return;
             if (e.target?.closest?.('input, textarea, select, [contenteditable=true], [data-game-input="ui"]')) return;
             if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormHealerMode && !useGameStore.getState().demoMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
             if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature'); return; }
@@ -114,9 +116,8 @@ export default function WormSwipeControls({ onTurn, worm }) {
             if (e.key === ' ') {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                if (!e.repeat) onTurn('jump-hold');
-                const airActive = worm.elementalT?.current > 0 && (worm.elementalType?.current === 'air' || worm.elementalPair?.current === 'air');
-                if (!e.repeat || !airActive) onTurn('jump');
+                onTurn('jump-hold');
+                onTurn('jump');
             }
         };
         const stopFire = () => { cancelFire(); firing = false; onTurn('fire-stop'); };

@@ -46,7 +46,7 @@ export function elementalFeedback(type, buffs, fusion = null) {
     if (fusion === 'firestorm') return { text: 'Strikes ignite a cross of fire', fraction: 0 };
     if (fusion === 'cryostorm') return { text: 'Slow marks · Strikes freeze, never hurt you', fraction: 0 };
     if (fusion === 'grounded') return { text: 'Strikes grow charged pads · Body is safe', fraction: 0 };
-    if (type === 'air') return { text: ability?.gliding ? 'GLIDING · Release Jump to descend' : 'UPDRAFT · Hold Jump to glide · Steer in the air', fraction: 0 };
+    if (type === 'air') return { text: ability?.flying ? 'FLYING · Release Jump to land' : 'HOLD JUMP TO FLY · Steer in the air', fraction: 0 };
     if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · ${momentum >= 0.8 ? 'WAVE READY · Sweeps both sides' : 'Build momentum to sweep'}`, fraction: momentum };
     if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Land to plant · Harvest gold buds' : `${buffs.springCount || 0} springs · ${ability?.gardenBudget ?? 0} buds left to plant`, fraction: buffs.springReady ? 1 : 0 };
     if (type === 'fire') return { text: `${ability?.fireReady ? 'FLAME DASH READY · Boost' : `Heat ${ability?.heat?.size ?? 0}/6`} · ${ability?.fireBonus ?? 0} double-growth pickups left · Flames still hurt`, fraction: ability?.fireReady ? 1 : (ability?.heat?.size ?? 0) / 6 };

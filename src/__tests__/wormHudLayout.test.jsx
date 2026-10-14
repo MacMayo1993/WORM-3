@@ -386,7 +386,7 @@ it('lets the arrival pause and resume without releasing gameplay early', () => {
   expect(host.querySelector('.worm-instrument').hasAttribute('data-arriving')).toBe(false);
 });
 
-it('holds and releases glide through the touch Jump button and uses Fire during Boost cooldown', () => {
+it('holds and releases flight through the touch Jump button and uses Fire during Boost cooldown', () => {
   const turns = vi.fn(); setWormTurnCallback(turns);
   wormBuffs.elementalAbilities = { fireReady: true };
   useGameStore.setState({ wormBoostState: 'cooldown' });
@@ -404,4 +404,14 @@ it('holds and releases glide through the touch Jump button and uses Fire during 
   act(() => boost.dispatchEvent(new Event('pointerdown', { bubbles: true })));
   expect(turns).toHaveBeenLastCalledWith('boost');
   wormBuffs.elementalAbilities = null; setWormTurnCallback(null);
+});
+
+it.each([['air', null], ['fire', 'air']])('labels the touch flight control for Air (%s, %s)', (theme, partner) => {
+  useGameStore.setState({ wormElementalTheme: theme, wormElementalPartner: partner });
+  renderPhase('crawling');
+  const jump = host.querySelector('.worm-jump');
+  expect(jump.textContent).toContain('Hold to fly');
+  expect(jump.getAttribute('aria-label')).toContain('release to land');
+  act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null }));
+  expect(jump.textContent).toBe('Jump');
 });

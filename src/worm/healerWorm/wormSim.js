@@ -1,4 +1,4 @@
-import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb, ELEMENT_ABILITIES } from './elementalAbilities.js';
+import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, tickAbilityVisuals, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb } from './elementalAbilities.js';
 import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
@@ -582,7 +582,6 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.jumpBase = jumpLiftOf(sim);
     sim.isJumping = true;
     sim.jumpT = 0.001;
-    sim.elementalAbilities.glideLeft = ELEMENT_ABILITIES.glideTiles;
     sim.jumpCount += 1;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
@@ -2447,6 +2446,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // out of the element's duration — the player gets the full ELEMENTAL_DURATION
     // of crawling afterwards.
     if (sim.elementalFocusT > 0) {
+        tickAbilityVisuals(sim, Math.min(delta, MAX_TICK_DELTA));
         sim.elementalFocusT = Math.max(0, sim.elementalFocusT - Math.min(delta, MAX_TICK_DELTA));
         return;
     }
@@ -2725,7 +2725,7 @@ export function stepWormSim(sim, delta, size, ctx) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }
             if (settled) { airFusionLanding(sim, size); elementalLanding(sim, size, ctx); }
-            sim.elementalAbilities.gliding = false;
+            sim.elementalAbilities.flying = false;
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
