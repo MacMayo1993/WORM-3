@@ -1,6 +1,6 @@
 import {
   BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS,
-  SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT, SPRING_COOLDOWN, SPRING_SLAM_WINDOW
+  SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT, SPRING_COOLDOWN, SPRING_SLAM_WINDOW, SPRING_AIM_MAX, SIGNATURE_READY_BEAT
 } from '../characterAbilities.js';
 import { makeWiggleSweep, WIGGLE_DURATION } from './wiggleSweep.js';
 import { getStableKey } from '../wormLogic.js';
@@ -14,15 +14,18 @@ export const SIGNATURES = {
   classic: { name: 'Orb Call', short: 'Orb Call', cooldown: CLASSIC_ORB_CALL_COOLDOWN, duration: CLASSIC_ORB_CALL_SECONDS, color: '#a6eb9b', hint: `Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds. Also spawns 50% more orbs.` },
   book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause layer turns for 5 seconds. Earn 25% more XP.' },
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
-  wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
-  inch: { name: 'Spring Loaded', short: 'Spring', cooldown: SPRING_COOLDOWN, duration: 0, color: '#c6ec86', hint: 'Coil and leap four tiles. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Landing must be clear; you can still jump once more in the air.' },
-  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds. The trail stays for 12 more seconds, and enemies that run into it are burned and thrown back.' },
+  wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs and any dropped orbs it crosses. Steering locks until finished.' },
+  inch: { name: 'Spring Loaded', short: 'Spring', cooldown: SPRING_COOLDOWN, duration: 0, color: '#c6ec86', hint: 'Tap to coil and leap four tiles; hold to stay coiled and see where you will land, then release to leap. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Landing must be clear; you can still jump once more in the air.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds; the trail stays for 12 more. Your head slips through your own body wherever it lies on the light, and enemies that run into it are burned and thrown back.' },
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 // Spring's numbers live in characterAbilities.js; re-exported for the effects and the body.
-export { SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT };
+export { SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT, SPRING_AIM_MAX, SIGNATURE_READY_BEAT };
+// While held past the coil, `charge` rests here instead of reaching zero, so every check
+// that holds other moves off during the coil (charge > 0) holds them off while aiming too.
+export const SPRING_HOLD_FLOOR = 1e-4;
 export const signatureKey = p => p ? `${p.x},${p.y},${p.z},${p.dirKey}` : '';
-export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, glowTrail: null, fxT: 0, fxTile: null, slam: null, slamT: 0, landing: null });
+export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, glowTrail: null, fxT: 0, fxTile: null, slam: null, slamT: 0, landing: null, held: false, aimT: 0, previewBlocked: false, readyT: 0 });
 const stickerAt = (ctx, p) => ctx.getCubies()?.[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
 
 // The restriction follows sticker identity when either mouth rotates to another face.
@@ -33,7 +36,10 @@ export function isParityLocked(sim, tile, ctx) {
 }
 
 export function releaseMobiTunnel(sim, tunnel) {
-  if (sim.signature.mobiTunnel?.pairId === tunnel.pairId) sim.signature.mobiTunnel = null;
+  if (sim.signature.mobiTunnel?.pairId !== tunnel.pairId) return;
+  sim.signature.mobiTunnel = null;
+  // Healing it is what makes the next tunnel available: the same ready beat as a cooldown.
+  sim.signature.readyT = SIGNATURE_READY_BEAT;
 }
 
 function targetFor(sim, size, ctx, character) {
@@ -92,7 +98,7 @@ export function activateSignature(sim, size, ctx) {
   sig.target = { ...available.target };
   sig.seq++; sig.fxTile = { ...sim.pos }; sig.fxT = 0.7;
   sig.notice = def.name; sig.noticeT = 1.8;
-  if (sig.character === 'inch') sig.charge = SPRING_COIL_SECONDS;
+  if (sig.character === 'inch') { sig.charge = SPRING_COIL_SECONDS; sig.aimT = 0; }
   else { sig.active = def.duration; sig.cooldown = def.cooldown; }
   if (sig.character === 'glow') sig.glowTrail = makeGlowTrail();
   if (sig.character === 'classic') {
@@ -153,17 +159,26 @@ export function tickSignature(sim, delta, size, ctx) {
   if (sig.character !== (ctx.getCharacter?.() ?? 'classic')) {
     Object.assign(sig, makeSignature(), { character: ctx.getCharacter?.() ?? 'classic' });
   }
+  // A coil (or a held aim) does not survive leaving the surface: a worm that crawled into a
+  // tunnel mouth while coiled must not leap the moment it comes out. Nothing was spent.
+  if (sim.phase !== 'crawling' && sig.charge > 0) { sig.charge = 0; sig.target = null; }
   if (sim.phase !== 'crawling' || !['active', 'finalHealing'].includes(ctx.getGamePhase())) return false;
   sig.noticeT = Math.max(0, sig.noticeT - delta);
   sig.fxT = Math.max(0, sig.fxT - delta);
   sig.slamT = Math.max(0, sig.slamT - delta);
+  sig.readyT = Math.max(0, sig.readyT - delta);
   if (sig.charge > 0) {
-    sig.charge = Math.max(0, sig.charge - delta);
     // The worm keeps crawling while its body gathers; the leap comes when the coil is done.
+    // A held input keeps it coiled (aiming) until release, or until the hold runs out.
+    if (sig.charge <= SPRING_HOLD_FLOOR) sig.aimT += delta;
+    const holding = sig.held && sig.aimT < SPRING_AIM_MAX;
+    sig.charge = Math.max(holding ? SPRING_HOLD_FLOOR : 0, sig.charge - delta);
     if (sig.charge > 0) return false;
     launchSpring(sim, size, ctx);
   }
+  const cooling = sig.cooldown > 0;
   sig.cooldown = Math.max(0, sig.cooldown - delta);
+  if (cooling && sig.cooldown === 0) sig.readyT = SIGNATURE_READY_BEAT;
   if (sig.mobiTunnel) sig.mobiTunnel.reentryT = Math.max(0, sig.mobiTunnel.reentryT - delta);
   if (sig.character === 'inch') {
     if (sig.active && !sim.isJumping) landSpring(sim, ctx);
@@ -176,11 +191,16 @@ export function tickSignature(sim, delta, size, ctx) {
 export function signatureReadout(sim, size, ctx) {
   const available = signatureAvailability(sim, size, ctx);
   const sig = sim.signature, def = SIGNATURES[available.character];
-  sig.preview = available.target;
+  // Nothing is previewed while an ability merely waits: only Spring's coil (and a held
+  // aim) shows the leap, read live as the worm crawls on, in its own colour unless the
+  // landing it would take now is blocked.
+  const aim = available.character === 'inch' && sig.charge > 0 ? signatureAvailability(sim, size, ctx, true) : null;
+  sig.preview = aim?.target ?? null;
+  sig.previewBlocked = !!aim?.reason;
   sig.reason = available.reason;
   return { character: available.character, ready: !available.reason, reason: available.reason,
     returnReady: false, activeSeconds: Math.ceil(sig.active), charges: sig.charges,
-    active: sig.active > 0 || sig.charge > 0, seconds: Math.ceil(sig.cooldown),
+    active: sig.active > 0 || sig.charge > 0, coiled: sig.charge > 0, seconds: Math.ceil(sig.cooldown),
     fraction: def?.cooldown ? 1 - sig.cooldown / def.cooldown : 1,
     notice: sig.noticeT > 0 ? sig.notice : sig.mobiTunnel ? `Heal your wormhole${sig.mobiTunnel.reentryT > 0 ? ` · re-entry in ${Math.ceil(sig.mobiTunnel.reentryT)}s` : ''}` : '' };
 }

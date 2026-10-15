@@ -16,7 +16,7 @@ import { bodyCoverageCount } from './bodyCoverage.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, launchSpring, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { SPRING_GRAB_TILES } from '../characterAbilities.js';
-import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
+import { breakGlowTrail, tickGlowTrail, litTiles } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
     fusionSpeedBonus, postFusionBurst, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
@@ -934,6 +934,10 @@ function tickJumpRescue(sim, delta, size, ctx) {
 export function queueTurn(sim, dir) {
     if (dir === 'jump-release') { sim.elementalAbilities.jumpHeld = false; return; }
     if (dir === 'jump-hold') { if (sim.alive) sim.elementalAbilities.jumpHeld = true; return; }
+    // The ability input held down (keyboard Q, the HUD key): Spring stays coiled and aims
+    // until it is released (signatures.js). Like jump-hold, these never queue a turn.
+    if (dir === 'signature-release') { sim.signature.held = false; return; }
+    if (dir === 'signature-hold') { if (sim.alive) sim.signature.held = true; return; }
     if (!sim.alive || sim.phase === 'falling') return;
     if (sim.signature.sweep) return;
     if (sim.jumpRescueT > 0) {
@@ -1322,6 +1326,31 @@ function resolveSpringSlam(sim, size, ctx) {
     sim.signature.noticeT = 1.8;
 }
 
+// Whether the wiping body passed within half a tile of `tile` since `oldTime`.
+function sweepCrosses(sweep, oldTime, samples, bodySamples, tile, size, expansion) {
+    _sweepOrb.fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, expansion))
+        .addScaledVector(FACE_NORMALS[tile.dirKey], WORM_LIFT);
+    for (let t = 0; t <= samples; t++) {
+        const at = oldTime + (sweep.elapsed - oldTime) * t / samples;
+        const offset = wiggleOffset(at);
+        for (let i = 0; i <= bodySamples; i++) {
+            wigglePointInto(_sweepPoint, sweep, i / bodySamples, offset, at);
+            if (_sweepPoint.distanceToSquared(_sweepOrb) < 0.25) return true;
+        }
+    }
+    return false;
+}
+
+// Glow Worm's Light Trail: where the body lies on lit tiles it is light, and the head
+// slips through it there instead of biting it. Only the paint the player can see counts
+// (litTiles), so the rule ends exactly when the trail has faded.
+function slipsThroughLight(sim, key) {
+    if (!key || !litTiles(sim)?.has(key)) return false;
+    sim.signature.notice = 'Slipped through the light';
+    sim.signature.noticeT = 1.2;
+    return true;
+}
+
 function tickWiggleSweep(sim, delta, size, ctx) {
     const sweep = sim.signature.sweep;
     const oldTime = sweep.elapsed;
@@ -1329,17 +1358,13 @@ function tickWiggleSweep(sim, delta, size, ctx) {
     const samples = Math.max(1, Math.ceil((sweep.elapsed - oldTime) / 0.008));
     const bodySamples = Math.max(32, Math.ceil((sweep.length + 6) / 0.15));
     for (const orb of [...sim.powerups]) {
-        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, sim.expansionAmount))
-            .addScaledVector(FACE_NORMALS[orb.dirKey], WORM_LIFT);
-        let hit = false;
-        for (let t = 0; t <= samples && !hit; t++) {
-            const offset = wiggleOffset(oldTime + (sweep.elapsed - oldTime) * t / samples);
-            for (let i = 0; i <= bodySamples; i++) {
-                wigglePointInto(_sweepPoint, sweep, i / bodySamples, offset, oldTime + (sweep.elapsed - oldTime) * t / samples);
-                if (_sweepPoint.distanceToSquared(_sweepOrb) < 0.25) { hit = true; break; }
-            }
-        }
+        const hit = sweepCrosses(sweep, oldTime, samples, bodySamples, orb, size, sim.expansionAmount);
         if (hit) tryPickupPowerupAt(sim, size, ctx, orb.x, orb.y, orb.z, orb.dirKey, true);
+    }
+    // The wipe also sweeps up a cut's dropped orbs it crosses (taken back as a recovery).
+    for (const drop of [...sim.droppedOrbs]) {
+        if (!sweepCrosses(sweep, oldTime, samples, bodySamples, drop, size, sim.expansionAmount)) continue;
+        tryPickupDroppedAt(sim, size, ctx, drop.x, drop.y, drop.z, drop.dirKey);
     }
     sweep.offset = wiggleOffset(sweep.elapsed);
     sim.pendingTurns.length = 0;
@@ -2025,6 +2050,8 @@ const PHASE_HANDLERS = {
                     const collisionKey = sim.pendingSelfCollision.key;
                     if (!pendingBodyStillPresent(sim)) {
                         sim.pendingSelfCollision = null;
+                    } else if (slipsThroughLight(sim, collisionKey)) {
+                        sim.pendingSelfCollision = null;
                     } else {
                         killWormSim(sim, ctx, {
                             reason: 'self-collision',
@@ -2471,7 +2498,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (usesRaisedPlatforms(ctx)) sim.pendingTunnelTrigger = null;
     if (sim.padFlight) {
         const landed = tickPlatformJump(sim, delta);
-        if (landed && !sim.selfCollisionGraceSteps && sim.landingGraceT <= 0 && !hasJumpClearance(sim)) {
+        if (landed && !sim.selfCollisionGraceSteps && sim.landingGraceT <= 0 && !hasJumpClearance(sim) && !slipsThroughLight(sim, tileKey(sim.pos))) {
             killWormSim(sim, ctx, { reason: 'self', headTile: tileKey(sim.pos) });
             return;
         }

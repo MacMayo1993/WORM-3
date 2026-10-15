@@ -37,6 +37,21 @@ it('removes Glow pulses on expiry, death and tunnel entry', () => {
   worm.phase.current = 'crawling'; useGameStore.setState({ wormAlive: false }); frames[0]();
   expect(meshes.every(m => m.count === 0)).toBe(true);
 });
+it('marks no tunnel site while MOBI is merely ready', () => {
+  worm.signature.current = { ...makeSignature(), character: 'mobi', preview: { x: 2, y: 2, z: 4, dirKey: 'PZ' } };
+  frames[0](); expect(meshes.every(m => m.count === 0)).toBe(true);
+});
+it('pulses once in the character colour when an ability comes off cooldown, then draws nothing', () => {
+  worm.signature.current = { ...makeSignature(), character: 'wiggle', readyT: 0.6 };
+  frames[0]();
+  expect(meshes[5].count).toBe(2); expect(meshes[5].material.color.getHexString()).toBe('ffb5d7');
+  const early = new Matrix4(); meshes[5].getMatrixAt(0, early);
+  worm.signature.current.readyT = 0.1; frames[0]();
+  const late = new Matrix4(); meshes[5].getMatrixAt(0, late);
+  expect(late.elements[0]).toBeGreaterThan(early.elements[0]);   // it runs outward
+  worm.signature.current.readyT = 0; frames[0]();
+  expect(meshes.every(m => m.count === 0)).toBe(true);
+});
 it('depth-tests the MOBI tunnel marker and follows its own rotating slice', () => {
   worm.signature.current = { ...makeSignature(), character: 'mobi', mobiTunnel: { reentryT: 10 }, target: { x: 2, y: 3, z: 4, dirKey: 'PZ' } };
   frames[0](); const initial = new Matrix4(); meshes[2].getMatrixAt(0, initial);
@@ -61,7 +76,8 @@ it('shows Classic attraction rings on the current face and removes them after th
 });
 
 // ── Inch Worm: Spring ────────────────────────────────────────────────────────
-// meshes: 0 target ring, 1 pulse rings, 2 lock, 3 pages, 4 arc dots.
+// meshes: 0 target ring, 1 pulse rings, 2 lock, 3 pages, 4 arc dots, 5 ready beat.
+// The leap is drawn only while Spring coils (charge > 0, which a held input keeps up to aim).
 function springWorm(extra = {}, interpT = 0.4) {
   const pos = { x: 2, y: 0, z: 4, dirKey: 'PZ' };
   worm.pos = { current: pos };
@@ -70,13 +86,18 @@ function springWorm(extra = {}, interpT = 0.4) {
   worm.moveDir = { current: 'up' };
   worm.restRead = { current: false };
   worm.isJumping = { current: false };
-  worm.signature.current = { ...makeSignature(), character: 'inch', preview: springLanding(pos, 'up', 5, interpT).tile, ...extra };
+  worm.signature.current = { ...makeSignature(), character: 'inch', charge: 0.1, preview: springLanding(pos, 'up', 5, interpT).tile, ...extra };
 }
 const heightOf = (mesh, i) => { const m = new Matrix4(); mesh.getMatrixAt(i, m); return m.elements[14] - 2.5; };   // above the +Z face
 
-it('draws the leap before it is taken: dots along the arc, rising to the apex and back to the landing', () => {
+it('draws nothing on the cube while Spring is merely ready', () => {
+  springWorm({ charge: 0 }); frames[0]();
+  expect(meshes.every(m => m.count === 0)).toBe(true);
+});
+it('draws the leap while it coils: dots along the arc, rising to the apex and back to the landing', () => {
   springWorm(); frames[0]();
-  expect(meshes[0].count).toBe(1);                      // the landing ring
+  expect(meshes[0].count).toBe(4);                      // the landing ring and the three coil rings at the head
+  expect(meshes[0].material.color.getHexString()).toBe('c6ec86');
   expect(meshes[4].count).toBe(16);
   const lifts = Array.from({ length: 16 }, (_, i) => heightOf(meshes[4], i));
   const top = Math.max(...lifts);
@@ -96,9 +117,13 @@ it('draws the arc over a cube edge without cutting through the cube', () => {
     expect(Math.max(Math.abs(m.elements[12]), Math.abs(m.elements[13]), Math.abs(m.elements[14]))).toBeGreaterThan(2.5);   // always outside the cube
   }
 });
-it('marks a blocked landing in orange, and hides the whole preview once airborne or while a layer turns', () => {
-  springWorm({ reason: 'Body blocks landing' }); frames[0]();
+it('keeps a clear coil green (its cooldown is no reason to warn), and marks a blocked landing in orange', () => {
+  springWorm({ reason: 'Recharging' }); frames[0]();
+  expect(meshes[0].material.color.getHexString()).toBe('c6ec86'); expect(meshes[4].material.color.getHexString()).toBe('c6ec86');
+  springWorm({ previewBlocked: true }); frames[0]();
   expect(meshes[0].material.color.getHexString()).toBe('ffbb72'); expect(meshes[4].material.color.getHexString()).toBe('ffbb72');
+});
+it('hides the whole preview once airborne or while a layer turns', () => {
   springWorm(); worm.isJumping.current = true; frames[0]();
   expect(meshes[0].count).toBe(0); expect(meshes[4].count).toBe(0);
   worm.isJumping.current = false; setLiveRotation('row', [1], [0.4], 1, 0.4); frames[0]();

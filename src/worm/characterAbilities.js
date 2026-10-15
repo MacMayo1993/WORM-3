@@ -16,6 +16,12 @@ export const SPRING_HEIGHT = 2.4;
 export const SPRING_COOLDOWN = 14;
 export const SPRING_GRAB_TILES = 2;
 export const SPRING_SLAM_WINDOW = 0.6;
+// Holding the ability input past the coil keeps the worm coiled and shows where it will
+// land; releasing leaps. A hold never lasts past this: the spring lets go on its own.
+export const SPRING_AIM_MAX = 2.5;
+// Seconds of the one-off pulse at the head when an ability comes off cooldown. A ready
+// ability draws nothing on the cube otherwise: the HUD button says it is ready.
+export const SIGNATURE_READY_BEAT = 0.8;
 export const characterXpMultiplier = character => character === 'book' ? BOOK_XP_MULTIPLIER : 1;
 export const characterOrbCount = (count, character) => character === 'classic' ? Math.ceil(count * 1.5) : count;
 export const holdsRotationTimer = signature => !!signature?.sweep || (signature?.character === 'book' && signature.active > 0);

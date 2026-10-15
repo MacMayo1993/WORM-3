@@ -108,7 +108,8 @@ export default function WormSwipeControls({ onTurn, worm }) {
             if (e.repeat) return;
             if (e.target?.closest?.('input, textarea, select, [contenteditable=true], [data-game-input="ui"]')) return;
             if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormHealerMode && !useGameStore.getState().demoMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
-            if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature'); return; }
+            // Held Q is a held ability (Spring stays coiled and aims until Q is let go).
+            if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature-hold'); onTurn('signature'); return; }
             if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
             if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }
             if (e.key === 'ArrowDown') { e.preventDefault(); emitDirection('down'); }
@@ -121,13 +122,13 @@ export default function WormSwipeControls({ onTurn, worm }) {
             }
         };
         const stopFire = () => { cancelFire(); firing = false; onTurn('fire-stop'); };
-        const releaseControls = () => { onTurn('jump-release'); stopFire(); };
+        const releaseControls = () => { onTurn('jump-release'); onTurn('signature-release'); stopFire(); };
         const onTouchMove = e => {
             const t = e.touches[0], origin = touchStart.current;
             if (e.touches.length !== 1 || (origin && t && Math.hypot(t.clientX - origin.x, t.clientY - origin.y) > 12)) cancelFire();
         };
         const cancelTouch = () => { touchStart.current = null; releaseControls(); };
-        const onKeyUp = e => { if (e.key === ' ') onTurn('jump-release'); if (e.key.toLowerCase() === 'f') stopFire(); };
+        const onKeyUp = e => { if (e.key === ' ') onTurn('jump-release'); if (e.key.toLowerCase() === 'q') onTurn('signature-release'); if (e.key.toLowerCase() === 'f') stopFire(); };
         const unsubscribeCapture = useGameStore.subscribe(s => s.captureMode, cancelTouch);
         window.addEventListener('keyup', onKeyUp);
         window.addEventListener('blur', releaseControls);
