@@ -230,7 +230,7 @@ export function stageStory(sim, size, level, character) {
   const chainHeals = !!level.mechanics?.multiHeals;
   const practice = { ...base, pendingMouths, retryMouths: mouthKeys.slice(0, 2), tunnelGoals, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     healTarget: ['collector', 'restore', 'mastery'].includes(level.kind) ? level.target : null,
-    elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
+    elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null, lastElementCompanion: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set(),
     // Dealt afresh on every attempt, so a retry or replay meets different elements
