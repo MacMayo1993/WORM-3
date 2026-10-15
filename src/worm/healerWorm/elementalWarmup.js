@@ -22,6 +22,7 @@ import { ELEMENTAL_DEFS } from './elementalDefs.js';
 import { getElementalSurfaceMaterial, getReactionSurfaceMaterial } from '../ElementalSurface.jsx';
 import { FUSION_LOOKS, REACTION_PARTICLES, reactionPatternOf } from './fusionLooks.js';
 import { getFusionParticleMaterial } from './fusionParticleMaterial.js';
+import { sigilEmblemWarmupMaterial } from './fusionSigilTexture.js';
 import { getFireMaterials } from '../ElementalFireSkin.jsx';
 import { getNatureMaterials } from '../ElementalGrassSkin.jsx';
 import { getNatureLeafMaterial } from './NatureClaimLeaves.jsx';
@@ -80,6 +81,8 @@ function collectElementalMaterials() {
     points.userData.elementalPoints = true;
     materials.push(points);
   }
+  // The recipe's sigil over the worm's head (FusionAura): one program for all of them.
+  materials.push(sigilEmblemWarmupMaterial());
   return materials;
 }
 

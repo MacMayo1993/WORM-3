@@ -38,7 +38,7 @@ const DETAIL_VARIANTS = { ice: 1 };
 const expectedCount = Object.entries(ELEMENTAL_DEFS).reduce(
   (n, [element, def]) => n + 5 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0),
   0
-) + Object.keys(FUSION_LOOKS).length * 2;
+) + Object.keys(FUSION_LOOKS).length * 2 + 1; // + the sigil emblem (FusionAura)
 
 describe('warmUpElementalSkins', () => {
   it('warms the orb and skin programs for every element and every fusion reaction', () => {

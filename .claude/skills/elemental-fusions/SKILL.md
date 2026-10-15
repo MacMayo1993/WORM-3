@@ -164,6 +164,28 @@ it, the flow bends round it. A new recipe needs a `FUSION_LOOKS` entry (a test c
 twenty, and that every look is distinct and differs from its reverse order); a new
 pattern needs a branch in the shell's fragment stage and is warmed automatically.
 
+### Every recipe's signature
+
+Two recipes of one coat family must never read alike, so each recipe also names, in
+`SIGNATURES` (`fusionLooks.js`):
+
+- a **sigil** (`fusionSigils.js`): one of 18 motifs drawn into its coat in its own
+  colour (`bubbles`, `shards`, `snowflake`, `hexfrost`, `forks`, `vortex`, `leaves`,
+  `veins`, `runes`, `ripples`, `chevrons`, `sunburst`, `flowers`, `pulse`, `embers`,
+  `droplets`, `wisps`, `stars`), tuned by `(scale, speed, density, strength)`. It is a
+  uniform (`uSigil`) in the family's program, so recipes add no programs. Motifs sit
+  in each sticker's frame and fade over its centre so the tile stays readable.
+- a particle **motion** (`REACTION_MOTIONS`, applied in `fusionParticles.js`): rise,
+  swirl, gust, fountain, zigzag, orbit (round the worm's head), hover, spiral.
+- the sigil is also the recipe's **glyph**: `FusionSigilIcon` on the FUSION banner and
+  in the Pause recipe guide, and an emblem floating over the worm's head in
+  `FusionAura` (`fusionSigilTexture.js`, warmed by `sigilEmblemWarmupMaterial`).
+
+`fusionSignatures.test.jsx` holds it: no (family, sigil) or (particle, motion) pair
+repeats, a sigil is worn at most twice and never by a recipe and its reverse, and
+every sigil has a shader branch and an icon. A new sigil needs all three: a GLSL
+branch, a `SIGILS` id and a `SIGIL_ICONS` path.
+
 ## Implementing a planned fusion
 
 1. **Keep identity separate from the live effect.** `getFusion(base, catalyst)` and

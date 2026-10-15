@@ -38,6 +38,7 @@ import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { getFusion, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { IGNITIONS } from './healerWorm/fusionIgnition.js';
+import FusionSigilIcon from './FusionSigilIcon.jsx';
 import { wormClock } from './wormClock.js';
 import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
@@ -944,7 +945,7 @@ export function FusionGuide() {
         <summary>Elemental recipes · pickup order matters</summary>
         <p>Collect a second element before the timer ends. Both last 10 seconds from that pickup. Collecting the older element reverses the recipe; repeating the newest only refreshes it.</p>
         <ul>{Object.values(ORDERED_FUSIONS).map(recipe => <li key={recipe.id}>
-            <strong>{fusionRecipeLabel(recipe)}</strong>
+            <strong><FusionSigilIcon recipe={recipe.id} size={18} className="worm-fusion-guide-sigil" /> {fusionRecipeLabel(recipe)}</strong>
             <span>{recipe.description}</span>
         </li>)}</ul>
     </details>;
@@ -1019,6 +1020,7 @@ function FusionBanner() {
             <span className="worm-fusion-kicker" style={{ fontFamily: HEADING_FONT }}>
                 <SpecialIcon type={recipe.base} size={14} /> {base.label} → {catalyst.label} <SpecialIcon type={recipe.catalyst} size={14} />
             </span>
+            <FusionSigilIcon recipe={recipe.id} size={40} className="worm-fusion-sigil" />
             <span className="worm-fusion-name" style={{ fontFamily: DISPLAY_FONT }}>{recipe.label}</span>
             {IGNITIONS[recipe.id] && <span className="worm-fusion-ignite" style={{ fontFamily: HEADING_FONT }}>{IGNITIONS[recipe.id].text}</span>}
             <span className="worm-fusion-rule">{recipe.description}</span>
