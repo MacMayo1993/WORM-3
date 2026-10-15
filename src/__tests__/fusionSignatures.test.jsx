@@ -49,6 +49,12 @@ describe('fusion signatures', () => {
     expect(sigilIdOf('nonsense')).toBe(-1);
   });
 
+  it('never calls smoothstep with its edges reversed (undefined in GLSL ES)', () => {
+    const literal = /smoothstep\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,/g;
+    const reversed = [...GLSL_SIGILS.matchAll(literal)].filter(([, lo, hi]) => Number(lo) >= Number(hi)).map(([call]) => call);
+    expect(reversed).toEqual([]);
+  });
+
   it('hands the reaction coat its recipe\'s sigil', () => {
     for (const { id } of recipes) {
       const look = FUSION_LOOKS[id];

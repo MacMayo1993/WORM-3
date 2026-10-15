@@ -86,6 +86,8 @@ export const GLSL_SIGILS = /* glsl */ `
     float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
     return length(pa - ba * h);
   }
+  // smoothstep is undefined in GLSL ES when edge0 >= edge1, and strict mobile drivers
+  // really do return garbage for it: write a falling edge as 1.0 - smoothstep(lo, hi, x).
   float sgLine(float d, float w) { return 1.0 - smoothstep(w * 0.45, w, d); }
   mat2 sgRot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
@@ -107,7 +109,7 @@ export const GLSL_SIGILS = /* glsl */ `
         float r = (0.04 + 0.06 * fract(h * 31.0)) * sc;
         float ring = sgLine(abs(length(p - c) - r), 0.03);
         float hi = exp(-dot(p - c + vec2(r * 0.4, -r * 0.4), p - c + vec2(r * 0.4, -r * 0.4)) / (r * r * 0.08));
-        s = max(s, (ring + hi * 0.6) * smoothstep(1.0, 0.75, y) * smoothstep(0.0, 0.1, y));
+        s = max(s, (ring + hi * 0.6) * (1.0 - smoothstep(0.75, 1.0, y)) * smoothstep(0.0, 0.1, y));
       }
     } else if (uSigil == 1) {
       // SHARDS — obsidian triangles, each catching the light as a sweep crosses it.
@@ -161,7 +163,7 @@ export const GLSL_SIGILS = /* glsl */ `
       float r = length(p);
       float ang = atan(p.y, p.x);
       float arms = sin(ang * 3.0 + r * 20.0 * sc - T * sp * 3.0 + ch * 6.0);
-      s = pow(0.5 + 0.5 * arms, 8.0) * smoothstep(0.55, 0.12, r) * (0.4 + den);
+      s = pow(0.5 + 0.5 * arms, 8.0) * (1.0 - smoothstep(0.12, 0.55, r)) * (0.4 + den);
     } else if (uSigil == 6) {
       // LEAVES — leaves tumbling across the faces on the breeze.
       vec2 q = (p + cellC) * sc * 1.6 + vec2(T * sp * 0.35, sin(T * sp * 0.6) * 0.3);
@@ -193,7 +195,7 @@ export const GLSL_SIGILS = /* glsl */ `
       // RIPPLES — rings spreading out from the tile's centre.
       float r = length(p);
       float ring = sin(r * 30.0 * sc - T * sp * 4.0 + ch * 6.0);
-      s = pow(max(ring, 0.0), 10.0) * smoothstep(0.58, 0.12, r) * (0.5 + den);
+      s = pow(max(ring, 0.0), 10.0) * (1.0 - smoothstep(0.12, 0.58, r)) * (0.5 + den);
     } else if (uSigil == 10) {
       // CHEVRONS — arrows marching across the face.
       vec2 q = (p + cellC) * sc * 3.0;
@@ -243,7 +245,7 @@ export const GLSL_SIGILS = /* glsl */ `
       float y = fract(q.y + T * sp * (0.4 + h * 0.5) + h * 7.0);
       float x = abs(fract(q.x) - 0.5);
       float head = exp(-(x * x * 120.0 + (y - 0.06) * (y - 0.06) * 260.0));
-      float trail = sgLine(x, 0.07) * smoothstep(0.7, 0.06, y) * step(0.06, y) * 0.7;
+      float trail = sgLine(x, 0.07) * (1.0 - smoothstep(0.06, 0.7, y)) * step(0.06, y) * 0.7;
       s = (head * 1.8 + trail) * step(1.0 - den, h);
     } else if (uSigil == 16) {
       // WISPS — long curling streamers of wind sweeping over the cube.
