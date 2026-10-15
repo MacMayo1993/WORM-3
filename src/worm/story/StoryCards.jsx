@@ -1,6 +1,6 @@
 import StoryStarRequirements from './StoryStarRequirements.jsx';
-import React, { Suspense, useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
-import { victoryViewport } from './victoryFrame.js';
+import React, { Suspense, useEffect, useId, useRef, useState } from 'react';
+import VictoryCubeStage from './VictoryCubeStage.jsx';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
@@ -263,7 +263,6 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
   const [ready, setReady] = useState(reducedMotion);
   const [leaving, setLeaving] = useState(false);
   const ref = useRef(null), exitTimer = useRef(null), navigating = useRef(false);
-  const stage = useRef(null);
   const last = level.id === WORM_STORY_LEVELS.at(-1).id, finale = isChapterFinale(level.id);
   const heading = last ? 'Story complete' : finale ? 'Chapter complete' : 'Level complete';
   const primary = last ? 'Levels' : finale ? `Start chapter ${storyChapterId(level.id) + 1}` : 'Next level';
@@ -271,24 +270,6 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
   const readyAt = STAR_FIRST_MS + (stars - 1) * STAR_STEP_MS + 450;
   const narrative = storyNarrative(level.id);
   const hasRewards = !!level.reward || !!result.unlockedCharacter || !!result.unlockedModes?.length;
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      const rect = stage.current?.getBoundingClientRect();
-      if (!rect?.width || !rect.height) return;
-      victoryViewport.current = { left: rect.left / window.innerWidth, top: rect.top / window.innerHeight,
-        width: rect.width / window.innerWidth, height: rect.height / window.innerHeight };
-    };
-    measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    observer?.observe(stage.current);
-    window.addEventListener('resize', measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', measure);
-      victoryViewport.current = null;
-    };
-  }, []);
 
   useEffect(() => {
     if (reducedMotion) { feel('storyComplete'); return; }
@@ -305,7 +286,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     ref.current?.focus();
     const key = e => {
       if (e.key !== 'Tab') return;
-      const controls = [...(ref.current?.querySelectorAll('button, summary') || [])]
+      const controls = [...(ref.current?.querySelectorAll('button, summary, [tabindex="0"]') || [])]
         .filter(el => !el.disabled && !el.closest('[inert]') && (!el.closest('details:not([open])') || el.tagName === 'SUMMARY'));
       const first = controls[0], lastControl = controls.at(-1);
       if (!first) { e.preventDefault(); ref.current?.focus(); }
@@ -334,7 +315,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
-    <div ref={stage} className="story-completion-cube" role="img" aria-label="Completed cube and your worm" />
+    <VictoryCubeStage />
     <div className="worm-story-result-sheet story-completion-card">
       <small className="story-completion-level">{chapterLine(level.id)}</small>
       <h2 id="worm-story-result-title">{heading}</h2>

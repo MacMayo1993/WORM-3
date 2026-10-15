@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import WormChaseCamera from '../worm/WormChaseCamera.jsx';
-import { victoryViewport } from '../worm/story/victoryFrame.js';
+import { victoryViewport, victoryView, resetVictoryView, rotateVictoryView, zoomVictoryView, victoryCameraFrame } from '../worm/story/victoryFrame.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
@@ -68,7 +68,7 @@ function expectCentered(worm, size) {
   expect(ndc.z).toBeLessThan(1);
 }
 beforeEach(() => {
-  victoryViewport.current = null;
+  victoryViewport.current = null; resetVictoryView();
   vi.mocked(prefersReducedMotion).mockReturnValue(false);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); root = createRoot(host);
@@ -82,7 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
-  victoryViewport.current = null;
+  victoryViewport.current = null; resetVictoryView();
 });
 
 it.each([2, 3, 4, 15])('keeps the entire size-%i victory orbit inside the clear stage, then restores the camera on retry', size => {
@@ -681,4 +681,35 @@ it.each([3, 5, 15])('leaves a raised wormhole with one cut onto the chase it res
       previous = now;
     }
   }
+});
+
+
+it.each([false, true])('lets players inspect and reset the victory cube with reduced motion=%s', still => {
+  vi.mocked(prefersReducedMotion).mockReturnValue(still);
+  const bounds = { left: .04, top: .02, width: .92, height: .4 };
+  victoryViewport.current = bounds;
+  // Free Play uses the same framed camera, without a Story result.
+  useGameStore.setState({ wormGamePhase: 'solved', wormStoryResult: null });
+  render(makeWorm(7), 7);
+  for (let i = 0; i < 360; i++) tick();
+  const before = scene.camera.position.clone();
+  zoomVictoryView(.65);
+  rotateVictoryView(80, -50);
+  for (let i = 0; i < 180; i++) tick();
+  expect(scene.camera.position.length()).toBeCloseTo(victoryCameraFrame(7, 412, 915, bounds).distance * .65, 4);
+  expect(scene.camera.position.clone().normalize().distanceTo(before.clone().normalize())).toBeGreaterThan(.3);
+  const manualPosition = scene.camera.position.clone();
+  for (let i = 0; i < 180; i++) tick();
+  expect(scene.camera.position.distanceTo(manualPosition)).toBeLessThan(1e-8);
+  resetVictoryView();
+  for (let i = 0; i < 360; i++) tick();
+  expect(victoryView.manual).toBe(false);
+  expect(scene.camera.position.length()).toBeCloseTo(before.length(), 3);
+});
+
+it('frames victory closer than the former bounding sphere on a phone', () => {
+  const bounds = { left: .04, top: .02, width: .92, height: .4 };
+  const narrow = Math.atan(Math.tan(55 * Math.PI / 360) * Math.min(bounds.height, bounds.width * 412 / 915));
+  const formerDistance = Math.sqrt(3) * (7 / 2 + .6) / Math.sin(narrow) * 1.08;
+  expect(victoryCameraFrame(7, 412, 915, bounds).distance).toBeLessThan(formerDistance * .9);
 });
