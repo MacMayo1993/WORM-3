@@ -62,7 +62,7 @@ const tangentInto = tunnelPathArcTangentInto;
 function rideFrames(path) {
   const legs = path.legA.length;
   let cache = path.rideFrames;
-  let unchanged = !!cache;
+  let unchanged = !!cache && cache.version === path.version;
   for (let i = 0; unchanged && i <= legs; i++) unchanged = (i < legs ? path.legA[i] : path.vEnd).equals(cache.controls[i]);
   if (unchanged) return cache;
   if (!cache) cache = path.rideFrames = {
@@ -70,6 +70,7 @@ function rideFrames(path) {
     normals: Array.from({ length: FRAME_STEPS + 1 }, () => new THREE.Vector3()),
   };
   for (let i = 0; i <= legs; i++) cache.controls[i].copy(i < legs ? path.legA[i] : path.vEnd);
+  cache.version = path.version;
   cache.forward = forwardPath(path);
   const sign = cache.forward ? 1 : -1;
   for (let i = 0; i <= FRAME_STEPS; i++) {

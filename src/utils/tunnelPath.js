@@ -81,6 +81,11 @@ export const TUNNEL_FLARE = 2;
 /** Width of the core tile a tunnel docks on: the band's width where it plugs in. */
 export const tunnelDockWidth = (size) => TUNNEL_CORE_TILE * tunnelCoreScale(size);
 
+// Occupied routes keep at least a 3x3-sized riding lane. This is physical gauge,
+// shared by recorded body spacing, contacts, ribbon and aperture, not a camera
+// dependent enlargement. Unoccupied network bands still dock on individual tiles.
+export const tunnelRiderDockWidth = size => Math.max(0.12, tunnelDockWidth(size));
+
 /** Width of a tunnel where it leaves its own tile. */
 export const tunnelMouthWidth = (size) => Math.min(TUNNEL_MOUTH_WIDTH, TUNNEL_FLARE * tunnelDockWidth(size));
 
@@ -213,6 +218,11 @@ const _dockSide = new THREE.Vector3();
 /** Allocate a reusable path object. Fill it with buildTunnelPathInto. */
 export const makeTunnelPath = () => {
   const path = {
+    // Cache all builder inputs by value: descriptors and live mesh vectors are
+    // mutable, so identity checks would miss rotations, expansion and pad moves.
+    buildInputs: Array.from({ length: 7 }, () => new THREE.Vector3()),
+    buildMask: -1,
+    version: 0,
     // Control points, mouth to mouth.
     vStart: new THREE.Vector3(),   // entry sticker surface
     throatA: new THREE.Vector3(),  // straight down the entry tile's normal
@@ -277,6 +287,18 @@ function throatDepth(anchor, normal, dock) {
  * @param {THREE.Vector3} [coreCenter] core center in the docks' coordinate space.
  */
 export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, dockB = null, coreCenter = null) {
+  const inputs = path.buildInputs;
+  const mask = (dockA ? 1 : 0) | (dockB ? 2 : 0) | (coreCenter ? 4 : 0);
+  if (path.buildMask === mask && inputs[0].equals(vStart) && inputs[1].equals(n1)
+    && inputs[2].equals(vEnd) && inputs[3].equals(n2)
+    && (!dockA || inputs[4].equals(dockA)) && (!dockB || inputs[5].equals(dockB))
+    && (!coreCenter || inputs[6].equals(coreCenter))) return path;
+  inputs[0].copy(vStart); inputs[1].copy(n1); inputs[2].copy(vEnd); inputs[3].copy(n2);
+  if (dockA) inputs[4].copy(dockA);
+  if (dockB) inputs[5].copy(dockB);
+  if (coreCenter) inputs[6].copy(coreCenter);
+  path.buildMask = mask;
+  path.version++;
   path.vStart.copy(vStart);
   path.vEnd.copy(vEnd);
   path.nStart.copy(n1).normalize();

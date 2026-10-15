@@ -5,7 +5,7 @@ import { makeStepHistory, shPush, shAt } from '../worm/circularBuffers.js';
 import { makeTunnelBodyProfile, blendTunnelBodyProfile, fitTunnelBodyInto } from '../worm/healerWorm/tunnelBodyFit.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideWidthAt } from '../utils/tunnelRide.js';
-import { tunnelDockWidth } from '../utils/tunnelPath.js';
+import { tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 
 it('fits every character footprint and swimming stroke between the rails, from mouth through the core', () => {
   const frame = makeTunnelRideFrame(), profile = makeTunnelBodyProfile(), fit = {};
@@ -17,7 +17,7 @@ it('fits every character footprint and swimming stroke between the rails, from m
     for (let step = 0; step <= 200; step++) {
       const arc = step / 200 * path.total;
       tunnelRideFrameInto(frame, path, arc);
-      Object.assign(profile, { rideWeight: 1, rideWidth: tunnelRideWidthAt(path, arc, tunnelDockWidth(size)),
+      Object.assign(profile, { rideWeight: 1, rideWidth: tunnelRideWidthAt(path, arc, tunnelRiderDockWidth(size)),
         rideClearance: frame.center.distanceTo(frame.floor) });
       for (const radius of [0.082, 0.092, 0.12, 0.16, 0.22]) for (const side of [-0.07, 0, 0.07]) {
         fitTunnelBodyInto(fit, profile, radius, side, 0.014);
@@ -48,9 +48,9 @@ it('retains the tail gauge independently of the head and clears reused surface s
   expect(untouched).toEqual({ scale: 1, side: 0.04, lift: 0.01, shift: 0 });
 });
 
-it('fits the complete seated head and its face through one tile even without core zoom', () => {
+it('fits the complete seated head and its face through the occupied aperture even without core zoom', () => {
   for (const size of [2,3,6,15]) for (const radius of [.092,.16,.22]) {
-    const width=tunnelDockWidth(size);
+    const width=tunnelRiderDockWidth(size);
     const fit=fitTunnelBodyInto({}, {rideWeight:1,rideWidth:width,rideClearance:0},radius,.07,.014);
     expect(Math.hypot(fit.shift + radius*fit.scale*1.1 + fit.lift,fit.side)).toBeLessThan(coreOpeningRadius(size));
   }

@@ -8,6 +8,7 @@ export const tunnelState = {
   occupiedTunnelIds: new Set(), // head and recorded trailing passages
   portalTunnel: null, // current passage, retained while its tail clears the exit
   t: 0,            // tunnelTraversalT: entry arm (0–0.4), core (0.4–0.6), exit arm (0.6–1)
+  rideHead: null, // current camera subject in world coordinates, only during a ride
   lensT: 0,        // where the chase lens is, in the same t: it trails the head by most of a cubie
   activeTunnelId: null, // pairId of the tunnel the worm is currently traversing (null when idle)
   tunnel: null,    // that tunnel's descriptor ({ entry, exit } grid tiles), for the core's approach zoom

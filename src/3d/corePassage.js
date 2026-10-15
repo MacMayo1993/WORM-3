@@ -1,18 +1,18 @@
 import * as THREE from 'three';
 import { buildTunnelPathForTunnel } from '../worm/wormLogic.js';
-import { makeTunnelPath, TUNNEL_MINI_FACE_R, tunnelDockWidth } from '../utils/tunnelPath.js';
+import { makeTunnelPath, TUNNEL_MINI_FACE_R, tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { CORE_ZOOM_MAX } from './antipodalCore.js';
 
 // Retain both docks and the centre even when the arms are very unequal.
 // Extra shoulder samples keep the opening on the actual curved ride at 1–6x zoom.
 const LEG_SAMPLES = [0, 24, 8, 8, 24];
 export const CORE_PASSAGE_POINTS = 65;
-// Leave a narrow rim inside one displayed sticker, on every board size.
-export const coreOpeningRadius = (size, zoom = 1) => tunnelDockWidth(size) * zoom * .45;
+// The active aperture grows with the occupied lane; small boards retain their gauge.
+export const coreOpeningRadius = (size, zoom = 1) => tunnelRiderDockWidth(size) * zoom * .45;
 // The ridden band plugs into that opening as the core swells: it widens with the
 // hole (leaving a rim) instead of arriving as a sliver of the unzoomed tile, and
 // never narrows below its own tile's width. Width only — the route never moves.
-export const coreOpeningBandWidth = (size, zoom = 1) => Math.max(tunnelDockWidth(size), coreOpeningRadius(size, zoom) * 2 * .85);
+export const coreOpeningBandWidth = (size, zoom = 1) => Math.max(tunnelRiderDockWidth(size), coreOpeningRadius(size, zoom) * 2 * .85);
 export const CORE_MIRROR_HALF = TUNNEL_MINI_FACE_R * 0.9;
 // Maximum face extent after zooming about any dock. Outer throats are always
 // beyond the core; omit them and crop long shoulders to this bounded region.
@@ -44,6 +44,9 @@ export function makeCorePassage() {
     path: makeTunnelPath(), signature: '',
     uniforms: {
       uPassageOpen: { value: 0 },
+      uSightRadius: { value: 0 },
+      uSightStart: { value: new THREE.Vector3() },
+      uSightEnd: { value: new THREE.Vector3() },
       uCoreRoomCenter: { value: new THREE.Vector3() },
       uCoreRoomHalf: { value: 0 },
       uPassageRadius: { value: coreOpeningRadius(3) },
@@ -77,8 +80,21 @@ export function updateCorePassage(passage, tunnel, size, expansion) {
   }
 }
 
+// A bounded sight corridor follows the actual head, rather than requiring the
+// lens, opening and a bent route to be collinear. Only the wall between lens
+// and head is opened; the room behind it and distant mirrors stay intact.
+export function updateCoreSightline(passage, camera, head, size) {
+  const u = passage.uniforms;
+  u.uSightRadius.value = head ? tunnelRiderDockWidth(size) * 0.55 : 0;
+  if (head) {
+    u.uSightStart.value.copy(camera);
+    u.uSightEnd.value.copy(head);
+  }
+}
+
 export const corePassageGLSL = `
-uniform float uPassageOpen, uPassageRadius;
+uniform float uPassageOpen, uPassageRadius, uSightRadius;
+uniform vec3 uSightStart, uSightEnd;
 uniform vec3 uCoreRoomCenter;
 uniform vec3 uPassagePoints[${CORE_PASSAGE_POINTS}];
 float portalDistance(vec3 point) {
@@ -101,7 +117,14 @@ float portalDistance(vec3 point) {
       }
     }
   }
-  return sqrt(distanceSq) - uPassageRadius;
+  float bore = sqrt(distanceSq) - uPassageRadius;
+  vec3 sight = uSightEnd - uSightStart;
+  float sightLengthSq = dot(sight, sight);
+  if (uSightRadius > 0.0 && sightLengthSq > 0.00000001) {
+    float t = clamp(dot(point - uSightStart, sight) / sightLengthSq, 0.0, 1.0);
+    bore = min(bore, length(point - (uSightStart + t * sight)) - uSightRadius);
+  }
+  return bore;
 }
 `;
 

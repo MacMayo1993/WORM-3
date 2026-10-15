@@ -188,6 +188,13 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     expect(room.parent).toBe(zoom);
     const roomUniforms = bodies.material.userData.portalCutout;
     expect(roomUniforms.uCoreRoomCenter.value.distanceTo(zoom.position)).toBeLessThan(1e-9);
+    const subject = new THREE.Vector3(.1, .02, 0);
+    tunnelState.rideHead = subject; frame();
+    expect(roomUniforms.uSightEnd.value.equals(subject)).toBe(true);
+    expect(roomUniforms.uSightStart.value.equals(camera.position)).toBe(true);
+    expect(roomUniforms.uSightRadius.value).toBeGreaterThan(0);
+    tunnelState.rideHead = null; frame();
+    expect(roomUniforms.uSightRadius.value).toBe(0);
     camera.position.set(0, 0, -3);
     for (let i = 0; i < 60; i++) frame();
     expect(zoom.scale.x).toBeCloseTo(1, 2);

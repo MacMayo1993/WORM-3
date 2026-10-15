@@ -20,9 +20,8 @@ import * as THREE from 'three';
 
 /** Where the rail may leave the head: this share of each half-extent from the centre. */
 export const RIDE_FRAME = 0.5;
-/** In the crossing close-up the subject is the core's opening, which the lens
- *  centres: a head the lens can see is inside it by construction, and one it
- *  cannot is behind the core's wall, so there the head is only kept on screen. */
+/** More tolerance during the narrow crossing close-up, while the aim catches
+ *  the head and the core's bounded sight corridor keeps its silhouette clear. */
 export const CLOSE_UP_FRAME = 0.92;
 /** The smoothed lens never lets the head past this share, whatever it lags. */
 export const RIDE_FRAME_LIMIT = 0.8;
@@ -91,8 +90,8 @@ export function frameRide(camera, pose, head, alpha = 1, closeUp = 0) {
   keepInFrame(_target, head, box, box, true);
   camera.position.copy(pose.cam);
   camera.quaternion.slerp(_target.quaternion, alpha);
-  // No turn-rate cap: where a route doubles back (both mouths on one face) the
-  // head sweeps past the lens at under half a unit, and any cap loses it behind.
+  // Geometry supplies clearance on doubled-back routes; this remains a final
+  // framing safeguard rather than a turn-rate clamp that could lose the head.
   const limit = THREE.MathUtils.lerp(RIDE_FRAME_LIMIT, CLOSE_UP_FRAME, closeUp);
   keepInFrame(camera, head, limit, limit);
   camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);

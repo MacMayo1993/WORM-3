@@ -262,6 +262,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         return () => {
             if (victoryFramedRef.current) camera.clearViewOffset();
             tunnelState.fallOpening = null;
+            tunnelState.rideHead = null;
             camera.fov = restoreFov;
             camera.near = restoreNear;
             camera.up.copy(restoreUp);
@@ -552,9 +553,8 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         const rocketCalm = prefersReducedMotion();
         const rocketKick = rocketCalm ? 0 : _rocketBurn.liftoff * _rocketBurn.ignite;
         const rocketFov = rocketLift * 4 + rocketKick * 5;
-        // The crossing close-up (tunnelCameraRails): while the head crosses the core
-        // and the lens is still short of its opening, frame that opening. Reduced
-        // motion keeps the ride's own lens and aim.
+        // Follow the crossing head through the core cutaway. Reduced motion
+        // keeps the ride's own lens and aim.
         const rideFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), wormTunnelFov(baseFov), tunnelMix);
         const closeUp = riding && !rocketCalm && !gameState.settings?.reducedMotion
             ? crossingCloseUpInto(_closeUp, worm.activeTunnel.current, tunnelTraversalT(phase, _enterP), size,
@@ -697,9 +697,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         // head the body draws inside the frame (bent, corner and doubled-back
         // routes used to lose it off a phone's edge or behind the lens), and
         // tightens round it through the crossing close-up.
+        tunnelState.rideHead = null;
         const applyRidePose = (pose, alpha) => {
-            // In the close-up, aim at the core's opening the worm is crossing beyond.
-            if (closeUp > 0) pose.look.lerp(_closeUp.center, closeUp);
+            // The cutaway keeps the crossing head visible, so frame the worm itself.
+            if (closeUp > 0) pose.look.lerp(_closeUp.subject, closeUp);
             bodyPathHeadInto(_rideHead, worm, true);
             frameRide(camera, pose, _rideHead, alpha, closeUp);
             camPosRef.current.copy(pose.cam);
@@ -707,6 +708,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             lookAtRef.current.copy(pose.cam).addScaledVector(_rideLook, pose.cam.distanceTo(pose.look));
             camUpRef.current.copy(camera.up);
             tunnelState.lensT = pose.lensT;
+            tunnelState.rideHead = _rideHead;
         };
 
         if (phase === 'crawling' || !worm.activeTunnel.current) {

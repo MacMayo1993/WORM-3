@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelCameraFrameInto, tunnelRideWidthAt } from '../utils/tunnelRide.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
 import { coreOpeningRadius } from '../3d/corePassage.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
-import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcToT, tunnelPathArcPointExtendedInto,
+import { makeTunnelPath, tunnelDockWidth, tunnelRiderDockWidth, tunnelPathTToArc, tunnelPathArcToT, tunnelPathArcPointExtendedInto,
   ARM_A_END, tunnelTraversalT } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
@@ -162,6 +162,21 @@ function cameraRideHeight(point, arc, tHead, size) {
 }
 
 const _cameraLift = new THREE.Vector3();
+const _returnSide = new THREE.Vector3();
+function returnCameraOffsetInto(out, path, tHead, camArc, point, size) {
+  out.set(0, 0, 0);
+  if (path.nStart.dot(path.nEnd) <= 0.95) return out;
+  out.subVectors(path.midB, path.midA).cross(path.nStart).normalize();
+  const shoulder = THREE.MathUtils.smoothstep(tHead, 0.18, 0.38)
+    * (1 - THREE.MathUtils.smoothstep(tHead, 0.72, 0.94));
+  const mouth = THREE.MathUtils.smoothstep(Math.min(camArc, path.total - camArc), 0.1, 0.8);
+  let room = 0.9;
+  const half = size / 2 - 0.12;
+  for (const axis of ['x', 'y', 'z']) {
+    if (Math.abs(out[axis]) > 1e-8) room = Math.min(room, Math.max(0, (half - Math.sign(out[axis]) * point[axis]) / Math.abs(out[axis])));
+  }
+  return out.multiplyScalar(room * shoulder * mouth);
+}
 function cameraLiftInto(out, up, tHead) {
   // During entry, raising the view must not push it back toward the mouth as
   // the transported frame bends. Release that constraint beyond the entry arm.
@@ -260,6 +275,17 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   const followHead = (1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5))
     * (1 - THREE.MathUtils.smoothstep(rideHeight, 0, .15));
   out.look.lerp(_headPoint, followHead);
+  // A same-face return passes the incoming rail at almost zero distance. Move
+  // the lens out of that plane before the head turns back; a rotation cap alone
+  // cannot keep a head that crosses the lens in view. Both mouths stay axial.
+  if (_camPath.nStart.dot(_camPath.nEnd) > 0.95) {
+    out.cam.add(returnCameraOffsetInto(_returnSide, _camPath, tHead, camArc, out.cam, size));
+    out.look.copy(_headPoint);
+    // A return has no stable tangent-defined horizon at the U-turn. Use the
+    // mouths' separation as its screen-up reference; it stays transverse to
+    // this offset shot and avoids a second whip from banking at the reversal.
+    out.up.subVectors(_camPath.midB, _camPath.midA).normalize();
+  }
   return out;
 }
 
@@ -338,7 +364,8 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   tunnelCamPoseInto(_entryStart, tunnel, tunnelTraversalT('entering', 0), size);
   const settle = rollBetween(from, _entryStart);
   tunnelCamPoseInto(_entryRide, tunnel, tHead, size);
-  _entryRideUp.copy(_entryRide.up);
+  // Position lift follows the transported rail, independently of shot banking.
+  _entryRideUp.copy(_rideFrame.normal);
   const remaining = settle * (1 - THREE.MathUtils.smoothstep(p, ENTRY_ROLL_START, 1));
   if (remaining) _entryRide.up.applyAxisAngle(_rollAxis.subVectors(_entryRide.look, _entryRide.cam).normalize(), remaining);
   const blend = diveProgress(p);
@@ -355,6 +382,7 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   // raised pad's shot sits behind the heading) never slides in at the last moment.
   out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height)));
   out.cam.addScaledVector(cameraLiftInto(_cameraLift, _entryRideUp, tHead), cameraRideHeight(out.cam, arc, tHead, size) * blend);
+  out.cam.addScaledVector(returnCameraOffsetInto(_returnSide, _camPath, tHead, arc, out.cam, size), blend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
 }
@@ -374,19 +402,11 @@ export function tunnelExitPoseInto(out, tunnel, progress, size) {
 }
 
 // ── Crossing close-up ────────────────────────────────────────────────────────
-// The core crossing is the ride's slowest stretch (2 s, dock to dock) and its
-// point: the half-twist and the antipodal centre. But the lens cannot be with
-// the head there. It trails most of a cubie behind on the rider's centerline
-// (the clearance capsule in front of the lens and the core's openings both
-// depend on that), so it is still in the entry arm for the whole crossing, and
-// the worm, fitted to the core tile's gauge, is 0.3–2% of the frame's height:
-// a speck in a porthole. Frame the porthole instead of moving the lens. While
-// the head is near or inside the core and the lens is still short of the
-// opening, the aim leans onto the opening's centre and the lens narrows so the
-// opening fills a fixed share of the frame's narrower side: as the lens closes
-// in the view widens back, so the porthole holds its size while the worm
-// crosses the mirror room beyond it. It opens out to the ride's wide lens
-// before the lens itself goes through.
+// Frame the crossing head while the lens trails the entry dock. The active
+// lane has a physical minimum gauge and corePassage opens a bounded line of
+// sight, so the shot can follow the worm through bends. Its FOV targets an 8%
+// tall head, bounded by the opening composition and a 30-degree minimum lens.
+// Release before the lens reaches the dock to rejoin the broad tunnel view.
 // The opening's radius as a share of the frame's narrower half-extent.
 export const CROSSING_FILL = 0.75;
 // Never narrower than this (a telephoto magnifies every wobble of the rail).
@@ -395,9 +415,9 @@ export const CROSSING_FOV_MIN = 30;
 const CLOSE_UP_LEAD = 0.3;
 // Back to the wide ride lens by the time the lens is this far short of the dock.
 const CLOSE_UP_RELEASE = 0.35;
-const _closeLens = new THREE.Vector3();
+const _closePose = makeTunnelCamPose();
 
-export const makeCrossingCloseUp = () => ({ weight: 0, center: new THREE.Vector3(), radius: 0, distance: 1 });
+export const makeCrossingCloseUp = () => ({ weight: 0, center: new THREE.Vector3(), subject: new THREE.Vector3(), radius: 0, distance: 1, headRadius: 0, headDistance: 1 });
 
 /**
  * The crossing close-up for the head at `tHead`: `weight` 0–1, and the entry
@@ -413,7 +433,11 @@ export function crossingCloseUpInto(out, tunnel, tHead, size, zoom = 1) {
     * (1 - THREE.MathUtils.smoothstep(camArc - dock, -CLOSE_UP_RELEASE, 0));
   out.center.copy(_camPath.midA);
   out.radius = coreOpeningRadius(size, zoom);
-  out.distance = cameraArcPointInto(_closeLens, _camPath, camArc).distanceTo(out.center);
+  tunnelPathArcPointExtendedInto(out.subject, _camPath, headArc);
+  tunnelCamPoseInto(_closePose, tunnel, tHead, size);
+  out.distance = _closePose.cam.distanceTo(out.center);
+  out.headDistance = _closePose.cam.distanceTo(out.subject);
+  out.headRadius = 0.19 * tunnelRideWidthAt(_camPath, headArc, tunnelRiderDockWidth(size));
   return out;
 }
 
@@ -424,6 +448,9 @@ export function crossingCloseUpInto(out, tunnel, tHead, size, zoom = 1) {
  */
 export function crossingFov(closeUp, aspect, widest) {
   const tanNarrow = closeUp.radius / (CROSSING_FILL * Math.max(closeUp.distance, 1e-3));
-  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanNarrow / Math.min(1, aspect)));
+  // Aim for an 8% tall head, even when the enlarged core's aperture is much
+  // wider than the body. Keep the old porthole bound as a second composition.
+  const subjectTan = closeUp.headRadius > 0 ? closeUp.headRadius / (0.08 * Math.max(closeUp.headDistance, 1e-3)) : Infinity;
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.min(tanNarrow / Math.min(1, aspect), subjectTan)));
   return THREE.MathUtils.clamp(fov, CROSSING_FOV_MIN, widest);
 }
