@@ -249,7 +249,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Cinematics render real stickers with local styling, never changing saved settings.
   const { biomeEnabled: configuredBiome, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
   const isChrome = mode === 'chrome';
-  const biomeEnabled = configuredBiome && !isChrome;
+  const isNeon = mode === 'neon';
+  const biomeEnabled = configuredBiome && !isChrome && !isNeon;
   const flipPads = presentation ? settings?.flipPads : gameConfig.flipPads;
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
@@ -643,7 +644,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipFromColor.current = fc[fromFaceId];
       flipToColor.current = fc[curr];
       // Texture follows city identity — use biome ground textures in biome mode
-      if (isChrome) {
+      if (isChrome || isNeon) {
         flipFromTexture.current = flipToTexture.current = null;
       } else if (biomeEnabled && meta?.orig) {
         const newFlips = flips;
@@ -704,7 +705,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // mesh is visible so living/patterned styles show through the additive rim glow.
       if (preserveFlipStyle && !biomeEnabled && !isGlass && !isChrome && !isSudokube && meshRef.current) {
         meshRef.current.material = getTileStyleMaterial(
-          manifoldStyles?.[fromFaceId] || 'solid', flipFromColor.current,
+          isNeon ? 'neonSign' : manifoldStyles?.[fromFaceId] || 'solid', flipFromColor.current,
           !!flipFromTexture.current, flipFromTexture.current, fc[ANTIPODAL_COLOR[fromFaceId]]);
         meshRef.current.visible = true;
       } else if (!isInstancedRef.current && meshRef.current) {
@@ -721,7 +722,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           // it back to the FROM style for the first half; the midpoint swaps it to TO,
           // so the antipodal style flips in with the animation. (Solid FROM has no
           // style to show — leave the TO style visible in that case.)
-          const fromStyleName = manifoldStyles?.[prevVal] || 'solid';
+          const fromStyleName = isNeon ? 'neonSign' : manifoldStyles?.[prevVal] || 'solid';
           if (fromStyleName !== 'solid') {
             const fromAntiHex = fc[ANTIPODAL_COLOR[prevVal]] ?? null;
             meshRef.current.material = getTileStyleMaterial(fromStyleName, flipFromColor.current, false, null, fromAntiHex);
@@ -1263,7 +1264,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
-  const currTexture = isDead || isChrome ? null
+  const currTexture = isDead || isChrome || isNeon ? null
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
   const currTextureReady = isTextureReady(currTexture);
@@ -1300,6 +1301,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // spent tiles reads as spent and the surviving pair actually stands out.
   const tileStyle = isDead || lightweightNumbers || isChrome
     ? 'solid'
+    : isNeon ? 'neonSign'
     : biomeGroundTexture
     ? 'solid'
     : stableCity
@@ -1353,7 +1355,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const bindStyleIdentity = useMemo(() => bindTileStyleIdentity({ x: meta?.origPos?.x, y: meta?.origPos?.y, z: meta?.origPos?.z }, meta?.orig),
     [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
 
-  const backTileStyle = isDead || lightweightNumbers || isChrome ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
+  const backTileStyle = isDead || lightweightNumbers || isChrome ? 'solid' : isNeon ? 'neonSign' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
@@ -1465,10 +1467,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const fromFaceId = preserveFlipStyle ? displayedFaceRef.current : prevCurr.current;
         const fromColor = fc[fromFaceId];
         if (preserveFlipStyle && !biomeEnabled && !isGlass && !isChrome && !isSudokube && fromColor) {
-          const texture = faceTextures?.[fromFaceId] || null;
+          const texture = isNeon ? null : faceTextures?.[fromFaceId] || null;
           meshRef.current.material = getTileStyleMaterial(
-            manifoldStyles?.[fromFaceId] || 'solid', fromColor,
+            isNeon ? 'neonSign' : manifoldStyles?.[fromFaceId] || 'solid', fromColor,
             !!texture, texture, fc[ANTIPODAL_COLOR[fromFaceId]]);
+        } else if (isNeon && fromColor) {
+          meshRef.current.material = getTileStyleMaterial('neonSign', fromColor);
         } else if (mat.color && fromColor) {
           mat.map = null; // texture restored in useEffect once flipFromTexture is known
           mat.color.set(fromColor);
@@ -1492,7 +1496,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Worm and cube modes share the same batched, animated portal face.

@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from '../../utils/device.js';
 import { bindDefaultTileStyleIdentity } from '../tileStyleIdentity.js';
 import { livingSurfaceShaders } from './shaders/livingSurfaceShaders.js';
 import { LIVING_SURFACE_KEYS } from '../../utils/livingSurfaceCatalog.js';
@@ -24,6 +25,7 @@ export { isAnimatedStyle } from './animatedStyles.js';
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
   time: { value: 0 },
+  reducedMotion: { value: prefersReducedMotion() ? 1 : 0 },
   // "Spin energy" in [0,1]: spikes while a layer is rotating and decays after,
   // so styles like orbChamber can jostle their contents in reaction to the turn.
   spin: { value: 0 },
@@ -68,6 +70,7 @@ export function setDiceCellState(texture, gridN, k) {
 // Update time uniform (call from useFrame)
 export function updateSharedTime(elapsed) {
   sharedUniforms.time.value = elapsed;
+  sharedUniforms.reducedMotion.value = prefersReducedMotion() ? 1 : 0;
 }
 
 // Update spin uniforms (call from useFrame). Energy is clamped to [0,1].
@@ -307,6 +310,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     tileFace: { value: 0 },
     baseColor: { value: color },
     time: sharedUniforms.time,
+    reducedMotion: sharedUniforms.reducedMotion,
     spin: sharedUniforms.spin,
     spinAxis: sharedUniforms.spinAxis,
     spinSlice: sharedUniforms.spinSlice,

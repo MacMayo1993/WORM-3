@@ -272,35 +272,54 @@ export const newStyleShaders = {
     }
   `,
 
-  // Neon Sign - glowing neon-tube border + inner diamond with flicker
+  // A bent neon tube fills the sign face; broad light spill colors its backing.
+  // Stable physical identity staggers electrical sputters even after a layer turn.
   neonSign: `
     uniform vec3 baseColor;
     uniform float time;
+    uniform float reducedMotion;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec2 vUv;
+    float tileCoat;
 
     void main() {
-      vec2 c    = vUv - 0.5;
-      vec2 bd   = abs(c) - vec2(0.38);
-      float bSDF  = max(bd.x, bd.y);
-      float bRing = abs(bSDF + 0.04);
-      float border  = smoothstep(0.035, 0.001, bRing);
-
-      float dSDF  = abs(c.x) + abs(c.y);
-      float dRing = abs(dSDF - 0.21);
-      float diamond = smoothstep(0.025, 0.001, dRing);
-
-      float flicker = 0.88 + 0.12 * sin(time * 8.1) * sin(time * 14.3 + 1.9);
-      float pulse   = 0.78 + 0.22 * sin(time * 1.8);
-
-      float neon = max(border, diamond) * flicker;
-      float glow = smoothstep(0.14, 0.0, bRing) * 0.28
-                 + smoothstep(0.09, 0.0, dRing) * 0.28;
-
-      vec3 nc  = baseColor * 2.8 + vec3(0.35);
-      vec3 gc  = baseColor * 0.75;
-      vec3 bg  = baseColor * 0.04;
-      vec3 col = bg + gc * glow * pulse + nc * neon;
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      vec2 p = vUv - 0.5;
+      float seed = fract(sin(dot(tileHome, vec3(12.9898, 78.233, 37.719))
+                        + tileFace * 19.19) * 43758.5453);
+      float t = time + seed * 23.0;
+      // Rounded perimeter tube, nearly edge to edge.
+      vec2 q = abs(p) - vec2(0.39);
+      float frame = abs(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.05);
+      // Five horizontal runs joined by alternating semicircular glass bends.
+      float tube = 1.0;
+      for (int i = 0; i < 5; i++) {
+        float y = -0.28 + float(i) * 0.14;
+        tube = min(tube, length(vec2(max(abs(p.x) - 0.27, 0.0), p.y - y)));
+        if (i < 4) {
+          float side = mod(float(i), 2.0) < 0.5 ? 1.0 : -1.0;
+          vec2 bend = vec2(p.x * side - 0.27, p.y - y - 0.07);
+          if (bend.x >= 0.0) tube = min(tube, abs(length(bend) - 0.07));
+        }
+      }
+      float d = min(tube, frame);
+      float aa = max(fwidth(d), 0.001);
+      float glass = 1.0 - smoothstep(0.012 - aa, 0.019 + aa, d);
+      float core = 1.0 - smoothstep(0.002, 0.007 + aa, d);
+      float halo = exp(-d * 32.0);
+      float spill = exp(-d * 7.0);
+      // One brief double sputter per cycle; never switches the whole panel off.
+      float cycle = mod(t, 5.7 + seed * 3.1);
+      float dip = (1.0 - smoothstep(0.025, 0.085, abs(cycle - 0.16))) * 0.48
+                + (1.0 - smoothstep(0.015, 0.055, abs(cycle - 0.34))) * 0.27;
+      float hum = 0.97 + 0.03 * sin(t * 8.1) * sin(t * 13.7);
+      float power = mix(hum - dip, 1.0, reducedMotion);
+      vec3 tint = baseColor / max(max(baseColor.r, baseColor.g), max(baseColor.b, 0.08));
+      vec3 backing = tint * (0.12 + 0.18 * spill);
+      vec3 light = tint * (0.38 * halo + 0.30 * glass)
+                 + mix(tint, vec3(1.0), 0.72) * core * 0.85;
+      tileCoat = 0.08;
+      gl_FragColor = vec4(clamp(backing + light * power, 0.0, 1.0), 1.0);
     }
   `,
 
