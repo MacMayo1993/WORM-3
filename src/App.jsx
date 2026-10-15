@@ -532,7 +532,7 @@ export default function WORM3() {
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
   const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
-  const [wormEntryPage, setWormEntryPage] = useState('choice');
+  const [wormEntryPage, setWormEntryPage] = useState('story');
 
   // Mobi intro — shown before any game mode goes live
   const [showMobiIntro, setShowMobiIntro] = useState(false);
@@ -869,7 +869,7 @@ export default function WORM3() {
   }, [cancelShuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
-    setWormEntryPage('choice');
+    setWormEntryPage('story');
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, []);
@@ -980,7 +980,7 @@ export default function WORM3() {
   }, [reset, cancelShuffle]);
 
   const handleWormNewGame = useCallback(() => {
-    setWormEntryPage(useGameStore.getState().wormStoryLevel ? 'story' : 'choice');
+    setWormEntryPage(useGameStore.getState().wormStoryLevel ? 'story' : 'free');
     clearMegaReducedFXOverride();
     useGameStore.getState().clearDisparityGame();
     useGameStore.getState().setShowMainMenu(false);

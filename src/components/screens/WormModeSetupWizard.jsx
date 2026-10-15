@@ -23,7 +23,7 @@ const WORM_SIZE_TIERS = [
   { n: MEGA_CUBE_SIZE, name: '15×15×15' }
 ];
 
-const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
+const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings, sectionSelect }) => {
   const [step, setStep] = useState(0);
   const isMobile = useIsMobile();
   const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
@@ -145,6 +145,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <WizardShell
       styles={S}
       mode="WORM MODE"
+      headerControl={sectionSelect}
       accent={ACCENT}
       categories={categories}
       active={step}

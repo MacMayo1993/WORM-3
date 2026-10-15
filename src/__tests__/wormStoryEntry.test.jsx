@@ -11,9 +11,13 @@ import { storyGrowthTarget } from '../worm/story/starGoals.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
-vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: ({ onComplete, onCancel, initialSettings }) => <div aria-label="Free Play setup"><button onClick={onCancel}>Cancel setup</button><button onClick={() => onComplete(initialSettings)}>Launch free run</button></div> }));
+vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: ({ onComplete, onCancel, initialSettings, sectionSelect }) => <div aria-label="Free Play setup">{sectionSelect}<button onClick={onCancel}>Cancel setup</button><button onClick={() => onComplete(initialSettings)}>Launch free run</button></div> }));
 let host, root, complete, cancel;
 const state = () => useGameStore.getState();
+const switchSection = value => act(() => {
+  const select = host.querySelector('select[aria-label="Worm mode section"]');
+  select.value = value; select.dispatchEvent(new Event('change', { bubbles: true }));
+});
 const click = text => act(() => [...host.querySelectorAll('button')].find(b => (b.getAttribute('aria-label') || b.textContent).includes(text)).click());
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -33,13 +37,13 @@ it('launches the Chapter 1 siege and finale on 6x6', () => {
   click('Worm Ascendant'); click('Play level');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 6 });
 });
-it('opens with Story on the left and Free Play on the right, without launching either', async () => {
-  show(); const cards = [...host.querySelector('.worm-path-split').children];
-  expect(cards).toHaveLength(2);
-  expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
-  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
+it('opens directly to Story Mode and switches sections without launching a run', async () => {
+  show();
+  expect(host.querySelector('.worm-path-split')).toBeNull();
+  expect(host.querySelector('select').value).toBe('story');
+  expect([...host.querySelector('select').options].map(option => option.text)).toEqual(['Story Mode', 'Free Play', 'Worm Customization']);
   expect(complete).not.toHaveBeenCalled();
-  click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   const rules = host.querySelector('[aria-label="Star requirements"]');
   expect(rules.querySelectorAll('li')).toHaveLength(3);
   const first = storyLevel(1);
@@ -49,18 +53,39 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 6, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
-  click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  await act(async () => { switchSection('free'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
-  click('Cancel setup'); expect(host.querySelector('.worm-path-split')).not.toBeNull();
+  switchSection('customize');
+  expect(host.querySelector('.worm-customization-body .worm-profile-options')).not.toBeNull();
+  expect(host.querySelector('select').value).toBe('customize');
+  switchSection('story');
+  expect(host.querySelector('.worm-level-grid')).not.toBeNull();
+  await act(async () => { switchSection('free'); });
+  click('Cancel setup'); expect(host.querySelector('select').value).toBe('story');
 });
 it('traps keyboard focus and handles Back/Escape within the mode boundary', () => {
   show(); const buttons = host.querySelectorAll('button'); expect(document.activeElement).toBe(buttons[0]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })));
   expect(document.activeElement).toBe(buttons[buttons.length-1]);
-  click('Levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-  expect(host.querySelector('.worm-path-split')).not.toBeNull(); expect(cancel).not.toHaveBeenCalled();
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); expect(cancel).toHaveBeenCalledOnce();
+  switchSection('customize');
+  const select = host.querySelector('select'); select.focus();
+  act(() => select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(select.value).toBe('customize'); expect(cancel).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(host.querySelector('select').value).toBe('story'); expect(cancel).not.toHaveBeenCalled();
+  click('Back to modes'); expect(cancel).toHaveBeenCalledOnce();
+});
+it('keeps the selected level when switching away from and back to Story Mode', async () => {
+  useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: {1:3,2:2,3:1}, claimed: {} } } });
+  show(); click('Clear Your Tail');
+  const selectedLabel = () => host.querySelector('.worm-level-grid [aria-pressed="true"]').getAttribute('aria-label');
+  const before = selectedLabel();
+  switchSection('customize'); switchSection('story');
+  expect(selectedLabel()).toBe(before);
+  await act(async () => { switchSection('free'); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  switchSection('story'); expect(selectedLabel()).toBe(before);
+  expect(complete).not.toHaveBeenCalled();
 });
 it('resumes at the next unlocked level and lets a completed level claim its reward from the map', () => {
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: {1:3,2:2,3:1}, claimed: {} } } });

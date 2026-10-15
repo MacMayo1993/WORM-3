@@ -7,6 +7,7 @@ import WormEntryScreen from '../components/screens/WormEntryScreen.jsx';
 import WormProfile from '../components/screens/WormProfile.jsx';
 import { feel } from '../utils/feel.js';
 
+vi.mock('../worm/story/StoryWorldPreview.jsx', () => ({ default: () => null }));
 vi.mock('../utils/feel.js', () => ({ feel: vi.fn(), resumeFeel: vi.fn() }));
 vi.mock('../hooks/index.js', () => ({ useIsMobile: () => true }));
 vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: ({ characterId, skinId, hatId }) =>
@@ -14,7 +15,8 @@ vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: ({ characterId, skinId,
 vi.mock('../components/screens/wizardSteps/CubePlate.jsx', () => ({ default: () => null }));
 vi.mock('../components/screens/WizardChrome.jsx', async importOriginal => ({
   ...await importOriginal(),
-  WizardShell: ({ categories, active, onSelect, onPrimary, onBack }) => <>
+  WizardShell: ({ categories, active, onSelect, onPrimary, onBack, headerControl }) => <>
+    {headerControl}
     <button onClick={onBack}>Back</button>
     <nav>{categories.map((category, i) => <button key={category.key} onClick={() => onSelect(i)}>{category.label}</button>)}</nav>
     {categories[active].content}<button onClick={onPrimary}>Start Playing</button>
@@ -67,25 +69,27 @@ it('keeps locked items visible without equipping them or playing a confirmation 
   }
 });
 
-it.each(['Levels →', 'Free Play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
+it.each(['story', 'free'])('launches %s with the shared profile instead of stale setup equipment', async path => {
   const complete = vi.fn(settings => state().initWormMode(9999, 0, settings.wormSpeed, settings.wormOrbCount,
     settings.wormholeInterval, settings.wormColor, false, settings.wormEnemiesEnabled, settings.storyLevel ?? null));
   act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={vi.fn()}
     initialSettings={{ wormColor: '#123456', wormCharacter: 'classic', wormSkin: 'slime' }} />));
-  const split = host.querySelector('.worm-path-split');
-  expect(split.nextElementSibling.classList.contains('worm-profile')).toBe(true);
-  click('Customize ✎'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
-  await act(async () => { button(path).click(); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  const switchSection = value => {
+    const select = host.querySelector('select'); select.value = value; select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  act(() => switchSection('customize'));
+  click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
+  await act(async () => { switchSection(path); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(preview()).toBe('book/royal/crown');
-  if (path.startsWith('Levels')) click('Play level 1-1 →');
+  if (path === 'story') click('Play level 1-1 →');
   else {
     // Editing within Free Play must also update the shared profile.
     click('Classic');
     click('Gameplay'); click('Start Playing');
   }
   expect(complete).toHaveBeenCalledWith(expect.objectContaining({ wormColor: '#a855f7' }));
-  expect(state().wormCharacter).toBe(path.startsWith('Levels') ? 'book' : 'classic');
-  if (path.startsWith('FREE')) expect(state().xpRun.character).toBe('classic');
+  expect(state().wormCharacter).toBe(path === 'story' ? 'book' : 'classic');
+  if (path === 'free') expect(state().xpRun.character).toBe('classic');
   expect(state().wormSkin).toBe('royal'); expect(state().wormHat).toBe('crown');
   expect(state().wormColor).toBe('#a855f7');
 });

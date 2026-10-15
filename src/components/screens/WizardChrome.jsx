@@ -488,6 +488,7 @@ export function WizardShell({
   onPrimary,
   finishLabel = "Play",
   secondary = null,
+  headerControl = null,
   quickPlay = null,
   mobile = isMobile,
   children
@@ -542,14 +543,14 @@ export function WizardShell({
       {children}
 
       <div className="mode-wizard-sheet" style={styles.sheet}>
-        <div style={styles.modeBar}>
+        <div className={headerControl ? 'worm-section-bar' : undefined} style={styles.modeBar}>
           <button type="button" onClick={onBack} className="ui-focusable" style={styles.backBtn} aria-label="Back">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 3L5 8l5 5" />
             </svg>
             {!mobile && (active === 0 ? 'Cancel' : 'Back')}
           </button>
-          <span className="mode-wizard-kicker">{theme.name}</span>
+          {headerControl || <span className="mode-wizard-kicker">{theme.name}</span>}
           <span className="mode-wizard-count">{String(active + 1).padStart(2, '0')} / {String(categories.length).padStart(2, '0')}</span>
         </div>
 
