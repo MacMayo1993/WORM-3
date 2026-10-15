@@ -42,9 +42,9 @@ function collectElementalMaterials() {
     materials.push(particles);
 
     // The pickup itself, before anything is claimed: an orb spawning on the board
-    // is the first moment these three programs are needed.
-    const orb = getElementalOrbMaterials(element, def.color, def.accent);
-    if (orb) materials.push(orb.core, orb.shell, orb.inner);
+    // is the first moment these programs are needed.
+    const orb = getElementalOrbMaterials(element, def.color, def.accent, def.fogColor);
+    if (orb) materials.push(orb.core, orb.shell, orb.inner, orb.hull);
 
     // The wash that arrives when it is claimed.
     switch (def.renderer) {

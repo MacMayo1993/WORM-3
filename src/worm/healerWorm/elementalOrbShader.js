@@ -1,7 +1,7 @@
 // src/worm/healerWorm/elementalOrbShader.js
 //
-// The material set behind the elemental pickup's *body* — the glassy sphere the
-// crest badge floats on. Three layers, all driven by one small shader pair:
+// The material set behind the elemental pickup's *body* — the shaped glass body the
+// crest badge floats over. Four layers, all sharing one vertex stage:
 //
 //   core  — the element itself, churning inside the sphere (object-space field,
 //           slowly rotated in-shader so the interior turns even while the orb
@@ -12,8 +12,16 @@
 //           flat glowing disc.
 //   inner — a back-side additive bloom just under the shell, so the core appears
 //           to be lit from within rather than pasted on.
+//   hull  — a slightly inflated back-face copy in the element's dark ink. Behind
+//           the body it is a dark backing (the sticker under a translucent orb
+//           used to show through and tint it, so Water on a blue tile or Earth on
+//           a green one vanished), and past the silhouette it is an ink outline,
+//           the same inked look as the worm's handmade pieces.
 //
-// `uMode` is a uniform, not a #define, so all four elements share one compiled
+// Each element has its own body shape (elementalOrbShapes.js); the vertex stage
+// animates the two that move: fire licks into tongues, the tornado sways.
+//
+// `uMode` is a uniform, not a #define, so every element shares one compiled
 // program: spawning an offering (four orbs at once, every 12s) never triggers a
 // shader compile after the first one.
 //
@@ -27,7 +35,7 @@
 //
 // An offering places at most one orb per element, so one set per element is all
 // that is ever live and `uAlpha` has a single writer. The cache is bounded by the
-// four elements, matching how ElementalSurface and HealerBombs hold their own
+// six elements, matching how ElementalSurface and HealerBombs hold their own
 // long-lived materials.
 
 import * as THREE from 'three';
@@ -40,6 +48,7 @@ const varyings = /* glsl */ `
   uniform int uMode;
   uniform vec3 uColor;
   uniform vec3 uAccent;
+  uniform vec3 uInk;
   uniform float uAlpha;
   varying vec3 vLocal;
   varying vec3 vNormalW;
@@ -47,12 +56,30 @@ const varyings = /* glsl */ `
 `;
 
 // Shared vertex stage. The orb's own group carries a uniform scale, so the plain
-// mat3(modelMatrix) normal transform is exact here (no normal matrix needed).
+// mat3(modelMatrix) normal transform is exact here (no normal matrix needed). The
+// displacement leaves normals as authored: at the size an orb is drawn the
+// difference does not read, and the hull runs the same stage so its outline
+// follows the moving silhouette.
 const vertexShader = /* glsl */ `
   ${varyings}
   void main() {
     vLocal = position;
-    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vec3 pos = position;
+    if (uMode == 1) {
+      // Flame: the tongues climb and sway, more the higher they reach, so the
+      // crown's outline flickers.
+      float h = smoothstep(-0.2, 0.6, pos.y);
+      float a = atan(pos.z, pos.x);
+      pos.y += h * h * 0.08 * sin(uTime * 5.0 + a * 3.0);
+      pos.x += sin(uTime * 3.1 + pos.y * 4.0) * 0.07 * h * h;
+      pos.z += cos(uTime * 2.7 + pos.y * 3.0) * 0.04 * h * h;
+    } else if (uMode == 5) {
+      // Tornado: the narrow foot whips about under a steadier mouth.
+      float foot = 0.5 - pos.y;
+      pos.x += sin(uTime * 2.6 + pos.y * 3.0) * 0.07 * foot;
+      pos.z += cos(uTime * 2.2 + pos.y * 2.5) * 0.05 * foot;
+    }
+    vec4 wp = modelMatrix * vec4(pos, 1.0);
     vNormalW = normalize(mat3(modelMatrix) * normal);
     vViewW = normalize(cameraPosition - wp.xyz);
     gl_Position = projectionMatrix * viewMatrix * wp;
@@ -94,45 +121,53 @@ const coreFragment = /* glsl */ `
     vec3 col;
     float alpha;
 
+    // Every interior is kept dense (alpha near 1 at the centre): a see-through
+    // body takes on the sticker behind it, which is what made the elements hard
+    // to tell apart on a scrambled cube.
     if (uMode == 0) {
-      // A moving tide and concentric ripples inside the glassy orb.
-      float wave = sin(p.x * 3.0 + t * 1.3) * 0.16 + sin(p.z * 2.5 - t) * 0.12;
-      float waterline = 1.0 - smoothstep(-0.1, 0.1, p.y - wave);
-      float rings = pow(0.5 + 0.5 * sin(length(p.xz) * 12.0 - t * 2.0), 10.0);
-      col = mix(uColor * 0.25, uColor, waterline * 0.7 + fres * 0.3);
-      col += uAccent * rings * waterline * 0.55;
-      col += uAccent * exp(-abs(p.y - wave) * 15.0) * 0.5;
-      alpha = 0.3 + waterline * 0.4 + fres * 0.25;
+      // Water: deep blue with a sloshing waterline and bright caustic webs.
+      float wave = sin(p.x * 3.0 + t * 1.6) * 0.18 + sin(p.z * 2.5 - t * 1.2) * 0.14;
+      float below = 1.0 - smoothstep(-0.12, 0.12, p.y - wave);
+      float c = abs(sin(p.x * 2.6 + t * 0.9) + sin(p.y * 3.1 - t * 1.1) + sin(p.z * 2.3 + t * 0.7));
+      float caustic = pow(1.0 - clamp(c * 0.6, 0.0, 1.0), 4.0);
+      vec3 deep = vec3(0.02, 0.10, 0.36);
+      col = mix(deep, uColor * 0.85, below * 0.55 + 0.15);
+      col += uAccent * caustic * (0.35 + 0.55 * below);
+      col += uAccent * exp(-abs(p.y - wave) * 12.0) * 0.7;
+      alpha = 0.88 + fres * 0.12;
     } else if (uMode == 1) {
-      // Flame tongues rise through the orb, rather than molten rock.
-      float flame = sin(p.x * 6.0 + sin(p.y * 3.0 - t * 2.0)) + sin(p.z * 5.0 - t);
-      float tongues = smoothstep(-0.7, 0.7, flame - p.y * 0.6);
-      float heat = exp(-abs(p.y + 0.6) * 1.4);
-      col = mix(vec3(0.15, 0.025, 0.01), uColor, tongues);
-      col = mix(col, uAccent, heat * tongues * 0.8);
-      alpha = 0.45 + tongues * 0.45;
+      // Fire: a white-gold heart under orange tongues, darkening to red at the tips.
+      float flame = sin(p.x * 6.0 + sin(p.y * 3.0 - t * 2.6)) + sin(p.z * 5.0 - t * 1.4);
+      float tongues = smoothstep(-0.8, 0.8, flame - p.y * 0.5);
+      float heart = exp(-dot(vLocal.xz, vLocal.xz) * 18.0) * smoothstep(0.45, -0.3, vLocal.y);
+      col = mix(vec3(0.55, 0.05, 0.02), uColor * 1.1, tongues);
+      col = mix(col, uAccent * 1.15, clamp(heart * 1.3, 0.0, 1.0));
+      alpha = 0.9 + tongues * 0.1;
     } else if (uMode == 2) {
-      // A branching stem and paired leaf veins preview the growing canopy.
-      float stem = exp(-abs(p.x + 0.14 * sin(p.y * 2.0 + t * 0.4)) * 15.0);
-      float leaves = pow(0.5 + 0.5 * cos(p.y * 9.0 - abs(p.x) * 5.0), 10.0) * exp(-abs(p.x) * 1.7);
-      col = mix(uColor * 0.2, uColor, 0.5 + 0.3 * sin(f));
-      col += uAccent * max(stem, leaves) * 0.7;
-      col = mix(col, uAccent, fres * 0.3);
-      alpha = 0.6 + fres * 0.3;
+      // Earth: grey-brown stone, a cap of moss, and glowing green seams of life.
+      float shade = 0.55 + 0.45 * clamp(dot(normalize(vNormalW), normalize(vec3(0.4, 0.9, 0.3))), 0.0, 1.0);
+      vec3 stone = mix(vec3(0.42, 0.34, 0.26), vec3(0.66, 0.58, 0.47), 0.5 + 0.5 * sin(f * 1.3));
+      float moss = smoothstep(0.14, 0.26, vLocal.y + 0.06 * sin(f * 2.0));
+      col = mix(stone, uColor * 0.85, moss) * shade;
+      float seam = 1.0 - smoothstep(0.0, 0.14, abs(f - 0.6));
+      col += uColor * seam * (1.0 - moss) * (0.7 + 0.3 * sin(t * 1.5));
+      alpha = 0.98;
     } else if (uMode == 3) {
-      // Stable six-armed crystal with slowly traveling glints.
-      float radius = length(p.xy);
-      float arms = abs(sin(atan(p.y, p.x + 0.00001) * 3.0)) * radius;
-      float crystal = exp(-arms * 18.0);
-      float facets = 0.5 + 0.5 * sin(p.z * 4.0 + p.x * 3.0);
-      col = mix(uColor * 0.35, uAccent, facets * 0.45 + fres * 0.35);
-      col += uAccent * crystal * (0.35 + 0.35 * pow(0.5 + 0.5 * sin(radius * 8.0 - t), 8.0));
-      alpha = 0.48 + fres * 0.4;
+      // Ice: hard facets, each lit flat, over a cold blue depth with frost cracks.
+      float facet = clamp(dot(normalize(vNormalW), normalize(vec3(0.3, 0.8, 0.5))), 0.0, 1.0);
+      vec3 depth = vec3(0.16, 0.42, 0.72);
+      col = mix(depth, vec3(0.88, 0.97, 1.0), facet * 0.75 + fres * 0.25);
+      float crack = 1.0 - smoothstep(0.0, 0.08, abs(sin(p.x * 2.2 + p.y * 1.7) + sin(p.z * 2.6 - p.y)));
+      col += vec3(1.0) * crack * 0.35;
+      col += uAccent * pow(0.5 + 0.5 * sin(vLocal.y * 9.0 - t * 1.6), 16.0) * 0.4;
+      alpha = 0.86 + fres * 0.14;
     } else if (uMode == 5) {
-      float angle = atan(p.z, p.x + 0.00001);
-      float spiral = pow(0.5 + 0.5 * sin(angle * 3.0 + p.y * 5.0 - t * 4.0), 12.0);
-      col = mix(uColor * 0.25, uAccent, spiral * 0.85 + fres * 0.15);
-      alpha = 0.16 + spiral * 0.65 + fres * 0.25;
+      // Air: pale streamers spiralling up the funnel, fast.
+      float angle = atan(vLocal.z, vLocal.x + 0.00001);
+      float spiral = pow(0.5 + 0.5 * sin(angle * 3.0 - vLocal.y * 14.0 - t * 7.0), 3.0);
+      vec3 base = mix(vec3(0.20, 0.52, 0.55), uColor, 0.45);
+      col = mix(base, uAccent, spiral * 0.85 + fres * 0.15);
+      alpha = 0.72 + spiral * 0.28;
     } else {
       // ── Lightning: a dark conductive body with white-hot filaments running
       // through it, discharging in bursts rather than pulsing evenly. The core is
@@ -143,11 +178,12 @@ const coreFragment = /* glsl */ `
       // burst a few times a second, which is what makes it read as arcing rather
       // than as a sine glow.
       float burst = pow(0.5 + 0.5 * sin(t * 3.1 + floor(t * 5.0) * 8.13), 6.0);
-      float veins = filament * (0.35 + 0.9 * burst);
-      col = mix(uColor * 0.18, uColor * 0.85, 0.5 + 0.5 * sin(f * 1.6));
+      float veins = filament * (0.45 + 1.0 * burst);
+      col = mix(uColor * 0.16, uColor * 0.7, 0.5 + 0.5 * sin(f * 1.6));
       col += uAccent * veins * 1.30;
-      col = mix(col, uAccent, fres * 0.30);
-      alpha = 0.58 + fres * 0.34 + veins * 0.22;
+      // The spike tips carry the charge.
+      col += uAccent * smoothstep(0.3, 0.5, length(vLocal)) * (0.4 + 0.6 * burst);
+      alpha = 0.92 + veins * 0.08;
     }
 
     gl_FragColor = vec4(clamp(col, 0.0, 1.4), clamp(alpha, 0.0, 1.0) * uAlpha);
@@ -194,12 +230,24 @@ const innerFragment = /* glsl */ `
   }
 `;
 
-function makeUniforms(element, colorHex, accentHex) {
+// The ink hull: a flat dark fill, drawn back-face only from a slightly inflated
+// copy, so it shows as a backing behind the body and an outline around it.
+const hullFragment = /* glsl */ `
+  precision highp float;
+  ${varyings}
+
+  void main() {
+    gl_FragColor = vec4(uInk, 0.92 * uAlpha);
+  }
+`;
+
+function makeUniforms(element, colorHex, accentHex, inkHex) {
   return {
     uTime: { value: 0 },
     uMode: { value: ELEMENT_MODE[element] ?? 0 },
     uColor: { value: new THREE.Color(colorHex) },
     uAccent: { value: new THREE.Color(accentHex) },
+    uInk: { value: new THREE.Color(inkHex) },
     uAlpha: { value: 1 }
   };
 }
@@ -213,12 +261,12 @@ const _orbMatCache = new Map();
  * lifetime fade writes `uAlpha` exactly once per orb per frame rather than three
  * times. There is deliberately no dispose: see the note at the top of the file.
  */
-export function getElementalOrbMaterials(element, colorHex, accentHex) {
-  const key = `${element}_${colorHex}_${accentHex}`;
+export function getElementalOrbMaterials(element, colorHex, accentHex, inkHex = '#0b0f1a') {
+  const key = `${element}_${colorHex}_${accentHex}_${inkHex}`;
   const hit = _orbMatCache.get(key);
   if (hit) return hit;
 
-  const uniforms = makeUniforms(element, colorHex, accentHex);
+  const uniforms = makeUniforms(element, colorHex, accentHex, inkHex);
   const base = { uniforms, vertexShader, transparent: true, depthWrite: false, toneMapped: false };
 
   const core = new THREE.ShaderMaterial({ ...base, fragmentShader: coreFragment, side: THREE.FrontSide });
@@ -235,7 +283,9 @@ export function getElementalOrbMaterials(element, colorHex, accentHex) {
     blending: THREE.AdditiveBlending
   });
 
-  const set = { uniforms, core, shell, inner };
+  const hull = new THREE.ShaderMaterial({ ...base, fragmentShader: hullFragment, side: THREE.BackSide });
+
+  const set = { uniforms, core, shell, inner, hull };
   _orbMatCache.set(key, set);
   return set;
 }

@@ -26,11 +26,11 @@ const _finishTex = (canvas) => {
   return tex;
 };
 
-// ── Shared greyscale sprites ────────────────────────────────────────────────
-// Both are white-on-transparent and tinted per material, so one texture serves
-// every element (and the orb's particles and ground pool as well).
+// ── Shared greyscale sprite ─────────────────────────────────────────────────
+// White-on-transparent and tinted per material, so one texture serves every
+// element (and the orb's particles and ground pool as well).
 
-const _shared = { glow: undefined, rays: undefined };
+const _shared = { glow: undefined };
 
 /** Soft radial falloff — the workhorse behind blooms, ground pools and motes. */
 export function getSoftGlowTexture() {
@@ -55,39 +55,6 @@ export function getSoftGlowTexture() {
   return _shared.glow;
 }
 
-/** Tapered light spokes — the slow rotating shine behind the medal. */
-function getRayTexture() {
-  if (_shared.rays !== undefined) return _shared.rays;
-  if (typeof document === 'undefined') {
-    _shared.rays = null;
-    return null;
-  }
-  const S = 256;
-  const R = S / 2;
-  const canvas = _canvas(S);
-  const ctx = canvas.getContext('2d');
-  ctx.translate(R, R);
-  const SPOKES = 12;
-  for (let i = 0; i < SPOKES; i++) {
-    // Alternating long/short spokes read as a star burst rather than a fan.
-    const len = R * (i % 2 === 0 ? 0.98 : 0.62);
-    const half = (Math.PI / SPOKES) * (i % 2 === 0 ? 0.30 : 0.18);
-    const g = ctx.createRadialGradient(0, 0, R * 0.12, 0, 0, len);
-    g.addColorStop(0, 'rgba(255,255,255,0.85)');
-    g.addColorStop(0.55, 'rgba(255,255,255,0.22)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    const a = (i / SPOKES) * Math.PI * 2;
-    ctx.arc(0, 0, len, a - half, a + half);
-    ctx.closePath();
-    ctx.fill();
-  }
-  _shared.rays = _finishTex(canvas);
-  return _shared.rays;
-}
-
 // ── Per-element emblem ──────────────────────────────────────────────────────
 // The element's icon, rasterised once per type into a glowing emblem texture.
 // Reuses elementalDefs' iconPath (24×24 viewBox) so the 3D badge and the HUD chip
@@ -103,7 +70,9 @@ function getEmblemTexture(type) {
   const S = 320;
   const canvas = _canvas(S);
   const ctx = canvas.getContext('2d');
-  const pad = 58;
+  // The glyph fills most of the medal: it sits on dark enamel now, and at play
+  // distance a small icon was the part nobody could read.
+  const pad = 40;
   const scale = (S - pad * 2) / 24;
   ctx.translate(pad, pad);
   ctx.scale(scale, scale);
@@ -116,9 +85,9 @@ function getEmblemTexture(type) {
   // the crisp white-hot silhouette. One pass gave a flat decal; stacking them is
   // what makes the emblem read as lit enamel.
   const passes = [
-    { blur: 16, width: 3.0, stroke: def.color, fill: def.color, alpha: 0.55 },
-    { blur: 8, width: 2.0, stroke: light, fill: light, alpha: 0.85 },
-    { blur: 3, width: 1.25, stroke: '#ffffff', fill: light, alpha: 1 }
+    { blur: 18, width: 3.4, stroke: def.color, fill: def.color, alpha: 0.75 },
+    { blur: 8, width: 2.4, stroke: def.color, fill: def.color, alpha: 1 },
+    { blur: 2, width: 1.5, stroke: light, fill: light, alpha: 1 }
   ];
   for (const pass of passes) {
     ctx.globalAlpha = pass.alpha;
@@ -160,17 +129,20 @@ export function getBadgeMaterials(type, color) {
       color: c, map: map ?? null, transparent: true, opacity,
       blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
     });
+  // Dark enamel under a bright glyph, framed in the element's own colour. Every
+  // crest used to be the same gold coin with a pale glyph on pale enamel, so from
+  // across the cube six different pickups read as six identical medals.
+  const ink = def?.fogColor || '#0b0f1a';
   const set = {
-    bloom: additive(color, 0.55, getSoftGlowTexture()),
-    rays: additive(accent, 0.22, getRayTexture()),
+    bloom: additive(color, 0.4, getSoftGlowTexture()),
     rim: new THREE.MeshStandardMaterial({
-      color: '#ffd45e', emissive: '#ff9f1c', emissiveIntensity: 0.85,
-      metalness: 0.8, roughness: 0.16, transparent: true, opacity: 1, toneMapped: false
+      color, emissive: color, emissiveIntensity: 0.9,
+      metalness: 0.5, roughness: 0.25, transparent: true, opacity: 1, toneMapped: false
     }),
-    keyline: new THREE.MeshStandardMaterial({ color: '#1c1108', metalness: 0.3, roughness: 0.5, transparent: true, opacity: 1 }),
+    keyline: new THREE.MeshStandardMaterial({ color: '#05070c', metalness: 0.3, roughness: 0.5, transparent: true, opacity: 1 }),
     enamel: new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 1.0,
-      metalness: 0.22, roughness: 0.2, transparent: true, opacity: 1, toneMapped: false
+      color: ink, emissive: ink, emissiveIntensity: 0.6,
+      metalness: 0.2, roughness: 0.3, transparent: true, opacity: 1, toneMapped: false
     }),
     pinstripe: additive(accent, 0.9),
     gloss: additive(accent, 0.14),
@@ -183,13 +155,40 @@ export function getBadgeMaterials(type, color) {
 
 // Per-element drifting matter around the orb, mirroring ElementalAtmosphere's
 // scene-scale field. `vy` is along the face normal (+ = away from the cube).
+// Every element's `particle` key must be listed: an unknown one falls back to
+// bubbles, which is how Lightning used to wear Water's.
 export const PARTICLE_KINDS = {
   bubbles: { count: 26, vy: 0.42, sway: 0.1, size: 0.055, opacity: 0.75 },
   embers: { count: 30, vy: 0.55, sway: 0.09, size: 0.05, opacity: 0.95 },
   spores: { count: 24, vy: -0.16, sway: 0.14, size: 0.05, opacity: 0.7 },
   wind: { count: 22, vy: 0.18, sway: 0.85, size: 0.065, opacity: 0.55 },
-  flakes: { count: 26, vy: -0.3, sway: 0.13, size: 0.055, opacity: 0.85 }
+  flakes: { count: 26, vy: -0.3, sway: 0.13, size: 0.055, opacity: 0.85 },
+  ions: { count: 22, vy: 0.08, sway: 0.22, size: 0.05, opacity: 0.95 }
 };
+
+// The offering's countdown, drawn as a draining arc round the orb's footprint on
+// the tile. It used to be a hoop round the crest, which with the two orbit rings
+// made every orb a stack of concentric outlines.
+const countdownVertex = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const countdownFragment = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uRemaining;
+  uniform float uAlpha;
+  varying vec2 vUv;
+  void main() {
+    vec2 d = vUv - 0.5;
+    // Clockwise from twelve o'clock in the ring's own plane.
+    float frac = fract(0.25 - atan(d.y, d.x) / 6.2831853);
+    float lit = step(frac, uRemaining);
+    gl_FragColor = vec4(uColor, mix(0.12, 0.85, lit) * uAlpha);
+  }
+`;
 // The orb's non-shader materials, held per element for the same reason the badge's
 // are (see elementalBadge.jsx): R3F disposes JSX-declared materials on unmount, and
 // disposing the last user of a program makes three destroy it, so every offering
@@ -207,8 +206,6 @@ export function getOrbTrimMaterials(element, color, accent, particleSize) {
       blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
     });
   const set = {
-    ringA: additive(accent, 0.34),
-    ringB: additive(color, 0.3),
     mote: new THREE.SpriteMaterial({
       map: glow, color: accent, transparent: true, opacity: 0.85,
       blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
@@ -218,7 +215,11 @@ export function getOrbTrimMaterials(element, color, accent, particleSize) {
       transparent: true, opacity: 1, blending: THREE.AdditiveBlending,
       depthWrite: false, toneMapped: false
     }),
-    countdown: additive(color, 0.45),
+    countdown: new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(color) }, uRemaining: { value: 1 }, uAlpha: { value: 1 } },
+      vertexShader: countdownVertex, fragmentShader: countdownFragment,
+      transparent: true, depthWrite: false, toneMapped: false
+    }),
     pool: additive(color, 0.42, glow),
     shock: additive(accent, 0.8)
   };
@@ -232,11 +233,11 @@ export function getOrbTrimMaterials(element, color, accent, particleSize) {
 export function elementalOrbMaterials(type) {
   const def = getSpecialDef(type);
   if (!def) return [];
-  const { color = '#ffffff', accent = '#ffffff' } = def;
-  const body = getElementalOrbMaterials(type, color, accent);
+  const { color = '#ffffff', accent = '#ffffff', fogColor } = def;
+  const body = getElementalOrbMaterials(type, color, accent, fogColor);
   const trim = getOrbTrimMaterials(type, color, accent, PARTICLE_KINDS[def.particle]?.size ?? 0.055);
   const badge = getBadgeMaterials(type, color);
-  return [body.core, body.shell, body.inner, ...Object.values(trim),
-    ...Object.entries(badge).filter(([key, material]) => !['bloom', 'rays', 'emblem'].includes(key) || material.map).map(([, material]) => material)];
+  return [body.core, body.shell, body.inner, body.hull, ...Object.values(trim),
+    ...Object.entries(badge).filter(([key, material]) => !['bloom', 'emblem'].includes(key) || material.map).map(([, material]) => material)];
 }
 
