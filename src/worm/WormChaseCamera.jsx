@@ -1,6 +1,6 @@
 import { storyArrivalPose } from './healerWorm/storyArrival.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
-import { victoryViewport, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
+import { victoryViewport, victoryView, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
 import { OPENING_FOV, openingCameraDistance } from './healerWorm/openingRotation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
@@ -298,7 +298,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         lastCamDeltaRef.current = delta;
         const gameState = useGameStore.getState();
         const gamePhase = gameState.wormGamePhase ?? 'active';
-        const victoryBounds = gamePhase === 'solved' && gameState.wormStoryResult ? victoryViewport.current : null;
+        const victoryBounds = gamePhase === 'solved' ? victoryViewport.current : null;
         if (!victoryBounds && victoryFramedRef.current) {
             camera.clearViewOffset();
             victoryFramedRef.current = false;
@@ -503,22 +503,24 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                 camera.setViewOffset(viewportSize.width, viewportSize.height, frame.offsetX, frame.offsetY, viewportSize.width, viewportSize.height);
                 victoryFramedRef.current = true;
             }
-            const dist = frame ? frame.distance / Math.hypot(1, 0.55) : 5 + size * 3.6;
-            const height = frame ? dist * 0.55 : 2 + size * 1.2;
+            const distance = Math.max(Math.sqrt(3) * (size / 2 + 0.6) + 0.5,
+                (frame ? frame.distance : 5 + size * 3.6) * victoryView.zoom);
+            const dist = distance * Math.cos(victoryView.pitch);
+            const height = distance * Math.sin(victoryView.pitch);
             if (prevGamePhaseRef.current !== 'solved') {
                 // Seed the orbit at the camera's current azimuth so it swings on smoothly
                 // from wherever the run ended instead of snapping to a fixed start angle.
                 solvedAngleRef.current = Math.atan2(camPosRef.current.z, camPosRef.current.x);
             }
             const still = prefersReducedMotion();
-            if (!still) solvedAngleRef.current += delta * SOLVED_ORBIT_SPEED;
+            if (!still && !victoryView.manual) solvedAngleRef.current += delta * SOLVED_ORBIT_SPEED;
             _camTargetCam.set(
-                Math.cos(solvedAngleRef.current) * dist,
+                Math.cos(solvedAngleRef.current + victoryView.yaw) * dist,
                 height,
-                Math.sin(solvedAngleRef.current) * dist
+                Math.sin(solvedAngleRef.current + victoryView.yaw) * dist
             );
             _camTargetLook.set(0, 0, 0);
-            const a = still ? 1 : Math.min(1, delta * 2.0);
+            const a = still ? 1 : Math.min(1, delta * (victoryView.manual ? 18 : 2));
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);

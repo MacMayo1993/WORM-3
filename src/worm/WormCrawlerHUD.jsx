@@ -4,6 +4,7 @@ import { getViewPowerDef, VIEW_POWER_DURATION } from './healerWorm/viewPowerups.
 import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
 import { storyLevel, storyChapterId, storyChapterIndex, STORY_CHAPTER_SIZE } from './story/levels.js';
+import VictoryCubeStage from './story/VictoryCubeStage.jsx';
 import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
@@ -519,18 +520,8 @@ const EXAMINE_RESTORE_BTN_STYLE = {
 
 // A full-screen celebration beat that must clear the HUD and mobile controls
 // beneath it — the CELEBRATION band, not the HUD-notification band it used to sit in.
-const WINNER_SCREEN_STYLE = {
-    position: 'fixed', inset: 0, zIndex: Z.CELEBRATION,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
-    pointerEvents: 'auto', overflowY: 'auto', fontFamily: FONT, boxSizing: 'border-box',
-    padding: 'max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))',
-};
-
-// The celebration is the mode carousel's paper with one ivory card on it.
-const WINNER_CARD_STYLE = {
-    width: 'min(94vw, 540px)', padding: 'clamp(18px, 3.4vh, 28px) 20px',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-};
+const WINNER_SCREEN_STYLE = { zIndex: Z.CELEBRATION, pointerEvents: 'auto', fontFamily: FONT };
+const WINNER_CARD_STYLE = { alignItems: 'center', textAlign: 'center' };
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
@@ -569,22 +560,22 @@ const WINNER_PP_NOTE_STYLE = {
     fontSize: 12, color: ARCADE_MUTED, marginBottom: 20, textAlign: 'center',
 };
 
-const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center', width: '100%', marginTop: 8 };
+const WINNER_BTN_ROW_STYLE = { display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'safe center', width: '100%', marginTop: 8 };
 
 const WINNER_PLAY_AGAIN_STYLE = { ...primaryBtnStyle(), minWidth: 140 };
 const WINNER_NEW_GAME_STYLE = { ...SECONDARY_BTN_STYLE, minWidth: 120 };
 
 const PODIUM_WRAP_STYLE = {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22, position: 'relative',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22, position: 'relative', maxWidth: '100%',
 };
 
 const PODIUM_WORM_ROW_STYLE = {
     display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4,
-    marginBottom: 6, flexWrap: 'nowrap', maxWidth: 'min(90vw, 520px)', overflow: 'hidden',
+    marginBottom: 6, flexWrap: 'nowrap', maxWidth: '100%', overflow: 'hidden',
 };
 
 const PODIUM_BASE_STYLE = {
-    width: 'min(90vw, 320px)', height: 44, borderRadius: '0 0 12px 12px',
+    width: 'min(90vw, 320px)', maxWidth: '100%', height: 44, borderRadius: '0 0 12px 12px',
     background: 'linear-gradient(180deg, #ffd700 0%, #b8860b 60%, #8B6914 100%)',
     boxShadow: '0 8px 32px rgba(255,215,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -615,8 +606,9 @@ function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityP
     }, [displayCount]);
 
     return (
-        <div style={WINNER_SCREEN_STYLE} className="arcade-paper">
-          <div className={`run-result ${OVERLAY_CARD_CLASS}`} style={WINNER_CARD_STYLE}>
+        <div style={WINNER_SCREEN_STYLE} className="worm-story-result story-completion worm-freeplay-completion">
+          <VictoryCubeStage />
+          <div className={`run-result ${OVERLAY_CARD_CLASS} worm-story-result-sheet story-completion-card`} style={WINNER_CARD_STYLE}>
             <ModeArtwork mode="success" className="screen-results-art" />
             <div style={WINNER_TITLE_STYLE}>Cube healed!</div>
             <div style={WINNER_SUB_STYLE}>All tunnels healed</div>

@@ -457,3 +457,14 @@ it.each([['air', null], ['fire', 'air']])('labels the touch flight control for A
   act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null }));
   expect(jump.textContent).toBe('Jump');
 });
+
+
+it('provides a clear interactive cube stage above Free Play victory results', () => {
+  useGameStore.setState({ wormGamePhase: 'solved' });
+  renderPhase('crawling');
+  const result = host.querySelector('.worm-freeplay-completion');
+  expect(result.querySelector('.story-completion-cube')).not.toBeNull();
+  expect(result.textContent).toContain('Pinch to zoom');
+  expect(result.textContent).toContain('New game');
+  expect(result.classList.contains('arcade-paper')).toBe(false);
+});
