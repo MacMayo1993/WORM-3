@@ -1,3 +1,4 @@
+import { segmentsToTiles, goalDisplayValue } from '../healerWorm/tileUnits.js';
 import StoryStarRequirements from './StoryStarRequirements.jsx';
 import React, { Suspense, useEffect, useId, useRef, useState } from 'react';
 import VictoryCubeStage from './VictoryCubeStage.jsx';
@@ -140,7 +141,7 @@ export function StoryObjectiveCard({ compact = false }) {
     const next = goals.find(goal => !goal.done);
     const headline = live?.canFinish ? 'Tasks complete' : recent ? `✓ ${recent.label}`
       : live?.settling ? (live.settlingHint ?? 'Finishing the current action')
-        : next ? `${next.label} ${next.value}/${next.target}` : `Tasks ${completed}/${goals.length}`;
+        : next ? `${next.label} ${goalDisplayValue(next, next.value)}/${goalDisplayValue(next, next.target)}` : `Tasks ${completed}/${goals.length}`;
     return <section ref={trackerRef} className={`worm-story-tracker${expanded ? '' : ' is-collapsed'}`} aria-label="Level tasks">
       <div className={`worm-story-summary${recent ? ' worm-task-confirmed' : ''}`}>
         <span className="worm-story-glance-level" title={level.title}>L{level.id}</span>
@@ -151,7 +152,7 @@ export function StoryObjectiveCard({ compact = false }) {
         </button>}
         <button ref={toggleRef} type="button" className="worm-story-glance worm-hud-chip"
           onClick={() => setExpandedRun(expanded ? null : runKey)} aria-expanded={expanded} aria-controls={detailsId}
-          aria-label={`Level ${level.id}: ${level.title}. ${completed} of ${goals.length} tasks complete.${next && !live?.settling ? ` Next: ${next.label}, ${next.value} of ${next.target}.` : ''} ${expanded ? 'Hide' : 'Show'} goals and star requirements.`}>
+          aria-label={`Level ${level.id}: ${level.title}. ${completed} of ${goals.length} tasks complete.${next && !live?.settling ? ` Next: ${next.label}, ${goalDisplayValue(next, next.value)} of ${goalDisplayValue(next, next.target)}.` : ''} ${expanded ? 'Hide' : 'Show'} goals and star requirements.`}>
           <span>Goals <b>{completed}/{goals.length}</b></span>
           <span className="worm-story-tracker-chevron" aria-hidden="true">{expanded ? '▴' : '▾'}</span>
         </button>
@@ -161,9 +162,9 @@ export function StoryObjectiveCard({ compact = false }) {
         <strong className="worm-story-details-title">L{level.id} · {level.title}</strong>
         {live?.settling && <p className="worm-story-live-hint">{live.settlingHint ?? 'Finishing the current action'}</p>}
         <ul className="worm-story-live" aria-label="Task checklist">
-          {goals.map(goal => <li key={goal.key} data-done={goal.done} aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
+          {goals.map(goal => <li key={goal.key} data-done={goal.done} aria-label={`${goal.label}: ${goalDisplayValue(goal, goal.value)} of ${goalDisplayValue(goal, goal.target)}${goal.done ? ', complete' : ''}`}>
             <span className="worm-story-live-label">{goal.label}</span>
-            <b aria-hidden="true">{goal.value}/{goal.target}</b>
+            <b aria-hidden="true">{goalDisplayValue(goal, goal.value)}/{goalDisplayValue(goal, goal.target)}</b>
             <i className="worm-story-live-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} /></i>
           </li>)}
         </ul>
@@ -178,9 +179,9 @@ export function StoryObjectiveCard({ compact = false }) {
     {/* Mobi has just spoken this; it stays one tap away instead of filling the card. */}
     {storyNarrative(level.id) && <details className="worm-story-mobi-fold"><summary>Mobi’s briefing</summary><StoryMobiNote levelId={level.id} /></details>}
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
-      aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
+      aria-label={`${goal.label}: ${goalDisplayValue(goal, goal.value)} of ${goalDisplayValue(goal, goal.target)}${goal.done ? ', complete' : ''}`}>
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
-      <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goal.value}/{goal.target}</b>
+      <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goalDisplayValue(goal, goal.value)}/{goalDisplayValue(goal, goal.target)}</b>
       <i className="worm-story-goal-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} /></i>
     </li>)}</ul>
     <StoryStarRequirements level={level} progress={live?.starGoals} />
@@ -320,8 +321,8 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
       <small className="story-completion-level">{chapterLine(level.id)}</small>
       <h2 id="worm-story-result-title">{heading}</h2>
       <div className="story-completion-size">
-        {Number.isFinite(result.finalLength) && <span>Worm length <strong>{result.finalLength}</strong> segments</span>}
-        {Number.isFinite(result.peakLength) && <span>Best length <strong>{result.peakLength}</strong> segments</span>}
+        {Number.isFinite(result.finalLength) && <span>Worm length <strong>{segmentsToTiles(result.finalLength)}</strong> tiles</span>}
+        {Number.isFinite(result.peakLength) && <span>Best length <strong>{segmentsToTiles(result.peakLength)}</strong> tiles</span>}
       </div>
       <div className="story-completion-award">
         <div className="story-completion-sparks" aria-hidden="true">{Array.from({ length: 16 }, (_, i) =>

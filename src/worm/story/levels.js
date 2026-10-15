@@ -1,3 +1,4 @@
+import { goalDisplayValue } from '../healerWorm/tileUnits.js';
 import { storyStarGoals } from './starGoals.js';
 import { STORY_LEVEL_DATA, STORY_CHAPTER_DATA } from './campaign.js';
 import { storyGoalText, TAIL_KINDS } from './goalText.js';
@@ -22,7 +23,7 @@ export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: l
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
 export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Fire → Water)', quenchFusions: 'Quench fusions (Water → Fire)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
   magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated',
-  bodyLength: 'body segments', bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
+  bodyLength: 'tiles long', bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
 // Short nouns for the plain progress line, keyed like the checklist.
 const PROGRESS_NOUNS = { ...STORY_MECHANIC_LABELS, orbs: 'orbs', colors: 'colors', rotations: 'turns', uniqueTunnels: 'pairs crossed', healed: 'pairs healed' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
@@ -108,7 +109,7 @@ export function storyFinishHint(level, metrics) {
 // count; long ones summarize and name the next unfinished task.
 export function storyProgressText(level, metrics) {
   const goals = storyChecklist(level, metrics);
-  const line = goal => `${goal.value}/${goal.target} ${PROGRESS_NOUNS[goal.key]}`;
+  const line = goal => `${goalDisplayValue(goal, goal.value)}/${goalDisplayValue(goal, goal.target)} ${PROGRESS_NOUNS[goal.key]}`;
   const clock = `${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
   if (goals.length > 4) {
     const next = goals.find(goal => !goal.done);
@@ -130,7 +131,7 @@ export function storyChecklist(level, metrics = {}) {
   const labels = { steamFusions: 'Make Steam: Fire → Water', quenchFusions: 'Make Quench: Water → Fire', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
     magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
-    bodyLength: 'Grow your worm', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
+    bodyLength: 'Grow your worm (tiles)', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
   return Object.entries(targets).map(([key, target]) => {

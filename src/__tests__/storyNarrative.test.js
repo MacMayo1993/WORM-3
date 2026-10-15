@@ -1,3 +1,4 @@
+import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 import { describe, expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS, storyChecklist } from '../worm/story/levels.js';
 import { WORM_STORY_NARRATIVE, storyNarrative, storyBriefingText, storyLaunchLines } from '../worm/story/narrative.js';
@@ -136,7 +137,7 @@ describe('every level can be supplied', () => {
     // A stated orb count covers the growth task.
     if (m.bodyLength) {
       expect(m.bodyLength).toBeLessThanOrEqual(10 + 3 * (level.orbs ?? (level.kind === 'orbs' ? level.target : Infinity)));
-      expect(level.goal).toContain(`grow to ${m.bodyLength} segments`);
+      expect(level.goal).toContain(`grow to ${segmentsToTiles(m.bodyLength)} tiles long`);
     }
     // The auditor's conservative power-offer model (two missed cycles) fits the clock.
     const powers = requiredPowerCycle(level).length;

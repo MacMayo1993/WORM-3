@@ -208,7 +208,7 @@ describe('story credit for the new goals', () => {
     expect(storyOutcome(level, metrics)).toBeNull();
     expect(storyOutcome(level, { ...metrics, bodyLength: 100 })).not.toBeNull();
     expect(storyGrowthTarget(level)).toBeGreaterThan(level.mechanics.bodyLength);
-    expect(storyProgressText(level, { ...metrics, elapsed: 10 })).toContain('99/100 body segments');
+    expect(storyProgressText(level, { ...metrics, elapsed: 10 })).toContain('8.91/9 tiles long');
   });
 
   it('counts landed body jumps on a level that is not a jump trial', () => {
@@ -227,7 +227,7 @@ describe('story credit for the new goals', () => {
 
   it('labels every new goal on a tunnel trial that also asks for them', () => {
     const level = storyLevel(54);
-    expect(storyChecklist(level).map(goal => goal.label)).toEqual(['Pass yourself in the Core', 'Double heals', 'Grow your worm', 'Cross tunnel pairs']);
+    expect(storyChecklist(level).map(goal => goal.label)).toEqual(['Pass yourself in the Core', 'Double heals', 'Grow your worm (tiles)', 'Cross tunnel pairs']);
     expect(level.goal).toContain('pass yourself in the Core once');
   });
 });

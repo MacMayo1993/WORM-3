@@ -312,7 +312,7 @@ export const WORM_STORY_NARRATIVE = {
       'New plan. The Longhaul thinks long means strong. We’ll show them long can also mean kind.',
       'Step one is the long part. Eat.',
     ],
-    debrief: 'A hundred segments. You’re officially a large worm. I’m having a badge made. In my head.',
+    debrief: 'Nine tiles long. You’re officially a large worm. I’m having a badge made. In my head.',
   },
   42: {
     briefing: [
@@ -621,7 +621,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Grow into a wall around the Core. The crawlers can’t get through a worm that long.',
     ],
-    debrief: 'A hundred and eighty segments of wall. The crawlers stopped trying. One waved. I think it was a wave.',
+    debrief: 'Sixteen tiles of wall. The crawlers stopped trying. One waved. I think it was a wave.',
   },
   85: {
     briefing: [
@@ -677,7 +677,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Glass reflects everything. Grow huge here and there will be two of you to look at.',
     ],
-    debrief: 'A hundred and seventy segments, reflected. The Longhaul stared the whole time.',
+    debrief: 'Fifteen tiles of worm, reflected. The Longhaul stared the whole time.',
   },
   93: {
     briefing: [
@@ -741,7 +741,7 @@ export const WORM_STORY_NARRATIVE = {
       'The longest body understands now, but understanding isn’t healing. It is still stretched across the Plane, pulling at our doors.',
       'To hold its attention you need to be enormous. The cargo deck has all the food we need.',
     ],
-    debrief: 'Two hundred segments. The Longhaul measured you. They looked impressed, which for the Longhaul is a hug.',
+    debrief: 'Eighteen tiles long. The Longhaul measured you. They looked impressed, which for the Longhaul is a hug.',
   },
   102: {
     briefing: [
@@ -753,7 +753,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Big decks have big gears. A huge body and nowhere to hide but everywhere.',
     ],
-    debrief: 'Twelve turns on a ten-layer deck with a hundred and ninety segments. I’m running out of compliments. Here’s one: wow.',
+    debrief: 'Twelve turns on a ten-layer deck with seventeen tiles of worm. I’m running out of compliments. Here’s one: wow.',
   },
   104: {
     briefing: [
@@ -785,7 +785,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Your body is so long it’s in your way everywhere. Big jumps. Lots of them.',
     ],
-    debrief: 'Ten clean jumps over two hundred twenty segments. The longest body tried one. It got stuck. We’ll work on it.',
+    debrief: 'Ten clean jumps over nearly twenty tiles of worm. The longest body tried one. It got stuck. We’ll work on it.',
   },
   109: {
     briefing: [

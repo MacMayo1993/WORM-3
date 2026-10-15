@@ -551,3 +551,18 @@ it('awards level 35 after all six tasks with a long tail still following an old 
   expect(worm.pos.current).toEqual(before.pos);
   expect(worm.timeAliveRef.current).toBe(before.time);
 });
+
+it('publishes exact tile length after growth, partial loss and a fresh run', () => {
+  begin(1);
+  expect(state().wormLengthTiles).toBe(0.9);
+  // A fractional orb may remain after a deposit or cut. It must not be rounded
+  // down to the carried-orb count when the HUD measures the actual body.
+  worm.tailLength.current = 22;
+  frame(0);
+  expect(state().wormLengthTiles).toBe(1.98);
+  worm.tailLength.current = 11;
+  frame(0);
+  expect(state().wormLengthTiles).toBe(0.99);
+  begin(1);
+  expect(state().wormLengthTiles).toBe(0.9);
+});

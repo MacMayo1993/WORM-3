@@ -1,3 +1,4 @@
+import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 vi.mock('../utils/device.js', async original => ({ ...(await original()), prefersReducedMotion: () => true }));
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -182,7 +183,7 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
   });
 
   it('states every numeric target in its goal text and pays in real store items', () => {
-    const numbers = [level.target, level.orbs, level.rotations, ...Object.values(level.mechanics ?? {})].filter(n => n > 1);
+    const numbers = [level.target, level.orbs, level.rotations, ...Object.entries(level.mechanics ?? {}).map(([key, n]) => key === 'bodyLength' ? segmentsToTiles(n) : n)].filter(n => n > 1);
     for (const n of numbers) expect(level.goal).toMatch(n === 2 ? /\b2\b|twice/ : new RegExp(`\\b${n}\\b`));
     for (const id of level.reward ?? []) expect(getStoreItem(id)).toBeTruthy();
     expect(level.par).toBeLessThan(level.limit);
