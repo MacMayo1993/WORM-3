@@ -1,3 +1,4 @@
+import { smeltToll, tunnelRideWears, riptideReach, regrowsCut, overgrowthTiles, takeGale, ELEMENT_ABILITIES } from './elementalAbilities.js';
 import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, tickAbilityVisuals, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb } from './elementalAbilities.js';
 import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
@@ -155,7 +156,7 @@ import {
 } from './constants.js';
 
 import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
-import { ageDroppedOrbs, takeDroppedOrbsAt } from './droppedOrbs.js';
+import { ageDroppedOrbs, takeDroppedOrbsAt, scatterDroppedOrbs } from './droppedOrbs.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
@@ -990,8 +991,12 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
         return;
     }
 
-    const nextTraversals = (sim.tunnelUseCounts.get(tunnelKey) ?? 0) + 1;
-    sim.tunnelUseCounts.set(tunnelKey, nextTraversals);
+    // Water's Smooth Passage: a ride while Water is up leaves the tunnel unworn, and
+    // the worm comes out the far end at full momentum.
+    const wears = tunnelRideWears(sim);
+    if (!wears) sim.waterMomentum = 1;
+    const nextTraversals = (sim.tunnelUseCounts.get(tunnelKey) ?? 0) + (wears ? 1 : 0);
+    if (wears) sim.tunnelUseCounts.set(tunnelKey, nextTraversals);
     // Safe/void-arm/collapse thresholds live in economy.js — see classifyTraversal
     // for the "void on the 4th traversal" rule.
     const traversalVerdict = classifyTraversal(nextTraversals);
@@ -1024,7 +1029,11 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
         let progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
         // A charged tunnel (opened by lightning) pays part of its own toll: the first
         // CHARGED_TOLL segments of the heal are free, the worm's orbs and tail untouched.
-        const free = sim.chargedTunnels.has(tunnelKey) ? Math.min(CHARGED_TOLL, HEAL_COST - progress.deposited) : 0;
+        const charged = sim.chargedTunnels.has(tunnelKey) ? Math.min(CHARGED_TOLL, HEAL_COST - progress.deposited) : 0;
+        // Fire's Smelter pays more of it from the Fire pickup's budget.
+        const smelted = smeltToll(sim, HEAL_COST - progress.deposited - charged);
+        if (smelted) abilityEvent(sim, 'fire', [{ x, y, z, dirKey }]);
+        const free = charged + smelted;
         if (free > 0) {
             progress = { ...progress, deposited: progress.deposited + free };
             ctx.applyDeposit({ orbsLeft: orbsCarried(sim.tailLength), nextInventory: ctx.getOrbInventory(), nextDeposited: progress.deposited },
@@ -1091,15 +1100,17 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GR
 }
 
 // Take back dropped orbs (a cut tail's scattered orbs, see droppedOrbs.js) on the
-// head's tile, or inside the magnet's reach. Each gives back exactly the orbs it
+// head's tile, or inside the magnet's reach (or Water's riptide, or an Air gale). Each gives back exactly the orbs it
 // carried — their own colours, not the tile's — and counts as a recovery, not a
 // new pickup, for the run's orb tally and story goals.
-function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey) {
+function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey, reachOverride = 0) {
     if (sim.droppedOrbs.length === 0) return;
-    const reach = sim.magnetT > 0 ? collectManifoldRing(x, y, z, dirKey, size, MAGNET_RADIUS, _magnetReach) : null;
+    const pull = Math.max(sim.magnetT > 0 ? MAGNET_RADIUS : 0, riptideReach(sim), reachOverride);
+    const reach = pull > 0 ? collectManifoldRing(x, y, z, dirKey, size, pull, _magnetReach) : null;
     const headKey = `${x},${y},${z},${dirKey}`;
     const taken = takeDroppedOrbsAt(sim, headKey, reach);
     if (!taken) return;
+    if (riptideReach(sim) && !reachOverride) abilityEvent(sim, 'water', [sim.pos, ...taken]);
     for (const drop of taken) {
         sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
         sim.lastOrbTime = sim.timeAlive;
@@ -1168,6 +1179,41 @@ function collectElementalTargets(sim, size, ctx, targets, kind) {
     abilityEvent(sim, kind, [sim.pos, ...targets, sim.pos]);
     const { x, y, z, dirKey } = sim.pos;
     tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, false, new Set(targets));
+}
+
+// Air's Gale: a landing after a flight takes every ripe growth orb and dropped orb
+// within ELEMENT_ABILITIES.galeReach steps (orbs hovering over flipped tiles too).
+const _galeReach = new Set();
+export function airGale(sim, size, ctx) {
+    if (!size) return 0;
+    const { x, y, z, dirKey } = sim.pos;
+    collectManifoldRing(x, y, z, dirKey, size, ELEMENT_ABILITIES.galeReach, _galeReach);
+    const targets = new Set(sim.powerups.filter(orb => ripeOrb(orb) && _galeReach.has(`${orb.x},${orb.y},${orb.z},${orb.dirKey}`)));
+    abilityEvent(sim, 'air', [sim.pos]);
+    if (targets.size) tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, false, targets);
+    tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey, ELEMENT_ABILITIES.galeReach);
+    ctx.feel?.('orb', { combo: sim.orbCombo });
+    return targets.size;
+}
+
+/**
+ * A cut the worm survives. With Earth up the lost orbs grow straight back onto the
+ * body (Regrowth: a worm regenerates); otherwise they scatter to be taken back
+ * (droppedOrbs.js). Returns how many orbs were regrown.
+ */
+export function dropCutOrbs(sim, size, ctx, drop) {
+    if (!sim.alive || !drop) return 0;
+    if (!regrowsCut(sim)) { scatterDroppedOrbs(sim, size, ctx, drop); return 0; }
+    const count = Math.max(drop.faceIds?.length ?? 0, drop.colors?.length ?? 0);
+    for (let i = 0; i < count; i++) {
+        const segments = drop.segments?.[i] ?? ORB_SEGMENT_GROWTH;
+        if (segments > 0) applyOrbPickupGrowth(sim, ctx, drop.colors?.[i] ?? '#ffdd44', drop.faceIds?.[i] ?? 0, segments, true);
+    }
+    if (count) {
+        sim.elementalAbilities.regrown += count;
+        abilityEvent(sim, 'garden', [sim.pos]);
+    }
+    return count;
 }
 
 function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = false, forcedOrbs = null) {
@@ -1315,6 +1361,8 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // already includes index 0 (the head); older logical visits are not coverage.
     const occupiedCount = bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount);
     for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
+    // Earth's Overgrowth: spring pads and growing buds close the surround with the body.
+    overgrowthTiles(sim, _ringOccupied);
     const cubies = ctx.getCubies();
     // Resolve the whole batch before applyHeal changes a neighbouring hole into
     // uncovered floor. Already-fired records must not block later eligible pairs.
@@ -2652,7 +2700,12 @@ export function stepWormSim(sim, delta, size, ctx) {
             spawnElementalOffering(sim, size, ctx);
         }
         // A cut tail's dropped orbs only wait while the worm can go and get them.
-        if (sim.droppedOrbs.length > 0) ageDroppedOrbs(sim, delta);
+        // Water's Riptide holds them as well: they wait while it washes them back.
+        if (sim.droppedOrbs.length > 0 && !riptideReach(sim)) ageDroppedOrbs(sim, delta);
+        if (sim.droppedOrbs.length > 0 && riptideReach(sim) && sim.phase === 'crawling' && !liveRotation.active && !sim.restRead) {
+            const { x, y, z, dirKey } = sim.pos;
+            tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey);
+        }
         if (sim.specials.length > 0) {
             let expired = false;
             for (let i = sim.specials.length - 1; i >= 0; i--) {
@@ -2725,6 +2778,8 @@ export function stepWormSim(sim, delta, size, ctx) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }
             if (settled) { airFusionLanding(sim, size); elementalLanding(sim, size, ctx); }
+            // Air's Gale: coming down from a real flight sweeps the orbs around the landing.
+            if (takeGale(sim) && settled) airGale(sim, size, ctx);
             sim.elementalAbilities.flying = false;
             sim.jumpT = 0;
             sim.isJumping = false;

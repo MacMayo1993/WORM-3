@@ -1,6 +1,5 @@
 import { queueOrbCascade } from './healerWorm/orbCascade.js';
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
-import { scatterDroppedOrbs } from './healerWorm/droppedOrbs.js';
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
@@ -65,6 +64,7 @@ import {
     killWormSim,
     queueTurn as queueTurnSim,
     jumpLiftOf,
+    dropCutOrbs,
 } from './healerWorm/wormSim.js';
 import { getOrbColor, parseTileKey, _parseTile } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
@@ -896,8 +896,8 @@ export function useWormCrawler(size, cubies) {
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
             droppedOrbs: f('droppedOrbs'),
             pendingDropDissolves: f('pendingDropDissolves'),
-            // Scatter a cut tail's orbs around the cut (droppedOrbs.js).
-            dropOrbs: (drop) => scatterDroppedOrbs(simRef.current, sizeRef.current, ctxRef.current, drop),
+            // Scatter a cut tail's orbs around the cut (droppedOrbs.js), or regrow them under Earth.
+            dropOrbs: (drop) => dropCutOrbs(simRef.current, sizeRef.current, ctxRef.current, drop),
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),

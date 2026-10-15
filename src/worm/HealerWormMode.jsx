@@ -22,6 +22,7 @@ import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { LightningStrikes } from './healerWorm/LightningStrikes.jsx';
 import { isHotTile, isFirebreakTile, isFrostTile, isMeltTile, chargeSpringPad, unseenFusionBursts, CHARGED_PAD_TTL, FUSION } from './healerWorm/elementalGameplay.js';
 import { fusionOf } from './healerWorm/elementalFusion.js';
+import { hazardClockRate } from './healerWorm/elementalAbilities.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 import BurrowEffects from './healerWorm/BurrowEffects.jsx';
 // src/worm/HealerWormMode.jsx
@@ -105,6 +106,8 @@ import { addMirrorSubject } from '../3d/mirrorSubjects.js';
 const _seedPos = new THREE.Vector3();
 const _seedNorm = new THREE.Vector3();
 const _seedBackDir = new THREE.Vector3();
+// Scratch for reading the sim's element state into hazardClockRate without allocating per frame.
+const _clockSim = { elementalT: 0, elementalType: null, elementalPair: null };
 
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
@@ -913,7 +916,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         if (holdsRotationTimer(worm.signature.current)) { rotationClock.held = true; return; }
         rotationClock.held = false;
-        autoTimerRef.current += Math.min(delta, 0.1);
+        // Ice's Cold Snap slows the slice-turn clock (warning included) while Ice is up.
+        _clockSim.elementalT = worm.elementalT.current;
+        _clockSim.elementalType = worm.elementalType.current;
+        _clockSim.elementalPair = worm.elementalPair.current;
+        autoTimerRef.current += Math.min(delta, 0.1) * hazardClockRate(_clockSim);
         const warningStart = rotationInterval - AUTO_ROTATE_WARNING;
 
         // Arm with the NEXT inverse move the moment the cycle starts (peek, don't
