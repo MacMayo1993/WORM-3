@@ -4,27 +4,30 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import NatureClaimLeaves from './NatureClaimLeaves.jsx';
 // src/worm/healerWorm/ElementalOrb.jsx
 //
-// The elemental offering as it sits on the board: a real orb, not a floating decal.
+// The elemental offering as it sits on the board. Telling the elements apart at a
+// glance is the whole job: Water, Ice and Air share a pale-blue palette, and six
+// tinted glass spheres under six identical gold medals were a guess. So identity is
+// carried three ways — shape, ink and glyph — before colour is needed at all:
 //
-// It is built in layers, outside in:
-//   • a ground pool of element-coloured light on the tile it hovers over, so the orb
-//     is anchored to the cube instead of pasted over it (plus a one-shot shockwave
-//     ring on spawn, which is what makes a new offering catch the eye);
-//   • a glassy sphere whose interior churns with the element itself — see
-//     elementalOrbShader.js for the core / shell / inner-bloom trio;
-//   • two counter-rotating orbit rings and a handful of orbiting motes, giving the
-//     silhouette movement that survives being seen from across the cube;
-//   • a small field of the element's own drifting matter (bubbles / embers / spores /
-//     flakes) contained around the orb, matching what ElementalAtmosphere plays at
-//     scene scale once the element is claimed — the pickup previews its own effect;
-//   • the enamel crest (ElementalBadge), billboarded and floated on the near face of
-//     the sphere so the icon always reads and always matches the HUD chip;
-//   • a countdown ring in the crest's plane that mirrors the HUD's draining ring;
+//   • a body with its own silhouette per element (droplet, flame, boulder, crystal,
+//     charge star, tornado; elementalOrbShapes.js) whose dense interior churns with
+//     the element itself (elementalOrbShader.js). It is billboarded upright, so a
+//     flame always points up the screen instead of its tip at the lens;
+//   • an ink hull in the element's dark tone behind and around the body, so the
+//     sticker under it cannot tint it and the silhouette is outlined on any tile;
+//   • the crest (ElementalBadge) floating above the body as a name tag: the HUD
+//     chip's glyph, bright on dark enamel in an element-coloured rim;
+//   • a ground pool of element-coloured light on the tile it hovers over, a
+//     draining countdown arc round that pool mirroring the HUD's ring, and a
+//     one-shot shockwave on spawn, which is what makes a new offering catch the eye;
+//   • a few orbiting motes and a small field of the element's own drifting matter
+//     (bubbles / embers / spores / flakes / ions / wind), matching what
+//     ElementalAtmosphere plays at scene scale once the element is claimed;
 //   • a point light in the element's colour, so the orb actually lights the face
-//     under it. Skipped on mobile, where four extra dynamic lights is a real cost.
+//     under it. Skipped on mobile, where several extra dynamic lights is a real cost.
 //
 // Everything animates from one useFrame writing to refs: no React renders per frame
-// and no per-frame allocation. Up to four of these exist at once (one offering =
+// and no per-frame allocation. Several of these exist at once (one offering =
 // one orb per element), so geometry AND the body's shader materials are shared at
 // module level; the orb owns only one small particle buffer, disposed on unmount.
 
@@ -39,6 +42,7 @@ import { getSpecialDef } from './specialDefs.js';
 import { ElementalBadge } from './elementalBadge.jsx';
 import { getSoftGlowTexture, getOrbTrimMaterials, PARTICLE_KINDS } from './elementalOrbMaterials.js';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
+import { getElementalOrbShape } from './elementalOrbShapes.js';
 
 // One knob for how big the pickup reads. Every part of the orb is authored at
 // ORB_SCALE 1 and multiplied through here — the body, the billboarded crest and
@@ -52,18 +56,34 @@ const ELEM_HOVER_LIFT = 0.3;
 const SHOCK_TIME = 0.7; // seconds the spawn shockwave takes to run out
 const FADE_FLOOR = 0.5; // an offering never dims past half — it should stay grabbable
 
+// The body's layers are one shape at four sizes (see elementalOrbShader.js):
+// the core sits just inside the glass, the ink hull just outside it.
+const LAYER_SCALE = { core: 0.9, inner: 0.96, shell: 1, hull: 1.09 };
+// The crest floats above the body in the billboard's frame: high enough to clear
+// the tallest shape (the crystal's tip), low enough to read as the orb's own tag.
+const CREST_LIFT = 0.76;
+const CREST_SCALE = 0.5;
+
+// The body's size relative to ORB_SCALE. Smaller than the old glass sphere: a dense
+// body hides the tile under it, where the glass let it show through.
+const BODY_SCALE = 0.98;
+
+// Spin about the upright axis, plus an optional tumble for the shapes that have no
+// natural up (a rock and a charge star can roll; a flame or a droplet cannot).
+const SPIN = {
+  water: { rate: 0.5, wobble: 0 },
+  fire: { rate: 0.7, wobble: 0 },
+  grass: { rate: 0.35, wobble: 0.22 },
+  ice: { rate: 0.6, wobble: 0.1 },
+  lightning: { rate: 1.1, wobble: 0.35 },
+  air: { rate: 2.2, wobble: 0 }
+};
+const DEFAULT_SPIN = { rate: 0.45, wobble: 0.2 };
+
 // One set for every elemental orb ever spawned.
 const _geos = {
-  core: new THREE.SphereGeometry(0.3, 24, 18),
-  inner: new THREE.SphereGeometry(0.395, 20, 14),
-  shell: new THREE.SphereGeometry(0.42, 28, 20),
-  // The orbit rings graze the shell rather than hooping wide of it: sized out at
-  // the countdown's radius they read as a second, duplicate outline.
-  ringA: new THREE.TorusGeometry(0.46, 0.011, 8, 64),
-  ringB: new THREE.TorusGeometry(0.4, 0.008, 8, 56),
-  // The countdown hugs the orb rather than hooping around it — a wide bright ring
-  // read as the orb's outline and swallowed the silhouette.
-  countdown: new THREE.TorusGeometry(0.63, 0.012, 8, 56),
+  // A thin arc round the pool, drained by its shader (elementalOrbMaterials.js).
+  countdown: new THREE.RingGeometry(0.4, 0.45, 64, 1),
   pool: new THREE.PlaneGeometry(2.0, 2.0),
   shock: new THREE.TorusGeometry(0.42, 0.022, 8, 48)
 };
@@ -95,14 +115,11 @@ export default function ElementalOrb({ special, size }) {
   useEffect(() => () => arrival.current.effect?.dispose(), []);
   const bodyRef = useRef();
   const spinRef = useRef();
-  const ringARef = useRef();
-  const ringBRef = useRef();
   const motesRef = useRef([]);
   const pointsRef = useRef();
   const billboardRef = useRef();
   const crestRef = useRef();
   const sparksRef = useRef();
-  const raysRef = useRef();
   const countdownRef = useRef();
   const groundRef = useRef();
   const poolRef = useRef();
@@ -117,9 +134,12 @@ export default function ElementalOrb({ special, size }) {
   const accent = def?.accent ?? '#ffffff';
 
   // Shared per element and never disposed — disposing them on unmount destroyed
-  // the compiled programs, so every offering relinked all three shaders and stalled
+  // the compiled programs, so every offering relinked the body shaders and stalled
   // the frame. See the note at the top of elementalOrbShader.js.
-  const mats = useMemo(() => getElementalOrbMaterials(special.type, color, accent), [special.type, color, accent]);
+  const ink = def?.fogColor ?? '#0b0f1a';
+  const mats = useMemo(() => getElementalOrbMaterials(special.type, color, accent, ink), [special.type, color, accent, ink]);
+  const shape = useMemo(() => getElementalOrbShape(special.type), [special.type]);
+  const spin = SPIN[special.type] ?? DEFAULT_SPIN;
 
   const glowTex = useMemo(() => getSoftGlowTexture(), []);
   const trim = useMemo(
@@ -187,18 +207,11 @@ export default function ElementalOrb({ special, size }) {
     const pop = 1;
     const breathe = reducedRef.current ? 1 : 1 + Math.sin(t * 2.6) * 0.035;
 
-    if (bodyRef.current) bodyRef.current.scale.setScalar(1.15 * ORB_SCALE * pop * breathe);
+    if (bodyRef.current) bodyRef.current.scale.setScalar(BODY_SCALE * ORB_SCALE * pop * breathe);
     if (spinRef.current && !reducedRef.current) {
-      spinRef.current.rotation.y = t * 0.45;
-      spinRef.current.rotation.x = Math.sin(t * 0.3) * 0.25;
-    }
-    if (ringARef.current && !reducedRef.current) {
-      ringARef.current.rotation.z = t * 0.9;
-      ringARef.current.rotation.y = 0.55 + Math.sin(t * 0.4) * 0.15;
-    }
-    if (ringBRef.current && !reducedRef.current) {
-      ringBRef.current.rotation.z = -t * 0.6;
-      ringBRef.current.rotation.x = 1.1 + Math.cos(t * 0.35) * 0.2;
+      spinRef.current.rotation.y = t * spin.rate;
+      spinRef.current.rotation.x = Math.sin(t * 0.7) * spin.wobble;
+      spinRef.current.rotation.z = Math.cos(t * 0.55) * spin.wobble * 0.6;
     }
 
     // Orbiting motes.
@@ -233,15 +246,14 @@ export default function ElementalOrb({ special, size }) {
       pts.geometry.attributes.position.needsUpdate = true;
     }
 
-    // Face the crest and its countdown ring at the camera. The parent already
-    // carries the tile's orientation, so undo it before applying the camera's.
+    // Stand the body and its crest upright on screen. The parent already carries
+    // the tile's orientation, so undo it before applying the camera's.
     if (billboardRef.current) {
       _billboard.copy(group.quaternion).invert().multiply(state.camera.quaternion);
       billboardRef.current.quaternion.copy(_billboard);
     }
-    if (crestRef.current) crestRef.current.scale.setScalar(0.58 * ORB_SCALE * pop);
+    if (crestRef.current) crestRef.current.scale.setScalar(CREST_SCALE * ORB_SCALE * pop);
     if (sparksRef.current && !reducedRef.current) sparksRef.current.rotation.z = t * 1.1;
-    if (raysRef.current && !reducedRef.current) raysRef.current.rotation.z = -t * 0.22;
 
     // Ground pool: hold it on the tile while the orb bobs above it, and swell it
     // gently so the face looks lit rather than stickered.
@@ -264,13 +276,12 @@ export default function ElementalOrb({ special, size }) {
     mats.uniforms.uTime.value = t;
     mats.uniforms.uAlpha.value = alpha * pop;
 
-    // Countdown ring — tightens toward the crest as the offering runs out. Set
-    // after the traverse, which would otherwise overwrite its opacity.
+    // Countdown arc on the tile, draining clockwise as the offering runs out.
+    // Its shader reads uniforms, not material.opacity, so the traverse leaves it be.
     if (countdownRef.current) {
-      const remaining = Math.max(0, Math.min(1, ttl / life));
-      countdownRef.current.scale.setScalar((0.82 + 0.18 * remaining) * ORB_SCALE * pop);
-      countdownRef.current.rotation.z = t * 0.5;
-      countdownRef.current.material.opacity = 0.45 * alpha;
+      const u = countdownRef.current.material.uniforms;
+      u.uRemaining.value = Math.max(0, Math.min(1, ttl / life));
+      u.uAlpha.value = alpha;
     }
 
     // One-shot spawn shockwave across the face, then it stays hidden.
@@ -287,7 +298,7 @@ export default function ElementalOrb({ special, size }) {
     group.visible = true;
     const reveal = arrival.current;
     if (!reveal.done) {
-      reveal.effect ??= createOrbReveal(group, { radius: 1.35, reducedMotion: reducedRef.current });
+      reveal.effect ??= createOrbReveal(group, { radius: 1.6, reducedMotion: reducedRef.current });
       reveal.done = !reveal.effect.update(orbRevealProgress(ageRef.current));
     }
   });
@@ -296,48 +307,40 @@ export default function ElementalOrb({ special, size }) {
 
   return (
     <group ref={groupRef} visible={false}>
-      {/* ── Orb body ───────────────────────────────────────────────────────── */}
-      <group ref={bodyRef}>
-        <group ref={spinRef}>
-          <mesh geometry={_geos.core} material={mats.core} renderOrder={1} raycast={() => null} />
-          <mesh geometry={_geos.inner} material={mats.inner} renderOrder={2} raycast={() => null} />
-          <mesh geometry={_geos.shell} material={mats.shell} renderOrder={3} raycast={() => null} />
+      {/* ── Upright on screen: the body and the crest above it ─────────────── */}
+      <group ref={billboardRef}>
+        <group ref={bodyRef}>
+          <group ref={spinRef}>
+            <mesh geometry={shape} material={mats.hull} scale={LAYER_SCALE.hull} renderOrder={0} raycast={() => null} />
+            <mesh geometry={shape} material={mats.core} scale={LAYER_SCALE.core} renderOrder={1} raycast={() => null} />
+            <mesh geometry={shape} material={mats.inner} scale={LAYER_SCALE.inner} renderOrder={2} raycast={() => null} />
+            <mesh geometry={shape} material={mats.shell} scale={LAYER_SCALE.shell} renderOrder={3} raycast={() => null} />
+          </group>
+
+          {/* Sprites, not spheres: at this size a low-poly sphere reads as a visible
+              hexagon, and a soft billboarded dot is both prettier and cheaper. */}
+          {MOTES.map((m, i) => (
+            <sprite
+              key={i}
+              material={trim.mote}
+              scale={[0.12, 0.12, 0.12]}
+              ref={(el) => {
+                motesRef.current[i] = el;
+                if (el) el.userData.baseOpacity = 0.85;
+              }}
+            />
+          ))}
         </group>
 
-        {/* Counter-rotating orbit rings — movement the silhouette keeps at distance. */}
-        <mesh
-          geometry={_geos.ringA}
-          material={trim.ringA}
-          ref={(el) => {
-            ringARef.current = el;
-            if (el) el.userData.baseOpacity = 0.34;
-          }}
-        />
-        <mesh
-          geometry={_geos.ringB}
-          material={trim.ringB}
-          ref={(el) => {
-            ringBRef.current = el;
-            if (el) el.userData.baseOpacity = 0.3;
-          }}
-        />
+        <group ref={crestRef} position={[0, CREST_LIFT * ORB_SCALE, 0.3 * ORB_SCALE]}>
+          <ElementalBadge type={special.type} color={color} sparksRef={sparksRef} />
+        </group>
+      </group>
 
-        {/* Sprites, not spheres: at this size a low-poly sphere reads as a visible
-            hexagon, and a soft billboarded dot is both prettier and cheaper. */}
-        {MOTES.map((m, i) => (
-          <sprite
-            key={i}
-            material={trim.mote}
-            scale={[0.14, 0.14, 0.14]}
-            ref={(el) => {
-              motesRef.current[i] = el;
-              if (el) el.userData.baseOpacity = 0.85;
-            }}
-          />
-        ))}
-
-        {/* The element's own matter drifting around the orb. */}
-        {!reducedRef.current && (
+      {/* ── The element's own matter drifting round the orb, in the tile's frame
+          so bubbles rise and flakes settle relative to the cube ──────────────── */}
+      {!reducedRef.current && (
+        <group scale={1.15 * ORB_SCALE}>
           <points
             ref={pointsRef}
             geometry={field.geometry}
@@ -346,18 +349,10 @@ export default function ElementalOrb({ special, size }) {
             raycast={() => null}
             userData={{ baseOpacity: field.cfg.opacity }}
           />
-        )}
-      </group>
-
-      {/* ── Crest, floated on the near face of the sphere ──────────────────── */}
-      <group ref={billboardRef}>
-        <group ref={crestRef} position={[0, 0, 0.5 * ORB_SCALE]}>
-          <ElementalBadge type={special.type} color={color} sparksRef={sparksRef} raysRef={raysRef} />
         </group>
-        <mesh ref={countdownRef} geometry={_geos.countdown} material={trim.countdown} position={[0, 0, 0.5 * ORB_SCALE]} />
-      </group>
+      )}
 
-      {/* ── Light pooled on the tile below ─────────────────────────────────── */}
+      {/* ── Light pooled on the tile below, ringed by the countdown ────────── */}
       <group ref={groundRef} rotation={[-Math.PI / 2, 0, 0]}>
         {glowTex && (
           <mesh
@@ -370,6 +365,7 @@ export default function ElementalOrb({ special, size }) {
             }}
           />
         )}
+        <mesh ref={countdownRef} geometry={_geos.countdown} material={trim.countdown} position={[0, 0, 0.005]} raycast={() => null} />
         <mesh ref={shockRef} geometry={_geos.shock} material={trim.shock} raycast={() => null} />
       </group>
 
