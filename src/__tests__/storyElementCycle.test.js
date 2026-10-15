@@ -44,13 +44,17 @@ it.each(WORM_STORY_LEVELS.filter(hasStoryElementGoal))('level $id offers all six
   }
 });
 
-it('refills a collected element while the other five and an active effect remain', () => {
+it('waits for the pickup cooldown even when the center-supply timer is already ready', () => {
   const { sim, p, size, offer, ctx } = setup();
   clearCenters(sim, p, size); offer();
   const first = sim.specials.shift(), others = sim.specials.slice();
   startElemental(sim, ctx, first.type); sim.elementalFocusT = 0;
   expect(offer()).toBe(false); // recovery
   for (let i = 0; i < 31; i++) updateMastery(sim, p, storyLevel(69), 0.1);
+  expect(sim.elementalClaimCooldown).toBe(15);
+  expect(offer()).toBe(false);
+  sim.elementalClaimCooldown = 0.01; expect(offer()).toBe(false);
+  sim.elementalClaimCooldown = 0;
   expect(offer()).toBe(true);
   expect(sim.specials).toHaveLength(6);
   for (const orb of others) expect(sim.specials).toContain(orb);
@@ -114,4 +118,23 @@ it('finishes level 69 elemental mastery after real Earth and Air launches land',
   expect(nextStoryPower(p, level)).toBeNull();
   expect(outcome()).not.toBeNull();
   expect(stageStory(sim, size, level, 'classic').lastElementCompanion).toBeNull();
+});
+
+it('clears all elemental choices during fusion while preserving unrelated pickups', () => {
+  const { sim, p, size, offer, ctx } = setup();
+  clearCenters(sim, p, size); offer();
+  const bonus = { ...sim.pos, type: 'spring', storyBonus: true, ttl: 20 };
+  sim.specials.push(bonus);
+  startElemental(sim, ctx, 'air');
+  startElemental(sim, ctx, 'fire');
+  expect(sim.specials).toEqual([bonus]);
+  sim.elementalFocusT = 0; sim.elementalClaimCooldown = 0; p.elementSupplyDelay = 0;
+  for (let n = 0; n < 20; n++) expect(offer()).toBe(false);
+  expect(sim.specials).toEqual([bonus]);
+  // Also clean stale/restored elemental orbs on the first story update.
+  sim.specials.push({ ...sim.pos, type: 'water' });
+  expect(offer()).toBe(true); expect(sim.specials).toEqual([bonus]);
+  sim.elementalT = 0;
+  expect(offer()).toBe(true);
+  expect(sim.specials.filter(o => o.storyCenterElement)).toHaveLength(6);
 });

@@ -251,7 +251,7 @@ export const ELEMENTAL_OFFER_COUNT = 3;
 // after a wash ended, so the cube was almost never without orbs on it; a claim now
 // buys a proper gap before the next one appears. Un-taken offerings do not trigger
 // it — only a claim does.
-export const ELEMENTAL_CLAIM_COOLDOWN = 30;
+export const ELEMENTAL_CLAIM_COOLDOWN = 15;
 // On claim the sim freezes for this long so the player can watch the element take
 // over the cube instead of crawling past it. The wash's own clock is held for the
 // beat too, so this is not taken out of ELEMENTAL_DURATION.

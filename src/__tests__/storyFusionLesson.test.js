@@ -42,7 +42,11 @@ it('offers all six choices for ordered lessons and counts both real recipe order
   expect(activeFusion(sim)).toBe('quench');
   expect(p.mechanics.quenchFusions).toBe(1);
   p.elementSupplyDelay = 0;
-  expect(offer()).toBe(true); // replenish Water during the Fire effect
+  expect(offer()).toBe(false); // the fusion clears and blocks the supply
+  expect(sim.specials.filter(orb => STORY_ELEMENTS.includes(orb.type))).toHaveLength(0);
+  sim.elementalT = 0; sim.elementalPair = null; sim.elementalType = null; sim.elementalClaimCooldown = 0;
+  expect(offer()).toBe(true);
+  claim('fire'); sim.elementalFocusT = 0;
   claim('water'); sim.elementalFocusT = 0;
   expect(activeFusion(sim)).toBe('steam');
   expect(p.mechanics.steamFusions).toBe(1);
@@ -69,6 +73,8 @@ it('keeps uncollected elemental choices after an effect expires without granting
   expect(p.mechanics.steamFusions).toBeUndefined();
   expect(p.mechanics.quenchFusions).toBeUndefined();
   p.elementSupplyDelay = 0;
+  expect(offer()).toBe(false); // expiry alone does not end the pickup cooldown
+  sim.elementalClaimCooldown = 0;
   expect(offer()).toBe(true);
   expect(sim.specials.some(orb => orb.type === 'water')).toBe(true);
 });

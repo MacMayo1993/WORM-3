@@ -209,6 +209,44 @@ describe('elemental offering placement', () => {
 });
 
 describe('elemental wash lifecycle', () => {
+  it('holds refill for 15 active seconds after each pickup and resets on the fusion pickup', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    ctx.getSpeed = () => 0.01; // keep the worm on the same safe surface lane
+    ctx.isStoryMode = () => true;
+    startElemental(sim, ctx, 'air');
+    expect(sim.elementalClaimCooldown).toBe(15);
+    stepWormSim(sim, 0.1, SIZE, ctx); // pickup camera hold
+    expect(sim.elementalClaimCooldown).toBe(15);
+    sim.elementalFocusT = 0;
+    ctx.isPaused = () => true;
+    stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.elementalClaimCooldown).toBe(15);
+    ctx.isPaused = () => false;
+    for (let i = 0; i < 50; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.elementalClaimCooldown).toBeCloseTo(10);
+    startElemental(sim, ctx, 'fire');
+    expect(sim.elementalClaimCooldown).toBe(15);
+    sim.elementalFocusT = 0;
+    for (let i = 0; i < 149; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.elementalClaimCooldown).toBeCloseTo(0.1);
+    stepWormSim(sim, 0.1, SIZE, ctx);
+    stepWormSim(sim, 0.001, SIZE, ctx); // floating-point boundary
+    expect(sim.elementalClaimCooldown).toBe(0);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.elementalClaimCooldown).toBe(0);
+  });
+
+  it('does not allow ambient offerings during an extended fusion even after cooldown ends', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    ctx.getSpeed = () => 0.01;
+    startElemental(sim, ctx, 'air'); startElemental(sim, ctx, 'water');
+    sim.elementalFocusT = 0; sim.elementalClaimCooldown = 0; sim.elementalSpawnTimer = 0;
+    sim.elementalT = 30;
+    for (let i = 0; i < 160; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.elementalT).toBeGreaterThan(0);
+    expect(sim.specials.filter(o => isElementalType(o.type))).toHaveLength(0);
+  });
+
   it('activateSpecial starts a wash for an element type', () => {
     const sim = makeSim();
     const ctx = makeCtx();

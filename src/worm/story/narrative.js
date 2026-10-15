@@ -403,15 +403,15 @@ export const WORM_STORY_NARRATIVE = {
   },
   54: {
     briefing: [
-      'New trick. If your head rides one door while your tail is still in another, both doors heal back to back.',
-      'Two at once. These doors heal for free when you ride them, so practice the timing.',
+      'New trick. Heal two different doors within twenty seconds of surface time to earn a double heal. The countdown pauses inside tunnels.',
+      'These doors heal for free when you ride them. Follow the countdown after the first repair; overlapping paid rides also count.',
     ],
     debrief: 'A double heal! Two doors, one body. The Longhaul can only bite one thing at a time. You can heal two.',
   },
   55: {
     briefing: [
       'Same trick, but now the doors want their toll. Carry both colors.',
-      'Ride one, then the other, before your tail clears the first.',
+      'Heal one, then another within twenty seconds of surface time. Tunnel rides pause the countdown.',
     ],
     debrief: 'Paid in full, healed in pairs. The pocket deck sounds quieter. The Longhaul is backing off.',
   },

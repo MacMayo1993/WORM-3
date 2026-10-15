@@ -1,4 +1,5 @@
 import { queueOrbCascade } from './healerWorm/orbCascade.js';
+import { STORY_DOUBLE_HEAL_WINDOW } from './healerWorm/healChain.js';
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
 import { scatterDroppedOrbs } from './healerWorm/droppedOrbs.js';
 import { getStableKey } from './wormLogic.js';
@@ -207,6 +208,7 @@ export function useWormCrawler(size, cubies) {
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,
             isStoryMode: () => !!useGameStore.getState().wormStoryLevel,
+            getDoubleHealWindow: () => storyLevel(useGameStore.getState().wormStoryLevel)?.mechanics?.multiHeals ? STORY_DOUBLE_HEAL_WINDOW : 0,
             isStoryTunnelTrial: () => storyLevel(useGameStore.getState().wormStoryLevel)?.kind === 'tunnel',
             allowRingHeal: () => {
                 const level = storyLevel(useGameStore.getState().wormStoryLevel);
