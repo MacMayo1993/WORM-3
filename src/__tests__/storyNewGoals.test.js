@@ -163,15 +163,13 @@ describe('story credit for the new goals', () => {
     expect(retry.fusionIds.size).toBe(0);
   });
 
-  it('offers paired elements until a fusion quest is brewed, then stops', () => {
+  it('keeps six choices available while fusion credit tracks completed recipes', () => {
     const { level, sim, p } = setup(66);
     // The first element this attempt dealt is the first one offered.
     expect(nextStoryPower(p, level)).toBe(p.elementOrder[0]);
-    p.powerDelay = 0;
+    p.powerDelay = 0; p.elementSupplyDelay = 0; p.viewOffered = true;
     expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
-    expect(sim.specials).toHaveLength(2);
-    expect(STORY_ELEMENTS).toContain(sim.specials[1].type);
-    expect(sim.specials[1].type).not.toBe(sim.specials[0].type);
+    expect(sim.specials.map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
     for (const [base, catalyst] of [['water', 'fire'], ['fire', 'water'], ['grass', 'ice']]) recordStoryMechanic(p, 'elementFusion', getFusion(base, catalyst).id);
     expect(nextStoryPower(p, level)).toBeNull();
   });

@@ -87,12 +87,11 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
 it('checks all six elemental effects and cycles back to missed powers', () => {
   const { sim, p, level, read } = setup(40);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4; p.mechanics.explodes = 2;
-  sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
-  expect(sim.specials[0].type).toBe('water');
-  for (const type of ['fire', 'grass', 'ice', 'lightning', 'air', 'water']) {
-    sim.specials = []; p.powerDelay = 0;
-    expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
-    expect(sim.specials[0].type).toBe(type);
+  p.viewOffered = true;
+  for (let round = 0; round < 2; round++) {
+    sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0;
+    expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
+    expect(sim.specials.map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
   }
   for (const type of ['water', 'fire', 'grass', 'ice', 'lightning', 'air']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
@@ -110,30 +109,24 @@ it('checks all six elemental effects and cycles back to missed powers', () => {
       sim.isJumping = false; read();
     }
     expect(p.elements.has(type)).toBe(true);
-    expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false); // don't replace an active element
+    offerStoryPower(sim, p, level, level.cubeSize, p.cubies);
+    expect(sim.elementalType).toBe(type); // offers never replace an active effect
   }
   expect(read().elements).toBe(6); expect(nextStoryPower(p, level)).toBeNull();
 });
 it('finishes level eight with three collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
   expect(level.mechanics).toEqual({ uniqueElements: 3 });
-  p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
-  expect(sim.specials[0].type).toBe('water');
-  p.powerDelay = 0;
-  sim.specials = []; // missed offerings do not count and can be offered again
-  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
-  expect(sim.specials[0].type).toBe('fire');
+  p.powerDelay = 0; p.elementSupplyDelay = 0;
+  expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
+  expect(sim.specials.map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
   expect(read().elementPickups).toBeUndefined();
   const won = completed(level, { elapsed: 80 });
   recordStoryMechanic(p, 'elementPickups', 'water');
   recordStoryMechanic(p, 'elementPickups', 'fire');
   expect(storyOutcome(level, { ...won, uniqueElements: read().uniqueElements })).toBeNull();
   expect(nextStoryPower(p, level)).toBe('grass');
-  sim.specials = []; sim.elementalT = 10;
-  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
-  sim.elementalT = 0; p.powerDelay = 0;
-  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
-  expect(sim.specials[0].type).toBe('grass');
+  expect(sim.specials.some(o => o.type === 'grass')).toBe(true);
   recordStoryMechanic(p, 'elementPickups', 'grass');
   expect(p.elements.size).toBe(0);
   expect(storyOutcome(level, { ...won, uniqueElements: read().uniqueElements })).not.toBeNull();
@@ -224,9 +217,9 @@ it('offers one optional view in later Story levels without replacing required po
   p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toMatch(/^view-/);
-  sim.specials = []; p.powerDelay = 0;
+  sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0;
   expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
-  expect(sim.specials.map(orb => orb.type)).toEqual(['water', 'fire']);
+  expect(sim.specials.map(orb => orb.type).sort()).toEqual([...STORY_ELEMENTS].sort());
   const early = setup(7); early.sim.specials = []; early.p.powerDelay = 0;
   early.p.mechanics = { ...early.level.mechanics };
   expect(offerStoryPower(early.sim, early.p, early.level, early.level.cubeSize ?? 5, early.p.cubies)).toBe(false);

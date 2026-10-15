@@ -1,12 +1,12 @@
 import { beforeEach, expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, storyLevel, storyOutcome, storyChecklist } from '../worm/story/levels.js';
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
-import { STORY_ELEMENTS, nextStoryPower, offerStoryPower, recordStoryMechanic, updateMastery, fusionReachableTiles } from '../worm/story/mastery.js';
+import { STORY_ELEMENTS, nextStoryPower, offerStoryPower, recordStoryMechanic, updateMastery } from '../worm/story/mastery.js';
 import { makeWormSim, startElemental, tileKey } from '../worm/healerWorm/wormSim.js';
 import { activeFusion } from '../worm/healerWorm/elementalFusion.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
-import { ttPush } from '../worm/circularBuffers.js';
+import { makeTileTrail, ttPush } from '../worm/circularBuffers.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
 import { assess, requiredPowerCycles } from '../../tools/worm-level-auditor/web/audit.js';
@@ -18,88 +18,77 @@ function setup(id = 24) {
   const p = stageStory(sim, size, level, 'classic');
   const offer = () => offerStoryPower(sim, p, level, size, p.cubies);
   const ctx = { feel() {}, onElementalTheme() {}, onStoryMechanic: (...args) => recordStoryMechanic(p, ...args) };
-  const claim = () => {
-    const [orb] = sim.specials.splice(0, 1);
+  const claim = type => {
+    const index = type ? sim.specials.findIndex(orb => orb.type === type) : 0;
+    expect(index).toBeGreaterThanOrEqual(0);
+    const [orb] = sim.specials.splice(index, 1);
     recordStoryMechanic(p, 'elementPickups', orb.type);
     startElemental(sim, ctx, orb.type);
     return orb;
   };
-  p.powerDelay = 0;
+  p.powerDelay = 0; p.elementSupplyDelay = 0;
   return { level, size, sim, p, offer, claim, ctx };
 }
 
-it('offers reachable ordered partners, counts each recipe, and exposes the same completion goals', () => {
-  const { level, size, sim, p, offer, claim, ctx } = setup();
+it('offers all six choices for ordered lessons and counts both real recipe orders', () => {
+  const { level, sim, p, offer, claim, ctx } = setup();
   expect(offer()).toBe(true);
-  expect(sim.specials[0].type).toBe('water');
-  claim();
-  expect(offer()).toBe(false); // focus shot is held
-  sim.elementalFocusT = 0;
-  const won = { alive: true, elapsed: 90, cuts: 0, peakLength: 100, orbs: level.orbs, healed: level.target,
-    remaining: 0, tailClear: true, landed: true, rotationSettled: true };
-  for (const [type, effect] of [['fire', 'quench'], ['water', 'steam']]) {
-    expect(offer()).toBe(true); // bypass only the ordinary power cooldown
-    const orb = sim.specials[0];
-    expect(orb.type).toBe(type);
-    expect(orb.ttl).toBe(sim.elementalT);
-    expect(fusionReachableTiles(sim, size, p.cubies, level.speed).has(tileKey(orb))).toBe(true);
-    expect(sim.powerups.some(food => tileKey(food) === tileKey(orb))).toBe(false);
-    expect(p.powerHint).toContain(effect === 'steam' ? 'Fire → Water: Steam' : 'Water → Fire: Quench');
-    claim();
-    expect(activeFusion(sim)).toBe(effect);
-    expect(p.mechanics[`${effect}Fusions`]).toBe(1);
-    sim.elementalFocusT = 0;
-    const metrics = { ...won, ...p.mechanics };
-    expect(!!storyOutcome(level, metrics)).toBe(effect === 'steam');
-  }
-  startElemental(sim, ctx, 'water'); // same catalyst: refresh only
+  expect(sim.specials.map(o => o.type)).toEqual(expect.arrayContaining(STORY_ELEMENTS));
+  expect(p.powerHint).toContain('Water → Fire: Quench');
+  expect(p.powerHint).toContain('Fire → Water: Steam');
+  claim('water'); sim.elementalFocusT = 0;
+  expect(offer()).toBe(false); // existing choices remain through the reveal/recovery
+  claim('fire'); sim.elementalFocusT = 0;
+  expect(activeFusion(sim)).toBe('quench');
   expect(p.mechanics.quenchFusions).toBe(1);
-  expect(offer()).toBe(false); // goals met: no endless elemental offers
-  const metrics = { ...won, ...p.mechanics };
-  const outcome = storyOutcome(level, metrics);
+  p.elementSupplyDelay = 0;
+  expect(offer()).toBe(true); // replenish Water during the Fire effect
+  claim('water'); sim.elementalFocusT = 0;
+  expect(activeFusion(sim)).toBe('steam');
+  expect(p.mechanics.steamFusions).toBe(1);
+  startElemental(sim, ctx, 'water'); // same catalyst refresh is not a second fusion
+  expect(p.mechanics.steamFusions).toBe(1);
+  const won = { alive: true, elapsed: 90, cuts: 0, peakLength: 100, orbs: level.orbs, healed: level.target,
+    remaining: 0, tailClear: true, landed: true, rotationSettled: true, ...p.mechanics };
+  const outcome = storyOutcome(level, won);
   expect(outcome.stars).toBe(3);
-  expect(storyChecklist(level, metrics).filter(g => g.key.endsWith('Fusions')).map(g => g.label)).toEqual([
-    'Make Steam: Fire → Water', 'Make Quench: Water → Fire',
-  ]);
-  const hud = storyHudSnapshot(null, level, metrics, 1, outcome);
-  metrics.quenchFusions = 0;
+  const hud = storyHudSnapshot(null, level, won, 1, outcome);
+  won.quenchFusions = 0;
+  expect(storyOutcome(level, won)).toBeNull();
   expect(hud.checklist.finishMetrics.quenchFusions).toBe(1);
-  expect(stageStory(sim, size, level).mechanics).toEqual({});
+  expect(stageStory(sim, level.cubeSize, level).mechanics).toEqual({});
 });
 
-it('removes a missed catalyst when its base expires and retries without granting credit', () => {
+it('keeps uncollected elemental choices after an effect expires without granting fusion credit', () => {
   const { sim, p, offer, claim } = setup();
-  offer(); claim(); sim.elementalFocusT = 0;
-  sim.elementalT = 5;
-  expect(offer()).toBe(true);
-  expect(sim.specials[0]).toMatchObject({ type: 'fire', ttl: 5, fusionBase: 'water' });
+  offer(); claim('water'); sim.elementalFocusT = 0;
+  const fire = sim.specials.find(orb => orb.type === 'fire');
   sim.elementalT = 0; sim.elementalType = null;
-  expect(offer()).toBe(true); // publishes removal to the HUD
-  expect(sim.specials).toHaveLength(0);
+  offer();
+  expect(sim.specials).toContain(fire);
   expect(p.mechanics.steamFusions).toBeUndefined();
-  expect(offer()).toBe(false);
-  p.powerDelay = 0;
+  expect(p.mechanics.quenchFusions).toBeUndefined();
+  p.elementSupplyDelay = 0;
   expect(offer()).toBe(true);
-  expect(sim.specials[0].type).toBe('water');
+  expect(sim.specials.some(orb => orb.type === 'water')).toBe(true);
 });
 
-it('waits instead of putting a catalyst behind blocked routes or offering it too late', () => {
-  const { sim, size, p, offer, claim } = setup();
-  offer(); claim(); sim.elementalFocusT = 0;
-  sim.elementalT = 2.9;
-  expect(offer()).toBe(false);
-  sim.elementalT = 9;
+it('waits instead of putting center choices inside a blocked body', () => {
+  const { sim, size, p, offer } = setup();
+  sim.tileTrail = makeTileTrail(6 * size * size);
   for (const tile of getAllSurfaceTiles(size)) ttPush(sim.tileTrail, tileKey(tile));
-  sim.tailLength = 1200;
+  sim.tailLength = 10000;
   expect(offer()).toBe(false);
-  expect(p.lastPower).toBe('water');
+  expect(p.elementSupplyCursor).toBe(0);
   sim.tailLength = 0;
   expect(offer()).toBe(true);
 });
 
-it('keeps single-element lessons sequential and awards mastery to both active halves', () => {
+it('offers six choices in introductory lessons and awards mastery to both active fusion halves', () => {
   const early = setup(8);
-  early.offer(); early.claim(); early.sim.elementalFocusT = 0;
+  early.offer();
+  expect(early.sim.specials.map(o => o.type)).toEqual(expect.arrayContaining(STORY_ELEMENTS));
+  early.claim('water'); early.sim.elementalFocusT = 0;
   expect(early.offer()).toBe(false);
   const { sim, p, level, ctx } = setup(40);
   startElemental(sim, ctx, 'water'); startElemental(sim, ctx, 'fire');
@@ -125,26 +114,19 @@ it('audits ordered supply and budgets repeated fusion quantities', () => {
   expect(assess({ ...record, config: { ...level, mechanics: { steamFusions: 200 } } }).status).toBe('undersupplied');
 });
 
-it.each([30, 35, 40])('offers a simultaneous reachable pair for fusion practice in level %i', id => {
-  const { sim, p, level, size, offer, claim } = setup(id);
-  // Finish non-element power tasks and the optional view; unrelated tasks can
-  // still be outstanding while the player experiments with elemental recipes.
+it.each([30, 40])('offers six separate face-center choices for fusion practice in level %i', id => {
+  const { sim, p, offer, claim } = setup(id);
   p.mechanics = { magnetOrbs: 999, explodes: 999, rockets: 999 };
   p.viewOffered = true;
   expect(offer()).toBe(true);
-  expect(sim.specials).toHaveLength(2);
-  const [first, second] = sim.specials;
-  expect(first.type).not.toBe(second.type);
-  expect(tileKey(first)).not.toBe(tileKey(second));
-  expect(fusionReachableTiles({ ...sim, pos: first, elementalT: 10 }, size, p.cubies, level.speed).has(tileKey(second))).toBe(true);
+  expect(sim.specials.map(o => o.type)).toEqual(expect.arrayContaining(STORY_ELEMENTS));
+  expect(new Set(sim.specials.map(tileKey)).size).toBe(6);
+  expect(new Set(sim.specials.map(o => o.dirKey)).size).toBe(6);
   for (const orb of sim.specials) expect(sim.powerups.map(tileKey)).not.toContain(tileKey(orb));
-  expect(p.powerHint).toContain('Two elements');
-  expect(offer()).toBe(false); // no duplicates on subsequent frames
-  expect(p.powerHint).toContain('Two elements');
-  claim();
-  expect(sim.specials).toHaveLength(1);
-  sim.elementalFocusT = 0;
-  claim();
+  expect(p.powerHint).toContain('All six elements');
+  expect(offer()).toBe(false);
+  const first = claim('water'); sim.elementalFocusT = 0;
+  const second = claim('fire');
   expect(sim.elementalPair).toBe(first.type);
   expect(sim.elementalType).toBe(second.type);
   expect(p.mechanics.elementPickups).toBe(2);
@@ -152,7 +134,7 @@ it.each([30, 35, 40])('offers a simultaneous reachable pair for fusion practice 
 
 const prefixLevels = WORM_STORY_LEVELS.filter(level => level.id >= 21 &&
   [3, 4].includes(level.mechanics?.uniqueElements ?? level.mechanics?.elements));
-it.each(prefixLevels)('level $id keeps the last required element in the fusion offering', level => {
+it.each(prefixLevels)('level $id keeps the last required element available alongside all six choices', level => {
   const { sim, p, offer } = setup(level.id);
   const key = level.mechanics.uniqueElements ? 'uniqueElements' : 'elements';
   // This attempt's deal decides which elements the goal asks for.
@@ -161,13 +143,11 @@ it.each(prefixLevels)('level $id keeps the last required element in the fusion o
   p.collectedElements = new Set(required.slice(0, -1));
   p.elements = new Set(required.slice(0, -1));
   expect(offer()).toBe(true);
-  expect(sim.specials).toHaveLength(2);
-  expect(sim.specials[0].type).toBe(required.at(-1));
-  expect(sim.specials[1].type).not.toBe(required.at(-1));
-  for (const orb of sim.specials) expect(required).toContain(orb.type);
+  expect(sim.specials.map(orb => orb.type)).toContain(required.at(-1));
+  const companion = sim.specials.find(orb => orb.type !== required.at(-1));
   // Taking only the companion must not complete the remaining identity goal.
-  recordStoryMechanic(p, 'elementPickups', sim.specials[1].type);
-  p.elements.add(sim.specials[1].type);
+  recordStoryMechanic(p, 'elementPickups', companion.type);
+  p.elements.add(companion.type);
   expect(nextStoryPower(p, level)).toBe(required.at(-1));
 });
 

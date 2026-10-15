@@ -69,7 +69,7 @@ it('combines an Earth spring pad with Air lift', () => {
 it('offers Air for a missing sixth element, and awards mastery only after landing', () => {
   const { sim, ctx, practice, level } = setup(70);
   practice.elements = new Set(STORY_ELEMENTS.slice(0, 5));
-  practice.mechanics = { fusions: 999 }; practice.viewOffered = true; practice.powerDelay = 0;
+  practice.mechanics = { fusions: 999 }; practice.viewOffered = true; practice.powerDelay = 0; practice.elementSupplyDelay = 0;
   expect(offerStoryPower(sim, practice, level, level.cubeSize, practice.cubies)).toBe(true);
   expect(sim.specials.some(s => s.type === 'air')).toBe(true);
   startElemental(sim, ctx, 'air'); sim.elementalFocusT = 0;

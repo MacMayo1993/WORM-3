@@ -23,7 +23,7 @@ describe('local story offerings', () => {
       .toEqual(originalTileSearch(pos, size, cubies, occupied));
     expect(storySurfaceTile({ pos: tiles[0] }, size, cubies, new Set(tiles.map(tileKey)))).toBeUndefined();
   });
-  it.each([27,30])('stops level %i offerings at its three authored elements', id => {
+  it.each([27,30])('tracks the three required identities separately from the six-element supply in level %i', id => {
     const p = { mechanics: { explodes: 1, magnetOrbs: 4 }, elements: new Set(['water','fire']), collectedElements: new Set(['water','fire']) };
     expect(nextStoryPower(p, storyLevel(id))).toBe('grass');
     p.elements.add('grass'); p.collectedElements.add('grass');

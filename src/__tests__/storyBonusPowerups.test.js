@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { storyLevel, WORM_STORY_LEVELS } from '../worm/story/levels.js';
 import { stageStory } from '../worm/story/runtime.js';
-import { offerStoryBonus, offerStoryPower, updateMastery, fusionReachableTiles, STORY_ELEMENTS } from '../worm/story/mastery.js';
+import { offerStoryBonus, offerStoryPower, updateMastery, STORY_ELEMENTS } from '../worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 
 function setup(id) {
@@ -50,16 +50,18 @@ it('keeps introductory levels and ordered fusion windows clear, and freezes bonu
   for (let i = 0; i < 60; i++) updateMastery(sim, p, level, 0.1);
   expect(p.bonusDelay).toBeCloseTo(0);
 });
-it.each(WORM_STORY_LEVELS.filter(l => l.mechanics?.uniqueElements || l.mechanics?.elements || l.mechanics?.elementPickups))('level $id places elemental offers across faces with a timed route for the partner', level => {
+it.each(WORM_STORY_LEVELS.filter(l => l.mechanics?.uniqueElements || l.mechanics?.elements || l.mechanics?.elementPickups))('level $id places elemental offers at separate face centers', level => {
   const { sim, p, size, quest } = setup(level.id);
   p.mechanics = { magnetOrbs: 999, rockets: 999, explodes: 999 };
+  p.elementSupplyDelay = 0; p.viewOffered = true;
   expect(quest()).toBe(true);
-  const [first, second] = sim.specials;
-  expect(STORY_ELEMENTS).toContain(first.type);
-  expect(first.dirKey).not.toBe(sim.pos.dirKey);
-  if (second) {
-    expect(second.dirKey).not.toBe(first.dirKey);
-    expect(fusionReachableTiles({ ...sim, pos: first, elementalT: 10 }, size, p.cubies, level.speed).has(tileKey(second))).toBe(true);
+  const elements = sim.specials.filter(o => STORY_ELEMENTS.includes(o.type));
+  expect(elements.length).toBeGreaterThan(0);
+  expect(new Set(elements.map(o => o.type)).size).toBe(elements.length);
+  expect(new Set(elements.map(o => o.dirKey)).size).toBe(elements.length);
+  for (const orb of elements) {
+    for (const key of ['x', 'y', 'z'].filter(k => k !== orb.dirKey.at(-1).toLowerCase()))
+      expect([Math.floor((size - 1) / 2), Math.ceil((size - 1) / 2)]).toContain(orb[key]);
   }
 });
 
