@@ -45,6 +45,8 @@ it.each([3, 15])('renders LEGO studs and whole-cubie neon on a %i cube, includin
   expect(lego.filter(n => n.type?.name === 'LegoStud')).toHaveLength(3);
   const neon = render('view-neon', { size, flipped: true });
   expect(neon.find(n => n.type === MergedLedEdges).props.edges).toHaveLength(12);
+  expect(neon.filter(n => n.type === StickerPlane).every(n => n.props.mode === 'neon')).toBe(true);
   const restored = render(null, { size, flipped: true });
   expect(restored.find(n => n.type === MergedLedEdges).props.edges).toHaveLength(4);
+  expect(restored.filter(n => n.type === StickerPlane).every(n => n.props.mode === 'grid')).toBe(true);
 });

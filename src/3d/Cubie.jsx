@@ -163,16 +163,18 @@ const Cubie = React.forwardRef(function Cubie({
   // (randomStyleTick). Keyed by the piece's home position so the style follows the
   // physical cubelet through rotations rather than flickering. Outside Random Mode the
   // global View-tab visualMode applies to the whole cube exactly as before.
-  const effectiveVisualMode = useMemo(() => {
+  const stickerVisualMode = useMemo(() => {
     if (powerView) return powerView;
-    if (wormNeon) return 'neon';
     if (!randomMode) return visualMode;
     // Preserve batching and avoid font workers/material remounts while a mobile
     // worm is running. Palette changes still remix the board every ten seconds.
     if (wormMode && (isMobile || perfReducedFX)) return 'classic';
     return pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick,
       isMobile || perfReducedFX ? LIGHT_CUBELET_VIEW_STYLES : PER_CUBELET_VIEW_STYLES);
-  }, [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ, perfReducedFX, wormMode]);
+  }, [powerView, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ, perfReducedFX, wormMode]);
+  // Automatic wormhole accents affect the chassis only. Full-face neon is a
+  // selected view (or pickup), not a replacement for every flipped tile style.
+  const effectiveVisualMode = powerView || (wormNeon ? 'neon' : stickerVisualMode);
 
   // Derived per-style render switches.
   const isLego = effectiveVisualMode === 'lego';
@@ -588,12 +590,12 @@ const Cubie = React.forwardRef(function Cubie({
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PZ`} meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={effectiveHollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NZ`} meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={effectiveHollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PX`} meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={effectiveHollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NX`} meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={effectiveHollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PY`} meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={effectiveHollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NY`} meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={effectiveHollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PZ`} meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={stickerVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={effectiveHollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NZ`} meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={stickerVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={effectiveHollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PX`} meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={stickerVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={effectiveHollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NX`} meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={stickerVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={effectiveHollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PY`} meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={stickerVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={effectiveHollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NY`} meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={stickerVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={effectiveHollowMode} />}
         </>
       )}
 
