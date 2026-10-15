@@ -19,8 +19,8 @@ const STORY_POWER_CYCLE = ['magnet', 'explode', 'water', 'rocket', 'fire', 'gras
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
-  air: 'Air: ride an updraft jump and land safely',
-  grass: 'Earth: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
+  air: 'Air: jump while Air is active, then release Jump and land safely',
+  grass: 'Earth: jump from a spring patch and land safely; jumping and landing with Earth grows a patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
 export const STORY_FUSION_GOALS = { steamFusions: getFusion('fire', 'water'), quenchFusions: getFusion('water', 'fire') };
 const pendingFusions = (p, level) => Object.entries(STORY_FUSION_GOALS).filter(([key]) => (p.mechanics[key] ?? 0) < (level.mechanics?.[key] ?? 0)).map(([, recipe]) => recipe);
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
@@ -255,7 +255,16 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   const hint = offered => {
     const recipe = partnerRecipe ?? recipes.find(r => r.base === offered);
     if (recipe) return `${fusionRecipeLabel(recipe)} · ${partnerRecipe ? 'Collect the marked partner before the timer ends.' : 'Collect the first element, then follow the marked partner.'}`;
-    if (sim.specials.filter(orb => STORY_ELEMENTS.includes(orb.type)).length > 1 && STORY_ELEMENTS.includes(offered)) return 'Two elements are available on different faces. Collect both before the first effect ends to fuse them; pickup order changes the result.';
+    const missing = storyElementTypes(level, p.elementOrder).slice(0, level.mechanics?.elements ?? 0)
+      .filter(element => !p.elements.has(element));
+    // The remaining orb must not hide instructions for the element already
+    // picked up. Collection alone does not complete a mastery action.
+    const active = missing.filter(element => hasElement(sim, element));
+    const shown = new Set([offered, ...sim.specials.map(orb => orb.type)]);
+    const actions = (active.length ? active : missing.filter(element => shown.has(element))).map(element => HINTS[element]);
+    const pairHint = sim.specials.filter(orb => STORY_ELEMENTS.includes(orb.type)).length > 1 && STORY_ELEMENTS.includes(offered)
+      ? 'Two elements are available on different faces. Collect both before the first effect ends to fuse them; pickup order changes the result.' : null;
+    if (actions.length || pairHint) return [...actions, pairHint].filter(Boolean).join(' · ');
     return (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
     ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered] ?? getSpecialDef(offered).description;
   };
@@ -288,9 +297,12 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime,
     ...(partnerRecipe ? { fusionBase: partnerRecipe.base } : {}) }, ...bonuses];
   if (level.id >= 21 && !recipes.length && STORY_ELEMENTS.includes(type)) {
-    const next = nextStoryPower({ ...p, lastPower: type }, level);
-    const second = elementPool.includes(next) && next !== type ? next
-      : elementPool.find(element => element !== type);
+    // Keep the first orb focused on unfinished tasks, but cycle companions
+    // independently through the entire allowed pool. Otherwise the last two
+    // unmastered elements permanently replace every other fusion choice.
+    const lastCompanion = elementPool.indexOf(p.lastElementCompanion);
+    const second = Array.from({ length: elementPool.length }, (_, offset) =>
+      elementPool[(lastCompanion + offset + 1) % elementPool.length]).find(element => element !== type);
     const pairBlocked = new Set([...blocked, ...sim.specials.map(tileKey)]);
     const pairReachable = fusionReachableTiles({ ...sim, pos: tile, elementalT: ELEMENTAL_DURATION }, size, cubies, level.speed);
     const partnerSim = { ...sim, pos: tile };
@@ -299,6 +311,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
     if (second && secondTile) {
       sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(secondTile));
       sim.specials.splice(1, 0, { ...secondTile, type: second, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime });
+      p.lastElementCompanion = second;
     }
   }
   p.lastPower = type;
