@@ -16,11 +16,17 @@ Read `src/worm/healerWorm/elementalFusion.js` and the "Two elements fuse" note i
 
 | Element | Key | Base effect | Where it lives |
 |---|---|---|---|
-| Water | `water` | Builds momentum on straight runs, up to +25% speed; turns shed it (×0.35) | `tickElementalGameplay`, `waterSpeedBonus`, `turnShedsMomentum` |
-| Fire | `fire` | Leaves a 3 s trail of hot tiles: firebreak vs bomb blasts, fuses on them burn 3× faster | `addElementalPatch(..., 'fire')`, `isHotTile` |
-| Nature | `grass` | Every landing grows an 8 s spring pad; jumping from one is a 2.2-tile leap | `consumeSpring`, landing in `stepWormSim` |
-| Ice | `ice` | The worm slides to the next tile before a turn takes; jumping steers at once | `iceHoldsTurn` |
-| Lightning | `lightning` | The storm marks 6 tiles; strikes kill a head, cut a tail, kill enemies, flip bare tiles into charged tunnels | `lightningStorm.js`, `runStorm` in `HealerWormMode.jsx` |
+| Water | `water` | Builds momentum on straight runs, up to +25% speed; turns shed it (×0.35). **Riptide**: dropped orbs within 3 steps wash back and their clock holds. **Smooth Passage**: a ride doesn't wear the tunnel and exits at full momentum | `tickElementalGameplay`, `waterSpeedBonus`, `turnShedsMomentum`, `riptideReach`, `tunnelRideWears` |
+| Fire | `fire` | Leaves a 3 s trail of hot tiles: firebreak vs bomb blasts, fuses on them burn 3× faster. **Smelter**: each ride pays 1 heal segment (2 mid-dash), 3 per pickup | `addElementalPatch(..., 'fire')`, `isHotTile`, `smeltToll` |
+| Nature | `grass` | Every landing grows an 8 s spring pad; jumping from one is a 2.2-tile leap. **Regrowth**: a cut's orbs grow straight back. **Overgrowth**: pads and buds cover a surround heal | `consumeSpring`, landing in `stepWormSim`, `dropCutOrbs`, `overgrowthTiles` |
+| Ice | `ice` | The worm slides to the next tile before a turn takes; jumping steers at once. **Cold Snap**: the slice-turn clock runs at half speed | `iceHoldsTurn`, `hazardClockRate` (read in `HealerWormMode`) |
+| Lightning | `lightning` | The storm marks 6 tiles; strikes kill a head, cut a tail, kill enemies, flip bare tiles into charged tunnels. **Overcharge**: each 4 s discharge charges the nearest tunnel within 3 steps | `lightningStorm.js`, `runStorm` in `HealerWormMode.jsx`, `overchargeTunnel` |
+| Air | `air` | Hold Jump to fly. **Gale**: landing after 0.5 s of flight sweeps orbs and dropped orbs within 2 steps | `airJumpAdvance`, `takeGale`, `airGale` |
+
+The bold powers are the core-loop powers (`ELEMENT_ABILITIES` in `elementalAbilities.js`,
+tests in `elementalCoreAbilities.test.js`): each one helps heal the cube on a board with
+no enemies or bombs. Keep them that way: a new element power should touch orbs, tolls,
+tunnel wear, surround heals, cuts or the slice clock, not only enemies and bombs.
 
 ## Order: base, then catalyst
 

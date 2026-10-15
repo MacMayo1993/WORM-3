@@ -174,7 +174,7 @@ export function ElementalAbilityEffects({ worm, size }) {
                 }
                 continue;
             }
-            const color = event.kind === 'fire' ? '#ff933b' : event.kind === 'garden' ? '#7aef92' : event.kind === 'lightning' ? '#e4caff' : '#c6f1ff';
+            const color = event.kind === 'fire' ? '#ff933b' : event.kind === 'garden' ? '#7aef92' : event.kind === 'lightning' ? '#e4caff' : event.kind === 'water' ? '#5fd0ff' : event.kind === 'air' ? '#b9f5ed' : '#c6f1ff';
             tilePose(event.tiles[0], r.p);
             put(r.rings, r.p, r.n, reduced ? 1.5 : 1 + progress * 3, color);
             if (event.kind !== 'lightning') continue;

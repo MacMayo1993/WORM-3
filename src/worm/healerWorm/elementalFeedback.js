@@ -46,12 +46,12 @@ export function elementalFeedback(type, buffs, fusion = null) {
     if (fusion === 'firestorm') return { text: 'Strikes ignite a cross of fire', fraction: 0 };
     if (fusion === 'cryostorm') return { text: 'Slow marks · Strikes freeze, never hurt you', fraction: 0 };
     if (fusion === 'grounded') return { text: 'Strikes grow charged pads · Body is safe', fraction: 0 };
-    if (type === 'air') return { text: ability?.flying ? 'FLYING · Release Jump to land' : 'HOLD JUMP TO FLY · Steer in the air', fraction: 0 };
-    if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · ${momentum >= 0.8 ? 'WAVE READY · Sweeps both sides' : 'Build momentum to sweep'}`, fraction: momentum };
-    if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Land to plant · Harvest gold buds' : `${buffs.springCount || 0} springs · ${ability?.gardenBudget ?? 0} buds left to plant`, fraction: buffs.springReady ? 1 : 0 };
-    if (type === 'fire') return { text: `${ability?.fireReady ? 'FLAME DASH READY · Boost' : `Heat ${ability?.heat?.size ?? 0}/6`} · ${ability?.fireBonus ?? 0} double-growth pickups left · Flames still hurt`, fraction: ability?.fireReady ? 1 : (ability?.heat?.size ?? 0) / 6 };
-    if (type === 'ice') return { text: `${ability?.icePhaseT > 0 ? 'SHELL BROKEN · Passing through body' : ability?.iceShield ? 'ICE SHELL READY' : 'Shell spent'} · Turn after a slide for +25%`, fraction: ability?.iceShield ? 1 : 0 };
-    return { text: `CHAIN ${ability?.lightningT > 0 ? `${ability.lightningT.toFixed(1)}s` : 'READY'} · Up to 3 orbs · Your storm is safe`, fraction: 1 - (ability?.lightningT ?? 0) / 4 };
+    if (type === 'air') return { text: ability?.flying ? (ability.flightT >= 0.5 ? 'GALE READY · Land to sweep 2 tiles' : 'FLYING · Release Jump to land') : 'HOLD JUMP TO FLY · Land a flight for a gale', fraction: 0 };
+    if (type === 'water') return { text: `Momentum +${Math.round(momentum * 25)}% · ${momentum >= 0.8 ? 'WAVE READY · Sweeps both sides' : 'Build momentum to sweep'} · Rides never wear`, fraction: momentum };
+    if (type === 'grass') return { text: buffs.springReady ? 'SPRING READY · Land to plant · Cuts regrow' : `${buffs.springCount || 0} springs · ${ability?.gardenBudget ?? 0} buds · Cuts regrow`, fraction: buffs.springReady ? 1 : 0 };
+    if (type === 'fire') return { text: `${ability?.fireReady ? 'FLAME DASH READY · Boost' : `Heat ${ability?.heat?.size ?? 0}/6`} · ${ability?.fireBonus ?? 0} double-growth pickups left · Smelter ${ability?.smeltBudget ?? 0} · Flames still hurt`, fraction: ability?.fireReady ? 1 : (ability?.heat?.size ?? 0) / 6 };
+    if (type === 'ice') return { text: `${ability?.icePhaseT > 0 ? 'SHELL BROKEN · Passing through body' : ability?.iceShield ? 'ICE SHELL READY' : 'Shell spent'} · Slice clock at half speed`, fraction: ability?.iceShield ? 1 : 0 };
+    return { text: `CHAIN ${ability?.lightningT > 0 ? `${ability.lightningT.toFixed(1)}s` : 'READY'} · Charges a tunnel within 3 · ${ability?.overcharged ?? 0} charged`, fraction: 1 - (ability?.lightningT ?? 0) / 4 };
 }
 export const patchOpacity = ttl => Math.min(1, Math.max(0, ttl / 0.6));
 export const springStretch = (ttl, reducedMotion) => reducedMotion ? 1 : 0.88 + 0.12 * Math.sin((8 - ttl) * 5);

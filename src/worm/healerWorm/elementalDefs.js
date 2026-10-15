@@ -36,7 +36,7 @@ export const ELEMENTAL_DEFS = {
     // A teardrop.
     iconPath: 'M12 2.2c3.6 4.7 6.2 8.3 6.2 11.6a6.2 6.2 0 0 1-12.4 0c0-3.3 2.6-6.9 6.2-11.6z',
     iconAccent: 'M9.2 12.6a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
-    description: 'Start at full momentum: +25% speed and sweep growth orbs from both adjacent lanes. Turns retain 65% momentum.',
+    description: 'Start at full momentum: +25% speed and sweep growth orbs from both adjacent lanes. Turns retain 65% momentum. Riptide pulls dropped orbs back from 3 tiles and holds their clock; tunnels you ride are not worn and you exit at full momentum.',
   },
   fire: {
     label: "Fire",
@@ -53,7 +53,7 @@ export const ELEMENTAL_DEFS = {
     // A flame.
     iconPath: 'M13.5 1.8c.6 3-1.2 4.6-2.8 6.4-1.6 1.8-3.2 3.7-3.2 6.6a6.5 6.5 0 0 0 13 0c0-2-.9-3.6-2-5 .1 1.6-.6 2.6-1.6 3-.1-2.6-1.4-4.6-3.4-6.4 1-1.6 1.2-3 0-4.6z',
     iconAccent: 'M12 12.4c1.4 1 2.1 2.2 2.1 3.5a2.1 2.1 0 0 1-4.2 0c0-1.3.7-2.5 2.1-3.5z',
-    description: 'Boost unleashes a flame dash. Six distinct tiles recharge it; ignite nearby growth orbs for double growth, up to six bonus pickups.',
+    description: 'Boost unleashes a flame dash. Six distinct tiles recharge it; ignite nearby growth orbs for double growth. Smelter: each tunnel ride pays 1 heal segment for you (2 mid-dash), up to 3 per pickup.',
   },
   grass: {
     // Keep the legacy grass key so saved runs and authored objectives remain compatible.
@@ -68,7 +68,7 @@ export const ELEMENTAL_DEFS = {
     // Mountain ridges over fertile ground.
     iconPath: 'M2 19 9 5l4 7 3-5 6 12H2zM5 22h14M7 10l2 2 2-2',
     iconAccent: '',
-    description: 'Start with a spring and garden. Land to grow more buds; harvest them when gold. Up to six buds per Earth pickup.',
+    description: 'Start with a spring and garden. Land to grow more buds; harvest them when gold. Regrowth: a cut tail grows straight back. Overgrowth: pads and buds count as body when you surround a tunnel.',
   },
   ice: {
     label: "Ice",
@@ -82,14 +82,14 @@ export const ELEMENTAL_DEFS = {
     // A six-point snowflake.
     iconPath: 'M12 1.5v21M3.2 6.6l17.6 10.2M20.8 6.6L3.2 16.8M12 5.2l2.6-2.6M12 5.2 9.4 2.6M12 18.8l2.6 2.6M12 18.8l-2.6 2.6',
     iconAccent: '',
-    description: 'Finish a slide with a turn for a speed burst. An ice shell saves one body collision; jump to steer immediately.',
+    description: 'Finish a slide with a turn for a speed burst. An ice shell saves one body collision; jump to steer immediately. Cold Snap: the slice-turn clock runs at half speed.',
   },
   air: {
     label: "Air", element: true, tileStyle: "holographic", renderer: "surface",
     color: "#b9f5ed", accent: "#ffffff", fogColor: "#143a40", particle: "wind",
     iconPath: "M2 8h13c5 0 5-6 1-6-2 0-3 1-3 2M2 12h17c4 0 4 6 0 6-2 0-3-1-3-2M2 16h7c4 0 4 6 0 6",
     iconAccent: "",
-    description: "Hold Jump to fly while Air lasts; release to land. Steer freely and gather nearby growth orbs in flight.",
+    description: "Hold Jump to fly while Air lasts; release to land. Steer freely and gather nearby growth orbs in flight. Gale: landing after half a second of flight sweeps every orb within 2 tiles.",
   },
   lightning: {
     label: "Lightning",
@@ -110,7 +110,7 @@ export const ELEMENTAL_DEFS = {
     // A bolt.
     iconPath: 'M13.6 1.8 4.2 13.4h5.4l-1.2 8.8 9.4-11.6h-5.4z',
     iconAccent: '',
-    description: 'Every four seconds, chain-collect up to three growth orbs and discharge into nearby enemies and bombs. Your lightning never harms you.',
+    description: 'Every four seconds, chain-collect up to three growth orbs and discharge into nearby enemies and bombs. Overcharge: each discharge charges the nearest tunnel within 3 tiles, which then pays 2 heal segments.',
   },
 };
 
