@@ -497,7 +497,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const seq = story || practice ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
-            inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size) : []) : invertWormScramble(seq);
+            inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size, story) : []) : invertWormScramble(seq);
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -940,7 +940,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
-            // Peek the next inverse move (a parallel pair only in Mega Mode).
+            // Peek the next move, including paired layers in Mega or authored story stages.
             pendingRotRef.current = inverseQueueRef.current[0];
         }
 

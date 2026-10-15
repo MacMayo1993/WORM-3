@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
-import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapterId, storyChapterIndex, isChapterFinale, STORY_CHAPTER_SIZE } from './levels.js';
+import { storyLevel, storyRotationDescription, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapterId, storyChapterIndex, isChapterFinale, STORY_CHAPTER_SIZE } from './levels.js';
 import { feel, resumeFeel } from '../../utils/feel.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { getWormCharacter } from '../wormCharacterData.js';
@@ -185,7 +185,7 @@ export function StoryObjectiveCard({ compact = false }) {
     </li>)}</ul>
     <StoryStarRequirements level={level} progress={live?.starGoals} />
     <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
-      {!state.started && level.rotateEvery ? ` · Turn every ${level.rotateEvery}s` : ''}</p>
+      {!state.started && level.rotateEvery ? ` · ${storyRotationDescription(level)}` : ''}</p>
     {live?.settling ? <p role="status">{live.settlingHint ?? 'Finishing the current action'}</p> : live?.hint ? <p className="worm-story-power-hint">{live.hint}</p> : null}
   </section>;
 }

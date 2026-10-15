@@ -10,7 +10,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { stageStory } from '../worm/story/runtime.js';
-import { storyLevel } from '../worm/story/levels.js';
+import { storyLevel, storyRotationCycle } from '../worm/story/levels.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
@@ -545,4 +545,31 @@ it('does not skip the arrival on a delayed frame or run hazards while its pause 
   act(() => useGameStore.setState({ wormPauseMenuOpen: false }));
   tick(67, .05);
   expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormPaused: false });
+});
+
+
+it.each([71, 82, 97, 103, 106, 115])('warns and dispatches both story layers in level %i, then repeats the cycle', id => {
+  const level = storyLevel(id), size = level.cubeSize;
+  resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+  const { cubies } = stageStory(sim, size, level);
+  act(() => useGameStore.setState({ size, cubies, wormStoryLevel: id, wormStoryStarted: true,
+    wormStoryResult: null, wormStoryReady: true, wormPauseMenuOpen: false }));
+  act(() => root.render(<Harness cubies={cubies} size={size} onRotate={rotate} onAnimatedShuffle={vi.fn()} />));
+  act(() => useGameStore.setState({ wormPaused: false }));
+  rotate.mockClear(); resolveSliceHits.mockClear();
+  const cycle = storyRotationCycle(size, level);
+  for (let index = 0; index < 7; index++) {
+    const move = cycle[index % cycle.length], layers = move.sliceIndices ?? [move.sliceIndex];
+    tick();
+    expect(rotationClock.sliceIndices).toEqual(layers);
+    expect(rotationClock.armed).toBe(true);
+    for (let frame = 0; frame < level.rotateEvery * 10 + 2 && rotate.mock.calls.length <= index; frame++) tick();
+    expect(rotate).toHaveBeenCalledTimes(index + 1);
+    const [axis, dir, anchor, undo, indices, directions] = rotate.mock.calls[index];
+    expect(axis).toBe(move.axis); expect(undo).toBe(false);
+    expect(indices).toEqual(move.sliceIndices); expect(directions).toEqual(move.sliceDirs);
+    expect(layers).toContain(anchor);
+    expect(dir).toBe(move.sliceDirs?.[layers.indexOf(anchor)] ?? move.dir);
+    expect(resolveSliceHits.mock.lastCall.slice(1)).toEqual([move.axis, layers, size]);
+  }
 });

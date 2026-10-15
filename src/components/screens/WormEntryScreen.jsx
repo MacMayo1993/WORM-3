@@ -4,7 +4,7 @@ import WormWordmark from '../branding/WormWordmark.jsx';
 import WormSectionSelect from './WormSectionSelect.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { WORM_STORY_CHAPTERS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist, storyChapter, storyLaunchSettings, storyChapterIndex, isChapterFinale } from '../../worm/story/levels.js';
+import { WORM_STORY_CHAPTERS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist, storyChapter, storyLaunchSettings, storyRotationDescription, storyChapterIndex, isChapterFinale } from '../../worm/story/levels.js';
 import { chapterWorldColor, stageCode } from '../../worm/story/levelMapLayout.js';
 import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { HEADING_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
@@ -134,7 +134,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
           <div className="worm-stage-chips">
             <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 21 7.3v9.4L12 21.5 3 16.7V7.3zM3 7.3l9 4.8 9-4.8M12 12.1v9.4" /></svg><span className="worm-level-board">{size}×{size} cube{view ? ` · ${view}` : ''}</span></span>
             <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8.5" /><path d="M12 8.5V13l3 2M9.5 2.5h5" /></svg><span className="worm-story-limit">{clock} to finish</span></span>
-            {level.rotateEvery ? <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5" /></svg><span>Turns every {level.rotateEvery}s</span></span> : null}
+            {level.rotateEvery ? <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5" /></svg><span>{storyRotationDescription(level)}</span></span> : null}
           </div>
           <StoryWorldPreview levelId={level.id} />
           <h3 className="worm-stage-heading">Mission</h3>

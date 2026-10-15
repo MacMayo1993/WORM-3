@@ -528,6 +528,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'The Longhaul is driving the gears now. All of them. In W³ we called this the Grind.',
       'A long body on a grinding deck. Keep every segment off the light.',
+      'Watch both warning bands: every third turn spins two separated layers in opposite directions. Keep your head and tail in the still layers.',
     ],
     debrief: 'Twelve turns, not a segment lost. The Grind didn’t grind you.',
   },

@@ -27,14 +27,33 @@ export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Fire → Wa
 const PROGRESS_NOUNS = { ...STORY_MECHANIC_LABELS, orbs: 'orbs', colors: 'colors', rotations: 'turns', uniqueTunnels: 'pairs crossed', healed: 'pairs healed' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
 // the normal warning and collision transaction; never steer hazards at the head.
-export const storyRotationCycle = size => [
-  { axis: 'col', sliceIndex: 0, dir: 1 },
-  { axis: 'row', sliceIndex: Math.floor(size / 2), dir: -1 },
-  { axis: 'depth', sliceIndex: size - 1, dir: 1 },
-  { axis: 'col', sliceIndex: Math.floor(size / 2), dir: -1 },
-  { axis: 'row', sliceIndex: size - 1, dir: 1 },
-  { axis: 'depth', sliceIndex: 0, dir: -1 },
-];
+export const storyDoubleLayerEvery = (level, size = level?.cubeSize ?? 5) =>
+  size > 7 && level?.rotateEvery && [1, 2, 3].includes(level.doubleLayerEvery) ? level.doubleLayerEvery : 0;
+export function storyRotationCycle(size, level = null) {
+  const cycle = [
+    { axis: 'col', sliceIndex: 0, dir: 1 },
+    { axis: 'row', sliceIndex: Math.floor(size / 2), dir: -1 },
+    { axis: 'depth', sliceIndex: size - 1, dir: 1 },
+    { axis: 'col', sliceIndex: Math.floor(size / 2), dir: -1 },
+    { axis: 'row', sliceIndex: size - 1, dir: 1 },
+    { axis: 'depth', sliceIndex: 0, dir: -1 },
+  ];
+  const every = storyDoubleLayerEvery(level, size);
+  if (!every) return cycle;
+  // Reuse Mega's two separated, counter-rotating planes. The other outer
+  // layer leaves stationary space between both bands, including on 8×8.
+  return cycle.map((move, index) => (index + 1) % every ? move : {
+    ...move,
+    sliceIndices: [move.sliceIndex, move.sliceIndex < size / 2 ? size - 1 : 0],
+    sliceDirs: [move.dir, -move.dir],
+  });
+}
+export function storyRotationDescription(level) {
+  if (!level.rotateEvery) return '';
+  const every = storyDoubleLayerEvery(level);
+  const pattern = every === 1 ? 'two layers each turn' : every === 2 ? 'two layers every other turn' : 'two layers every third turn';
+  return `Turns every ${level.rotateEvery}s${every ? ` · ${pattern}` : ''}`;
+}
 export const storyLevel = id => WORM_STORY_LEVELS.find(level => level.id === id) ?? null;
 export const storyStars = (progress, id) => progress?.wormStory?.stars?.[id] || 0;
 export const storyUnlocked = (progress, id) => !!storyLevel(id) && (id === 1 || storyStars(progress, id - 1) > 0);
