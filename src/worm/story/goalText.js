@@ -1,3 +1,4 @@
+import { segmentsToTiles } from '../healerWorm/tileUnits.js';
 // The mission sentence on the map and pause card, built from a level's own
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
@@ -24,7 +25,7 @@ const PRIMARY = {
 
 // Display order of the extra tasks, after the primary goal.
 const TASKS = [
-  ['bodyLength', n => `grow to ${n} segments`],
+  ['bodyLength', n => `grow to ${segmentsToTiles(n)} tiles long`],
   ['selfPasses', n => `pass yourself in the Core ${times(n)}`],
   ['multiHeals', n => `make ${count(n, 'double heal')}`],
   ['bodyJumps', n => `land ${count(n, 'jump')} over your body`],

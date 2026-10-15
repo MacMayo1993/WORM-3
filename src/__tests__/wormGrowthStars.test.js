@@ -1,3 +1,4 @@
+import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 import { expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, storyLevel, storyChecklist, storyOutcome } from '../worm/story/levels.js';
 import { storyGrowthTarget, storyStarRules, shouldFinishStory } from '../worm/story/starGoals.js';
@@ -29,7 +30,7 @@ it.each(WORM_STORY_LEVELS)('requires real growth for three stars on level $id an
   const rules = storyStarRules(level);
   expect(rules[0]).toContain(`${level.limit}s`);
   expect(rules[1]).toContain(' OR ');
-  expect(rules[2]).toContain(`${metrics.peakLength} body segments`);
+  expect(rules[2]).toContain(`${segmentsToTiles(metrics.peakLength)} tiles long`);
 });
 
 it('offers a finish button while growth is attainable, then finishes at three stars or par expiry', () => {

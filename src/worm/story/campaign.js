@@ -396,7 +396,7 @@ export const STORY_LEVEL_DATA = [
   { id: 107, cubeSize: 10, title: 'Heavy Artillery', subtitle: 'The last guns of W³.',
     kind: 'mastery', target: 5, orbs: 56, speed: 2.75, rotateEvery: 11, par: 585, limit: 900, points: 95,
     mechanics: { rockets: 3, explodes: 4, bombs: 4, kills: 5 } },
-  { id: 108, cubeSize: 10, title: 'Long Jump', subtitle: 'Two hundred twenty segments in the way.',
+  { id: 108, cubeSize: 10, title: 'Long Jump', subtitle: 'Nearly twenty tiles of worm in the way.',
     kind: 'jump', target: 10, orbs: 70, speed: 2.75, par: 480, limit: 745, points: 95,
     mechanics: { doubleJumps: 5, bodyLength: 220 } },
   { id: 109, cubeSize: 10, title: 'Deck Siege', subtitle: 'The last holdouts.',

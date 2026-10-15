@@ -1,3 +1,4 @@
+import { segmentsToTiles } from './healerWorm/tileUnits.js';
 import { queueOrbCascade } from './healerWorm/orbCascade.js';
 import { STORY_DOUBLE_HEAL_WINDOW } from './healerWorm/healChain.js';
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
@@ -564,6 +565,10 @@ export function useWormCrawler(size, cubies) {
         const elementalRevealHeld = sim.elementalFocusT > 0;
         sim.orbCascadeBombTiles = hazards.bombTiles ?? [];
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
+        const lengthTiles = segmentsToTiles(sim.tailLength);
+        if (useGameStore.getState().wormLengthTiles !== lengthTiles) {
+            useGameStore.setState({ wormLengthTiles: lengthTiles });
+        }
         burrowBridge.current = sim.burrows;
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
@@ -773,6 +778,7 @@ export function useWormCrawler(size, cubies) {
             wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null, wormViewPower: null,
             wormOrbFlash: null,
             wormBodyTiles: 0,
+            wormLengthTiles: segmentsToTiles(sim.tailLength),
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},
             wormHealedCount: 0,

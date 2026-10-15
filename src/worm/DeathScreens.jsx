@@ -194,7 +194,7 @@ function DeathTitle({ kind, long, children }) {
 
 // ─── Entry point ────────────────────────────────────────────────────────────────
 export default function DeathScreen({
-    deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles,
+    deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles, wormLengthTiles = 0,
     formatTime, onRetry, onNewGame, onExamine,
 }) {
     const dialogRef = useRef(null);
@@ -210,7 +210,7 @@ export default function DeathScreen({
     // offering when there is a spot on the board to go and look at.
     const canExamine = !!onExamine && kind === 'tail-bite' && !!location;
     const length = wormBodyTiles ?? 0;
-    const shownLength = useCountUp(length, still);
+    const shownLength = useCountUp(Math.round(wormLengthTiles * 100), still) / 100;
     const stats = [
         ['Time', formatTime(wormTimeAlive)],
         ['Healed', wormHealedCount],
@@ -239,7 +239,7 @@ export default function DeathScreen({
                     <div className="worm-death-hero">
                         <div className="worm-death-hero-value" aria-hidden="true">{shownLength}</div>
                         <WormBeads length={length} color={wormColor} />
-                        <div className="worm-death-hero-label">Final length<span className="worm-death-sr">: {length}</span></div>
+                        <div className="worm-death-hero-label">Final length · tiles<span className="worm-death-sr">: {wormLengthTiles}</span></div>
                     </div>
                     <div className="worm-death-stats">
                         {stats.map(([label, value], i) => (

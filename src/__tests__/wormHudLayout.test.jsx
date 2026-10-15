@@ -24,7 +24,7 @@ beforeEach(() => {
     wormStoryLevel: null, wormStoryStarted: false, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
     wormElementalTheme: null, wormElementalPartner: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
-    wormRunAchievements: [] });
+    wormRunAchievements: [], settings: { ...useGameStore.getState().settings, wormQuestsMinimized: false } });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
   wormBuffs.tunnelNeeds = null;
   rotationClock.armed = true;
@@ -43,7 +43,7 @@ it('clears unavailable surface controls for every transit phase and restores the
     expect(host.querySelector('.worm-primary-actions')).toBeNull();
     expect(host.querySelector('.worm-signature-control')).toBeNull();
     expect(host.querySelector('.worm-mission-live')).toBeNull();
-    expect(host.querySelector('[aria-label="Orb reserve by face"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Tile reserve by face"]')).toBeNull();
     expect(host.querySelector('.worm-rotation-clock')).toBeNull();
     expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(false);
   }
@@ -51,7 +51,7 @@ it('clears unavailable surface controls for every transit phase and restores the
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
   expect(host.querySelector('.worm-signature-control')).not.toBeNull();
   expect(host.textContent).toContain('Collect 3 face orbs');
-  expect(host.querySelector('[aria-label="Orb reserve by face"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Tile reserve by face"]')).not.toBeNull();
   expect(host.querySelector('.worm-rotation-clock')).not.toBeNull();
 });
 it('replaces secondary context with one healing readout and keeps pause usable during transit', () => {
@@ -108,7 +108,7 @@ it('keeps the next task visible and puts every task and star rule behind the Goa
   expect(header.textContent).toContain('Goals 1/6');
   expect(rows()).toEqual(['Finish boosts2/2', 'Land double-jumps1/2', 'Land a rocket flight0/1', 'Catch orbs with a magnet0/4', 'Heal tunnel pairs0/2', 'Collect orbs5/24']);
   expect(top.querySelectorAll('.worm-star-requirements li')).toHaveLength(3);
-  expect(top.querySelector('.worm-star-requirements').textContent).toContain('76/64');
+  expect(top.querySelector('.worm-star-requirements').textContent).toContain('6.84/5.76');
   expect(top.querySelector('.worm-story-details').id).toBe(header.getAttribute('aria-controls'));
   expect(top.querySelector('.worm-story-live-hint').textContent).toBe('Rocket: steer the flight and land');
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
@@ -247,7 +247,7 @@ it('resumes a user pause when starting capture and restores the HUD afterward', 
   expect(host.querySelector('[aria-label="Pause"]')).not.toBeNull();
 });
 
-it('records the live rotation warning, pickups and launch countdown while menus stay hidden', () => {
+it('keeps the reserve tint with hidden chrome while recording pickups and launch countdown', () => {
   useGameStore.setState({ captureMode: true, wormPhase: 'crawling', wormOrbFlash: null });
   rotationClock.secondsLeft = 1.7;
   rotationClock.total = 10;
@@ -257,11 +257,10 @@ it('records the live rotation warning, pickups and launch countdown while menus 
   act(() => vi.advanceTimersByTime(32));
   const chrome = host.querySelector('.capture-chrome');
   expect(chrome.hidden).toBe(true);
-  const clock = document.querySelector('.capture-rotation-clock .worm-rotation-clock');
-  expect(clock.textContent).toContain('1.7s');
-  expect(clock.style.display).toBe('flex');
-  expect(clock.closest('[hidden], [inert]')).toBeNull();
-  expect(document.querySelectorAll('.worm-rotation-clock')).toHaveLength(1);
+  const clock = host.querySelector('.worm-hud-reserve .worm-rotation-clock');
+  expect(clock.textContent).toBe('');
+  expect(clock.closest('.capture-chrome').hidden).toBe(true);
+  expect(document.querySelector('.capture-rotation-clock')).toBeNull();
   act(() => useGameStore.setState({ wormOrbFlash: { color: '#ff9933', seq: 1 } }));
   expect(document.querySelector('.worm-orb-flash').closest('[hidden], [inert]')).toBeNull();
   act(() => useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true }));
@@ -297,19 +296,62 @@ it('shows Orb Shower with a live ten-second countdown and removes it when rain e
   act(() => useGameStore.setState({ wormOrbShowerActive: false })); expect(chip()).toBeNull();
 });
 
-it('shares the rotation countdown row with effects outside the pause and inventory rail', () => {
-  Object.assign(rotationClock, { armed: true, total: 10, secondsLeft: 7.4, warning: 0, held: false });
+it('colors the orb reserve from green to red without a separate countdown row', () => {
+  Object.assign(rotationClock, { armed: true, total: 10, secondsLeft: 10, warning: 0, held: false });
   renderPhase('crawling');
   act(() => vi.advanceTimersByTime(20));
   const clock = host.querySelector('.worm-rotation-clock');
-  expect(clock.parentElement.classList.contains('worm-hud-telemetry')).toBe(true);
-  expect(clock.closest('.worm-hud-bar')).toBeNull();
-  expect(host.querySelector('[aria-label="Pause"]').closest('.worm-hud-bar')).not.toBeNull();
-  expect(clock.textContent).toContain('Turn in');
-  expect(clock.textContent).toContain('7.4s');
-  rotationClock.secondsLeft = 2.1;
+  expect(clock.parentElement.classList.contains('worm-hud-reserve')).toBe(true);
+  expect(clock.closest('.worm-hud-bar')).not.toBeNull();
+  expect(clock.textContent).toBe('');
+  expect(clock.style.backgroundColor).toBe('rgb(53, 212, 53)');
+  rotationClock.secondsLeft = 0;
   act(() => vi.advanceTimersByTime(20));
-  expect(clock.textContent).toContain('2.1s');
+  expect(clock.style.backgroundColor).toBe('rgb(212, 53, 53)');
+  rotationClock.held = true;
+  act(() => vi.advanceTimersByTime(20));
+  expect(clock.style.opacity).toBe('0.16');
+  rotationClock.armed = false;
+  act(() => vi.advanceTimersByTime(20));
+  expect(clock.hidden).toBe(true);
+});
+
+it('minimizes quests from the top bar, remembers the choice and restores them', () => {
+  renderPhase('crawling');
+  expect(host.querySelector('.worm-mission-glance')).not.toBeNull();
+  act(() => host.querySelector('[aria-label="Minimize quests"]').click());
+  expect(host.querySelector('.worm-mission-glance')).toBeNull();
+  expect(useGameStore.getState().settings.wormQuestsMinimized).toBe(true);
+  act(() => root.render(null)); renderPhase('crawling');
+  expect(host.querySelector('.worm-mission-glance')).toBeNull();
+  act(() => host.querySelector('[aria-label="Show quests"]').click());
+  expect(host.querySelector('.worm-mission-glance')).not.toBeNull();
+  act(() => host.querySelector('[aria-label="Pause"]').click());
+  act(() => host.querySelector('.worm-quest-setting').click());
+  expect(useGameStore.getState().settings.wormQuestsMinimized).toBe(true);
+});
+
+it('minimizes the story row and keeps fractional tile goals exact when restored', () => {
+  const runId = useGameStore.getState().wormRunId;
+  useGameStore.setState({ wormStoryLevel: 1, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 1, seconds: 250,
+    goals: [{ key: 'bodyLength', label: 'Grow your worm (tiles)', value: 99, target: 100, done: false }] } });
+  renderPhase('crawling');
+  expect(host.querySelector('.worm-story-next').textContent).toContain('8.91/9');
+  act(() => host.querySelector('[aria-label="Minimize quests"]').click());
+  expect(host.querySelector('.worm-story-tracker')).toBeNull();
+  act(() => host.querySelector('[aria-label="Show quests"]').click());
+  act(() => host.querySelector('.worm-story-glance').click());
+  expect(host.querySelector('.worm-story-live li').textContent).toContain('8.91/9');
+  expect(host.querySelector('.worm-story-live li').dataset.done).toBe('false');
+});
+
+it('shows physical tile length and reserve without changing the carried-orb count', () => {
+  useGameStore.setState({ wormBodyTiles: 4, wormLengthTiles: 1.98, wormOrbInventory: { 1: 12, 2: 2 } });
+  renderPhase('crawling');
+  expect(host.querySelector('[aria-label="Worm length: 1.98 tiles"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Front: 1.08 tiles of growth"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Left: 0.18 tiles of growth"]')).not.toBeNull();
+  expect(useGameStore.getState().wormBodyTiles).toBe(4);
 });
 
 it('previews the ordered next pickup and keeps the full recipe guide inside Pause', () => {
