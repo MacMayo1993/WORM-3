@@ -227,7 +227,6 @@
 
 /* Share the short telemetry rail; reserve the full next-task line for play. */
 .worm-hud-telemetry { align-items:center; }
-.worm-hud-telemetry .worm-rotation-clock { flex:1 1 48%; min-width:0; }
 .worm-hud-telemetry>.worm-hud-context { flex:1 1 52%; }
 .worm-hud-telemetry .worm-buffs { width:100%; }
 .worm-hud-telemetry .worm-buff-item:only-child { flex:1; }
@@ -313,3 +312,26 @@
 .worm-pause-key[aria-pressed="false"] > svg { background:#e6e4cf; color:#7b7f70; }
 .worm-pause-key:focus-visible { outline:none; }
 .worm-pause-key:focus-visible > svg { outline:3px solid #2774ad; outline-offset:3px; }
+
+/* Turn urgency belongs to the reserve's backing, not another telemetry row. */
+.worm-hud-reserve { position:relative; isolation:isolate; border-radius:12px; }
+.worm-rotation-clock { position:absolute; inset:0; z-index:-1; border-radius:inherit; pointer-events:none; }
+.worm-rotation-clock[hidden] { display:none; }
+.worm-instrument .orb-reserve { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; }
+.worm-instrument .orb-reserve .orb-slot { display:grid; grid-template-columns:minmax(0,1fr); justify-items:center; gap:2px; padding:3px 1px; min-width:0; border-color:transparent; background:#fffff55c; }
+.worm-instrument .orb-reserve .orb-slot-empty { display:grid; }
+.worm-instrument .orb-reserve .orb-slot-count { font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.worm-instrument .orb-slot-pickup { border-color:var(--orb-color); }
+.worm-instrument .worm-hud-stats > div { flex-direction:column!important; gap:1px; }
+.worm-quest-toggle { display:grid; place-items:center; width:32px; min-height:40px; padding:0; flex:none; border:1px solid var(--hud-border); border-radius:10px; background:var(--hud-raised); color:var(--hud-text); pointer-events:auto; cursor:pointer; }
+.worm-quest-toggle[aria-expanded=false] { background:var(--hud-active); }
+.worm-quest-setting { min-height:44px; padding:8px 12px; border:1px solid var(--hud-border); border-radius:10px; background:var(--hud-raised); color:var(--hud-text); font:inherit; cursor:pointer; }
+@media (min-width:560px) {
+  .worm-instrument .orb-reserve .orb-slot { grid-template-columns:auto minmax(0,1fr); gap:3px; }
+  .worm-instrument .orb-reserve .orb-slot-count { font-size:12px; }
+}
+@media (max-width:360px) {
+  .worm-instrument .orb-reserve .orb-slot-count { font-size:10px; }
+  .worm-instrument .worm-hud-stats { gap:3px; }
+  .worm-quest-toggle { width:28px; }
+}

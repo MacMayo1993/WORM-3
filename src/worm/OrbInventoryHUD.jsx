@@ -1,3 +1,4 @@
+import { segmentsToTiles, TILE_GROWTH_HELP } from './healerWorm/tileUnits.js';
 // src/worm/OrbInventoryHUD.jsx
 // Six stable face slots. Samples retain the real tile pattern so faces sharing
 // a colour remain distinguishable; counts use their own neutral reading surface.
@@ -57,6 +58,7 @@ function useTilePattern(styleKey, colorHex) {
 const FACE_NAMES = ['Front', 'Left', 'Top', 'Back', 'Right', 'Bottom'];
 
 const OrbSlot = ({ color, styleKey, count, faceId }) => {
+  const tiles = segmentsToTiles(count);
   const pattern = useTilePattern(styleKey, color);
   const previous = useRef(count);
   const [pickedUp, setPickedUp] = useState(false);
@@ -69,16 +71,16 @@ const OrbSlot = ({ color, styleKey, count, faceId }) => {
     return () => { clearTimeout(timer); setPickedUp(false); };
   }, [count]);
   return <div className={`orb-slot${count === 0 ? ' orb-slot-empty' : ''}${pickedUp ? ' orb-slot-pickup' : ''}`}
-    style={{ '--orb-color': color }} role="listitem" aria-label={`${FACE_NAMES[faceId - 1]}: ${count} orbs`} title={FACE_NAMES[faceId - 1]}>
+    style={{ '--orb-color': color }} role="listitem" aria-label={`${FACE_NAMES[faceId - 1]}: ${tiles} tiles of growth`} title={`${FACE_NAMES[faceId - 1]}: ${tiles} tiles. ${TILE_GROWTH_HELP}`}>
     <span className="orb-sample" aria-hidden="true" style={{ backgroundColor: color, backgroundImage: pattern ? `url(${pattern})` : 'none' }} />
-    <span className="orb-slot-count" aria-hidden="true">{count}</span>
+    <span className="orb-slot-count" aria-hidden="true">{tiles}</span>
     <span className="orb-slot-face" aria-hidden="true">{FACE_NAMES[faceId - 1]}</span>
   </div>;
 };
 
 export default function OrbInventoryHUD({ orbInventory, faceColors, tileStyles, mobile = false }) {
   if (!orbInventory || !faceColors) return null;
-  return <div className={`orb-reserve${mobile ? ' orb-reserve-mobile' : ''}`} role="list" aria-label="Orb reserve by face">
+  return <div className={`orb-reserve${mobile ? ' orb-reserve-mobile' : ''}`} role="list" aria-label="Tile reserve by face">
     {FACE_ORDER.map(faceId => <OrbSlot key={faceId} faceId={faceId} color={faceColors[faceId] ?? '#888888'}
       styleKey={tileStyles?.[faceId]} count={orbInventory[faceId] ?? 0} />)}
   </div>;

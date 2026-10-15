@@ -1,3 +1,4 @@
+import { segmentsToTiles } from '../healerWorm/tileUnits.js';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../healerWorm/constants.js';
 
 // Peak physical length survives healing deposits; lifetime pickups alone cannot
@@ -30,7 +31,7 @@ export function storyStarRules(level) {
   return [
       `Complete all tasks within ${level.limit}s.`,
       `Complete all tasks, plus finish within ${level.par}s OR avoid all tail cuts.`,
-      `Complete all tasks within ${level.par}s, no tail cuts, AND reach ${target} body segments.`,
+      `Complete all tasks within ${level.par}s, no tail cuts, AND reach ${segmentsToTiles(target)} tiles long.`,
   ];
 }
 

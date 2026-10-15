@@ -45,8 +45,8 @@ it('keeps six stable inventory slots and highlights only a pickup, not spending'
   render(3);
   expect([...host.querySelectorAll('[role="listitem"]')]).toEqual(original);
   expect(host.querySelectorAll('.orb-slot-pickup')).toHaveLength(1);
-  expect(original[0].getAttribute('aria-label')).toBe('Front: 3 orbs');
-  expect(original[1].getAttribute('aria-label')).toBe('Left: 0 orbs');
+  expect(original[0].getAttribute('aria-label')).toBe('Front: 0.27 tiles of growth');
+  expect(original[1].getAttribute('aria-label')).toBe('Left: 0 tiles of growth');
   act(() => vi.advanceTimersByTime(400));
   render(1); expect(host.querySelector('.orb-slot-pickup')).toBeNull();
 });

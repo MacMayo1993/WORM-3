@@ -1,3 +1,4 @@
+import { TILE_GROWTH_HELP } from './healerWorm/tileUnits.js';
 import { ORB_SHOWER_DURATION } from './healerWorm/orbSpawning.js';
 import { getViewPowerDef, VIEW_POWER_DURATION } from './healerWorm/viewPowerups.js';
 import { EXPLODE_DURATION } from './wormExpansion.js';
@@ -599,7 +600,7 @@ const PODIUM_LABEL_STYLE = {
 
 const MAX_WORM_DISPLAY = 28;
 
-function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAlive, wormHealedCount, wormColor, formatTime, onRetry, onNewGame }) {
+function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAlive, wormHealedCount, wormColor, formatTime, onRetry, onNewGame }) {
     const ppEarned = wormBodyTiles * 10;
     const displayCount = Math.min(wormBodyTiles, MAX_WORM_DISPLAY);
     const overflow = wormBodyTiles > MAX_WORM_DISPLAY ? wormBodyTiles - MAX_WORM_DISPLAY : 0;
@@ -637,7 +638,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
-                    <span style={PODIUM_LABEL_STYLE}>Final length: {wormBodyTiles}</span>
+                    <span style={PODIUM_LABEL_STYLE}>Final length: {wormLengthTiles} tiles</span>
                 </div>
             </div>
             <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
@@ -1111,6 +1112,7 @@ function PauseMenu({ onResume, onHome, onRetry, onSettings, onToggleAntipodal, a
     const onDialogKeyDown = useDialogBehavior(dialogRef, onResume);
     const cameraHorizon = useGameStore(s => s.wormCameraHorizon ?? 'face');
     const toggleCameraHorizon = useGameStore(s => s.toggleWormCameraHorizon);
+    const questsMinimized = useGameStore(s => s.settings?.wormQuestsMinimized ?? false);
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
     const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
     const setSettings = useGameStore(s => s.setSettings);
@@ -1137,6 +1139,11 @@ function PauseMenu({ onResume, onHome, onRetry, onSettings, onToggleAntipodal, a
                     <PauseKey label={hapticsOn ? 'Vibrate' : 'No buzz'} pressed={hapticsOn} onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
                         icon={<><rect x="8" y="4" width="8" height="16" rx="2" />{hapticsOn ? <path d="M4 9v6M20 9v6" /> : <path d="M4 4l16 16" />}</>} />
                 </div>
+                <button type="button" className="worm-quest-setting" aria-pressed={questsMinimized}
+                    onClick={() => setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }))}>
+                    {questsMinimized ? 'Show quests during play' : 'Minimize quests during play'}
+                </button>
+                <small>{TILE_GROWTH_HELP}</small>
                 {storyId && <StoryObjectiveCard />}
                 <WormMissionCard summary />
                 <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
@@ -1300,11 +1307,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
 
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormLengthTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? WORM_SPEED_OPTIONS[0].value,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
+            wormLengthTiles: s.wormLengthTiles ?? 0,
             // NOTE: the wormhole countdown lives in the wormClock bridge (not the store) —
             // it changes every frame and is only shown inside PauseMenu, which snapshots it.
             wormControlMode: s.wormControlMode ?? 'non-oriented',
@@ -1364,6 +1372,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (captureMode && isPaused) handleResume();
     }, [captureMode, isPaused, handleResume]);
 
+    const questsMinimized = settings?.wormQuestsMinimized ?? false;
+    const toggleQuests = () => useGameStore.getState().setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }));
+    const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
+    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation');
+
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
     const jumpReadyStyle = {
@@ -1401,27 +1414,29 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {/* Two elements just fused: named over the claim camera beat, outside the clipped status row. */}
             {wormAlive && phase === 'crawling' && <FusionBanner />}
 
-            {captureMode && !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && (
-                <CaptureVisual><div className="capture-rotation-clock"><RotationCountdownHUD compact /></div></CaptureVisual>
-            )}
-
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
-                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal'].includes(lesson.id)) && (
+                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'rotation'].includes(lesson.id)) && (
                             <div className="worm-hud-reserve">
+                                {showRotationTint && <RotationCountdownHUD />}
                                 <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                             </div>
                         )}
 
                         {/* Length and pause stay visible throughout transit. */}
                         <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <span style={GLANCE_LABEL_STYLE} aria-label="Length">LEN</span>
-                                <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
+                            <div title={TILE_GROWTH_HELP} aria-label={`Worm length: ${wormLengthTiles} tiles`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <span style={GLANCE_LABEL_STYLE}>TILES</span>
+                                <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormLengthTiles}</span>
                             </div>
 
+                            {showQuestToggle && <button type="button" className="worm-quest-toggle worm-hud-key"
+                                aria-label={questsMinimized ? 'Show quests' : 'Minimize quests'} aria-expanded={!questsMinimized}
+                                onClick={toggleQuests} title={questsMinimized ? 'Show quests' : 'Minimize quests'}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m3 6 2 2 3-4M11 6h10M3 13h4m4 0h10M3 20h4m4 0h10" /></svg>
+                            </button>}
                             <button
                                 onPointerDown={handlePause}
                                 onClick={e => { if (e.detail === 0) handlePause(); }}
@@ -1437,11 +1452,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                 </div>
                 <div className="worm-hud-status-row worm-hud-telemetry">
-                    {!captureMode && !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD compact />}
                     {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
                 </div>
-                {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
-                {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
+                {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
+                {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
             </div>
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
@@ -1530,6 +1544,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {wormGamePhase === 'solved' && !storyId && (
                 <WinnerScreen
                     wormBodyTiles={wormBodyTiles}
+                    wormLengthTiles={wormLengthTiles}
                     wormSessionOrbs={wormSessionOrbs}
                     parityPoints={parityPoints}
                     wormTimeAlive={wormTimeAlive}
@@ -1549,6 +1564,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     wormHealedCount={wormHealedCount}
                     wormTunnelCount={wormTunnelCount}
                     wormBodyTiles={wormBodyTiles}
+                    wormLengthTiles={wormLengthTiles}
                     formatTime={formatTime}
                     onRetry={onRetry}
                     onNewGame={onNewGame}
