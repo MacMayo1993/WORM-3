@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as storyMastery from '../worm/story/mastery.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
 import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
 import { DEFAULT_SETTINGS, generateCampaign, generateLevel, modeledPowerBudget } from '../../tools/worm-level-auditor/web/generator.js';
@@ -56,6 +57,39 @@ describe('campaign drafting workshop', () => {
     expect(draft.config).not.toEqual(generateLevel(50, RECIPE, templates).config);
     expect(auditGeneratedLevel(draft).status).toBe('checked');
     expect(STORY_WORLDS[50]).toBe(prior);
+  });
+
+  it.each(['elements', 'uniqueElements', 'elementPickups', 'fusions', 'uniqueFusions', 'steamFusions', 'quenchFusions'])(
+    'audits center supplies separately from quest powers for %s', key => {
+      const draft = generateLevel(50, RECIPE, templates);
+      draft.config.mechanics = { [key]: 1, magnetOrbs: 4, explodes: 1, rockets: 1 };
+      draft.config.limit = 10000;
+      const result = auditGeneratedLevel(draft);
+      expect(result.errors).toEqual([]);
+      expect(result.status).toBe('checked');
+      for (const stage of Object.values(result.record.stages)) {
+        expect(stage.questCycle).toEqual(['magnet', 'explode', 'rocket']);
+        expect(new Set(stage.centerElements)).toEqual(new Set(ELEMENTS));
+        for (const type of [...ELEMENTS, ...stage.questCycle]) expect(stage.offered).toContain(type);
+      }
+    },
+  );
+
+  it.each(['center', 'quest'])('still rejects broken %s power supply', lane => {
+    const offer = storyMastery.offerStoryPower;
+    const spy = vi.spyOn(storyMastery, 'offerStoryPower').mockImplementation((sim, ...args) => {
+      const changed = offer(sim, ...args);
+      if (lane === 'center') sim.specials = sim.specials.filter(orb => orb.type !== 'air');
+      else for (const orb of sim.specials) if (orb.type === 'magnet') orb.type = 'rocket';
+      return changed;
+    });
+    try {
+      const result = auditGeneratedLevel(generateLevel(50, RECIPE, templates));
+      expect(result.status).toBe('invalid');
+      expect(result.errors).toEqual([lane === 'center'
+        ? 'Center supply does not replenish all six elements.'
+        : 'Offered quest power does not match generated objectives.']);
+    } finally { spy.mockRestore(); }
   });
 
   it.each(['elementPickups', 'magnetOrbs'])('rejects a 200 %s edit within a 500-second limit in both densities', key => {

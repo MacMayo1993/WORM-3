@@ -8,6 +8,7 @@ import {ELEMENTAL_DURATION,MAGNET_RADIUS} from '../../../src/worm/healerWorm/con
 import {STORY_WORLDS,STORY_ORB_ROUTES} from '../../../src/worm/story/worlds.js';
 import {assess,ELEMENTS,elementTypes} from '../web/audit.js';
 import {requiredPowerCycle,SUPPORTED_SIZES} from '../web/generator.js';
+import {hasStoryElementGoal,STORY_ELEMENT_GOALS} from '../../../src/worm/story/elementGoals.js';
 const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills','bodyLength','bodyJumps','selfPasses','multiHeals','fusions','uniqueFusions'];
 const worlds=Object.values(STORY_WORLDS),palettes=new Set(worlds.map(w=>w.palette)),backgrounds=new Set(worlds.map(w=>w.background)),styles=new Set(worlds.flatMap(w=>Object.values(w.styles)));
 const positive=n=>Number.isInteger(n)&&n>0&&n<=200;
@@ -54,6 +55,11 @@ export function auditGeneratedLevel(candidate){
  STORY_WORLDS[level.id]=candidate.world;
  try{
   const objectives=storyChecklist(level),stages={},expectedCycle=requiredPowerCycle(level);
+  // Elements refill independently at face centers; only the remaining quest
+  // powers advance lastPower. Keep the required pool for conservative budgets.
+  const centerElements=hasStoryElementGoal(level);
+  const questLevel=centerElements?{...level,mechanics:Object.fromEntries(Object.entries(level.mechanics).filter(([key])=>!STORY_ELEMENT_GOALS.includes(key)))}:level;
+  const questCycle=requiredPowerCycle(questLevel);
   for(const character of ['glow','classic']){
    resetLiveRotation();const sim=makeWormSim(size);sim.rand=()=>.42;
    const p=stageStory(sim,size,level,character),initialOrbs=sim.powerups.length;
@@ -65,23 +71,35 @@ export function auditGeneratedLevel(candidate){
    invariant(Object.keys(p.orbTargets).length===6,'Staged food does not cover all six colors.');
    invariant(activePairs+p.pendingMouths.length===totalPairs,'Staged tunnel supply differs from the target.');
    invariant(size>3||initialOrbs<=Math.floor(6*size*size*.6),'Small-board food exceeds the density allowance.');
-   const offered=[];let magnetReach=0;
-   for(let i=0;i<expectedCycle.length*3;i++){
-    sim.specials=[];p.powerDelay=0;
-    invariant(nextStoryPower(p,level)===expectedCycle[i%expectedCycle.length],'Power cycle does not match generated objectives.');
+   const offered=[],centerSupply=new Set();let magnetReach=0;
+   for(let i=0;i<Math.max(questCycle.length,centerElements?ELEMENTS.length:0)*3;i++){
+    sim.specials=[];p.powerDelay=0;p.elementSupplyDelay=0;
+    const expected=questCycle.length?questCycle[i%questCycle.length]:null;
+    invariant(nextStoryPower(p,questLevel)===expected,'Power cycle does not match generated objectives.');
     invariant(offerStoryPower(sim,p,level,size,p.cubies),'A required power cannot be placed at launch.');
-    const orb=sim.specials[0];offered.push(orb.type);
-    if(orb.type==='magnet'){
+    const centers=sim.specials.filter(orb=>orb.storyCenterElement);
+    invariant(new Set(centers.map(orb=>orb.dirKey)).size===centers.length,'Element supply overlaps a face.');
+    for(const orb of centers){
+     invariant(ELEMENTS.includes(orb.type),'Unsupported element in center supply.');
+     const axes=['x','y','z'].filter(axis=>axis!==orb.dirKey.slice(-1).toLowerCase());
+     invariant(axes.every(axis=>[Math.floor((size-1)/2),Math.ceil((size-1)/2)].includes(orb[axis])),'Element supply is not at a face center.');
+     centerSupply.add(orb.type);
+    }
+    offered.push(...sim.specials.map(orb=>orb.type));
+    const orb=sim.specials.find(orb=>!orb.storyBonus&&!orb.storyCenterElement);
+    invariant(!expected||orb?.type===expected,'Offered quest power does not match generated objectives.');
+    if(orb?.type==='magnet'){
      const reach=collectManifoldRing(orb.x,orb.y,orb.z,orb.dirKey,size,MAGNET_RADIUS);
      magnetReach=sim.powerups.filter(o=>reach.has(tileKey(o))&&tileKey(o)!==tileKey(orb)).length;
      invariant(magnetReach>=Math.min(4,level.mechanics.magnetOrbs),'Magnet support is below its outstanding catch allowance.');
     }
    }
+   invariant(!centerElements||ELEMENTS.every(type=>centerSupply.has(type)),'Center supply does not replenish all six elements.');
    sim.specials=[];sim.powerups=[];p.orbRefillDelay=0;
    invariant(replenishStoryOrbs(sim,p,{cubies:p.cubies},size,.1),'No refill after depletion.');
    const refillColorCount=new Set(sim.powerups.map(o=>p.cubies[o.x][o.y][o.z].stickers[o.dirKey].orig)).size;
    invariant(refillColorCount===6,'Refill does not restore all six colors.');
-   stages[character]={initialOrbs,orbTargets:p.orbTargets,colorCount:6,activePairs,pendingPairs:p.pendingMouths.length,totalPairs,powerCycle:expectedCycle,offered,magnetReach,refillColorCount,refillSixColors:true,pickupBudget:size<=3?Math.floor(6*size*size*.6):null};
+   stages[character]={initialOrbs,orbTargets:p.orbTargets,colorCount:6,activePairs,pendingPairs:p.pendingMouths.length,totalPairs,powerCycle:expectedCycle,questCycle,centerElements:[...centerSupply],offered,magnetReach,refillColorCount,refillSixColors:true,pickupBudget:size<=3?Math.floor(6*size*size*.6):null};
   }
   const ideal={alive:true,elapsed:1,landed:true,tailClear:true,rotationSettled:true,remaining:0,cuts:0};
   for(const o of objectives)ideal[o.key]=o.target;
