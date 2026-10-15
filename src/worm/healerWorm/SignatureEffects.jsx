@@ -6,7 +6,7 @@ import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.j
 import { prefersReducedMotion } from '../../utils/device.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { FACE_NORMALS, WORM_LIFT } from './constants.js';
-import { SPRING_COIL_SECONDS, SPRING_HEIGHT, SIGNATURES } from './signatures.js';
+import { SPRING_COIL_SECONDS, SPRING_HEIGHT, SIGNATURES, SIGNATURE_READY_BEAT } from './signatures.js';
 import { SPRING_SLAM_WINDOW } from '../characterAbilities.js';
 import { springLanding } from './jumpLanding.js';
 import { arcLift } from './jumpArc.js';
@@ -28,6 +28,11 @@ function instances(geometry, color, count, reveal = false) {
 
 // A bounded set of surface markers, with no extra lights or postprocessing.
 // Character markers obey depth so the opposite face stays hidden.
+//
+// A READY ability draws nothing on the cube: the HUD key glows, and the moment a
+// cooldown ends one ring pulses out from the head in the character's colour. Markers
+// appear on intent: Spring's arc only while it coils (or is held to aim), MOBI's lock
+// only while its tunnel is open, the wipers' ring only while they sweep.
 export function SignatureEffects({ worm, size }) {
     const r = useMemo(() => ({
         target: instances(new THREE.RingGeometry(0.32, 0.36, 40), '#c6ec86', 4),
@@ -35,16 +40,17 @@ export function SignatureEffects({ worm, size }) {
         lock: instances(new THREE.RingGeometry(0.32, 0.39, 4), '#ceacff', 3),
         pages: instances(new THREE.PlaneGeometry(0.46, 0.65), '#ffda91', 3),
         arc: instances(new THREE.CircleGeometry(0.055, 12), '#c6ec86', ARC_DOTS),
+        ready: instances(new THREE.RingGeometry(0.44, 0.5, 48), '#ffffff', 2),
         route: [],
         pose: new THREE.Object3D(), normal: new THREE.Vector3(), axis: new THREE.Vector3(),
     }), []);
     useEffect(() => () => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc]) {
+        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc, r.ready]) {
             mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose();
         }
     }, [r]);
     useFrame(() => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc]) mesh.count = 0;
+        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc, r.ready]) mesh.count = 0;
         const sig = worm.signature.current;
         const state = useGameStore.getState();
         if (!state.wormAlive || worm.phase.current !== 'crawling'
@@ -65,6 +71,13 @@ export function SignatureEffects({ worm, size }) {
             mesh.setMatrixAt(mesh.count++, pose.matrix);
             mesh.instanceMatrix.needsUpdate = true;
         };
+        // Off cooldown: one beat at the head, then nothing until the player acts.
+        if (sig.readyT > 0 && SIGNATURES[sig.character]) {
+            const age = 1 - sig.readyT / SIGNATURE_READY_BEAT;
+            r.ready.material.color.set(SIGNATURES[sig.character].color);
+            r.ready.material.opacity = 0.75 * (1 - age);
+            for (let i = 0; i < 2; i++) place(r.ready, worm.pos.current, reduced ? 1 + i * 0.4 : 0.5 + age * 2.2 + i * 0.35, 0.1 + i * 0.01);
+        }
         if (sig.character === 'classic' && sig.active > 0) {
             const age = SIGNATURES.classic.duration - sig.active;
             r.pulse.material.color.set(SIGNATURES.classic.color);
@@ -76,7 +89,7 @@ export function SignatureEffects({ worm, size }) {
             const tile = worm.pos.current;
             for (let i = 0; i < 3; i++) place(r.pages, tile, 0.85, 0.18 + i * 0.07, (i - 1) * 0.2);
         } else if (sig.character === 'wiggle') {
-            r.target.material.color.set(sig.reason ? '#ffbb72' : '#ffb5d7');
+            r.target.material.color.set('#ffb5d7');
             if (sig.sweep) place(r.target, sig.target);
             if (sig.fxT > 0) {
                 r.pulse.material.color.set('#ffb5d7'); r.pulse.material.opacity = sig.fxT * 0.55;
@@ -84,38 +97,37 @@ export function SignatureEffects({ worm, size }) {
             }
         } else if (sig.character === 'inch') {
             const grounded = !liveRotation.active && !worm.restRead.current && !worm.isJumping.current;
-            const color = sig.reason ? '#ffbb72' : '#c6ec86';
-            if (grounded) {
-                const tile = sig.charge > 0 ? sig.target : sig.preview;
+            // The leap is drawn only once it is asked for: through the coil, and for as long
+            // as the input is held to aim. It reads the landing live as the worm crawls on,
+            // orange while the leap it would take now is blocked.
+            const tile = grounded && sig.charge > 0 ? sig.preview : null;
+            if (tile) {
+                const color = sig.previewBlocked ? '#ffbb72' : '#c6ec86';
                 r.target.material.color.set(color);
                 place(r.target, tile);
-                if (sig.charge > 0) {
-                    const compressed = 1 - sig.charge / SPRING_COIL_SECONDS;
-                    for (let i = 0; i < 3; i++) place(r.target, worm.pos.current, 0.6 + i * 0.18,
-                        0.13 + i * 0.12 * (1 - compressed * 0.7));
+                const compressed = 1 - sig.charge / SPRING_COIL_SECONDS;
+                for (let i = 0; i < 3; i++) place(r.target, worm.pos.current, 0.6 + i * 0.18,
+                    0.13 + i * 0.12 * (1 - compressed * 0.7));
+                // The leap, drawn: dots along the arc it will fly, from the head to the landing.
+                r.arc.material.color.set(color);
+                const interpT = worm.interpT.current, from = worm.prevTile.current ?? worm.pos.current;
+                const { span } = springLanding(worm.pos.current, worm.moveDir.current, size, interpT, r.route);
+                const path = r.route;                               // pos, then each tile to the landing
+                for (let j = 1; j <= ARC_DOTS; j++) {
+                    const u = j / (ARC_DOTS + 1), progress = interpT + u * span;
+                    // Progress 0 is the tile the head left, 1 is pos, k + 1 is path[k].
+                    const m = Math.floor(progress), last = path.length - 1;
+                    const a = m < 1 ? from : path[Math.min(m - 1, last)], b = path[Math.min(Math.max(m, 0), last)];
+                    const at = surfacePose(a, b, progress - m, size, WORM_LIFT + arcLift(u, SPRING_HEIGHT));
+                    const { pose: dot, normal } = r;
+                    dot.position.fromArray(at.position);
+                    normal.fromArray(at.normal);
+                    dot.quaternion.setFromUnitVectors(Z, normal);
+                    dot.scale.setScalar(0.7 + 0.5 * Math.sin(Math.PI * u));
+                    dot.updateMatrix();
+                    r.arc.setMatrixAt(r.arc.count++, dot.matrix);
                 }
-                if (tile) {
-                    // The leap, drawn: dots along the arc it will fly, from the head to the landing.
-                    r.arc.material.color.set(color);
-                    const interpT = worm.interpT.current, from = worm.prevTile.current ?? worm.pos.current;
-                    const { span } = springLanding(worm.pos.current, worm.moveDir.current, size, interpT, r.route);
-                    const path = r.route;                               // pos, then each tile to the landing
-                    for (let j = 1; j <= ARC_DOTS; j++) {
-                        const u = j / (ARC_DOTS + 1), progress = interpT + u * span;
-                        // Progress 0 is the tile the head left, 1 is pos, k + 1 is path[k].
-                        const m = Math.floor(progress), last = path.length - 1;
-                        const a = m < 1 ? from : path[Math.min(m - 1, last)], b = path[Math.min(Math.max(m, 0), last)];
-                        const at = surfacePose(a, b, progress - m, size, WORM_LIFT + arcLift(u, SPRING_HEIGHT));
-                        const { pose: dot, normal } = r;
-                        dot.position.fromArray(at.position);
-                        normal.fromArray(at.normal);
-                        dot.quaternion.setFromUnitVectors(Z, normal);
-                        dot.scale.setScalar(0.7 + 0.5 * Math.sin(Math.PI * u));
-                        dot.updateMatrix();
-                        r.arc.setMatrixAt(r.arc.count++, dot.matrix);
-                    }
-                    r.arc.instanceMatrix.needsUpdate = true;
-                }
+                r.arc.instanceMatrix.needsUpdate = true;
             }
             // Launch: rings spring out of the tile it left.
             if (sig.active > 0 && sig.fxT > 0 && sig.fxTile) {
@@ -129,9 +141,11 @@ export function SignatureEffects({ worm, size }) {
                 for (let i = 0; i < 3; i++) place(r.pulse, sig.slam.tile, reduced ? 1.2 + i * 0.5 : 0.5 + (age * 3.2 + i * 0.55), 0.12 + i * 0.01);
             }
         } else if (sig.character === 'mobi') {
-            const tile = sig.mobiTunnel ? sig.target : sig.preview;
-            r.lock.material.opacity = sig.mobiTunnel ? 0.6 : 0.35;
-            place(r.lock, tile, 1.12, 0.14, Math.PI / 4);
+            // Only the tunnel MOBI has open is marked; a ready ability marks nothing.
+            if (sig.mobiTunnel) {
+                r.lock.material.opacity = 0.6;
+                place(r.lock, sig.target, 1.12, 0.14, Math.PI / 4);
+            }
         } else if (sig.character === 'glow' && sig.active > 0 && sig.glowTrail?.path.count) {
             const key = ttAt(sig.glowTrail.path, 0);
             if (!key) return;
@@ -144,5 +158,5 @@ export function SignatureEffects({ worm, size }) {
                 reduced ? 1.4 + i * 0.8 : 0.7 + ((age * 1.8 + i) % 3), 0.12 + i * 0.02);
         }
     });
-    return <>{[r.target, r.pulse, r.lock, r.pages, r.arc].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
+    return <>{[r.target, r.pulse, r.lock, r.pages, r.arc, r.ready].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
 }

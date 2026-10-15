@@ -19,15 +19,25 @@ export default function SignatureButton({ compact = false }) {
   }, [def]);
   if (!def || def.passive) return null;
   const current = readout?.character === character ? readout : null;
-  const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current || (!current.returnReady && (current.seconds > 0 || current.active));
+  // Spring's key stays live while it is coiled, so letting go of it (the leap) still lands.
+  const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current
+    || (!current.returnReady && !current.coiled && (current.seconds > 0 || current.active));
   const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} left` : current?.active ? 'Active' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
   const status = current?.notice || (!current?.ready && !current?.active && !current?.seconds ? current?.reason : '') || '';
   const activate = () => {
     const state = useGameStore.getState();
-    if (!disabled && state.wormAlive && !state.wormPaused) callWormTurn('signature');
+    if (!disabled && !current?.coiled && state.wormAlive && !state.wormPaused) callWormTurn('signature');
   };
+  // Pressed and held is a held ability (Spring aims until it is let go); a tap is a press.
+  const press = e => {
+    if (disabled || current?.coiled) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    callWormTurn('signature-hold');
+    activate();
+  };
+  const release = () => callWormTurn('signature-release');
   return <div className={`worm-signature-control${compact ? ' worm-signature-compact' : ''}`} style={{ width: '100%', minWidth: 0, textAlign: 'center' }}>
-    <button type="button" disabled={disabled} onPointerDown={activate}
+    <button type="button" disabled={disabled} onPointerDown={press} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
       onClick={e => { if (e.detail === 0) activate(); }}
       aria-label={`${current?.returnReady ? 'Return to bookmark' : def.name}${current?.returnReady ? `, ${current.activeSeconds} seconds to return` : current?.seconds > 0 ? `, ${current.seconds} seconds remaining` : ''}`}
       title={`${def.hint} Keyboard: Q${status ? ` · ${status}` : ''}`} className="worm-hud-key"
