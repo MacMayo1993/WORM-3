@@ -200,8 +200,10 @@ export function TunnelPortalFX({ worm, size }) {
         }
 
         // ── Exit burst (spat out) ──────────────────────────────────────────────
-        // Fire once, the instant the head breaks out of the exit mouth.
-        if (phase === 'exiting' && tunnel && !firedRef.current && prog > 0.55) {
+        // Fire once, the instant the head breaks out of the exit mouth: windout's
+        // first frame, when the lens cuts outside. It used to fire at 55% of the
+        // exit arm, about 1.5 s earlier, and was over before the cut could show it.
+        if (phase === 'windout' && tunnel && !firedRef.current) {
             firedRef.current = true;
             burstTRef.current = 0;
             const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);

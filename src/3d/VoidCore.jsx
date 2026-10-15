@@ -378,7 +378,9 @@ function VoidCore({ cubieRefs = null }) {
       light.color.copy(_tint);
       light.intensity = exposure * (0.5 + 1.1 * energy) * (1 + f.flash * 1.5);
     }
-  }, -0.25); // publish the core pose before its attached ribbons/cords update
+  }, -0.2); // after the chase camera (-0.25), so the zoom, cut and capture see this
+  // frame's lens (at an equal priority mount order ran this first, a frame late);
+  // before the attached ribbons/cords (0) read the core pose.
 
   return (
     <group ref={rootRef} name="antipodal-core">

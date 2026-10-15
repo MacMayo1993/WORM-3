@@ -27,7 +27,12 @@ import {
     tunnelExitPoseInto,
     tunnelEntryPoseInto,
     windupPoseInto,
+    makeCrossingCloseUp,
+    crossingCloseUpInto,
+    crossingFov,
+    DIVE_SPAN,
 } from './tunnelCameraRails.js';
+import { frameRide } from './rideFraming.js';
 import {
     WORM_LIFT,
     CAM_HEIGHT_BASE,
@@ -122,6 +127,9 @@ const dominantAxis = v => {
 const SOLVED_ORBIT_SPEED = 0.6;
 const _entryTileCenter = new THREE.Vector3();
 const _windupHeading = new THREE.Vector3();
+const _rideHead = new THREE.Vector3();
+const _closeUp = makeCrossingCloseUp();
+const _rideLook = new THREE.Vector3();
 const _WORLD_UP = new THREE.Vector3(0, 1, 0);
 const _rails = makeTunnelCamPose();
 // Heal-focus scratch — the push-in framing while a ring heal freezes the worm.
@@ -345,8 +353,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             camUpRef.current.copy(camera.up);
             return;
         }
-        const near = phase !== 'crawling' && worm.activeTunnel.current
-            ? Math.min(surfaceNearRef.current, TUNNEL_CAM_NEAR) : surfaceNearRef.current;
+        // Only while the lens can be in an aperture: the windup and windout shots
+        // stand outside the cube, where a 0.002 near plane only costs depth precision.
+        const riding = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && !!worm.activeTunnel.current;
+        const near = riding ? Math.min(surfaceNearRef.current, TUNNEL_CAM_NEAR) : surfaceNearRef.current;
         if (camera.near !== near) {
             camera.near = near;
             camera.updateProjectionMatrix();
@@ -542,7 +552,15 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         const rocketCalm = prefersReducedMotion();
         const rocketKick = rocketCalm ? 0 : _rocketBurn.liftoff * _rocketBurn.ignite;
         const rocketFov = rocketLift * 4 + rocketKick * 5;
-        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), wormTunnelFov(baseFov), tunnelMix) + rocketFov;
+        // The crossing close-up (tunnelCameraRails): while the head crosses the core
+        // and the lens is still short of its opening, frame that opening. Reduced
+        // motion keeps the ride's own lens and aim.
+        const rideFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), wormTunnelFov(baseFov), tunnelMix);
+        const closeUp = riding && !rocketCalm && !gameState.settings?.reducedMotion
+            ? crossingCloseUpInto(_closeUp, worm.activeTunnel.current, tunnelTraversalT(phase, _enterP), size,
+                tunnelState.coreZoom ?? 1).weight : 0;
+        const closeFov = closeUp > 0 ? crossingFov(_closeUp, camera.aspect, rideFov) : rideFov;
+        const targetFov = THREE.MathUtils.lerp(rideFov, closeFov, closeUp) + rocketFov;
         const fovAlpha = enteredReveal ? 1 : 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -675,10 +693,26 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             aimCamera(camera, pose.cam, pose.look, pose.up, alpha);
             camUpRef.current.copy(camera.up);
         };
+        // Inside the cube the rail's aim is a composition: rideFraming holds the
+        // head the body draws inside the frame (bent, corner and doubled-back
+        // routes used to lose it off a phone's edge or behind the lens), and
+        // tightens round it through the crossing close-up.
+        const applyRidePose = (pose, alpha) => {
+            // In the close-up, aim at the core's opening the worm is crossing beyond.
+            if (closeUp > 0) pose.look.lerp(_closeUp.center, closeUp);
+            bodyPathHeadInto(_rideHead, worm, true);
+            frameRide(camera, pose, _rideHead, alpha, closeUp);
+            camPosRef.current.copy(pose.cam);
+            _rideLook.set(0, 0, -1).applyQuaternion(camera.quaternion);
+            lookAtRef.current.copy(pose.cam).addScaledVector(_rideLook, pose.cam.distanceTo(pose.look));
+            camUpRef.current.copy(camera.up);
+            tunnelState.lensT = pose.lensT;
+        };
 
         if (phase === 'crawling' || !worm.activeTunnel.current) {
             tunnelState.active = false;
             tunnelState.t = 0;
+            tunnelState.lensT = 0;
             tunnelState.activeTunnelId = null;
             tunnelState.tunnel = null;
             // Smooth interpolated worm world position (copy into scratch — no .clone())
@@ -946,10 +980,15 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                 const carry = elapsed * (1 - tp) * (1 - tp);
                 transitionPose.current.cam.addScaledVector(phaseStartVel.current, carry);
                 transitionPose.current.look.addScaledVector(phaseStartVel.current, carry);
+                applyTunnelPose(transitionPose.current);
+                tunnelState.lensT = 0;
             } else {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
+                // The dive itself is exact. Once it has landed on the rail, turn the
+                // lens as the rest of the ride does: on a long Mega arm the shoulder
+                // swung the bare rail six or seven degrees a frame.
+                applyRidePose(transitionPose.current, tp > DIVE_SPAN ? 1 - Math.exp(-10 * delta) : 1);
             }
-            applyTunnelPose(transitionPose.current);
             if (mobile && phase === 'windup') {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
@@ -965,11 +1004,13 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             tunnelState.tunnel = tunnel;
             if (phase === 'exiting') tunnelExitPoseInto(_rails, tunnel, tp, size);
             else tunnelCamPoseInto(_rails, tunnel, tHead, size);
-            applyTunnelPose(_rails, 1 - Math.exp(-10 * delta));
+            applyRidePose(_rails, 1 - Math.exp(-10 * delta));
         } else if (phase === 'windout') {
             const tunnel = worm.activeTunnel.current;
+            if (prevPhaseRef.current !== 'windout') tunnelState.onExitCut?.();
             tunnelState.active = true;
             tunnelState.t = 1;
+            tunnelState.lensT = 1;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
             tunnelState.tunnel = tunnel;
             // A pipe exit: the lens followed the head up the exit arm, and cuts here

@@ -17,8 +17,9 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.
 
 import * as THREE from 'three';
 import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
+import { coreOpeningRadius } from '../3d/corePassage.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
-import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcPointExtendedInto,
+import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcToT, tunnelPathArcPointExtendedInto,
   ARM_A_END, tunnelTraversalT } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
@@ -87,8 +88,9 @@ export const diveEase = (p) => {
   return c * c * c * (c * (c * 6 - 15) + 10);
 };
 
-/** Join the follow rail within the first 16% of the entry arm (under 0.6s). */
-export const diveProgress = (tp) => diveEase(tp / 0.16);
+/** The share of the entry arm the dive takes to land on the follow rail (under 0.6s). */
+export const DIVE_SPAN = 0.16;
+export const diveProgress = (tp) => diveEase(tp / DIVE_SPAN);
 
 /**
  * How far behind the head the camera trails.
@@ -213,6 +215,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   buildTunnelPathForTunnel(_camPath, tunnel, size);
   coreZoomBoundsInto(_coreBounds, _camPath.midA, size);
   const camArc = cameraArcForHead(_camPath, tHead, size);
+  out.lensT = tunnelPathArcToT(_camPath, camArc);
 
   cameraArcPointInto(out.cam, _camPath, camArc);
 
@@ -265,7 +268,11 @@ export const makeTunnelCamPose = () => ({
   cam: new THREE.Vector3(),
   look: new THREE.Vector3(),
   up: new THREE.Vector3(),
-  tangent: new THREE.Vector3()
+  tangent: new THREE.Vector3(),
+  // Where the LENS is along the route, in the head's traversal t (0 at the
+  // entry mouth, 0.5 at the centre). The lens trails the head by most of a
+  // cubie, so beats the player should see happen when the lens gets there.
+  lensT: 0
 });
 
 const _poseMatrix = new THREE.Matrix4();
@@ -341,6 +348,7 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   _entryLateral.addScaledVector(_camPath.nStart, -height);
   const arc = THREE.MathUtils.lerp(-height,
     cameraArcForHead(_camPath, tHead, size), blend);
+  out.lensT = tunnelPathArcToT(_camPath, arc);
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
   // Centre on the mouth over the whole descent, so an offset approach (the
@@ -363,4 +371,59 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
  */
 export function tunnelExitPoseInto(out, tunnel, progress, size) {
   return tunnelCamPoseInto(out, tunnel, tunnelTraversalT('exiting', THREE.MathUtils.clamp(progress, 0, 1)), size);
+}
+
+// ── Crossing close-up ────────────────────────────────────────────────────────
+// The core crossing is the ride's slowest stretch (2 s, dock to dock) and its
+// point: the half-twist and the antipodal centre. But the lens cannot be with
+// the head there. It trails most of a cubie behind on the rider's centerline
+// (the clearance capsule in front of the lens and the core's openings both
+// depend on that), so it is still in the entry arm for the whole crossing, and
+// the worm, fitted to the core tile's gauge, is 0.3–2% of the frame's height:
+// a speck in a porthole. Frame the porthole instead of moving the lens. While
+// the head is near or inside the core and the lens is still short of the
+// opening, the aim leans onto the opening's centre and the lens narrows so the
+// opening fills a fixed share of the frame's narrower side: as the lens closes
+// in the view widens back, so the porthole holds its size while the worm
+// crosses the mirror room beyond it. It opens out to the ride's wide lens
+// before the lens itself goes through.
+// The opening's radius as a share of the frame's narrower half-extent.
+export const CROSSING_FILL = 0.75;
+// Never narrower than this (a telephoto magnifies every wobble of the rail).
+export const CROSSING_FOV_MIN = 30;
+// Start closing in as the head comes within this much route of the entry dock.
+const CLOSE_UP_LEAD = 0.3;
+// Back to the wide ride lens by the time the lens is this far short of the dock.
+const CLOSE_UP_RELEASE = 0.35;
+const _closeLens = new THREE.Vector3();
+
+export const makeCrossingCloseUp = () => ({ weight: 0, center: new THREE.Vector3(), radius: 0, distance: 1 });
+
+/**
+ * The crossing close-up for the head at `tHead`: `weight` 0–1, and the entry
+ * opening the lens frames (its `center`, the entry dock, which the core's zoom
+ * never moves; its `radius` at the live `zoom`; and its `distance` from the lens).
+ */
+export function crossingCloseUpInto(out, tunnel, tHead, size, zoom = 1) {
+  buildTunnelPathForTunnel(_camPath, tunnel, size);
+  const dock = _camPath.armALen;
+  const headArc = tunnelPathTToArc(_camPath, tHead);
+  const camArc = cameraArcForHead(_camPath, tHead, size);
+  out.weight = THREE.MathUtils.smoothstep(headArc - dock, -CLOSE_UP_LEAD, 0)
+    * (1 - THREE.MathUtils.smoothstep(camArc - dock, -CLOSE_UP_RELEASE, 0));
+  out.center.copy(_camPath.midA);
+  out.radius = coreOpeningRadius(size, zoom);
+  out.distance = cameraArcPointInto(_closeLens, _camPath, camArc).distanceTo(out.center);
+  return out;
+}
+
+/**
+ * The vertical FOV (degrees) that shows the close-up's opening at CROSSING_FILL
+ * of the frame's narrower half-extent, for a viewport `aspect` (width / height),
+ * within [CROSSING_FOV_MIN, `widest`].
+ */
+export function crossingFov(closeUp, aspect, widest) {
+  const tanNarrow = closeUp.radius / (CROSSING_FILL * Math.max(closeUp.distance, 1e-3));
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanNarrow / Math.min(1, aspect)));
+  return THREE.MathUtils.clamp(fov, CROSSING_FOV_MIN, widest);
 }
