@@ -7,7 +7,7 @@ import { getSpecialDef } from '../healerWorm/specialDefs.js';
 import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE, ELEMENTAL_DURATION } from '../healerWorm/constants.js';
 import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
-import { STORY_ELEMENTS, storyElementTypes, storyElementPool } from './elementGoals.js';
+import { STORY_ELEMENTS, STORY_ELEMENT_GOALS, hasStoryElementGoal, storyElementTypes, storyElementPool } from './elementGoals.js';
 export { STORY_ELEMENTS, storyElementCount } from './elementGoals.js';
 
 export const STORY_POWER_OPENING_DELAY = 10;
@@ -54,7 +54,8 @@ export function updateMastery(sim, p, level, delta) {
   if (!level.mechanics) return;
   // This clock runs only through active story metrics, so ready cards, pauses
   // and rescue holds cannot consume the opening window or recovery time.
-  const powerBusy = sim.specials.some(orb => !orb.storyBonus) || sim.rocketActive || sim.magnetT > 0 ||
+  p.elementSupplyDelay = Math.max(0, (p.elementSupplyDelay ?? STORY_POWER_OPENING_DELAY) - Math.min(Math.max(delta, 0), 0.1));
+  const powerBusy = sim.specials.some(orb => !orb.storyBonus && !orb.storyCenterElement) || sim.rocketActive || sim.magnetT > 0 ||
     sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0;
   p.powerDelay = powerBusy ? STORY_POWER_COOLDOWN
     : Math.max(0, (p.powerDelay ?? STORY_POWER_OPENING_DELAY) - Math.min(Math.max(delta, 0), 0.1));
@@ -224,10 +225,64 @@ export function fusionReachableTiles(sim, size, cubies, speed) {
   return reachable;
 }
 
-// Later levels offer two distinct elements together for optional fusion practice.
-// Authored fusion lessons retain their ordered, timed catalyst guidance. Other
-// powers wait for the current effect to end; missed powers return next cycle.
+// Every elemental task keeps all six choices available at face centers.
+// Other required powers retain their own offer/recovery cycle.
 export function offerStoryPower(sim, p, level, size, cubies) {
+  if (!hasStoryElementGoal(level)) return offerStoryQuestPower(sim, p, level, size, cubies);
+  const supplied = offerStoryCenterElements(sim, p, level, size, cubies);
+  // Element supplies have their own lane, so six recurring choices cannot
+  // starve required rockets, magnets, explosions, or the optional view offer.
+  const otherGoals = Object.fromEntries(Object.entries(level.mechanics).filter(([key]) => !STORY_ELEMENT_GOALS.includes(key)));
+  const offered = offerStoryQuestPower(sim, p, { ...level, mechanics: otherGoals }, size, cubies, true);
+  const missing = storyElementTypes(level, p.elementOrder).slice(0, level.mechanics.elements ?? 0)
+    .filter(type => !p.elements.has(type));
+  const actions = missing.filter(type => hasElement(sim, type)).map(type => HINTS[type]);
+  const recipes = pendingFusions(p, level).map(recipe => `${fusionRecipeLabel(recipe)}: collect in this order before the first effect ends`);
+  p.powerHint = [p.powerHint, ...actions, ...recipes, 'All six elements refill at face centers. Collect two while active to fuse them.'].filter(Boolean).join(' · ');
+  return supplied || offered;
+}
+
+function offerStoryCenterElements(sim, p, level, size, cubies) {
+  if ((p.elementSupplyDelay ?? STORY_POWER_OPENING_DELAY) > 0 || !sim.alive || sim.phase !== 'crawling' ||
+      sim.isJumping || sim.rocketActive || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0) return false;
+  const occupied = new Set([sim.pos, sim.prevTile, ...sim.specials].filter(Boolean).map(tileKey));
+  for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
+  const present = new Set(sim.specials.filter(orb => STORY_ELEMENTS.includes(orb.type)).map(orb => orb.type));
+  const faces = [['PX', 'x', size - 1], ['NX', 'x', 0], ['PY', 'y', size - 1], ['NY', 'y', 0], ['PZ', 'z', size - 1], ['NZ', 'z', 0]];
+  const centers = [...new Set([Math.floor((size - 1) / 2), Math.ceil((size - 1) / 2)])];
+  const order = p.elementOrder ?? STORY_ELEMENTS;
+  let changed = false;
+  const cursor = p.elementSupplyCursor ?? 0;
+  for (let offset = 0; offset < order.length; offset++) {
+    const i = (cursor + offset) % order.length;
+    const type = order[i];
+    if (present.has(type)) continue;
+    let tile;
+    for (let faceOffset = 0; faceOffset < faces.length && !tile; faceOffset++) {
+      const [dirKey, axis, edge] = faces[(i + faceOffset) % faces.length], axes = ['x', 'y', 'z'].filter(key => key !== axis);
+      // At most one elemental offering per face, even on even-sized cubes.
+      if (sim.specials.some(orb => STORY_ELEMENTS.includes(orb.type) && orb.dirKey === dirKey)) continue;
+      for (const a of centers) for (const b of centers) {
+        const candidate = { dirKey, [axis]: edge, [axes[0]]: a, [axes[1]]: b };
+        const sticker = cubies[candidate.x]?.[candidate.y]?.[candidate.z]?.stickers[dirKey];
+        if (!tile && sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(candidate))) tile = candidate;
+      }
+    }
+    // Keep the next missing element at the front if centers are blocked. Once
+    // any face clears it gets a turn, even if its preferred face is a tunnel.
+    if (!tile) { p.elementSupplyCursor = i; break; }
+    occupied.add(tileKey(tile));
+    sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(tile));
+    sim.specials.push({ ...tile, type, storyCenterElement: true, id: `story-${level.id}-${p.powerSeq++}`,
+      ttl: STORY_POWER_LIFETIME, maxTtl: STORY_POWER_LIFETIME });
+    p.elementSupplyCursor = (i + 1) % order.length;
+    changed = true;
+  }
+  if (changed) p.elementSupplyDelay = STORY_POWER_COOLDOWN;
+  return changed;
+}
+
+function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = false) {
   // Required lesson powers always take priority. Optional transformations wait
   // until Chapter 2 has taught the alternate views in their authored levels.
   const recipes = pendingFusions(p, level);
@@ -247,10 +302,10 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   let type = partnerRecipe?.catalyst ?? nextStoryPower(p, level);
   const elementPool = storyElementPool(level, p.elementOrder);
   const canOfferView = !type && level.id >= 21 && !p.viewOffered;
-  if (!type && !canOfferView && level.id >= 21) {
+  if (!type && !canOfferView && level.id >= 21 && !centerElements) {
     type = elementPool[(elementPool.indexOf(p.lastPower) + 1) % elementPool.length];
   }
-  const displayedType = sim.specials.find(orb => !orb.storyBonus)?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
+  const displayedType = sim.specials.find(orb => !orb.storyBonus && !orb.storyCenterElement)?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
     : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : sim.specials[0]?.type ?? null);
   const hint = offered => {
     const recipe = partnerRecipe ?? recipes.find(r => r.base === offered);
@@ -268,8 +323,9 @@ export function offerStoryPower(sim, p, level, size, cubies) {
     return (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
     ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered] ?? getSpecialDef(offered).description;
   };
-  p.powerHint = displayedType ? hint(displayedType) : null;
-  if ((!type && !canOfferView) || sim.specials.some(orb => !orb.storyBonus) || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || (sim.elementalT > 0 && !partnerRecipe) || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  const questDisplay = centerElements && STORY_ELEMENTS.includes(displayedType) ? null : displayedType;
+  p.powerHint = questDisplay ? hint(questDisplay) : null;
+  if ((!type && !canOfferView) || sim.specials.some(orb => !orb.storyBonus && !orb.storyCenterElement) || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || (sim.elementalT > 0 && !partnerRecipe) || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
   if (!partnerRecipe && (p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const blocked = new Set([tileKey(sim.pos)]);
   if (sim.prevTile) blocked.add(tileKey(sim.prevTile));
@@ -293,7 +349,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   if (canOfferView) { type = drawViewPower(sim.specialPicker, sim.rand); p.viewOffered = true; }
   sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(tile));
   const lifetime = partnerRecipe ? sim.elementalT : STORY_POWER_LIFETIME;
-  const bonuses = sim.specials.filter(orb => orb.storyBonus);
+  const bonuses = sim.specials.filter(orb => orb.storyBonus || orb.storyCenterElement);
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime,
     ...(partnerRecipe ? { fusionBase: partnerRecipe.base } : {}) }, ...bonuses];
   if (level.id >= 21 && !recipes.length && STORY_ELEMENTS.includes(type)) {

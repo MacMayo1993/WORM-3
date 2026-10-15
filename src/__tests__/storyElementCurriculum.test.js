@@ -34,11 +34,11 @@ it.each([[13, 'grass', 'earth'], [17, 'air', 'air']])('level %i teaches %s befor
   p.elements.add('water'); p.mechanics.rockets = 1;
   expect(read().elements).toBe(0);
   for (let miss = 0; miss < 3; miss++) {
-    p.powerDelay = 0; sim.specials = [];
+    p.powerDelay = 0; p.elementSupplyDelay = 0; sim.specials = [];
     expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
-    expect(sim.specials.map(orb => orb.type)).toEqual([type]);
+    expect(sim.specials.map(orb => orb.type)).toContain(type);
   }
-  expect(p.powerHint.toLowerCase()).toContain(name);
+  expect(p.powerHint).toContain('All six elements');
   expect(level.goal).toContain(`master 1 element (${name})`);
   expect(storyChecklist(level).find(goal => goal.key === 'elements').label).toBe(`Master ${name}`);
   expect(requiredPowerCycle(level)).toContain(type);
@@ -69,9 +69,15 @@ it.each([40, 64, 69, 70, 100, 106, 113, 120])('level %i requires and supplies al
     expect(read()[key]).toBe(5);
     expect(storyChecklist(level, read()).find(goal => goal.key === key).done).toBe(false);
     expect(nextStoryPower(p, level)).toBe(missing);
-    sim.specials = []; p.powerDelay = 0;
-    expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
-    expect(sim.specials[0].type).toBe(missing);
+    // A center under the staged head may be blocked; the missing type must
+    // get a turn on the next refill even before that center is clear.
+    const offered = new Set();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0;
+      expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
+      sim.specials.forEach(orb => offered.add(orb.type));
+    }
+    expect(offered.has(missing)).toBe(true);
     p.elements.add(missing); p.collectedElements.add(missing);
     expect(read()[key]).toBe(6);
   }

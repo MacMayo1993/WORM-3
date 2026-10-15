@@ -4,6 +4,7 @@ import { stageStory } from '../worm/story/runtime.js';
 import { updateMastery, offerStoryPower, nextStoryPower, STORY_POWER_OPENING_DELAY, STORY_POWER_COOLDOWN } from '../worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
+import { hasStoryElementGoal, STORY_ELEMENTS } from '../worm/story/elementGoals.js';
 import { rotateTilePosition } from '../worm/wormHelpers.js';
 const setup = id => {
   const level = storyLevel(id), size = level.cubeSize ?? 5, sim = makeWormSim(size);
@@ -17,10 +18,14 @@ it.each(WORM_STORY_LEVELS)('level $id starts without power-ups and offers requir
   expect(sim.specials).toHaveLength(0);
   expect(offer()).toBe(false);
   if (!nextStoryPower(p, level)) return;
-  p.powerDelay = 0;
+  p.powerDelay = 0; p.elementSupplyDelay = 0;
   // A dense initial orb route may occupy the eligible side tiles until collected.
   sim.powerups = sim.powerups.filter(orb => orb.dirKey !== sim.pos.dirKey);
   expect(offer()).toBe(true);
+  if (hasStoryElementGoal(level)) {
+    for (const orb of sim.specials.filter(o => o.storyCenterElement)) expect(STORY_ELEMENTS).toContain(orb.type);
+    return;
+  }
   let ahead = sim.pos, heading = sim.moveDir;
   for (let step = 0; step <= 3; step++) {
     expect(tileKey(sim.specials[0])).not.toBe(tileKey(ahead));
@@ -36,7 +41,7 @@ it('uses active time for the opening and recovery, including an expired offering
   advance(0.2); expect(offer()).toBe(true);
   expect(sim.specials[0].type).toBe('rocket');
   advance(20); expect(p.powerDelay).toBe(STORY_POWER_COOLDOWN);
-  sim.specials = []; // expired or missed: no instant replacement
+  sim.specials = sim.specials.filter(o => o.storyCenterElement); // missed quest power: no instant replacement
   expect(offer()).toBe(false);
   advance(STORY_POWER_COOLDOWN - 0.1); expect(offer()).toBe(false);
   advance(0.2); expect(offer()).toBe(true);
@@ -58,13 +63,13 @@ it('waits for the flight and recovery to finish before repeating a required rock
 it('cycles every unfinished quest power even when earlier tasks earn no credit', () => {
   const { sim, p, level, offer } = setup(40);
   // The elements fill their cycle slots in the order this attempt dealt them.
-  const [a, b, c, d, e, f] = p.elementOrder;
+  p.elementSupplyDelay = 0;
   for (let round = 0; round < 2; round++) {
-    for (const type of ['magnet', 'explode', a, 'rocket', b, c, d, e, f]) {
-      sim.specials = []; p.powerDelay = 0;
-      expect(nextStoryPower(p, level)).toBe(type);
+    for (const type of ['magnet', 'explode', 'rocket']) {
+      sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0;
       expect(offer()).toBe(true);
       expect(sim.specials[0].type).toBe(type);
+      expect(sim.specials.filter(o => o.storyCenterElement).map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
     }
   }
   expect(p.mechanics).toEqual({});

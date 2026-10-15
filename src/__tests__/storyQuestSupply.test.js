@@ -8,7 +8,8 @@ import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
 import { collectManifoldRing, getActiveTunnels } from '../worm/wormLogic.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import { ELEMENTAL_DURATION, MAGNET_RADIUS } from '../worm/healerWorm/constants.js';
-import { ttPush } from '../worm/circularBuffers.js';
+import { hasStoryElementGoal } from '../worm/story/elementGoals.js';
+import { makeTileTrail, ttPush } from '../worm/circularBuffers.js';
 
 // Independent checklist of every authored power quest, including required variety.
 const POOLS = {
@@ -36,24 +37,20 @@ beforeEach(() => resetLiveRotation());
 // The tables name elements in their authored slots. A level without its own
 // elementTypes deals a fresh order each attempt; read each slot through it.
 const dealt = (p, list) => list.map(type => p.elementOrder && STORY_ELEMENTS.includes(type) ? p.elementOrder[STORY_ELEMENTS.indexOf(type)] : type);
-// One marked power, plus (from level 21) a distinct elemental partner when the
-// first is an element, so fusions can be practised. The partner never changes
-// which power the quest cycle offers first.
-function expectOffer(sim, level) {
+// Quest powers share the board with up to six center elements.
+function expectOffer(sim) {
   expect(sim.specials.length).toBeGreaterThanOrEqual(1);
-  expect(sim.specials.length).toBeLessThanOrEqual(level.id >= 21 && STORY_ELEMENTS.includes(sim.specials[0].type) ? 2 : 1);
-  if (sim.specials.length === 2) {
-    expect(STORY_ELEMENTS).toContain(sim.specials[1].type);
-    expect(sim.specials[1].type).not.toBe(sim.specials[0].type);
-    expect(tileKey(sim.specials[1])).not.toBe(tileKey(sim.specials[0]));
-  }
+  expect(sim.specials.length).toBeLessThanOrEqual(7);
+  const elements = sim.specials.filter(o => STORY_ELEMENTS.includes(o.type));
+  expect(new Set(elements.map(o => o.type)).size).toBe(elements.length);
+  expect(new Set(sim.specials.map(tileKey)).size).toBe(sim.specials.length);
 }
 function setup(id, character = 'classic') {
   const level = storyLevel(id), size = level.cubeSize, sim = makeWormSim(size);
   sim.rand = () => 0.42;
   const p = stageStory(sim, size, level, character);
   const offer = () => offerStoryPower(sim, p, level, size, p.cubies);
-  const reoffer = () => { sim.specials = []; p.powerDelay = 0; return offer(); };
+  const reoffer = () => { sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0; return offer(); };
   return { level, size, sim, p, offer, reoffer };
 }
 
@@ -67,15 +64,19 @@ it.each(WORM_STORY_LEVELS)('level $id supplies six colors, every tunnel and recu
     // No completed goals: missed magnets/mastery cannot hold other tasks hostage.
     const pool = POOLS[level.id] ?? [];
     if (!pool.length) expect(nextStoryPower(p, level)).toBeNull();
+    const nonElements = pool.filter(type => !STORY_ELEMENTS.includes(type));
+    const suppliedElements = new Set();
     for (let cycle = 0; cycle < 3; cycle++) {
       const offered = [];
-      for (let i = 0; i < pool.length; i++) {
-        expect(reoffer()).toBe(true); // includes the original dense opening layout
-        expectOffer(sim, level);
-        offered.push(sim.specials[0].type);
+      for (let i = 0; i < Math.max(nonElements.length, hasStoryElementGoal(level) ? 1 : 0); i++) {
+        expect(reoffer()).toBe(true);
+        expectOffer(sim);
+        for (const orb of sim.specials) if (STORY_ELEMENTS.includes(orb.type)) suppliedElements.add(orb.type);
+        if (nonElements.length) offered.push(sim.specials[0].type);
       }
-      expect(offered).toEqual(dealt(p, pool));
+      expect(offered).toEqual(nonElements);
     }
+    if (hasStoryElementGoal(level)) expect([...suppliedElements].sort()).toEqual([...STORY_ELEMENTS].sort());
     expect(p.mechanics).toEqual({});
     expect(p.elements.size).toBe(0);
     // Refill after complete depletion, including small boards and large finales.
@@ -85,17 +86,19 @@ it.each(WORM_STORY_LEVELS)('level $id supplies six colors, every tunnel and recu
   }
 });
 
-it('level 30 offers Explode second and all three elements without requiring magnet or water success', () => {
+it('level 30 offers Explode second while all six elements remain independently available', () => {
   const { sim, p, reoffer } = setup(30);
   const offered = [];
-  for (let i = 0; i < 10; i++) { expect(reoffer()).toBe(true); offered.push(sim.specials[0].type); }
-  expect(offered).toEqual(dealt(p, [...POOLS[30], ...POOLS[30]]));
-  p.mechanics.explodes = 1; p.mechanics.magnetOrbs = 4;
-  p.collectedElements.add(dealt(p, ['fire'])[0]);
-  for (const type of dealt(p, ['water', 'grass', 'water', 'grass'])) {
-    expect(reoffer()).toBe(true); expect(sim.specials[0].type).toBe(type);
+  for (let i = 0; i < 4; i++) {
+    expect(reoffer()).toBe(true); offered.push(sim.specials[0].type);
+    expect(sim.specials.filter(o => o.storyCenterElement).map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
   }
-  expect(stageStory(sim, 6, storyLevel(30)).lastPower).toBeNull();
+  expect(offered).toEqual(['magnet', 'explode', 'magnet', 'explode']);
+  p.mechanics.explodes = 1; p.mechanics.magnetOrbs = 4; p.viewOffered = true;
+  p.collectedElements.add(dealt(p, ['fire'])[0]);
+  expect(reoffer()).toBe(true);
+  expect(sim.specials.map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
+  expect(stageStory(sim, 6, storyLevel(30)).elementSupplyCursor).toBe(0);
 });
 
 it.each(Object.keys(POOLS).map(Number))('level %i leaves time for repeated pickup opportunities', id => {
@@ -120,7 +123,7 @@ it('makes room on a face filled with food without spawning on the head, body or 
   const count = sim.powerups.length;
   expect(reoffer()).toBe(true);
   expect(sim.specials[0].type).toBe('explode');
-  expect(sim.powerups).toHaveLength(count - 1);
+  expect(sim.powerups).toHaveLength(count - sim.specials.length);
   expect(sim.powerups.some(o => tileKey(o) === tileKey(sim.specials[0]))).toBe(false);
   const s = sim.specials[0], sticker = p.cubies[s.x][s.y][s.z].stickers[s.dirKey];
   expect(sticker.curr).toBe(sticker.orig);
@@ -130,9 +133,10 @@ it('makes room on a face filled with food without spawning on the head, body or 
 it('does not skip a quest power when every safe position is blocked by the body', () => {
   const { sim, p, size, reoffer } = setup(30);
   const original = sim.powerups.slice();
-  const face = getAllSurfaceTiles(size).filter(t => t.dirKey === sim.pos.dirKey);
+  sim.tileTrail = makeTileTrail(6 * size * size);
+  const face = getAllSurfaceTiles(size);
   for (const t of face) ttPush(sim.tileTrail, tileKey(t));
-  sim.tailLength = 500;
+  sim.tailLength = 10000;
   expect(reoffer()).toBe(false);
   expect(p.lastPower).toBeNull();
   expect(sim.powerups).toEqual(original);

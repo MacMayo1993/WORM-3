@@ -168,16 +168,15 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     const { size, sim, staged } = stage(level);
     expect(sim.specials).toHaveLength(0);
     if (!nextStoryPower(staged, level)) return;
-    staged.powerDelay = 0; // Opening clock is exercised in storyPowerPacing.test.js.
+    staged.powerDelay = 0; staged.elementSupplyDelay = 0; // Opening clock is exercised in storyPowerPacing.test.js.
     if (!sim.specials.length) {
       // Offers retry every tick; eating the orbs around the head frees a tile.
       sim.powerups = sim.powerups.filter(orb => orb.dirKey !== sim.pos.dirKey);
       offerStoryPower(sim, staged, level, size, staged.cubies);
     }
-    // From level 21 an elemental offer may come with a distinct elemental partner.
-    const paired = level.id >= 21 && STORY_ELEMENTS.includes(sim.specials[0]?.type);
+    // Six center elements can coexist with one required non-element power.
     expect(sim.specials.length).toBeGreaterThanOrEqual(1);
-    expect(sim.specials.length).toBeLessThanOrEqual(paired ? 2 : 1);
+    expect(sim.specials.length).toBeLessThanOrEqual(7);
     if (sim.specials.length === 2) expect(STORY_ELEMENTS).toContain(sim.specials[1].type);
     expect(new Set(sim.specials.map(orb => orb.type)).size).toBe(sim.specials.length);
   });
