@@ -32,6 +32,7 @@ import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
+import { GLSL_SIGILS, sigilIdOf } from './healerWorm/fusionSigils.js';
 
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3, air: 4 };
 
@@ -315,6 +316,11 @@ const fragmentShader = /* glsl */ `
 
   // Ridged noise: bright where the field crosses its midpoint — thin branching lines.
   float ridge(float n, float sharp) { return pow(1.0 - abs(n * 2.0 - 1.0), sharp); }
+
+#if SURFACE_MODE == 3
+  // A recipe's own motif, drawn into its family's coat (fusionSigils.js).
+  ${GLSL_SIGILS}
+#endif
 
   // Perturb a normal by a scalar height field using its screen-space derivatives
   // (the surface-gradient method): shading detail without a single extra vertex.
@@ -673,6 +679,12 @@ const fragmentShader = /* glsl */ `
     light = uAccent * (streak * 0.8 + lane * 0.9) * (1.0 + wakeRing * 1.8) + uColor * (fres * 0.45 + vRim * 0.3)
           + uAccent * near * 0.25;
   #endif
+    // The recipe's sigil: the motif no other fusion wears. Added light in its own
+    // colour, a little body so it reads over bright stickers, brighter round the worm.
+    float sig = sigilAt(st, vFaceUV - st, seamD, vWorld, vFaceN, vWormD, T) * uSigilParams.w * (1.0 + near * 0.8);
+    light += uSigilColor * sig;
+    bodyCol = mix(bodyCol, uSigilColor * 0.55, clamp(sig * 0.25, 0.0, 0.35));
+    a = clamp(a + sig * 0.1, 0.0, 1.0);
     // The reaction surges in along the claim front and dissolves at the end.
     float surge = vArrive * (1.0 - vArrive) * 4.0;
     light += uAccent * surge * 0.4;
@@ -762,6 +774,9 @@ export function getReactionSurfaceMaterial(recipeId, look, pattern) {
         uColor: { value: new THREE.Color(look.color) },
         uAccent: { value: new THREE.Color(look.accent) },
         uReactDepth: { value: look.depth },
+        uSigil: { value: sigilIdOf(look.sigil) },
+        uSigilColor: { value: new THREE.Color(look.sigilColor ?? look.accent) },
+        uSigilParams: { value: new THREE.Vector4(...(look.sigilParams ?? [1, 1, 0.6, 0.5])) },
         uWormHead,
         uWormBody,
         uClaimOrigin: { value: new THREE.Vector4() },

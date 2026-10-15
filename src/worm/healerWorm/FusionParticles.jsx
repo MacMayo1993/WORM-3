@@ -6,7 +6,7 @@ import { wormExpansion } from '../wormExpansion.js';
 import { wormBuffs } from '../wormBuffs.js';
 import { wormSegments } from '../wormSegments.js';
 import { elementalEnvelope } from './elementalLifecycle.js';
-import { fusionLookOf, REACTION_PARTICLES } from './fusionLooks.js';
+import { fusionLookOf, reactionMotionOf, REACTION_PARTICLES } from './fusionLooks.js';
 import { makeReactionField, stepReactionField } from './fusionParticles.js';
 import { getFusionParticleMaterial } from './fusionParticleMaterial.js';
 
@@ -17,6 +17,7 @@ import { getFusionParticleMaterial } from './fusionParticleMaterial.js';
 export default function FusionParticles({ recipe, size, count }) {
   const look = fusionLookOf(recipe);
   const cfg = REACTION_PARTICLES[look?.particle] ?? REACTION_PARTICLES.steam;
+  const motion = reactionMotionOf(recipe);
   const pointsRef = useRef();
   const elapsed = useRef(0);
   const material = useMemo(() => (look ? getFusionParticleMaterial(recipe, look, cfg) : null), [recipe, look, cfg]);
@@ -39,7 +40,7 @@ export default function FusionParticles({ recipe, size, count }) {
     const dt = Math.min(delta, 0.05);
     elapsed.current += dt;
     const env = elementalEnvelope({ elapsed: elapsed.current, remaining: wormBuffs.elementalT });
-    stepReactionField(field, dt, { cfg, size, expansion: wormExpansion.amount, worm: wormSegments, emitting: env.accents || env.phase === 'claim', rand: Math.random });
+    stepReactionField(field, dt, { cfg, size, expansion: wormExpansion.amount, worm: wormSegments, emitting: env.accents || env.phase === 'claim', rand: Math.random, motion });
     const attrs = geometry.attributes;
     attrs.position.needsUpdate = true;
     attrs.aAlpha.needsUpdate = true;

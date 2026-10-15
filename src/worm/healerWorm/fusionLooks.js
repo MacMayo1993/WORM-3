@@ -9,7 +9,10 @@
 //     `reaction`), in one of a handful of patterns with the recipe's own palette;
 //   • a reaction particle field (FusionParticles.jsx) that boils off the cube's faces
 //     and off the worm itself, so the reaction follows the player;
-//   • the fill light in the reaction's colour.
+//   • the fill light in the reaction's colour;
+//   • the recipe's SIGIL (fusionSigils.js), a motif drawn into the coat that no other
+//     recipe wears, and the recipe's particle MOTION (swirl, gust, fountain...), so
+//     two recipes of one family never look alike. The sigil is also its HUD glyph.
 //
 // Pure data: no React, no Three. Every ordered recipe has its own entry.
 
@@ -43,8 +46,60 @@ export const REACTION_PARTICLES = Object.freeze({
   spores: { id: 9, size: 0.09, grow: 0.3, life: 2.8, out: 0.45, buoy: 0.2,  drag: 1.0, additive: true,  worm: 0.3,  opacity: 0.85 },
 });
 
+/**
+ * How a reaction's particles move once born (fusionParticles.js), on top of their
+ * kind's own lift and drag. Each recipe pairs a kind with a motion no other recipe
+ * uses with that kind.
+ */
+export const REACTION_MOTIONS = Object.freeze({
+  rise: 0,      // straight off the surface, the kind's own buoyancy (the default)
+  swirl: 1,     // wheeling round the cube's vertical axis
+  gust: 2,      // blown sideways by a wind that slowly turns
+  fountain: 3,  // thrown high off the faces and falling back
+  zigzag: 4,    // hopping in sharp jumps, like a spark finding ground
+  orbit: 5,     // drawn round the worm's head in a ring
+  hover: 6,     // hanging close to the surface, bobbing
+  spiral: 7,    // a funnel: wheeling round and in toward the axis while rising
+});
+
 const look = (pattern, color, accent, glow, particle, tint, tint2, depth = 0.05) =>
-  Object.freeze({ pattern, color, accent, glow, particle, tint, tint2, depth });
+  ({ pattern, color, accent, glow, particle, tint, tint2, depth });
+
+// Each recipe's signature: [sigil, sigil colour, particle motion, (scale, speed,
+// density, strength)]. A sigil is worn by at most two recipes, never in the same
+// coat family, and never by a pair and its reverse.
+const SIGNATURES = {
+  'water-air':     ['vortex',    '#e9fffb', 'swirl',    [1.0, 1.1, 0.7, 0.55]],
+  'air-water':     ['droplets',  '#d9f4ff', 'hover',    [1.0, 1.2, 0.6, 0.6]],
+  'fire-air':      ['embers',    '#fff1b0', 'rise',     [1.0, 1.3, 0.55, 0.75]],
+  'air-fire':      ['pulse',     '#ffc078', 'gust',     [1.0, 1.0, 0.7, 0.55]],
+  'grass-air':     ['leaves',    '#f0d48c', 'swirl',    [1.0, 1.4, 0.45, 0.5]],
+  'air-grass':     ['flowers',   '#e9ff9e', 'gust',     [1.1, 0.8, 0.6, 0.55]],
+  'ice-air':       ['wisps',     '#ffffff', 'gust',     [0.9, 1.0, 0.6, 0.5]],
+  'air-ice':       ['stars',     '#e8ffff', 'swirl',    [1.0, 1.0, 0.45, 0.7]],
+  'lightning-air': ['wisps',     '#dfe4ff', 'spiral',   [1.3, 1.6, 0.5, 0.45]],
+  'air-lightning': ['stars',     '#fbff9e', 'orbit',    [1.3, 1.8, 0.55, 0.8]],
+  steam:           ['bubbles',   '#ffffff', 'rise',     [1.0, 1.0, 0.75, 0.6]],
+  slipstream:      ['chevrons',  '#e8fbff', 'gust',     [1.0, 1.4, 0.8, 0.45]],
+  bloom:           ['flowers',   '#fff2a8', 'hover',    [1.0, 1.0, 0.85, 0.6]],
+  conductor:       ['forks',     '#e6ecff', 'zigzag',   [1.0, 1.0, 0.55, 0.9]],
+  quench:          ['shards',    '#cbb8ff', 'rise',     [1.0, 0.8, 0.55, 0.7]],
+  coldfire:        ['snowflake', '#d8f2ff', 'swirl',    [1.0, 1.0, 0.8, 0.65]],
+  wildfire:        ['sunburst',  '#d6ff7a', 'gust',     [1.0, 1.2, 0.6, 0.55]],
+  plasma:          ['vortex',    '#ffd8ff', 'orbit',    [1.4, 1.8, 0.8, 0.6]],
+  geyser:          ['ripples',   '#e6fff8', 'fountain', [1.0, 1.2, 0.7, 0.55]],
+  emberseed:       ['veins',     '#ffcc5c', 'fountain', [1.0, 0.9, 0.5, 0.65]],
+  'ski-jump':      ['chevrons',  '#7ed9a4', 'fountain', [0.8, 1.0, 0.6, 0.5]],
+  thunderpad:      ['runes',     '#d9c4ff', 'zigzag',   [1.0, 1.2, 0.7, 0.7]],
+  'frozen-wake':   ['hexfrost',  '#ffffff', 'hover',    [1.0, 0.8, 0.6, 0.65]],
+  meltdown:        ['droplets',  '#ffd2a8', 'fountain', [1.0, 1.6, 0.7, 0.6]],
+  frostbloom:      ['hexfrost',  '#eafcff', 'rise',     [1.3, 1.1, 0.5, 0.6]],
+  static:          ['forks',     '#ffffff', 'zigzag',   [0.7, 2.0, 0.8, 0.7]],
+  current:         ['pulse',     '#cfe2ff', 'spiral',   [1.4, 1.5, 0.5, 0.6]],
+  firestorm:       ['veins',     '#ffe08a', 'spiral',   [1.4, 1.6, 0.6, 0.6]],
+  cryostorm:       ['snowflake', '#ffffff', 'spiral',   [1.3, 0.7, 0.6, 0.7]],
+  grounded:        ['leaves',    '#fff6a6', 'hover',    [0.9, 0.7, 0.55, 0.6]],
+};
 
 /**
  * Every recipe's reaction. `color`/`accent` paint the coat, `glow` is the fill light,
@@ -89,8 +144,16 @@ export const FUSION_LOOKS = Object.freeze({
   grounded:      look('bloom',  '#3fae4f', '#ffe34a', '#8cf07a', 'spores', '#fff6a6', '#7cff6a', 0.04),
 });
 
+for (const [id, [sigil, sigilColor, motion, sigilParams]] of Object.entries(SIGNATURES)) {
+  Object.assign(FUSION_LOOKS[id], { sigil, sigilColor, motion, sigilParams: Object.freeze(sigilParams) });
+}
+for (const entry of Object.values(FUSION_LOOKS)) Object.freeze(entry);
+
 /** The look for a recipe id, or null. */
 export const fusionLookOf = id => FUSION_LOOKS[id] ?? null;
 
 /** A recipe's coat pattern as its shader define value. */
 export const reactionPatternOf = id => REACTION_PATTERNS[FUSION_LOOKS[id]?.pattern] ?? 0;
+
+/** A recipe's particle motion as the number fusionParticles.js steps on. */
+export const reactionMotionOf = id => REACTION_MOTIONS[FUSION_LOOKS[id]?.motion] ?? 0;
