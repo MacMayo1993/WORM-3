@@ -1,4 +1,4 @@
-import { hasElement, getFusion, fusionRecipeLabel } from '../healerWorm/elementalFusion.js';
+import { hasElement, activeFusion, getFusion, fusionRecipeLabel } from '../healerWorm/elementalFusion.js';
 import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { tileKey } from '../healerWorm/wormSim.js';
@@ -228,6 +228,14 @@ export function fusionReachableTiles(sim, size, cubies, speed) {
 // Every elemental task keeps all six choices available at face centers.
 // Other required powers retain their own offer/recovery cycle.
 export function offerStoryPower(sim, p, level, size, cubies) {
+  if (activeFusion(sim)) {
+    const remaining = sim.specials.filter(orb => !STORY_ELEMENTS.includes(orb.type));
+    if (remaining.length !== sim.specials.length) {
+      sim.specials = remaining;
+      p.powerHint = 'Fusion active — elemental orbs return after the fusion and pickup cooldown end.';
+      return true;
+    }
+  }
   if (!hasStoryElementGoal(level)) return offerStoryQuestPower(sim, p, level, size, cubies);
   const supplied = offerStoryCenterElements(sim, p, level, size, cubies);
   // Element supplies have their own lane, so six recurring choices cannot
@@ -238,12 +246,15 @@ export function offerStoryPower(sim, p, level, size, cubies) {
     .filter(type => !p.elements.has(type));
   const actions = missing.filter(type => hasElement(sim, type)).map(type => HINTS[type]);
   const recipes = pendingFusions(p, level).map(recipe => `${fusionRecipeLabel(recipe)}: collect in this order before the first effect ends`);
-  p.powerHint = [p.powerHint, ...actions, ...recipes, 'All six elements refill at face centers. Collect two while active to fuse them.'].filter(Boolean).join(' · ');
+  const supplyHint = activeFusion(sim) ? 'Fusion active — no elemental orbs until it ends.'
+    : sim.elementalClaimCooldown > 0 ? `Element refill in ${Math.ceil(sim.elementalClaimCooldown)}s. Existing orbs can still fuse.`
+    : 'All six elements refill at face centers. Collect two while active to fuse them.';
+  p.powerHint = [p.powerHint, ...actions, ...recipes, supplyHint].filter(Boolean).join(' · ');
   return supplied || offered;
 }
 
 function offerStoryCenterElements(sim, p, level, size, cubies) {
-  if ((p.elementSupplyDelay ?? STORY_POWER_OPENING_DELAY) > 0 || !sim.alive || sim.phase !== 'crawling' ||
+  if (activeFusion(sim) || sim.elementalClaimCooldown > 0 || (p.elementSupplyDelay ?? STORY_POWER_OPENING_DELAY) > 0 || !sim.alive || sim.phase !== 'crawling' ||
       sim.isJumping || sim.rocketActive || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0) return false;
   const occupied = new Set([sim.pos, sim.prevTile, ...sim.specials].filter(Boolean).map(tileKey));
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
@@ -325,7 +336,7 @@ function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = fals
   };
   const questDisplay = centerElements && STORY_ELEMENTS.includes(displayedType) ? null : displayedType;
   p.powerHint = questDisplay ? hint(questDisplay) : null;
-  if ((!type && !canOfferView) || sim.specials.some(orb => !orb.storyBonus && !orb.storyCenterElement) || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || (sim.elementalT > 0 && !partnerRecipe) || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  if ((!type && !canOfferView) || (STORY_ELEMENTS.includes(type) && (activeFusion(sim) || sim.elementalClaimCooldown > 0)) || sim.specials.some(orb => !orb.storyBonus && !orb.storyCenterElement) || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || (sim.elementalT > 0 && !partnerRecipe) || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
   if (!partnerRecipe && (p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const blocked = new Set([tileKey(sim.pos)]);
   if (sim.prevTile) blocked.add(tileKey(sim.prevTile));

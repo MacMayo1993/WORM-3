@@ -2,6 +2,7 @@
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
 // text stays literal.
+import { STORY_DOUBLE_HEAL_WINDOW } from '../healerWorm/healChain.js';
 import { STORY_ELEMENTS, storyElementNames, storyElementsRandom } from './elementGoals.js';
 export const TAIL_KINDS = ['tunnel', 'collector', 'restore'];
 export const TUNNEL_KINDS = ['tunnel', 'collector', 'restore', 'mastery'];
@@ -63,9 +64,7 @@ export function storyGoalText(level) {
   if (TAIL_KINDS.includes(level.kind)) notes.push('Clear your tail to finish.');
   if (level.kind === 'jump' || m.bodyJumps) notes.push('Empty jumps do not count.');
   if (m.selfPasses) notes.push('A pass counts when you dive into a tunnel while your tail is still inside one.');
-  if (m.multiHeals) notes.push(level.kind === 'tunnel'
-    ? 'For a double heal, ride a second pair before your tail leaves the first.'
-    : 'For a double heal, carry both tolls and ride a second pair before your tail leaves the first.');
+  if (m.multiHeals) notes.push(`For a double heal, heal two different pairs within ${STORY_DOUBLE_HEAL_WINDOW} seconds of surface time. Tunnel travel pauses the clock; overlapping paid rides also count.`);
   if (m.selfPasses || m.multiHeals) notes.push('Missed a chain? Retry doors open after the last pair and your tail clear.');
   if ((m.ringHeals || m.signatures) && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnel deposits seal only after the surround and ability tasks.');
   if (level.rotateEvery && (level.kind === 'rotation' || level.rotations)) notes.push(`Turns come every ${level.rotateEvery} seconds.`);

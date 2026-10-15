@@ -3,6 +3,7 @@ import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import { rollStoryElements, storyElementTypes } from './elementGoals.js';
+import { STORY_DOUBLE_HEAL_WINDOW } from '../healerWorm/healChain.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ttAt, ttReset } from '../circularBuffers.js';
@@ -303,13 +304,17 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   practice.peakLength = Math.max(practice.peakLength ?? 0, Math.floor(sim.tailLength), Math.floor(sim.peakTailLength ?? 0));
   if (level.kind === 'jump' || level.mechanics?.bodyJumps) trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
+  const needsDoubleHeal = (practice.mechanics.multiHeals ?? 0) < (level.mechanics?.multiHeals ?? 0);
+  const chainHint = needsDoubleHeal ? sim.healChain?.remaining > 0
+    ? `Double heal: seal another pair within ${Math.ceil(sim.healChain.remaining)}s of surface time. Tunnel travel pauses the clock.`
+    : `Double heal: heal two different pairs within ${STORY_DOUBLE_HEAL_WINDOW}s of surface time.` : null;
   return {
     ...practice.mechanics,
     elements: storyElementCount(practice.elements, level.mechanics?.elements, storyElementTypes(level, practice.elementOrder)),
     uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements, storyElementTypes(level, practice.elementOrder)),
     elementOrder: practice.elementOrder,
     uniqueFusions: practice.fusionIds?.size ?? 0,
-    powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
+    powerHint: [chainHint, practice.powerHint].filter(Boolean).join(' · ') || null, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
     // The size goal is the longest body reached this run; deposits shrink the
     // worm afterwards without taking the credit back.

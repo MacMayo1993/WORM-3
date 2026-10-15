@@ -1,5 +1,6 @@
 import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, tickAbilityVisuals, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb } from './elementalAbilities.js';
 import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
+import { recordCompletedHeal, tickHealChain } from './healChain.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
@@ -266,6 +267,8 @@ export function makeWormSim(size) {
         explodeT: 0,
         expansionAmount: 0,
         elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
+        elementalClaimCooldown: 0,
+        healChain: null,
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
         rocketActive: false,      // protected flight with gradual takeoff/landing
@@ -456,6 +459,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.explodeT = 0;
     sim.expansionAmount = 0;
     sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
+    sim.elementalClaimCooldown = 0;
+    sim.healChain = null;
     sim.specialPicker = makeSpecialPicker();
     // Introduce the new pickup first; subsequent spawns use the normal shuffle bag.
     sim.specialPicker.bag = ['explode'];
@@ -750,6 +755,15 @@ export function startElemental(sim, ctx, type, size = 0) {
     sim.elementalPair = next.pair;
     sim.elementalT = ELEMENTAL_DURATION;
     sim.elementalMaxT = ELEMENTAL_DURATION;
+    sim.elementalClaimCooldown = ELEMENTAL_CLAIM_COOLDOWN;
+    sim.elementalSpawnTimer = Math.max(sim.elementalSpawnTimer, ELEMENTAL_CLAIM_COOLDOWN);
+    if (next.fused) {
+        const remaining = sim.specials.filter(orb => !isElementalType(orb.type));
+        if (remaining.length !== sim.specials.length) {
+            sim.specials = remaining;
+            ctx.onSpecialsChanged?.(sim.specials.slice());
+        }
+    }
     claimElementalAbility(sim, type, size, ctx);
     // Where the element enters the world. The orb is claimed by the head, so the
     // head's tile IS the claim point; the skin sweeps outward from it. Snapshotted
@@ -968,6 +982,13 @@ function otherHealRiding(sim, ctx, tunnelKey, passage = null) {
         if (other !== passage && other.heal && other.tunnelKey !== tunnelKey) return true;
     }
     return false;
+}
+
+function healIdentity(tunnel, ctx, fallback) {
+    const cubies = ctx.getCubies?.();
+    if (!cubies) return fallback;
+    return [tunnel.entry, tunnel.exit].map(tile =>
+        getStableKey(tile.x, tile.y, tile.z, tile.dirKey, cubies)).filter(Boolean).sort().join('|') || fallback;
 }
 
 function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false, intentional = false, landingHeading = null) {
@@ -1325,7 +1346,8 @@ function tryWormholeRingHeal(sim, size, ctx) {
         const { tunnel, tunnelKey } = hit;
         // One surround that seals several pairs, or one sealed while a paid
         // traversal still rides in the body, heals pairs together.
-        if (index > 0 || otherHealRiding(sim, ctx, tunnelKey)) ctx.onStoryMechanic?.('multiHeals');
+        const riding = otherHealRiding(sim, ctx, tunnelKey);
+        const doubled = index > 0 || riding;
         if (tunnelKey) sim.ringHealedTunnelKeys.add(tunnelKey);
         const entryStableKey = getStableKey(
             tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, cubies
@@ -1335,6 +1357,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
         );
         sim.healFired = true;
         sim.healed += 1;
+        recordCompletedHeal(sim, ctx, healIdentity(tunnel, ctx, tunnelKey), doubled, riding);
         // A surround can seal a pair while a previous traversal's tail still
         // occupies it. Keep that visual route, but retire its queued heal so
         // clearing the tail cannot credit the same pair (and rewards) twice.
@@ -1572,6 +1595,7 @@ export function faceCenterTiles(size) {
  * @returns {number} how many elemental orbs were actually placed
  */
 function spawnElementalOffering(sim, size, ctx) {
+    if (activeFusion(sim) || sim.elementalClaimCooldown > 0) return 0;
     let changed = false;
     // Clear any un-taken elemental orbs from the last cycle (buffs stay).
     for (let i = sim.specials.length - 1; i >= 0; i--) {
@@ -2534,6 +2558,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
     }
 
+    tickHealChain(sim, delta);
+    if (sim.phase === 'crawling') sim.elementalClaimCooldown = Math.max(0, (sim.elementalClaimCooldown ?? 0) - delta);
+
     // Elemental wash: drain the mood timer on the same crawling-only clock as the
     // buffs, so a pause or tunnel transit freezes it rather than letting it lapse
     // off-screen. Movement effects read the same remaining duration.
@@ -2778,10 +2805,11 @@ export function stepWormSim(sim, delta, size, ctx) {
         if (pending) {
             const { tunnel, stableKey, tunnelKey } = pending;
             const doubled = otherHealRiding(sim, ctx, tunnelKey, passage);
+            const identity = healIdentity(tunnel, ctx, tunnelKey);
             sim.healFired = true;
             sim.healed += 1;
             ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
-            if (doubled) ctx.onStoryMechanic?.('multiHeals');
+            recordCompletedHeal(sim, ctx, identity, doubled, doubled);
             releaseMobiTunnel(sim, tunnel);
             sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
             if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);

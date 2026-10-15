@@ -46,14 +46,16 @@ The theme ties to mechanics. Healing joins twins back together. **Passing yourse
 
 The six elements are Water, Fire, Earth, Ice, Lightning and Air. Level 8 requires Water, Fire and Earth collection; level 13 teaches an Earth spring launch and safe landing; level 17 teaches an Air jump and safe landing. Level 64 collects all six. Levels 40, 69, 70, 100, 106, 113 and 120 master all six. Focused lessons use `elementTypes` so their offers, objective credit and text share the same named set. The internal `grass` ID remains Earth for save compatibility.
 
+Elemental objectives supply all six elements at free face centers. Each elemental pickup starts a 15-second cooldown before any new elemental orb can spawn; existing choices remain available for the second pickup. Forming a fusion clears the other elemental orbs, and no elemental orbs spawn while that fusion is active. The cooldown counts active surface time, pausing during tunnel travel and camera holds. Other power-ups remain available.
+
 Every existing objective is still used (orbs, colors, tunnel crossings, body jumps, layer turns, heals, surrounds, boosts, double jumps, rockets, magnets, explosions, element pickups, distinct elements, element mastery, Steam and Quench, abilities, bombs, enemies). Mechanic goals may now sit on any level kind, so a tunnel trial can also ask for passes and a rotation trial for growth. Four goals are new:
 
 | Key | Checklist label | Credit |
 | --- | --- | --- |
 | `bodyLength` | Grow your worm | The run's peak body length (`practice.peakLength`). Tolls spent afterwards do not remove it. The three-star growth target is at least eight orbs beyond it (`STAR_GROWTH_BEYOND_TASK`). |
 | `selfPasses` | Pass yourself in the Core | The sim marks `selfPassPending` when the head dives while any earlier passage's tail has not cleared (`bodyStillRiding`), and reports the pass from `crawling.enter()`, so a pass the worm does not survive earns nothing. Re-entering the same pair from its far end counts. |
-| `multiHeals` | Double heals | A pair seals while a heal on a different pair still rides in the body: the head is mid-ride through a paying tunnel (or any tunnel on a trial), or an earlier passage still carries a heal (`otherHealRiding`). One surround that seals several pairs counts once per extra pair. |
-| `fusions` / `uniqueFusions` | Fuse two elements / Different fusions | Every `elementFusion` event; distinct recipe IDs in `practice.fusionIds`. While either is open, `nextStoryPower` offers every element in the level's pool, and from level 21 each offer comes with a distinct partner. |
+| `multiHeals` | Double heals | On a double-heal quest, seal two different pairs within 20 seconds of active surface time; tunnel travel and camera holds pause the window, and the HUD shows the time remaining. Overlapping paid heals (`otherHealRiding`) and multi-pair surrounds still count. The same two heals receive one credit even when both timing and overlap qualify. |
+| `fusions` / `uniqueFusions` | Fuse two elements / Different fusions | Every `elementFusion` event; distinct recipe IDs in `practice.fusionIds`. All six elemental choices are supplied at face centers, subject to the pickup cooldown and fusion exclusion above. |
 
 `bodyJumps` also works as a mechanic outside jump trials; `trackPracticeBodyJump` runs whenever it is asked for.
 
