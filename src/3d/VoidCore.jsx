@@ -35,7 +35,7 @@ import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
-import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
+import { makeCorePassage, updateCorePassage, updateCoreSightline, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
 import { mirrorSubjects, warmMirrorPrograms } from './mirrorSubjects.js';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from './coreMirrorRoom.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
@@ -334,6 +334,8 @@ function VoidCore({ cubieRefs = null }) {
       zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
     }
     passage.uniforms.uPassageRadius.value = coreOpeningRadius(size, f.zoom);
+    updateCoreSightline(passage, camera.position,
+      wormMode && tunnelState.active ? tunnelState.rideHead : null, size);
     mirrors.group.visible = wormMode && passage.uniforms.uPassageOpen.value > .5;
     if (probe) {
       // Link the room's programs, and every program its capture draws with, while

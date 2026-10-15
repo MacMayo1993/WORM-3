@@ -31,6 +31,7 @@ import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
 import { makeTunnelEnergyUniforms, tunnelEnergySeed } from './tunnelEnergy.js';
+import { tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { coreOpeningBandWidth } from '../3d/corePassage.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
@@ -464,7 +465,7 @@ const MobiusTunnel = ({
     // opening it dives into, so it fills the hole instead of entering as a sliver.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
     const dockW = isActive && wormMode ? coreOpeningBandWidth(state.size, tunnelState.coreZoom ?? 1)
-      : tunnelDockWidth(state.size) * coreZoom;
+      : occupied && wormMode ? tunnelRiderDockWidth(state.size) : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||

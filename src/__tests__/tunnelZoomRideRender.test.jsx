@@ -8,7 +8,7 @@ import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { buildTunnelPathForTunnel, getTunnelWorldPosSmoothInto } from '../worm/wormLogic.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
-import { makeTunnelPath, tunnelPathTToArc, tunnelDockWidth, tunnelGaugeAt, tunnelArmFractionAt } from '../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelPathTToArc, tunnelRiderDockWidth, tunnelGaugeAt, tunnelArmFractionAt } from '../utils/tunnelPath.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideSampleArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import { coreOpeningBandWidth } from '../3d/corePassage.js';
 
@@ -82,7 +82,7 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       tunnelState.coreZoom = 6;
       tunnelState.activeTunnelId = 'next-tunnel';
       tunnelState.occupiedTunnelIds = new Set([id]);
-      frame(); checkFloor(tunnelDockWidth(size));
+      frame(); checkFloor(tunnelRiderDockWidth(size));
       expect(ribbon.parent.visible).toBe(true);
       const fixed = positions.array.slice();
       tunnelState.occupiedTunnelIds.clear();

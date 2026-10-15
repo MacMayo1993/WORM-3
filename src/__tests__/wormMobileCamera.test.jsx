@@ -294,9 +294,9 @@ it('widens the portrait tunnel view and restores normal surface framing after de
 });
 
 // The lens trails most of a cubie behind the head, so it is still in the entry
-// arm while the head crosses the core, and the worm there is fitted to the core
-// tile's gauge. The ride frames the core's opening instead of moving the lens.
-it.each([false, true])('frames the core opening through the crossing, and keeps the ride lens for reduced motion (%s)', reduced => {
+// arm while the head crosses the core. A minimum physical gauge and bounded
+// sight cutaway let the close-up frame the worm itself.
+it.each([false, true])('frames the head through the crossing, and keeps the ride lens for reduced motion (%s)', reduced => {
   const size = 5, worm = makeWorm(size), zoom = 4;
   tunnelState.coreZoom = zoom;
   useGameStore.setState({ wormGamePhase: 'active', settings: { ...useGameStore.getState().settings, reducedMotion: reduced } });
@@ -309,11 +309,10 @@ it.each([false, true])('frames the core opening through the crossing, and keeps 
   const closeUp = crossingCloseUpInto(makeCrossingCloseUp(), tunnel, .5, size, zoom);
   if (reduced) expect(scene.camera.fov).toBeGreaterThan(100);
   else expect(scene.camera.fov).toBeCloseTo(crossingFov(closeUp, scene.camera.aspect, 100.7), 0);
-  // The opening sits in the middle of the frame, the head inside it.
-  const opening = closeUp.center.clone().project(scene.camera);
+  // The head is the subject of the crossing close-up.
   const head = worm.headInterpPos.current.clone().project(scene.camera);
   if (!reduced) {
-    expect(Math.hypot(opening.x, opening.y)).toBeLessThan(0.15);
+    expect(Math.hypot(head.x, head.y)).toBeLessThan(0.15);
     expect(scene.camera.fov).toBeLessThan(80);
   }
   expect(Math.max(Math.abs(head.x), Math.abs(head.y))).toBeLessThan(0.8);
@@ -350,8 +349,7 @@ it.each([3, 5, 15])('keeps the head in a portrait frame through every ride phase
         worst = Math.max(worst, Math.abs(ndc.x), Math.abs(ndc.y));
       }
     }
-    // Never off screen (the old rail reached 1.7, or behind the lens). Inside the
-    // core the opening is the subject and the head is only kept on screen.
+    // Never off screen (the old rail reached 1.7, or behind the lens).
     expect(worst).toBeLessThan(0.95);
   }
 });

@@ -174,3 +174,29 @@ bounded feedback batches draw, captures screenshots in `/tmp/worm-elements`
 (override with `SHOTS`), and fails on JavaScript or shader errors. The fixed
 camera is test-only. Software WebGL captures are visibility checks, not FPS data.
 Use `ELEMENTS=air,fire` to capture only selected elements while iterating on effects.
+
+### Core framing and sightline regressions
+
+`node scripts/perf-worm/ride-framing.mjs` samples straight, bent and same-face
+routes at 60 Hz. It reports projected head height during the middle half of the
+core crossing, maximum aim/rotation step and head framing. These are geometry
+measurements, not rendered screenshots or frame-rate measurements.
+
+`CHROMIUM=/path/to/chrome node scripts/perf-worm/core-sightline.mjs` checks the
+production shell and mirror cutout shaders in WebGL. It checks the sight corridor,
+its bounded ends, adjacent intact walls and deactivation. It requires a host that
+permits Chromium's local sockets.
+
+The occupied lane now has a 0.12 world-unit minimum core width. The simulation's
+recorded gauge, body-contact distance, tail-occupied ribbon and core aperture all
+use that width; the unoccupied network still docks at individual tile width.
+The close-up targets an 8% tall head with a 30-degree minimum FOV. Same-face routes
+use a lateral camera offset and stable horizon, shared by entry and ride rails.
+The offset stays inside the outer shell. A bounded camera-to-head cutaway prevents
+the core wall from hiding the crossing head.
+
+Path builders reuse arc tables only when all mouth positions, normals, docks and
+core-center inputs match by value. Transported frames track the path version.
+A local 20,000-call static 15x15 route microbenchmark took 94.5 ms rebuilding versus
+1.7 ms cached; this does not predict whole-game FPS. This optimization is independent
+of the unavailable external `mobius-ride-fixes.patch`, which has not been applied.

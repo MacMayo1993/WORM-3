@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning, coreLightningGLSL } from '../3d/coreLightning.js';
 import { coreOpeningBandWidth, coreOpeningRadius } from '../3d/corePassage.js';
-import { tunnelCoreScale, tunnelDockWidth } from '../utils/tunnelPath.js';
+import { tunnelCoreScale, tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { coreCubieMatrixInto, CORE_ZOOM_MAX } from '../3d/antipodalCore.js';
 
 const shader = () => ({
@@ -53,10 +53,10 @@ describe('core lightning seams', () => {
 describe('the ridden band and the core opening', () => {
   it('fills the opening as the core swells, leaving a rim, and never narrows below its tile', () => {
     for (const size of [2, 3, 5, 10, 15]) {
-      expect(coreOpeningBandWidth(size, 1)).toBeCloseTo(tunnelDockWidth(size), 10);
+      expect(coreOpeningBandWidth(size, 1)).toBeCloseTo(tunnelRiderDockWidth(size), 10);
       for (let zoom = 1; zoom <= CORE_ZOOM_MAX; zoom += 0.25) {
         const width = coreOpeningBandWidth(size, zoom);
-        expect(width).toBeGreaterThanOrEqual(tunnelDockWidth(size));
+        expect(width).toBeGreaterThanOrEqual(tunnelRiderDockWidth(size));
         if (zoom >= 1.5) {
           expect(width).toBeLessThan(2 * coreOpeningRadius(size, zoom));
           expect(width).toBeGreaterThan(1.5 * coreOpeningRadius(size, zoom));
