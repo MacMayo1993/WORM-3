@@ -50,12 +50,16 @@ export default function TunnelTransitOverlay() {
   // the tube, then cuts outside as the worm pops out of the hole. A bloom in the
   // exit tile's colour marks it, as the punch marks the dive in.
   const exitCutRef = useRef(0);
-  const prevPhaseRef = useRef(wormPhase);
-  if (prevPhaseRef.current !== wormPhase) {
-    if (wormPhase === 'windout') exitCutRef.current = 1;
-    prevPhaseRef.current = wormPhase;
-  }
   const exitRef = useRef(null);
+  // The camera calls this in the frame it cuts (tunnelProgressBridge.js), so the
+  // bloom's first frame is the cut's frame, not one or two frames after it.
+  useEffect(() => {
+    tunnelState.onExitCut = () => {
+      exitCutRef.current = 1;
+      if (exitRef.current) exitRef.current.style.opacity = String(prefersReducedMotion() ? 0 : 0.55);
+    };
+    return () => { tunnelState.onExitCut = null; };
+  }, []);
   const vignetteRef = useRef(null);
   const fringeRef = useRef(null);
   const seamRef = useRef(null);
@@ -89,9 +93,12 @@ export default function TunnelTransitOverlay() {
         if (!isActive && exitCutRef.current <= 0) { rafRef.current = null; return; }
       } else {
         const t = tunnelState.t ?? 0;
+        // Where the LENS is (it trails the head by most of a cubie): the crossing
+        // beats mark what the player is looking at, not where the head already is.
+        const lens = tunnelState.lensT ?? t;
         // Squeeze hardest at the Möbius midpoint, where the band's orientation
         // inverts and the camera is rolling through its half-twist.
-        const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, t)));
+        const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, lens)));
 
         if (vignetteRef.current) {
           vignetteRef.current.style.opacity = String(amp * (reduced ? 0.06 : 0.08 + mid * 0.03));
@@ -100,8 +107,9 @@ export default function TunnelTransitOverlay() {
           fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.10 + mid * 0.06));
         }
         if (seamRef.current) {
-          // A brief bloom exactly at ½π — the identification moment.
-          const seam = Math.max(0, 1 - Math.abs(t - 0.5) / 0.07);
+          // A brief bloom exactly at ½π — the identification moment — as the
+          // lens itself passes the antipodal centre.
+          const seam = Math.max(0, 1 - Math.abs(lens - 0.5) / 0.07);
           // A smaller bloom accompanies the early dive through the outer mouth.
           const punch = Math.max(0, 1 - Math.abs(t - 0.10) / 0.045);
           seamRef.current.style.opacity = String(reduced ? 0 : amp * Math.max(seam, punch * punch * 0.65) * 0.08);

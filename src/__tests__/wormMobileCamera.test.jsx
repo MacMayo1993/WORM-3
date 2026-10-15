@@ -15,7 +15,7 @@ import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
 import { getWindWorldPosInto, getTunnelWorldPosInto } from '../worm/wormLogic.js';
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
-import { TUNNEL_CAM_NEAR } from '../worm/tunnelCameraRails.js';
+import { TUNNEL_CAM_NEAR, makeCrossingCloseUp, crossingCloseUpInto, crossingFov } from '../worm/tunnelCameraRails.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeCautionFall, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
@@ -283,13 +283,77 @@ it('widens the portrait tunnel view and restores normal surface framing after de
   worm.activeTunnel.current = {
     entry: { x: 2, y: 4, z: 2, dirKey: 'PY' }, exit: { x: 2, y: 0, z: 2, dirKey: 'NY' }
   };
-  worm.phase.current = 'tunnel'; worm.tunnelProgress.current = .5;
+  // Down the entry arm, well short of the core (the crossing close-up is below).
+  worm.phase.current = 'entering'; worm.tunnelProgress.current = .5;
   for (let i = 0; i < 180; i++) tick();
   expect(scene.camera.fov).toBeGreaterThan(100);
   expect(scene.camera.fov).toBeLessThan(103);
   worm.phase.current = 'crawling'; worm.activeTunnel.current = null;
   for (let i = 0; i < 180; i++) tick();
   expect(scene.camera.fov).toBeCloseTo(surfaceFov, 0);
+});
+
+// The lens trails most of a cubie behind the head, so it is still in the entry
+// arm while the head crosses the core, and the worm there is fitted to the core
+// tile's gauge. The ride frames the core's opening instead of moving the lens.
+it.each([false, true])('frames the core opening through the crossing, and keeps the ride lens for reduced motion (%s)', reduced => {
+  const size = 5, worm = makeWorm(size), zoom = 4;
+  tunnelState.coreZoom = zoom;
+  useGameStore.setState({ wormGamePhase: 'active', settings: { ...useGameStore.getState().settings, reducedMotion: reduced } });
+  render(worm, size);
+  const tunnel = { entry: { x: 2, y: 4, z: 2, dirKey: 'PY' }, exit: { x: 2, y: 0, z: 2, dirKey: 'NY' } };
+  worm.activeTunnel.current = tunnel;
+  worm.phase.current = 'tunnel'; worm.tunnelProgress.current = .5;
+  getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, .5, size);
+  for (let i = 0; i < 180; i++) tick();
+  const closeUp = crossingCloseUpInto(makeCrossingCloseUp(), tunnel, .5, size, zoom);
+  if (reduced) expect(scene.camera.fov).toBeGreaterThan(100);
+  else expect(scene.camera.fov).toBeCloseTo(crossingFov(closeUp, scene.camera.aspect, 100.7), 0);
+  // The opening sits in the middle of the frame, the head inside it.
+  const opening = closeUp.center.clone().project(scene.camera);
+  const head = worm.headInterpPos.current.clone().project(scene.camera);
+  if (!reduced) {
+    expect(Math.hypot(opening.x, opening.y)).toBeLessThan(0.15);
+    expect(scene.camera.fov).toBeLessThan(80);
+  }
+  expect(Math.max(Math.abs(head.x), Math.abs(head.y))).toBeLessThan(0.8);
+  tunnelState.coreZoom = 1;
+  useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: false } });
+});
+
+// The rail aims down the route; round a bend, or where slice turns put both
+// mouths on one face and the route doubles back, the head used to leave a
+// phone's narrow frame or go behind the lens on the way out.
+it.each([3, 5, 15])('keeps the head in a portrait frame through every ride phase on bent and doubled-back routes (%s)', size => {
+  const n = size - 1, c = Math.floor(size / 2);
+  for (const route of [
+    { entry: { x: c, y: n, z: c, dirKey: 'PY' }, exit: { x: 0, y: c, z: c, dirKey: 'NX' } },
+    { entry: { x: 0, y: n, z: n, dirKey: 'PZ' }, exit: { x: n, y: 0, z: 0, dirKey: 'PX' } },
+    { entry: { x: 0, y: n, z: c, dirKey: 'PY' }, exit: { x: n, y: n, z: c, dirKey: 'PY' } },
+  ]) {
+    const worm = makeWorm(size, route.entry.dirKey);
+    const tunnel = { ...route, padExpansion: wormRaisedAmount(size), padHeight: WORM_PAD_HEIGHT };
+    render(worm, size, `frame-${size}-${route.exit.dirKey}-${route.exit.x}`); tick();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    worm.activeTunnel.current = tunnel;
+    let worst = 0;
+    for (const [phase, seconds] of [['entering', tunnelArmSeconds(tunnel)], ['tunnel', 2], ['exiting', tunnelArmSeconds(tunnel)]]) {
+      worm.phase.current = phase;
+      const frames = Math.round(seconds * 60);
+      for (let frame = 1; frame <= frames; frame++) {
+        worm.tunnelProgress.current = frame / frames;
+        getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT(phase, frame / frames), size);
+        tick();
+        const view = worm.headInterpPos.current.clone().applyMatrix4(scene.camera.matrixWorldInverse);
+        expect(view.z).toBeLessThan(0); // in front of the lens
+        const ndc = worm.headInterpPos.current.clone().project(scene.camera);
+        worst = Math.max(worst, Math.abs(ndc.x), Math.abs(ndc.y));
+      }
+    }
+    // Never off screen (the old rail reached 1.7, or behind the lens). Inside the
+    // core the opening is the subject and the head is only kept on screen.
+    expect(worst).toBeLessThan(0.95);
+  }
 });
 
 it('tracks rendered jump and rocket height through turns', () => {

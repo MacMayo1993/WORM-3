@@ -442,6 +442,22 @@ export function tunnelPathTToArc(path, t) {
     + h * (path.legM0[i] * (f3 - 2 * f2 + f) + path.legM1[i] * (f3 - f2));
 }
 
+/**
+ * Inverse of tunnelPathTToArc: the traversal parameter at world arc-length `arc`
+ * (clamped to the path). The pacing is monotone, so a bisection is exact to
+ * float precision; used to say where the lens is in the same t the head uses.
+ */
+export function tunnelPathArcToT(path, arc) {
+  if (!(arc > 0)) return 0;
+  if (arc >= path.total) return 1;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) * 0.5;
+    if (tunnelPathTToArc(path, mid) < arc) lo = mid; else hi = mid;
+  }
+  return (lo + hi) * 0.5;
+}
+
 /** Write the world position at a given world arc-length (clamped to the path). */
 export function tunnelPathArcPointInto(out, path, arc) {
   const a = arc < 0 ? 0 : arc > path.total ? path.total : arc;
