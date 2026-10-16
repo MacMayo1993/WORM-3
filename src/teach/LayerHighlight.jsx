@@ -40,7 +40,7 @@ export const rimVertexShader = `
 // scene, and it can be two planes at once — fbm across all of that, every frame,
 // for the whole ten-second cycle, is the frame killer. What the lite rim still
 // says is the part that matters: this layer, this way, and it is getting close.
-export const rimFragmentShader = lite => `
+export const rimFragmentShader = (lite, occluded = false) => `
   uniform vec3  uDeep;
   uniform vec3  uCore;
   uniform float uTime;
@@ -85,7 +85,9 @@ export const rimFragmentShader = lite => `
     }
     sweep = clamp(sweep, 0.0, 1.25);
 
-    float glow = ((line * 0.40 + halo * 0.60) * (0.45 + sweep * 1.05) + fill * (0.03 + sweep * 0.055)) * uGain;
+    float glow = ${occluded
+      ? 'line * step(0.4, fract(s * 8.0 - uDir * uTime * 0.6)) * (0.14 + sweep * 0.22)'
+      : '((line * 0.40 + halo * 0.60) * (0.45 + sweep * 1.05) + fill * (0.03 + sweep * 0.055)) * uGain'};
     if (glow < 0.004) discard;
 
     vec3 col = mix(uDeep, uCore, clamp(sweep * 0.6 + line * 0.3, 0.0, 1.0));
@@ -275,11 +277,12 @@ const STREAMERS = 3;
  *                    a 15×15 it costs more than the frame has. The information is
  *                    in the rim, so the rim is what a big cube keeps.
  * @param surfaceOnly exterior-facing rims without the orbiting decoration
+ * @param showOccluded dashed direction cues where a paired plane is hidden by the cube
  * @param cubieTransforms live piece registry for exploded/raised/rotating rims
  * @param expansionRef fallback lattice expansion while pieces are mounting
  */
 const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1, lite = false,
-  surfaceOnly = false, cubieTransforms = null, expansionRef = null }) => {
+  surfaceOnly = false, showOccluded = false, cubieTransforms = null, expansionRef = null }) => {
   const spinnerRef = useRef();
   const rimRef = useRef();
   const worldToRim = useMemo(() => new THREE.Matrix4(), []);
@@ -438,6 +441,19 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
           blending={THREE.AdditiveBlending}
         />
       </mesh>
+
+      {/* A paired turn can put its second plane entirely behind the cube.
+          Dashed, unfilled rims reveal only the occluded portions; the ordinary
+          surface warning still owns visible tiles. Share the animated geometry
+          and uniforms so both passes follow the same pieces and turn direction. */}
+      {showOccluded && (
+        <mesh name="layer-warning-occluded" frustumCulled={false} raycast={() => null}>
+          <primitive object={rimGeometry} attach="geometry" />
+          <shaderMaterial vertexShader={rimVertexShader} fragmentShader={rimFragmentShader(true, true)}
+            uniforms={rimUniforms} transparent side={THREE.DoubleSide}
+            depthFunc={THREE.GreaterDepth} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      )}
 
       {!rimOnly && (
       <group quaternion={belt.quaternion} position={belt.position}>

@@ -109,6 +109,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size, wo
                     gain={lite ? RIM_GAIN_LITE : RIM_GAIN}
                     lite={lite}
                     surfaceOnly
+                    showOccluded={indices.length > 1}
                     cubieTransforms={liveCubies}
                     expansionRef={worm?.expansionAmount}
                 />

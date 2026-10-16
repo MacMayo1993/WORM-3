@@ -70,7 +70,9 @@ export default function WormEffectWarmup({ body }) {
     materials.push(...ownedRaised.map(mesh => mesh.material), ...bored.map(mesh => mesh.material));
     // The slice-warning rim mounts with each warning and unmounts after the turn;
     // holding its programs here keeps every warning after the first from relinking.
-    const rims = [false, true].map(lite => new THREE.ShaderMaterial({ vertexShader: rimVertexShader, fragmentShader: rimFragmentShader(lite),
+    const rims = [[false, false], [true, false], [true, true]].map(([lite, occluded]) => new THREE.ShaderMaterial({
+      vertexShader: rimVertexShader, fragmentShader: rimFragmentShader(lite, occluded),
+      side: occluded ? THREE.DoubleSide : THREE.FrontSide,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     materials.push(...rims);
     const meshes = [...pickupWarmupMeshes(pool.warm, geometry), ...flips, ...raised, ...bored,
