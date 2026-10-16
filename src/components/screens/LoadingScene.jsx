@@ -5,8 +5,8 @@
  *
  * The same black-plastic cube with glossy classic stickers as IntroScene drops
  * out of a portal hanging above, falls into the wormhole in the paper, and comes
- * straight back out of the portal above — mid-transit it is in both at once, its
- * lower half already falling out of the top portal. On the way its top layer
+ * straight back out of the portal above — mid-transit it is split between them,
+ * as much of it out of the top portal as has sunk into the paper. On the way its top layer
  * gives a half twist, and the sticker flip wave turns the cube to its antipodal
  * colours and back. LoadingPortal draws the waving paper and both portals.
  *
@@ -18,7 +18,7 @@
  * initial route; preloadAssets.js warms the chunk during the opening.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
 import { shaftClipPath } from './loadingWormhole.js';
@@ -75,18 +75,21 @@ const Airflow = React.memo(function Airflow() {
   </div>;
 });
 
-// From the upper portal's far edge to the floor portal's near edge.
+// Between the two portals' near lips.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
 
 export default function LoadingScene({ translucent = false }) {
+  const sceneRef = useRef(null);
+  const fallRef = useRef(null);
   const wellRef = useRef(null);
   const topRef = useRef(null);
-  // The CSS animations start as the scene mounts; the portals keep the same clock.
-  const [startedAt] = useState(() => performance.now());
+  // `wl-live` holds the scene still and hidden until LoadingPortal has drawn
+  // the portals once and adds `wl-ready`; the portals then run off the fall's
+  // own clock, so they stay in step with the cube.
   return (
     <>
-      <LoadingPortal wellRef={wellRef} topRef={topRef} startedAt={startedAt} translucent={translucent} />
-      <div className="wl-scene">
+      <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} translucent={translucent} />
+      <div className="wl-scene wl-live" ref={sceneRef}>
         <div className="wl-well" ref={topRef} />
         <div className="wl-gap" />
         <div className="wl-well" ref={wellRef}>
@@ -96,7 +99,7 @@ export default function LoadingScene({ translucent = false }) {
         {/* The cube and its twin one drop below: as the one goes into the
             paper, the other is the same cube coming out of the portal above. */}
         <div className="wl-shaft" style={SHAFT_STYLE}>
-          <div className="wl-fall">
+          <div className="wl-fall" ref={fallRef}>
             <div className="wl-view">
               <Airflow />
               <Cube />
