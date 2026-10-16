@@ -41,7 +41,7 @@ import * as THREE from 'three';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
-import { getNextSurfacePosition, getWormholeHealRing, makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
+import { getNextSurfacePosition, getWormholeHealRing, makeTunnelCenterline, buildTunnelCenterlineInto, turnWorm } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
 import { WORM_PAD_HEIGHT, WORM_PIECE_POP, raisedWormExpansion } from '../game/raisedCubie.js';
@@ -764,6 +764,37 @@ describe('flipped tiles and tunnel traversal', () => {
     const tunnelKey = 'test-tunnel';
     return { cubies, tunnel, tunnelKey };
   }
+
+  it.each(['queued', 'approach', 'windup', 'entering', 'tunnel', 'exiting', 'windout'])('discards extra jumps during %s while preserving exit steering', stage => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const reverse = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+    for (const tile of [tunnel.entry, tunnel.exit]) cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey].flips = 1;
+    const sim = makeSim();
+    const ctx = makeCtx({
+      getCubies: () => cubies,
+      getTunnelEntry: () => 'pad',
+      resolveTunnel: (_x, _y, _z, dirKey) => ({ tunnel: dirKey === tunnel.exit.dirKey ? reverse : tunnel, tunnelKey }),
+    });
+    if (stage === 'queued') queueTurn(sim, 'jump');
+    else {
+      startJump(sim, ctx, SIZE);
+      expect(sim.padFlight).not.toBeNull();
+      if (stage !== 'approach') expect(runUntil(sim, ctx, () => sim.phase === stage)).toBe(true);
+      queueTurn(sim, 'jump');
+    }
+    queueTurn(sim, 'turnRight');
+    queueTurn(sim, 'jump');
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling' && !sim.padFlight && sim.tunnelPassages.length > 0)).toBe(true);
+    const exitDirection = sim.moveDir;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.padFlight).toBeNull();
+    expect(sim.isJumping).toBe(false);
+    expect(sim.moveDir).toBe(turnWorm(exitDirection, 'right'));
+    expect(sim.pendingTurns).toEqual([]);
+    expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
+    expect(sim.tunnelUseCounts.get(tunnelKey)).toBe(1);
+  });
 
   it('enters windup when fully stepping onto a flipped tile', () => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();

@@ -940,6 +940,9 @@ export function queueTurn(sim, dir) {
     if (dir === 'signature-hold') { if (sim.alive) sim.signature.held = true; return; }
     if (!sim.alive || sim.phase === 'falling') return;
     if (sim.signature.sweep) return;
+    // A pad flight and its tunnel ride own the jump through touchdown. Buffering
+    // another press here would dive straight back into the exit mouth.
+    if (dir === 'jump' && (sim.phase !== 'crawling' || sim.padFlight)) return;
     if (sim.jumpRescueT > 0) {
         if (sim.cautionRescue) {
             const action = dir === 'turnLeft' ? 'left' : dir === 'turnRight' ? 'right' : dir;
@@ -1105,6 +1108,8 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     sim.tunnelProgress = 0;
     sim.selfPassPending = bodyStillRiding(sim);
     // Raised landings loop around the rim before diving; keep the existing history.
+    // Also discard jumps queued before the entry committed, retaining exit steering.
+    sim.pendingTurns = sim.pendingTurns.filter(action => action !== 'jump');
     sim.phase = 'windup';
     ctx.feel('dive');
     sim.onFlippedTile = false;
@@ -2667,8 +2672,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         if (sim.rocketT === 0) {
             sim.rocketActive = false;
             sim.rocketBoostHandoffT = ROCKET_BOOST_HANDOFF;
+            // Protection uses the landing clock. selfCollisionGraceSteps counts
+            // whole tiles; STEPS_PER_TILE counts body samples and granted 50 tiles.
             sim.landingGraceT = ROCKET_LANDING_GRACE;
-            sim.selfCollisionGraceSteps = Math.max(sim.selfCollisionGraceSteps, STEPS_PER_TILE);
             sim.pendingSelfCollision = null;
             sim.pendingTunnelTrigger = null;
             ctx.feel('rocketLand');
