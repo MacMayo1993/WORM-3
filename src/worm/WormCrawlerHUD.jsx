@@ -918,16 +918,8 @@ function BuffStrip({ detailed = false, onInspect }) {
                 <span ref={elemSecondsRef} aria-hidden="true" />
                 {hasWater && <span className="worm-buff-meter worm-momentum-meter" ref={momentumRef} aria-hidden="true" />}
             </button>
-            {fusion && !detailed && <div className="worm-fusion-live" key={fusion.id}>
-                <span role="status">{partnerDef.label} → {elemDef.label} · Both active</span>
-                <strong ref={feedbackRef}>{fusionFeedback(fusion, wormBuffs).text}</strong>
-            </div>}
-            {detailed && <div className="worm-power-detail">{fusion && <strong>{fusionRecipeLabel(fusion)} · Both elements active</strong>}<p>{elemDescription}</p><p ref={feedbackRef} /></div>}
-            {preview && (detailed
-                ? <p className="worm-fusion-preview">Next pickup — {fusionRecipeLabel(preview)}. {preview.description}</p>
-                : <button type="button" className="worm-fusion-preview" onClick={onInspect} title={preview.description}>
-                    Next: {getElementalDef(preview.catalyst).label} → {preview.label} <span aria-hidden="true">ⓘ</span>
-                  </button>)}
+            {detailed && <div className="worm-power-detail">{fusion && <strong>{fusionRecipeLabel(fusion)} · Both elements active</strong>}<p>{elemDescription}</p>{fusion && IGNITIONS[fusion.id] && <p>{IGNITIONS[fusion.id].text}</p>}<p ref={feedbackRef} /></div>}
+            {preview && detailed && <p className="worm-fusion-preview">Next pickup — {fusionRecipeLabel(preview)}. {preview.description}</p>}
         </div>}
     </div>;
 }
@@ -982,41 +974,6 @@ function SpecialNotice({ suppressed = false }) {
         >
             <SpecialIcon type={shown.type} size={13} />
             <span>{expired ? `${def.label} GONE` : `${def.label} NEARBY`}</span>
-        </div>
-    );
-}
-
-// ─── Fusion banner ───────────────────────────────────────────────────────────
-// Two elements just fused. The claim camera pulls out to show the cube transform; this
-// names what the pair now does, in the two elements' colours, so a fusion reads as an
-// event and not as another pickup.
-
-const FUSION_BANNER_MS = 3200;
-
-function FusionBanner() {
-    const notice = useGameStore(s => s.wormFusionNotice);
-    const [shown, setShown] = useState(null);
-    const timer = useRef(null);
-    useEffect(() => {
-        if (!notice) { setShown(null); return; }
-        setShown(notice);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => setShown(null), FUSION_BANNER_MS);
-        return () => clearTimeout(timer.current);
-    }, [notice]);
-    const recipe = shown ? ORDERED_FUSIONS[shown.key] : null;
-    if (!recipe) return null;
-    const base = getElementalDef(recipe.base), catalyst = getElementalDef(recipe.catalyst);
-    return (
-        <div key={shown.seq} className="worm-fusion-banner" role="status" aria-live="assertive"
-            style={{ '--fusion-a': base.color, '--fusion-b': catalyst.color, fontFamily: UI_FONT }}>
-            <span className="worm-fusion-kicker" style={{ fontFamily: HEADING_FONT }}>
-                <SpecialIcon type={recipe.base} size={14} /> {base.label} → {catalyst.label} <SpecialIcon type={recipe.catalyst} size={14} />
-            </span>
-            <FusionSigilIcon recipe={recipe.id} size={40} className="worm-fusion-sigil" />
-            <span className="worm-fusion-name" style={{ fontFamily: DISPLAY_FONT }}>{recipe.label}</span>
-            {IGNITIONS[recipe.id] && <span className="worm-fusion-ignite" style={{ fontFamily: HEADING_FONT }}>{IGNITIONS[recipe.id].text}</span>}
-            <span className="worm-fusion-rule">{recipe.description}</span>
         </div>
     );
 }
@@ -1088,6 +1045,25 @@ function BoostButton({ wormAlive }) {
 }
 
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
+
+// Power details are deliberately opt-in. A pickup or tunnel phase change can
+// update the compact chip, but never opens a dialog or pauses the simulation.
+function PowerInfo({ onResume }) {
+    const dialogRef = useRef(null);
+    const onDialogKeyDown = useDialogBehavior(dialogRef, onResume);
+    return <div style={overlayScrimStyle({ tint: UI_MOSS_LIGHT, fixed: false, zIndex: 10 })} onClick={onResume}>
+        <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} role="dialog" aria-modal="true"
+            aria-label="Active power information" className={`worm-power-info ${OVERLAY_CARD_CLASS}`}
+            style={{ ...overlayCardStyle(UI_MOSS_LIGHT, { width: 420 }), ...arcadeModeVars('worm') }}
+            onClick={e => e.stopPropagation()}>
+            <ScreenHeading mode="pause" title="Active powers" />
+            <p>Game paused</p>
+            <BuffStrip detailed />
+            <FusionGuide />
+            <button type="button" className="worm-pause-resume arcade-primary" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
+        </div>
+    </div>;
+}
 
 function SignatureGuide() {
     const character = useGameStore(s => s.wormCharacter);
@@ -1236,7 +1212,7 @@ function PauseKey({ label, icon, onClick, pressed }) {
     </button>;
 }
 
-function HudContext({ surface, demo, onInspect }) {
+function HudContext({ surface, demo, onInspect, onPowerInspect }) {
     const hasBuff = useGameStore(s => s.wormOrbShowerActive || s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme || !!s.wormViewPower);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
@@ -1245,7 +1221,7 @@ function HudContext({ surface, demo, onInspect }) {
     }, []);
     const healing = hasTunnel && !demo;
     return <div className="worm-hud-context">
-        {healing ? <TunnelNeedsCard compact onInspect={onInspect} /> : surface && hasBuff ? <BuffStrip onInspect={onInspect} /> : null}
+        {healing ? <TunnelNeedsCard compact onInspect={onInspect} /> : surface && hasBuff ? <BuffStrip onInspect={onPowerInspect} /> : null}
         {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
         <SpecialNotice suppressed={healing || hasBuff || !surface} />
     </div>;
@@ -1257,6 +1233,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const showCutawayLens = useGameStore(s => s.showCutawayLens && !inspectionSuspended(s));
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const [showPowerInfo, setShowPowerInfo] = useState(false);
     const captureMode = useGameStore(s => s.captureMode);
 
     ensureHudStyle();
@@ -1280,7 +1257,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         useGameStore.setState({ wormPauseMenuOpen: isPaused });
         return () => useGameStore.setState({ wormPauseMenuOpen: false });
     }, [isPaused]);
-    useEffect(() => { setIsPaused(false); }, [runId]);
+    useEffect(() => { setIsPaused(false); setShowPowerInfo(false); }, [runId]);
     useLayoutEffect(() => {
         const tray = trayRef.current;
         if (!tray || captureMode) return;
@@ -1349,12 +1326,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const handlePause = useCallback(() => {
         if (!canPause) return;
         resumeFeel(); feel('uiKey');
+        setShowPowerInfo(false);
+        setIsPaused(true);
+        setWormPaused(true);
+    }, [canPause, setWormPaused]);
+    const handlePowerInspect = useCallback(() => {
+        if (!canPause) return;
+        resumeFeel(); feel('uiKey');
+        setShowPowerInfo(true);
         setIsPaused(true);
         setWormPaused(true);
     }, [canPause, setWormPaused]);
     const handleResume = useCallback(() => {
         resumeFeel(); feel('uiKey');
         setIsPaused(false);
+        setShowPowerInfo(false);
         setWormPaused(['spawning', 'countdown'].includes(useGameStore.getState().wormGamePhase) || (storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormFinished)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode, storyId]);
 
@@ -1403,8 +1389,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
-            {/* Two elements just fused: named over the claim camera beat, outside the clipped status row. */}
-            {wormAlive && phase === 'crawling' && <FusionBanner />}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
@@ -1444,7 +1428,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                 </div>
                 <div className="worm-hud-status-row worm-hud-telemetry">
-                    {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
+                    {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
                 </div>
                 {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                 {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
@@ -1492,7 +1476,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             </div>}
 
             {/* ── Pause Menu Overlay ── */}
-            {isPaused && !showCutawayLens && (
+            {isPaused && !showCutawayLens && showPowerInfo && <PowerInfo onResume={handleResume} />}
+            {isPaused && !showCutawayLens && !showPowerInfo && (
                 <PauseMenu
                     onResume={handleResume}
                     onHome={onHome}
