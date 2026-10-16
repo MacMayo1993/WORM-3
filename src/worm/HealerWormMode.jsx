@@ -9,7 +9,7 @@ import { WormLighting } from './WormLighting.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
 import { springSlamTiles } from './healerWorm/jumpLanding.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
-import { storySurfaceTile } from './story/mastery.js';
+import { storyBombTile, STORY_BOMB_OPENING_DELAY, STORY_BOMB_REFILL_DELAY, STORY_BOMB_FUSE } from './story/bombs.js';
 import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
 import { combatBridge, strikeEnemies, afflictEnemies, nearestEnemy } from './combat/portalCombat.js';
@@ -510,7 +510,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             bombsRef.current          = [];
             bombMembershipRef.current++;
             blastApiRef.current?.clear();
-            bombTimerRef.current      = BOMB_SPAWN_INTERVAL;
+            bombTimerRef.current      = story?.mechanics?.bombs ? STORY_BOMB_OPENING_DELAY : BOMB_SPAWN_INTERVAL;
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
 
@@ -569,7 +569,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         pendingRotRef.current = null;
         warningProgressRef.current = 0;
         resetRotationClock();
-        bombTimerRef.current = BOMB_SPAWN_INTERVAL;
+        bombTimerRef.current = storyLevel(useGameStore.getState().wormStoryLevel)?.mechanics?.bombs
+            ? STORY_BOMB_OPENING_DELAY : BOMB_SPAWN_INTERVAL;
         useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
     };
 
@@ -656,8 +657,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             runFusionBurst();
         }
 
-        // Story objectives own their ending; later challenges repeat the warned slice cycle.
-        if (store.wormStoryLevel && (!story?.rotateEvery || store.wormStoryResult)) { resetRotationClock(); return; }
+        // Story objectives own their ending. Bomb supply also runs on stories
+        // without a slice cycle; only the rotation section skips those below.
+        if (store.wormStoryLevel && store.wormStoryResult) { resetRotationClock(); return; }
 
         // The combat arena owns its ending; ordinary bombs and solving turns stay off.
         if (store.wormCombatMode) { resetRotationClock(); return; }
@@ -694,8 +696,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
-        runStorm(store, delta);
-        if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
+        if (!story || story.rotateEvery) runStorm(store, delta);
+        if (!story && combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
         // A head that changed sides of the turning layer early in the turn is
         // resolved as if it had been there when the turn fired. This must run
         // before the animState guard below: the hazard's own tween sets animState
@@ -768,15 +770,15 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             occupied.clear();
             for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
 
-            if (story?.mechanics?.bombs && worm.storyBombsNeeded?.() && bombsRef.current.length === 0 &&
-                wormBuffs.elementalT <= 0) {
+            if (story?.mechanics?.bombs && worm.storyBombsNeeded?.() && bombsRef.current.length === 0) {
                 bombTimerRef.current -= bdelta;
                 if (bombTimerRef.current <= 0 && warningProgressRef.current <= 0) {
-                    const tile = storySurfaceTile({ pos: worm.pos.current }, size, store.cubies, occupied);
+                    const tile = storyBombTile(worm.pos.current, size, store.cubies, occupied,
+                        combatBridge.current, [...worm.powerups.current, ...worm.specials.current]);
                     if (tile) {
-                        bombsRef.current.push({ id: bombSeqRef.current++, tile, fuse: 25, maxFuse: 25 });
+                        bombsRef.current.push({ id: bombSeqRef.current++, tile, fuse: STORY_BOMB_FUSE, maxFuse: STORY_BOMB_FUSE });
                         bombMembershipRef.current++;
-                        bombTimerRef.current = 10;
+                        bombTimerRef.current = STORY_BOMB_REFILL_DELAY;
                     }
                 }
             }
@@ -912,6 +914,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // The store snapshot above predates bomb damage. A lethal explosion must
         // not dequeue a slice or overwrite its death cue in the same frame.
         if (!useGameStore.getState().wormAlive) return;
+
+        if (store.wormStoryLevel && !story?.rotateEvery) { resetRotationClock(); return; }
+        // Encounters hold slices, but never hold Story bomb supply or fuses.
+        if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
 
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         if (holdsRotationTimer(worm.signature.current)) { rotationClock.held = true; return; }

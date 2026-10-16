@@ -10,7 +10,8 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { stageStory } from '../worm/story/runtime.js';
-import { storyLevel, storyRotationCycle } from '../worm/story/levels.js';
+import { WORM_STORY_LEVELS, storyLevel, storyRotationCycle } from '../worm/story/levels.js';
+import { recordStoryMechanic } from '../worm/story/mastery.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
@@ -307,6 +308,68 @@ it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary 
   expect(sim.orbCascades).toHaveLength(1);
   expect(props.bombsRef.current).toHaveLength(0);
   expect(useGameStore.getState().parityPoints).toBe(coins);
+});
+
+it.each(WORM_STORY_LEVELS.filter(level => level.mechanics?.bombs))(
+  'supplies the entire bomb objective for level $id during an encounter with zero kills', level => {
+    const size = level.cubeSize;
+    resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+    const practice = stageStory(sim, size, level), cubies = practice.cubies;
+    worm.storyBombsNeeded = () => (practice.mechanics.bombs ?? 0) < level.mechanics.bombs;
+    worm.recordStoryBomb = id => recordStoryMechanic(practice, 'bombs', id);
+    act(() => useGameStore.setState({ size, cubies, wormStoryLevel: level.id, wormStoryStarted: true,
+      wormStoryResult: null, wormPauseMenuOpen: false }));
+    act(() => root.render(<Harness cubies={cubies} size={size} onRotate={rotate} onAnimatedShuffle={vi.fn()} />));
+    const combat = makeCombat(size, sim.pos);
+    combat.ambient = true; combat.encounter = true;
+    combat.enemies.push(makeEnemy(combat)); combatBridge.current = combat;
+    const { bombsRef } = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+    tick(100); // briefing/pause cannot spend the opening delay
+    expect(bombsRef.current).toHaveLength(0);
+    act(() => useGameStore.setState({ wormPaused: false }));
+    sim.elementalType = 'water'; sim.elementalT = wormBuffs.elementalT = 10;
+    tick(31);
+    expect(bombsRef.current).toHaveLength(1);
+    const first = bombsRef.current[0];
+    tick(10);
+    expect(first.fuse).toBeCloseTo(23.8);
+    // A missed bomb must be replaced, without awarding disarm progress.
+    checkBlastHitWorm.mockReturnValue(null);
+    first.fuse = 0.01; tick();
+    expect(practice.mechanics.bombs ?? 0).toBe(0);
+    tick(51);
+    expect(bombsRef.current).toHaveLength(1);
+    for (let n = 0; n < level.mechanics.bombs; n++) {
+      expect(bombsRef.current).toHaveLength(1);
+      isBombDisarmed.mockReturnValueOnce(true); tick();
+      expect(practice.mechanics.bombs).toBe(n + 1);
+      expect(bombsRef.current).toHaveLength(0);
+      tick(51);
+    }
+    expect(bombsRef.current).toHaveLength(0);
+    expect(combat.kills).toBe(0);
+    expect(combat.enemies).toHaveLength(1);
+    expect(rotate).not.toHaveBeenCalled();
+  }
+);
+
+it('runs quest bombs without a rotation schedule and freezes them on a result screen', () => {
+  const level = storyLevel(86), rotateEvery = level.rotateEvery;
+  try {
+    level.rotateEvery = 0;
+    worm.storyBombsNeeded = () => true;
+    act(() => useGameStore.setState({ wormStoryLevel: 86, wormStoryStarted: true, wormPaused: false }));
+    const { bombsRef } = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+    tick(201);
+    expect(bombsRef.current).toHaveLength(1);
+    const bomb = bombsRef.current[0], fuse = bomb.fuse;
+    act(() => useGameStore.setState({ wormStoryResult: { won: true } }));
+    tick(100);
+    expect(bomb.fuse).toBe(fuse);
+    expect(rotate).not.toHaveBeenCalled();
+  } finally {
+    level.rotateEvery = rotateEvery;
+  }
 });
 
 it("Spring's landing defuses the bombs in the 3x3 around it, pays for each, and leaves farther ones ticking", () => {
