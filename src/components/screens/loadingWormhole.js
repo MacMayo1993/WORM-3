@@ -10,27 +10,34 @@
 /**
  * The cube's endless fall between the two portals: out of the one above, into
  * the one on the paper, and out of the one above again. Must match
- * LoadingScene.css: `--wl-beat` is the period, `--wl-drop` the drop between the
- * portals (in cubes), and the `wl-fall` keyframes start the cube `lead` cubes
- * above the top portal, still inside it. Time 0 is that start, as the screen
- * mounts. The cube passes through both portals at once — its centre sinks
- * through the bottom mouth as its twin's comes out of the top one — `lead`
- * cubes into each fall.
+ * LoadingScene.css and LoadingScreen.css: `--wl-beat` is the period, `--wl-drop`
+ * the drop between the portals' centres (in cubes), and the `wl-fall` keyframes
+ * start the cube `lead` cubes above the top portal's centre. Time 0 is that
+ * start, as the scene's animations begin.
+ *
+ * Both portals cut the cube along their near (lower) lip, which sits `lip`
+ * cubes below each portal's centre (the mouth's half-height: 0.18 of a mouth
+ * 2.4 cubes wide). The cube and its twin are exactly one drop apart, so the two
+ * cuts fall on the same line of the cube: whatever has sunk into the paper has
+ * come out of the portal above, and the two pieces always add up to one cube.
+ * The cube passes through — half of it in each portal — when its centre crosses
+ * the lip, `lead + lip` cubes into each fall, which this `lead` puts at mid-beat.
+ * That also leaves the restart (cube fully inside the top portal, twin fully
+ * sunk) as far from either lip as the cube's height allows.
  */
-export const FALL = { period: 1.5, drop: 2.8, lead: 1.4 };
+export const FALL = { period: 1.5, drop: 2.8, lip: 0.432, lead: 0.968 };
 /** Seconds into each fall at which the cube passes through the portals. */
-export const PASS_AT = (FALL.period * FALL.lead) / FALL.drop;
+export const PASS_AT = (FALL.period * (FALL.lead + FALL.lip)) / FALL.drop;
 
 const fmt = (v) => +v.toFixed(4);
 
 /**
  * The CSS clip-path for the shaft the cube falls down, which is exactly as wide
- * as the portals and runs from the top of the one above to the bottom of the one
- * on the paper. The upper portal faces down: the cube emerges across its mouth
- * from the far (upper) arc, then passes IN FRONT of its lower rim. The floor
- * portal faces up: the cube sinks behind its near (lower) arc. Clipping both
- * at their near arcs makes the upper portal look like an opaque lid.
- * `rim` is the CSS length of a portal's half-height.
+ * as the portals and runs from the near lip of the one above to the near lip
+ * of the one on the paper. Both portals are holes seen from above: the cube
+ * slides out from under the upper one's near lip and sinks behind the floor
+ * one's, cut along the same line of the cube in each, so it is never in both
+ * at once. `rim` is the CSS length of a portal's half-height.
  */
 export function shaftClipPath(rim = 'var(--wl-wb)', steps = 12) {
   const arc = (centre, from, to) =>
@@ -38,9 +45,9 @@ export function shaftClipPath(rim = 'var(--wl-wb)', steps = 12) {
       const angle = from + ((to - from) * i) / steps;
       return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${rim} * ${fmt(Math.sin(angle))})`;
     });
-  // Left to right along the ceiling's far edge, then right to left along the
-  // floor's near edge. The rim canvas covers these two cut lines.
-  return `polygon(${[...arc(rim, Math.PI, Math.PI * 2), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
+  // Left to right along the ceiling's near edge, then right to left along the
+  // floor's. The lips canvas covers both cut lines.
+  return `polygon(${[...arc(rim, Math.PI, 0), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
 }
 
 export const THROAT = 0.17; // throat radius, as a fraction of the mouth

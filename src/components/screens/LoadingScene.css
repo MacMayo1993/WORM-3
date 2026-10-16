@@ -15,14 +15,20 @@
  *  - Fully respects prefers-reduced-motion (a still 3/4 pose between portals).
  *
  * The fall: the cube drops a drop (--wl-drop, the gap between the portals'
- * centres) every --wl-beat, at a steady terminal speed, starting 1.4 cubes up
+ * centres) every --wl-beat, at a steady terminal speed, starting 0.968 cubes up
  * inside the top portal. A twin one drop below makes the loop: as the cube sinks
  * into the paper its twin is the same cube coming out of the top, and when the
  * fall repeats the two swap places unseen. The shaft is clipped to the open air
- * from the ceiling portal's far edge to the floor portal's near edge
- * (shaftClipPath), with those halves of their lips drawn over it.
- * loadingWormhole.js (FALL) holds the same numbers and kicks both portals as
- * the cube passes through, 50% into each fall.
+ * between the two portals' near lips (shaftClipPath), which the lips canvas
+ * draws over it. Cube and twin are cut on the same line, so exactly as much
+ * comes out of the top as has gone into the paper. loadingWormhole.js (FALL)
+ * holds the same numbers and kicks both portals as the cube passes through,
+ * half in each, 50% into each fall.
+ *
+ * Nothing moves until the portals have drawn their first frame: until then the
+ * scene and the canvases are hidden and every animation in it is paused, so the
+ * cover fades in on a whole picture and the canvases, which read their clock
+ * from the fall itself, start in step with the cube.
  *
  * Over four falls (--wl-cycle) the top layer gives two half twists, each while
  * the cube is in the open (16.5% and 66.5% of the cycle), and the flip wave
@@ -43,6 +49,24 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+/* Held still and hidden until LoadingPortal has drawn the portals once. */
+.wl-scene.wl-live,
+.wl-backdrop.wl-live {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.wl-scene.wl-live:not(.wl-ready) *,
+.wl-scene.wl-live:not(.wl-ready) *::before,
+.wl-scene.wl-live:not(.wl-ready) *::after {
+  animation-play-state: paused !important;
+}
+
+.wl-scene.wl-ready,
+.wl-backdrop.wl-ready {
+  opacity: 1;
 }
 
 /* The clipped halves of the portal lips, over the falling cube. Keep this
@@ -75,8 +99,8 @@
 }
 
 @keyframes wl-fall {
-  from { transform: translateY(calc(var(--wl-cube) * -1.4)); }
-  to { transform: translateY(calc(var(--wl-cube) * -1.4 + var(--wl-drop))); }
+  from { transform: translateY(calc(var(--wl-cube) * -0.968)); }
+  to { transform: translateY(calc(var(--wl-cube) * -0.968 + var(--wl-drop))); }
 }
 
 .wl-view {

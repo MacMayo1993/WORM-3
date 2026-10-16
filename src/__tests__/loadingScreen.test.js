@@ -114,30 +114,41 @@ describe('the shaft between the portals', () => {
   const clip = shaftClipPath('R', 12);
   const points = clip.slice('polygon('.length, -1).split(', ');
 
-  it('reveals the cube through the ceiling opening and hides it inside the floor opening', () => {
+  it("cuts the cube along each portal's near lip", () => {
     expect(points).toHaveLength(26);
     expect(points[0]).toBe('0% calc(R + R * 0)');
-    expect(points[6]).toBe('50% calc(R + R * -1)'); // far edge: the whole exit mouth is visible
+    expect(points[6]).toBe('50% calc(R + R * 1)'); // the upper portal's near lip
     expect(points[12]).toBe('100% calc(R + R * 0)');
     expect(points[13]).toBe('100% calc(100% - R + R * 0)');
-    expect(points[19]).toBe('50% calc(100% - R + R * 1)');
+    expect(points[19]).toBe('50% calc(100% - R + R * 1)'); // the floor portal's near lip
     expect(points[25]).toBe('0% calc(100% - R + R * 0)');
   });
 
-  it('clips opposite sides of the downward exit and upward entrance', () => {
-    for (const [i, point] of points.entries()) {
-      const sin = Number(point.match(/\* (-?[\d.]+)\)$/)[1]);
-      if (i <= 12) expect(sin).toBeLessThanOrEqual(0);
-      else expect(sin).toBeGreaterThanOrEqual(0);
-    }
+  it('cuts the cube and its twin, one drop apart, on the same line, so it is never in both portals', () => {
+    const upper = points
+      .slice(0, 13)
+      .map((p) => p.replace('calc(R + ', 'calc('))
+      .reverse();
+    const lower = points.slice(13).map((p) => p.replace('calc(100% - R + ', 'calc('));
+    expect(lower).toEqual(upper);
   });
 
-  it('starts above the visible exit and keeps the discarded twin below the entrance', () => {
+  it('passes through, half in each portal, mid-fall', () => {
+    // The lip is the mouth's half-height: 0.18 of a mouth 2.4 cubes wide.
+    expect(FALL.lip).toBeCloseTo(2.4 * 0.18, 6);
+    expect(shellCss).toContain('aspect-ratio: 1 / 0.36;');
+    expect(css).toContain('--wl-wb: calc(var(--wl-well-w) * 0.18);');
+    expect(shellCss).toContain('--wl-well-w: min(calc(var(--wl-cube) * 2.4), 88vw);');
+    expect(PASS_AT / FALL.period).toBeCloseTo(0.5, 6);
+  });
+
+  it('restarts the fall with the cube hidden inside the top portal and its twin sunk into the paper', () => {
     // Conservative projected half-height of the tilted CSS cube, in cubes.
     const halfCube = 0.9;
-    const halfMouth = 2.4 * 0.18;
-    expect(-FALL.lead + halfCube).toBeLessThan(-halfMouth);
-    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + halfMouth);
+    // The cube starting the fall is wholly above the upper portal's near lip ...
+    expect(-FALL.lead + halfCube).toBeLessThan(FALL.lip - 0.4);
+    // ... and the twin ending it wholly below the floor portal's.
+    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.lip + 0.4);
   });
 });
 

@@ -10,16 +10,20 @@
  *    dragged down into the mouth on the floor;
  *  - the portals, behind the cube: the spinning funnel in the paper (grid
  *    swirling in, sticker confetti falling through, a worm riding the vortex
- *    out of the throat and back), the same tunnel seen through the portal
- *    hanging above (viewed from below), and the exposed halves of their lips;
- *  - the upper portal's far lip and the floor portal's near lip, drawn over the
- *    cube to hide the cut lines as it comes out and goes in.
+ *    out of the throat and back), the same tunnel through the portal hanging
+ *    above, and the far halves of their lips. Both are seen from above, as the
+ *    cube is, so it comes out from under the upper one's near lip exactly as it
+ *    sinks behind the lower one's;
+ *  - both portals' near lips, drawn over the cube to hide the cut lines as it
+ *    comes out and goes in.
  *
  * The portals sit wherever LoadingScene's `.wl-well` elements are, so the cube's
- * CSS fall, shadow and ripple always line up with them. Time is measured from
- * `startedAt`, the moment the cube's CSS animations began, so both portals kick
- * as the cube passes through. The RAF loop is torn down on unmount; reduced
- * motion draws a still frame on a flat, unmoving sheet.
+ * CSS fall, shadow and ripple always line up with them. Time is read from the
+ * fall's own CSS animation, so both portals kick as the cube passes through even
+ * when the cover mounts in a busy frame. The scene is held still and hidden
+ * until the first frame is drawn (`wl-ready`), so the cover fades in whole. The
+ * RAF loop is torn down on unmount; reduced motion draws a still frame on a
+ * flat, unmoving sheet.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -50,6 +54,7 @@ const SWIRL = 2.6; // how far an arm winds between rim and throat, radians
 const RIM = 0.045; // half the lip's width, as a fraction of the mouth
 const STILL_TIME = 2.8; // the reduced-motion frame: between passes, worm half out
 const PAPER_INTERVAL = 30; // ms between paper redraws: every other frame at 60Hz
+const REVEAL_LIMIT = 700; // ms: show the scene even if the portals never draw
 
 const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const FACE_RGB = Object.fromEntries(Object.entries(RUBIKS_FACE_COLORS).map(([id, hex]) => [id, rgbOf(hex)]));
@@ -330,8 +335,8 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true) {
 }
 
 // ── The lip: a toy-bright ring of the six sticker colours, turning with the vortex.
-// 'back' and 'front' name the upper and lower screen-space arcs. The ceiling
-// exit overlays its BACK arc; the floor entrance overlays its FRONT arc.
+// 'back' and 'front' name the far (upper) and near (lower) screen-space arcs.
+// Each portal draws its back arc behind the cube and its front arc over it.
 function drawRim(ctx, well, spin, pulse, half) {
   const { cx, cy, a, b } = well;
   const outer = [a * (1 + RIM), b * (1 + RIM)];
@@ -370,6 +375,13 @@ function drawRim(ctx, well, spin, pulse, half) {
   ctx.restore();
 }
 
+// The fall's CSS animation, whose clock the portals keep. Null where the
+// browser has no Web Animations API or the fall does not run (reduced motion).
+function fallAnimation(el) {
+  const list = el?.getAnimations?.();
+  return list?.find((a) => a.animationName === 'wl-fall') ?? null;
+}
+
 // The portal above the cube hangs in the air: a soft light round it lifts it
 // off the paper, brightening as the cube comes through.
 function drawHalo(ctx, well, pulse) {
@@ -385,7 +397,7 @@ function drawHalo(ctx, well, pulse) {
   ctx.restore();
 }
 
-export default function LoadingPortal({ wellRef, topRef, startedAt, translucent = false }) {
+export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, translucent = false }) {
   const paperRef = useRef(null);
   const vortexRef = useRef(null);
   const frontRef = useRef(null);
@@ -397,8 +409,22 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
     const paper = paperCanvas?.getContext('2d');
     const ctx = canvas?.getContext('2d');
     const front = frontCanvas?.getContext('2d');
-    if (!paper || !ctx || !front) return undefined;
+    // Let the scene run and fade in: on the first drawn frame, or regardless
+    // once REVEAL_LIMIT has passed so the cube never waits on the canvases.
+    let revealed = false;
+    const reveal = () => {
+      if (revealed) return;
+      revealed = true;
+      for (const el of [sceneRef?.current, paperCanvas, canvas, frontCanvas]) el?.classList.add('wl-ready');
+    };
+    if (!paper || !ctx || !front) {
+      reveal();
+      return undefined;
+    }
+    const revealTimer = window.setTimeout(reveal, REVEAL_LIMIT);
     const reduced = prefersReducedMotion();
+    const mountedAt = performance.now();
+    let fall = null;
     let W = 0;
     let H = 0;
     let dpr = 1;
@@ -434,26 +460,22 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
         layer.clearRect(0, 0, W, H);
       }
       const spin = spinAngle(t);
-      // Behind the cube: both tunnels and each mouth's exposed rim. Reflect
-      // the ceiling funnel vertically so we see its underside, facing down.
+      // Behind the cube: both tunnels and their far lips. The cube is seen
+      // from above, so it falls in front of each mouth's far side.
       if (top) {
         drawHalo(ctx, top, pulse);
-        ctx.save();
-        ctx.translate(0, 2 * top.cy);
-        ctx.scale(1, -1);
         drawFunnel(ctx, top, t, spin, pulse, false);
-        ctx.restore();
-        drawRim(ctx, top, spin, pulse, 'front');
+        drawRim(ctx, top, spin, pulse, 'back');
       }
       if (well) {
         drawFunnel(ctx, well, t, spin, pulse);
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
-      // Cover only the clipped edge of each mouth. The cube leaving the upper
-      // portal must cover its lower rim, rather than disappearing behind it.
-      if (top) drawRim(front, top, spin, pulse, 'back');
+      // Over the cube: both near lips, along the lines the shaft is cut on.
+      if (top) drawRim(front, top, spin, pulse, 'front');
       if (well) drawRim(front, well, spin, pulse, 'front');
+      reveal();
     };
 
     const resize = () => {
@@ -479,7 +501,11 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
       still = window.setInterval(() => draw(STILL_TIME, performance.now()), 500);
     } else {
       const frame = (now) => {
-        if (!document.hidden) draw((now - startedAt) / 1000, now);
+        if (!document.hidden) {
+          fall ??= fallAnimation(fallRef?.current);
+          const ms = fall?.currentTime;
+          draw((typeof ms === 'number' ? ms : now - mountedAt) / 1000, now);
+        }
         raf = requestAnimationFrame(frame);
       };
       raf = requestAnimationFrame(frame);
@@ -487,16 +513,17 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(still);
+      window.clearTimeout(revealTimer);
       observer?.disconnect();
       if (!observer) window.removeEventListener('resize', resize);
     };
-  }, [wellRef, topRef, startedAt, translucent]);
+  }, [sceneRef, fallRef, wellRef, topRef, translucent]);
 
   return (
     <>
-      <canvas ref={paperRef} className="wl-backdrop" aria-hidden="true" />
-      <canvas ref={vortexRef} className="wl-backdrop" aria-hidden="true" />
-      <canvas ref={frontRef} className="wl-backdrop wl-portal-lips" aria-hidden="true" />
+      <canvas ref={paperRef} className="wl-backdrop wl-live" aria-hidden="true" />
+      <canvas ref={vortexRef} className="wl-backdrop wl-live" aria-hidden="true" />
+      <canvas ref={frontRef} className="wl-backdrop wl-live wl-portal-lips" aria-hidden="true" />
     </>
   );
 }
