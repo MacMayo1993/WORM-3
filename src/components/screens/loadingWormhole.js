@@ -91,11 +91,19 @@ export function spinAngle(t) {
 export const funnelRadius = (s) => 1 - (1 - THROAT) * Math.pow(clamp01(s), 1.25);
 export const funnelSink = (s) => DEPTH * Math.pow(clamp01(s), 1.5);
 
+/**
+ * How far depth s has shifted inside the mouth when the view leans: the throat
+ * lies deeper than the rim, so it slides with the viewer by `well.lx`/`well.ly`
+ * (in half-widths/half-heights of the mouth) while the rim stays put.
+ */
+export const funnelLean = (s) => Math.pow(clamp01(s), 1.5);
+
 /** Screen point on the funnel wall at depth s and angle (radians, 0 = right, π/2 = toward the viewer). */
 export function funnelPoint(well, s, angle, out = {}) {
   const r = funnelRadius(s);
-  out.x = well.cx + Math.cos(angle) * r * well.a;
-  out.y = well.cy + Math.sin(angle) * r * well.b + funnelSink(s) * well.b;
+  const lean = funnelLean(s);
+  out.x = well.cx + Math.cos(angle) * r * well.a + (well.lx || 0) * lean * well.a;
+  out.y = well.cy + Math.sin(angle) * r * well.b + funnelSink(s) * well.b + (well.ly || 0) * lean * well.b;
   out.r = r;
   return out;
 }

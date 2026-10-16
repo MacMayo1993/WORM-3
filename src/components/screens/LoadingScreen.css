@@ -18,10 +18,18 @@
   overflow: hidden;
   /* The paper's own base until the wormhole's canvases paint. */
   background: #f8f4e8;
+  /* The whole cover is the loader's touch surface (hold to dive, tap to spin):
+     no scrolling, text selection or long-press callout. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   --wl-ink: #26372d;
   /* The portals stack the scene 3.7 cubes tall: the cube shrinks on short
-     screens so the scene, the status line and some air still fit. */
-  --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100vh - 190px) / 3.9));
+     screens so the scene, the status line, MOBI's line (LoadingScene.css; not
+     shown below 561px tall) and some air still fit. */
+  --wl-reserve: 250px;
+  --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100vh - var(--wl-reserve)) / 3.9));
   --wl-well-w: min(calc(var(--wl-cube) * 2.4), 88vw);
   /* The drop between the portals' centres (loadingWormhole.js FALL.drop). */
   --wl-drop: calc(var(--wl-cube) * 2.8);
@@ -84,6 +92,9 @@
   .wl-title-sub .wl-line { display: none; }
   .wl-title-sub p { letter-spacing: 0.14em; }
 }
+@media (max-height: 560px) {
+  .wl-root { --wl-reserve: 190px; }
+}
 @media (max-height: 520px) {
   .wl-title-card { padding: 4px 18px; }
   .wl-title { font-size: 34px; }
@@ -92,7 +103,7 @@
 
 /* Phones measure against the visible viewport, not the one behind the toolbars. */
 @supports (height: 100dvh) {
-  .wl-root { --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100dvh - 190px) / 3.9)); }
+  .wl-root { --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100dvh - var(--wl-reserve)) / 3.9)); }
 }
 
 /* === Scene: two portals and the cube falling between them === */

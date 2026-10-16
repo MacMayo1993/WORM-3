@@ -25,6 +25,12 @@
  * holds the same numbers and kicks both portals as the cube passes through,
  * half in each, 50% into each fall.
  *
+ * The cover is also a toy (loadingPlay.js): holding anywhere dives (`wl-warp`
+ * on the scene: every animation in it plays faster together, the cube
+ * stretches, the airflow lengthens and speed lines close in round the shaft),
+ * a tap spins the cube (`.wl-spin`), and MOBI sits at the foot of the cover with
+ * a line and a loop count.
+ *
  * Nothing moves until the portals have drawn their first frame: until then the
  * scene and the canvases are hidden and every animation in it is paused, so the
  * cover fades in on a whole picture and the canvases, which read their clock
@@ -49,6 +55,14 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+/* The paper overhangs the screen so a tilt can slide it without showing an
+   edge (PAPER_PAD in LoadingPortal.jsx). */
+.wl-backdrop.wl-paper {
+  inset: -16px;
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
 }
 
 /* Held still and hidden until LoadingPortal has drawn the portals once. */
@@ -171,6 +185,60 @@
   transform-style: preserve-3d;
   transform: rotateX(-24deg) rotateY(var(--wl-yaw));
   animation: wl-sway 10s ease-in-out -5s infinite alternate;
+}
+
+/* Inside the cube's own frame, so a kick spins it about its vertical axis and
+   it keeps facing the viewer at the same tilt. */
+.wl-spin {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* === The dive: stretched by speed, the air rushing past === */
+.wl-view {
+  scale: 1 1;
+  transition: scale 0.35s ease-out;
+}
+
+.wl-scene.wl-warp .wl-view {
+  scale: 0.95 1.08;
+}
+
+.wl-airflow {
+  transform-origin: 50% 20%;
+  transition: transform 0.35s ease-out, opacity 0.35s ease-out;
+}
+
+.wl-scene.wl-warp .wl-airflow {
+  transform: scaleY(1.9);
+}
+
+/* Speed lines closing in on the shaft, over the paper and under the portals. */
+.wl-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.12);
+  transform-origin: var(--wl-veil-x, 50%) var(--wl-veil-y, 50%);
+  transition: opacity 0.4s ease-out, transform 0.5s ease-out;
+  background: repeating-conic-gradient(
+    from 0deg at var(--wl-veil-x, 50%) var(--wl-veil-y, 50%),
+    rgba(38, 55, 45, 0) 0deg 2.6deg,
+    rgba(38, 55, 45, 0.2) 2.6deg 3.2deg,
+    rgba(38, 55, 45, 0) 3.2deg 5.3deg,
+    rgba(38, 55, 45, 0.1) 5.3deg 5.7deg
+  );
+  -webkit-mask-image: radial-gradient(circle at var(--wl-veil-x, 50%) var(--wl-veil-y, 50%), transparent 0 calc(var(--wl-cube) * 2.1), #000 calc(var(--wl-cube) * 4.2));
+  mask-image: radial-gradient(circle at var(--wl-veil-x, 50%) var(--wl-veil-y, 50%), transparent 0 calc(var(--wl-cube) * 2.1), #000 calc(var(--wl-cube) * 4.2));
+}
+
+.wl-scene.wl-warp ~ .wl-veil {
+  opacity: 1;
+  transform: scale(1);
+  transition-duration: 0.25s, 0.35s;
 }
 
 @keyframes wl-sway {
@@ -341,9 +409,103 @@
   83%, 100% { transform: scale(1.75); opacity: 0; }
 }
 
+/* === MOBI at the foot of the cover: a line every couple of loops === */
+.wl-mobi {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 7px 14px 7px 7px;
+  border: 2px solid var(--wl-ink);
+  border-radius: 18px;
+  background: #fffcf1;
+  box-shadow: 0 4px 0 var(--wl-ink), 0 12px 26px rgba(38, 55, 45, 0.14);
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.35s ease-out, transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* It pops up with the scene, once the portals have drawn. */
+.wl-scene.wl-live:not(.wl-ready) ~ .wl-mobi {
+  opacity: 0;
+  transform: translate(-50%, 14px);
+}
+
+.wl-mobi-face {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--wl-ink);
+  border-radius: 50%;
+  /* The head of the guide art (Mobi.webp is the whole figure). */
+  background-image: var(--wl-mobi), radial-gradient(circle at 50% 45%, #2b3a63, #101729);
+  background-size: 300% auto, cover;
+  background-position: 82% 6%, center;
+  background-repeat: no-repeat;
+}
+
+/* The loop count, pinned to MOBI like a badge; it pops each pass. */
+.wl-loops {
+  position: absolute;
+  top: -8px;
+  left: -12px;
+  min-width: 18px;
+  padding: 2px 5px;
+  border: 2px solid #fffcf1;
+  border-radius: 999px;
+  background: var(--wl-ink);
+  color: #fffdf2;
+  font: 800 11px/1.1 var(--wl-heading-font);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.wl-loops.wl-on {
+  opacity: 1;
+}
+
+.wl-mobi-say {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wl-mobi-name {
+  font: 800 10px/1 var(--wl-heading-font);
+  letter-spacing: 0.16em;
+  color: #6a705e;
+}
+
+.wl-mobi-line {
+  font: 700 clamp(12px, 1.7vw, 14px)/1.3 var(--wl-heading-font);
+  color: var(--wl-ink);
+}
+
+/* No room for him beside the title card or on a short screen. */
+.wl-title-card ~ .wl-mobi {
+  display: none;
+}
+
+@media (max-height: 560px) {
+  .wl-mobi {
+    display: none;
+  }
+}
+
 /* === Reduced motion: the cube still, in the open between the portals === */
 @media (prefers-reduced-motion: reduce) {
   .wl-airflow { display: none; }
+  .wl-veil { display: none; }
+  .wl-mobi, .wl-view, .wl-airflow { transition: none; }
   .wl-air-streak, .wl-air-wake { animation: none; }
   .wl-fall,
   .wl-cube,
