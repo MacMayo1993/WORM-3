@@ -84,17 +84,32 @@ it('hides the mounted WORM preview through every tunnel phase and restores curre
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const previous = { ...liveCubies };
   liveCubies.refs = null; liveCubies.size = 0;
-  const move = { axis: 'col', sliceIndex: 0, sliceIndices: [0, 5], sliceDirs: [1, -1], dir: 1 };
+  const size = 8;
+  const move = { axis: 'col', sliceIndex: 0, sliceIndices: [0, size - 1], sliceDirs: [1, -1], dir: 1 };
   const pending = { current: move };
   const worm = { phase: { current: 'crawling' }, expansionAmount: { current: 0 } };
   let h;
   try {
-    h = await sceneHarness(<SliceWarningLights size={6} pendingRotRef={pending} warningProgressRef={{ current: 0 }} worm={worm} />);
+    h = await sceneHarness(<SliceWarningLights size={size} pendingRotRef={pending} warningProgressRef={{ current: 0 }} worm={worm} />);
     await h.tick(); await h.tick();
     const group = h.scene.getObjectByName('worm-slice-warning');
     const rims = [];
-    group.traverse(o => { if (o.isMesh) rims.push(o); });
-    expect(rims).toHaveLength(2); // no floating streamers or aura meshes
+    const hiddenRims = [];
+    group.traverse(o => {
+      if (o.name === 'layer-warning-rim') rims.push(o);
+      if (o.name === 'layer-warning-occluded') hiddenRims.push(o);
+    });
+    expect(rims).toHaveLength(2);
+    expect(hiddenRims).toHaveLength(2);
+    for (let i = 0; i < hiddenRims.length; i++) {
+      expect(hiddenRims[i].geometry).toBe(rims[i].geometry);
+      expect(hiddenRims[i].material.uniforms).toBe(rims[i].material.uniforms);
+      expect(hiddenRims[i].material.depthTest).toBe(true);
+      expect(hiddenRims[i].material.depthFunc).toBe(THREE.GreaterDepth);
+      expect(hiddenRims[i].material.depthWrite).toBe(false);
+      expect(hiddenRims[i].material.side).toBe(THREE.DoubleSide);
+      expect(hiddenRims[i].frustumCulled).toBe(false);
+    }
     const geometries = rims.map(r => r.geometry);
     for (const rim of rims) {
       expect(rim.material.side).toBe(THREE.FrontSide);
@@ -113,7 +128,7 @@ it('hides the mounted WORM preview through every tunnel phase and restores curre
     await h.tick();
     expect(group.visible).toBe(true);
     for (let i = 0; i < rims.length; i++) {
-      const template = getSliceRimGeometry(6, 'col', i ? 5 : 0);
+      const template = getSliceRimGeometry(size, 'col', i ? size - 1 : 0);
       expect(rims[i].geometry).not.toBe(template);
       expect(center(rims[i].geometry, 0).distanceTo(center(template, 0))).toBeGreaterThan(1);
     }

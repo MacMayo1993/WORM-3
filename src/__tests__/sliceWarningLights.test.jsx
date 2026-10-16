@@ -56,15 +56,22 @@ describe('rotation preview lighting', () => {
       const h = renderWarning({ size, move });
       expect(h.rims).toHaveLength(1);
       expect(h.rims[0]).toMatchObject(move);
+      expect(h.rims[0].showOccluded).toBe(false);
       h.unmount();
     }
   });
 
-  it('lights both planes of a paired rotation, with their own turn directions', () => {
-    const move = { axis: 'col', sliceIndex: 0, sliceIndices: [0, 4], sliceDirs: [1, -1], dir: 1 };
-    const h = renderWarning({ size: 5, move });
-    expect(h.rims.map(r => [r.axis, r.sliceIndex, r.dir])).toEqual([['col', 0, 1], ['col', 4, -1]]);
-    h.unmount();
+  it.each([5, 8, 9, 10, 11, 12, 13, 14, 15])('previews both counter-turns through occlusion on size %i', size => {
+    for (const axis of ['col', 'row', 'depth']) {
+      const move = { axis, sliceIndex: 0, sliceIndices: [0, size - 1], sliceDirs: [1, -1], dir: 1 };
+      const h = renderWarning({ size, move });
+      expect(h.rims.map(r => [r.axis, r.sliceIndex, r.dir])).toEqual([[axis, 0, 1], [axis, size - 1, -1]]);
+      expect(h.rims.every(r => r.showOccluded)).toBe(true);
+      h.setMove({ axis, sliceIndex: 0, dir: -1 });
+      expect(h.rims).toHaveLength(1);
+      expect(h.rims[0].showOccluded).toBe(false);
+      h.unmount();
+    }
   });
 
   it('replaces the old preview when the next turn changes and clears it when disarmed', () => {
