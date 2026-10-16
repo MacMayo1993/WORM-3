@@ -11,10 +11,10 @@ const project = (shot, fov, aspect, point) => {
 
 describe('sliceShotInto', () => {
   const cases = [];
-  for (const size of [2, 3, 4, 5]) for (const axis of ['col', 'row', 'depth']) for (const layer of [0, size - 1])
+  for (const size of [2, 3, 4, 5, 6, 10, 15]) for (const axis of ['col', 'row', 'depth']) for (const layer of [0, size - 1])
     for (const [fov, aspect] of [[70, 390 / 763], [60, 1], [55, 16 / 9]]) cases.push({ size, axis, layer, fov, aspect });
 
-  it.each(cases)('uses half the extra slice pullback on $size×$size, $axis layer $layer at fov $fov, aspect $aspect', ({ size, axis, layer, fov, aspect }) => {
+  it.each(cases)('halves the slice overview distance on $size×$size, $axis layer $layer at fov $fov, aspect $aspect', ({ size, axis, layer, fov, aspect }) => {
     const k = (size - 1) / 2, half = k + 0.5;
     const coord = { col: 'x', row: 'y', depth: 'z' }[axis];
     // A hit on the layer, on a face the layer crosses.
@@ -26,7 +26,7 @@ describe('sliceShotInto', () => {
     const halfV = fov * Math.PI / 360;
     const halfH = Math.atan(Math.tan(halfV) * aspect);
     const previousDistance = (Math.sqrt(3) * half + .45) / Math.sin(Math.min(halfV, halfH)) + shot.look.length();
-    expect(shot.cam.distanceTo(shot.look) - chaseDistance).toBeCloseTo((previousDistance - chaseDistance) / 2, 8);
+    expect(shot.cam.distanceTo(shot.look)).toBeCloseTo(Math.max(chaseDistance, previousDistance / 2), 8);
     const hit = project(shot, fov, aspect, impact);
     expect(Math.abs(hit.x)).toBeLessThan(0.8); expect(Math.abs(hit.y)).toBeLessThan(0.8);
   });

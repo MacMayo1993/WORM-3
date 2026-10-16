@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { WORM_CAMERA_ZOOM, clampWormCameraZoom, wheelCameraZoom, wormCameraZoomLabel, desktopHeadFraming } from '../worm/wormCameraZoom.js';
+import { WORM_CAMERA_ZOOM, clampWormCameraZoom, wheelCameraZoom, wormCameraZoomLabel, desktopHeadFraming, eventCameraDistance } from '../worm/wormCameraZoom.js';
 
 describe('WORM camera distance', () => {
+  it('halves the event distance instead of averaging it with the chase distance', () => {
+    expect(eventCameraDistance(10, 30)).toBe(15);
+    expect(eventCameraDistance(7.26, 17.9)).toBe(8.95);
+    expect(eventCameraDistance(10, 12)).toBe(10); // no inward jump from a distant chase
+    expect(eventCameraDistance(5, 20, 12)).toBe(12); // orbit stays outside cube corners
+  });
   it('starts a little further back than the original lens', () => {
     expect(WORM_CAMERA_ZOOM.default).toBeGreaterThan(1);
     expect(WORM_CAMERA_ZOOM.min).toBeLessThan(1);

@@ -7,7 +7,7 @@ const smooth = t => {
     return t * t * t * (t * (t * 6 - 15) + 10);
 };
 
-// Orbit with half the original overview pullback, then return to the captured pose.
+// Orbit at half the original overview radius, then return to the captured pose.
 // Use the same portrait/expanded-board fit as the reference distance.
 export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0, reducedMotion = false } = {}) {
     const position = camera.position.clone();
@@ -25,7 +25,9 @@ export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0
     const limitingHalfFov = Math.min(verticalHalfFov, Math.atan(Math.tan(verticalHalfFov) * camera.aspect));
     const halfExtent = (size - 1) * cubeExpansionScale(size, expansion) / 2 + 1;
     const fitRadius = Math.sqrt(3) * halfExtent / Math.sin(limitingHalfFov) * 1.15;
-    const revealRadius = eventCameraDistance(position.length(), Math.max(position.length() * 1.35, fitRadius));
+    // A close full orbit must still clear the corners on wide/expanded boards.
+    const clearanceRadius = Math.sqrt(3) * (halfExtent - 0.5) + 0.15;
+    const revealRadius = eventCameraDistance(position.length(), Math.max(position.length() * 1.35, fitRadius), clearanceRadius);
     return { revealRadius, reducedMotion, position, look: target, up: camera.up.clone(), quaternion: camera.quaternion.clone(),
         axis, viewUp, fov: camera.fov, rotation: new Quaternion() };
 }
