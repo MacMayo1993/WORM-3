@@ -155,6 +155,24 @@ export const MOBI_MILESTONES = {
   100: 'A hundred loops. Even the Core is impressed.'
 };
 
+const MILESTONE_LOOPS = Object.keys(MOBI_MILESTONES)
+  .map(Number)
+  .sort((a, b) => a - b);
+
+/**
+ * The milestone the loop count crossed going from `from` to `to`, or null. A
+ * stalled main thread (the cover's whole reason to exist) or a throttled tab can
+ * advance several loops in one frame, so a milestone is any one in (from, to],
+ * not only one landed on exactly; if a jump crosses several, the latest wins.
+ */
+export function milestoneCrossed(from, to) {
+  let crossed = null;
+  for (const loop of MILESTONE_LOOPS) {
+    if (loop > from && loop <= to) crossed = loop;
+  }
+  return crossed;
+}
+
 // Where MOBI's deck is in this session, so the next cover carries on from the
 // last instead of opening on the same line every time.
 let deck = 0;
@@ -339,15 +357,16 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     // marks the milestones. A dive buzzes the phone once per pass.
     const loops = reduced ? 0 : passes(t);
     if (loops !== play.loops) {
+      const milestone = milestoneCrossed(play.loops, loops);
       play.loops = loops;
       if (badge) {
         badge.textContent = `×${loops}`;
         badge.classList.add('wl-on');
-        badge.animate?.(POP, { duration: MOBI_MILESTONES[loops] ? 520 : 260, easing: 'ease-out' });
+        badge.animate?.(POP, { duration: milestone ? 520 : 260, easing: 'ease-out' });
       }
       if (play.holding) vibrate(12);
-      if (MOBI_MILESTONES[loops]) {
-        say(MOBI_MILESTONES[loops], now);
+      if (milestone) {
+        say(MOBI_MILESTONES[milestone], now);
         lineLoops = loops;
       }
     }
