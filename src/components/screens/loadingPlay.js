@@ -2,6 +2,11 @@
 // tap to kick the cube into a spin and ring both portals, and MOBI keeps you
 // company with a line every couple of loops and a count of how many you've made.
 //
+// The view tilts too: the mouse (or a finger held on the cover, or a phone's own
+// tilt where the browser gives it without asking) moves the viewer, so the cube
+// and portals slide over the paper, the cube turns to show its other sides and
+// the throats lean inside their mouths. See TILT.
+//
 // Everything here runs off LoadingPortal's frame loop (the fall's own clock, `t`
 // in seconds of fall) or off pointer events; nothing sets React state. The dive
 // speeds every animation in the scene together through the Web Animations API, so
@@ -26,7 +31,69 @@ export const HINT_LOOPS = 3;
 export const LINE_MS = 2800;
 export const LINE_MS_STILL = 3500;
 
+/**
+ * The tilt: where the viewer leans, as -1…1 across and down the screen.
+ * `near` px is how far the portals and cube slide (opposite the lean), `far` px
+ * how far the paper does, `turn` degrees how far the cube turns at full lean
+ * (across, then down), `lean` how far a throat shifts inside its mouth (in
+ * mouth half-widths), `ease` the smoothing rate (1/s), and `degrees` the phone
+ * tilt from its resting pose that counts as full lean.
+ */
+export const TILT = { near: 16, far: 6, turn: [9, 6], lean: 0.16, ease: 7, degrees: 22, settle: 0.004, deadzone: 0.03 };
+
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+
+/** Ease `current` toward `target` over `dt` real seconds (frame-rate independent). */
+export function tiltToward(current, target, dt) {
+  return current + (target - current) * (1 - Math.exp(-dt * TILT.ease));
+}
+
+/** Screen point → lean (-1…1 across and down, 0 at the centre), into `out`. */
+export function pointerAim(x, y, width, height, out) {
+  out.x = width > 0 ? clamp1((x / width) * 2 - 1) : 0;
+  out.y = height > 0 ? clamp1((y / height) * 2 - 1) : 0;
+  return out;
+}
+
+/**
+ * A phone's tilt → lean, relative to the pose it rests in (`base`, which drifts
+ * toward the current pose so a lean held still slowly recentres), turned to the
+ * screen's orientation (`angle`, degrees). `beta` tips the top away, `gamma`
+ * tips the right side down. Writes `out`; updates `base`.
+ */
+export function orientationAim(beta, gamma, angle, base, out) {
+  if (base.beta === null) {
+    base.beta = beta;
+    base.gamma = gamma;
+  }
+  const db = beta - base.beta;
+  const dg = gamma - base.gamma;
+  base.beta += db * TILT.settle;
+  base.gamma += dg * TILT.settle;
+  // In portrait the right side tipping down leans right, the top tipping away leans down.
+  let x = dg;
+  let y = db;
+  const turn = (((Math.round(angle / 90) % 4) + 4) % 4) * 90;
+  if (turn === 90) [x, y] = [db, -dg];
+  else if (turn === 180) [x, y] = [-dg, -db];
+  else if (turn === 270) [x, y] = [-db, dg];
+  out.x = clamp1(x / TILT.degrees);
+  out.y = clamp1(y / TILT.degrees);
+  return out;
+}
+
+/**
+ * The cube's turn for a lean, as a CSS `rotate` value: leaning right shows more
+ * of its right side (a turn about the vertical), leaning down less of its top.
+ */
+export function tiltRotate(x, y) {
+  const rx = y * TILT.turn[1];
+  const ry = -x * TILT.turn[0];
+  const deg = Math.hypot(rx, ry);
+  if (deg < 0.01) return '0 1 0 0deg';
+  return `${(rx / deg).toFixed(4)} ${(ry / deg).toFixed(4)} 0 ${deg.toFixed(3)}deg`;
+}
 
 /** The dive's 0–1 level after `dt` real seconds, rising while held and easing off when let go. */
 export function warpLevel(level, holding, dt) {
@@ -139,6 +206,9 @@ const SPIN = [{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(360deg)' }];
  */
 export function createLoadingPlay({ scene, veil, line, badge, reduced = false }) {
   const play = {
+    tiltX: 0,
+    tiltY: 0,
+    tiltMoved: false,
     warp: 0,
     kick: 0,
     kickSince: Infinity,
@@ -149,9 +219,15 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     loops: 0,
     press,
     release,
-    frame
+    frame,
+    aim
   };
+  // What the tilt is easing toward: a pointer while one is aiming, else the phone.
+  const pointer = { x: 0, y: 0, active: false };
+  const motion = { x: 0, y: 0, active: false };
+  const cubes = Array.from(scene?.querySelectorAll?.('.wl-cube') ?? []);
   let kickAt = null;
+  let tilted = false;
   let kickPending = false;
   let spinBase = 0;
   let lastNow = null;
@@ -199,6 +275,20 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     }
   }
 
+  /**
+   * Point the view: `source` 'pointer' (a mouse over the cover, or a finger held
+   * on it) or 'motion' (the phone's tilt); `active` false stops that source.
+   */
+  function aim(source, x, y, active = true) {
+    if (reduced) return;
+    const into = source === 'motion' ? motion : pointer;
+    // Sensor noise below the deadzone doesn't move anything (or redraw the paper).
+    if (source === 'motion' && into.active && Math.abs(x - into.x) < TILT.deadzone && Math.abs(y - into.y) < TILT.deadzone) return;
+    into.x = x;
+    into.y = y;
+    into.active = active;
+  }
+
   function release() {
     if (!play.holding) return;
     play.holding = false;
@@ -223,6 +313,23 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     play.kick = kickPulse(t, kickAt);
     play.kickSince = kickAt === null ? Infinity : t - kickAt;
     play.spin = kickSpin(t, kickAt, spinBase);
+
+    // The tilt: eased toward its aim, written to the scene only when it moves.
+    const goal = pointer.active ? pointer : motion.active ? motion : null;
+    const tx = tiltToward(play.tiltX, goal ? goal.x : 0, dt);
+    const ty = tiltToward(play.tiltY, goal ? goal.y : 0, dt);
+    const settled = Math.abs(tx) < 0.001 && Math.abs(ty) < 0.001 && !goal;
+    play.tiltMoved = Math.abs(tx - play.tiltX) > 0.0005 || Math.abs(ty - play.tiltY) > 0.0005;
+    play.tiltX = settled ? 0 : tx;
+    play.tiltY = settled ? 0 : ty;
+    if (play.tiltMoved || (settled && tilted)) {
+      tilted = !settled;
+      if (scene?.style)
+        scene.style.transform = settled ? '' : `translate3d(${(-tx * TILT.near).toFixed(2)}px, ${(-ty * TILT.near).toFixed(2)}px, 0)`;
+      const turn = settled ? '' : tiltRotate(play.tiltX, play.tiltY);
+      for (const cube of cubes) cube.style.rotate = turn;
+      play.tiltMoved = true;
+    }
 
     play.warp = warpLevel(play.warp, play.holding, dt);
     const rate = warpRate(play.warp);

@@ -18,7 +18,9 @@
  * arrives, holding anywhere dives faster (every animation and both canvases
  * speed up together, with speed lines round the shaft), a tap kicks the cube
  * into a spin and rings both portals, and MOBI keeps count of the loops with a
- * line every couple of them.
+ * line every couple of them. The view tilts with the mouse, a finger held on
+ * the cover, or a phone's own tilt (where the browser offers it without a
+ * permission prompt): the scene slides over the paper and the cube turns.
  *
  * Lazy-loaded by LoadingScreen, with its stylesheet, to keep both off the
  * initial route; preloadAssets.js warms the chunk during the opening.
@@ -28,7 +30,7 @@ import React, { useEffect, useRef } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
 import { shaftClipPath } from './loadingWormhole.js';
-import { createLoadingPlay } from './loadingPlay.js';
+import { createLoadingPlay, orientationAim, pointerAim } from './loadingPlay.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScene.css';
@@ -114,24 +116,60 @@ export default function LoadingScene({ translucent = false }) {
       reduced: prefersReducedMotion()
     });
     playRef.current = play;
+    // The view leans toward a mouse anywhere over the cover, or a finger while it
+    // is held there; a phone's tilt leans it the rest of the time.
+    const at = { x: 0, y: 0 };
+    let touching = false;
+    const aimAt = (e) => {
+      pointerAim(e.clientX, e.clientY, window.innerWidth, window.innerHeight, at);
+      play.aim('pointer', at.x, at.y);
+    };
     const press = (e) => {
       if (e.button > 0) return;
+      if (e.pointerType !== 'mouse') touching = true;
+      aimAt(e);
       play.press();
     };
-    const release = () => play.release();
+    const move = (e) => {
+      if (e.pointerType === 'mouse' || touching) aimAt(e);
+    };
+    const release = (e) => {
+      if (touching && e?.pointerType !== 'mouse') {
+        touching = false;
+        play.aim('pointer', 0, 0, false);
+      }
+      play.release();
+    };
+    const leave = (e) => {
+      if (!e.relatedTarget && e.pointerType === 'mouse') play.aim('pointer', 0, 0, false);
+    };
+    const base = { beta: null, gamma: null };
+    const tilt = { x: 0, y: 0 };
+    const orient = (e) => {
+      if (e.beta === null || e.gamma === null) return;
+      const angle = window.screen?.orientation?.angle ?? window.orientation ?? 0;
+      orientationAim(e.beta, e.gamma, angle, base, tilt);
+      play.aim('motion', tilt.x, tilt.y);
+    };
     const noMenu = (e) => e.preventDefault();
     root.addEventListener('pointerdown', press);
     root.addEventListener('contextmenu', noMenu);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerout', leave);
     window.addEventListener('pointerup', release);
     window.addEventListener('pointercancel', release);
     window.addEventListener('blur', release);
+    window.addEventListener('deviceorientation', orient);
     return () => {
       playRef.current = null;
       root.removeEventListener('pointerdown', press);
       root.removeEventListener('contextmenu', noMenu);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerout', leave);
       window.removeEventListener('pointerup', release);
       window.removeEventListener('pointercancel', release);
       window.removeEventListener('blur', release);
+      window.removeEventListener('deviceorientation', orient);
     };
   }, []);
 

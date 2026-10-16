@@ -39,6 +39,7 @@ import {
   MOTE_COUNT,
   THROAT,
   WORM_SEGMENTS,
+  funnelLean,
   funnelPoint,
   funnelRadius,
   funnelSink,
@@ -49,7 +50,7 @@ import {
   spinAngle,
   wormPose
 } from './loadingWormhole.js';
-import { KICK, OPEN, portalOpen } from './loadingPlay.js';
+import { KICK, OPEN, TILT, portalOpen } from './loadingPlay.js';
 
 const TAU = Math.PI * 2;
 const INK = '#26372d';
@@ -60,6 +61,9 @@ const SWIRL = 2.6; // how far an arm winds between rim and throat, radians
 const RIM = 0.045; // half the lip's width, as a fraction of the mouth
 const STILL_TIME = 2.8; // the reduced-motion frame: between passes, worm half out
 const PAPER_INTERVAL = 30; // ms between paper redraws: every other frame at 60Hz
+// The paper canvas overhangs the screen by this much (LoadingScene.css), so a
+// tilt can slide it without showing an edge.
+const PAPER_PAD = 16;
 const REVEAL_LIMIT = 700; // ms: show the scene even if the portals never draw
 
 const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -83,7 +87,7 @@ function eachSample(start, end, fineStart, fineEnd, visit) {
 }
 
 // ── The paper ────────────────────────────────────────────────────────────────
-function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr) {
+function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr, pad = 0) {
   ctx.save();
   ctx.globalAlpha = opacity;
   // The shader's highlight is measured in uv, so its falloff stretches with the screen.
@@ -93,7 +97,7 @@ function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr) {
   paper.addColorStop(0, paperRgb(P.paperCentre));
   paper.addColorStop(1, paperRgb(P.paperEdge));
   ctx.fillStyle = paper;
-  ctx.fillRect(-P.highlight[0], P.highlight[1] - 1, 1, 1);
+  ctx.fillRect(-P.highlight[0] - pad / W, P.highlight[1] - 1 - pad / H, 1 + (2 * pad) / W, 1 + (2 * pad) / H);
   ctx.restore();
   if (!well) return;
 
@@ -251,7 +255,8 @@ function drawWorm(ctx, well, t) {
 // on the paper: sticker confetti falling through and the worm.
 function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
   const { cx, cy, a, b } = well;
-  const throatY = cy + funnelSink(1) * b;
+  const throatX = cx + (well.lx || 0) * a;
+  const throatY = cy + funnelSink(1) * b + (well.ly || 0) * b;
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(cx, cy, a, b, 0, 0, TAU);
@@ -259,7 +264,7 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
 
   // The wall darkens as it falls away from the light toward the throat.
   ctx.save();
-  ctx.translate(cx, throatY);
+  ctx.translate(throatX, throatY);
   ctx.scale(1, b / a);
   const wall = ctx.createRadialGradient(0, 0, 0, 0, 0, a * 1.3);
   wall.addColorStop(0, DEEP);
@@ -277,7 +282,8 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
     const s = k / 8;
     const r = funnelRadius(s);
     ctx.beginPath();
-    ctx.ellipse(cx, cy + funnelSink(s) * b, r * a, r * b, 0, 0, TAU);
+    const lean = funnelLean(s);
+    ctx.ellipse(cx + (well.lx || 0) * lean * a, cy + funnelSink(s) * b + (well.ly || 0) * lean * b, r * a, r * b, 0, 0, TAU);
     ctx.lineWidth = 1;
     ctx.strokeStyle = s < 0.45 ? `rgba(${LINE_RGB},0.55)` : `rgba(236,232,214,${0.1 + 0.18 * (1 - s)})`;
     ctx.stroke();
@@ -309,14 +315,14 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
   // of the far side — where everything that falls in comes out antipodal.
   const glow = FACE_RGB[RIM_ORDER[passes(t) % RIM_ORDER.length]];
   ctx.beginPath();
-  ctx.ellipse(cx, throatY, THROAT * a, THROAT * b, 0, 0, TAU);
+  ctx.ellipse(throatX, throatY, THROAT * a, THROAT * b, 0, 0, TAU);
   ctx.fillStyle = DEEP;
   ctx.fill();
   ctx.lineWidth = 2 + 2 * pulse;
   ctx.strokeStyle = rgba(glow, 0.6 + 0.4 * pulse);
   ctx.stroke();
   ctx.save();
-  ctx.translate(cx, throatY);
+  ctx.translate(throatX, throatY);
   ctx.scale(1, b / a);
   const far = ctx.createRadialGradient(0, 0, 0, 0, 0, THROAT * a * 0.8);
   far.addColorStop(0, rgba(shade(glow, 0.7), 0.55 + 0.4 * pulse));
@@ -460,6 +466,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     // is redrawn at half rate (or at once when the mouth moves); only the
     // portals above it are drawn every frame.
     let paperAt = -Infinity;
+    const paperWell = { cx: 0, cy: 0, a: 1, b: 1 };
     let paperKey = '';
 
     const measure = (ref, box) => {
@@ -472,17 +479,43 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       if (!W || !H) return;
       const play = playRef?.current;
       play?.frame(t, now);
+      // The tilt: the portals' canvases slide with the scene (so the mouths stay
+      // on the shaft's cut lines), the paper slides less, and the throats lean
+      // the other way inside their mouths. Written before measuring, so the
+      // canvas and the scene it is measured against have moved together.
+      const tx = play?.tiltX ?? 0;
+      const ty = play?.tiltY ?? 0;
+      if (play?.tiltMoved) {
+        const near = tx || ty ? `translate3d(${(-tx * TILT.near).toFixed(2)}px, ${(-ty * TILT.near).toFixed(2)}px, 0)` : '';
+        canvas.style.transform = near;
+        frontCanvas.style.transform = near;
+        paperCanvas.style.transform = tx || ty ? `translate3d(${(-tx * TILT.far).toFixed(2)}px, ${(-ty * TILT.far).toFixed(2)}px, 0)` : '';
+      }
       const box = canvas.getBoundingClientRect();
       const top = opened(measure(topRef, box), reduced ? 1 : portalOpen(t));
       const well = opened(measure(wellRef, box), reduced ? 1 : portalOpen(t, OPEN.floorDelay));
       const kick = play?.kick ?? 0;
       const boost = Math.max(play?.warp ?? 0, kick);
       const pulse = reduced ? 0 : Math.max(passPulse(t), kick);
-      const key = well ? `${Math.round(well.cx)},${Math.round(well.cy)},${Math.round(well.a)}` : '';
+      for (const mouth of [top, well]) {
+        if (!mouth) continue;
+        mouth.lx = tx * TILT.lean;
+        mouth.ly = ty * TILT.lean;
+      }
+      // Where the floor mouth sits on the paper, which slides less than the portals.
+      let lens = null;
+      if (well) {
+        lens = paperWell;
+        lens.cx = well.cx - tx * (TILT.near - TILT.far);
+        lens.cy = well.cy - ty * (TILT.near - TILT.far);
+        lens.a = well.a;
+        lens.b = well.b;
+      }
+      const key = lens ? `${Math.round(lens.cx)},${Math.round(lens.cy)},${Math.round(lens.a)}` : '';
       if (key !== paperKey || now - paperAt >= PAPER_INTERVAL) {
-        paper.setTransform(dpr, 0, 0, dpr, 0, 0);
-        paper.clearRect(0, 0, W, H);
-        drawPaper(paper, W, H, t, reduced ? 0 : 1, well, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr);
+        paper.setTransform(dpr, 0, 0, dpr, PAPER_PAD * dpr, PAPER_PAD * dpr);
+        paper.clearRect(-PAPER_PAD, -PAPER_PAD, W + 2 * PAPER_PAD, H + 2 * PAPER_PAD);
+        drawPaper(paper, W, H, t, reduced ? 0 : 1, lens, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr, PAPER_PAD);
         paperAt = now;
         paperKey = key;
       }
@@ -517,10 +550,12 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       dpr = Math.min(2, window.devicePixelRatio || 1);
       W = rect.width;
       H = rect.height;
-      for (const layer of [paperCanvas, canvas, frontCanvas]) {
+      for (const layer of [canvas, frontCanvas]) {
         layer.width = Math.max(1, Math.round(W * dpr));
         layer.height = Math.max(1, Math.round(H * dpr));
       }
+      paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * dpr));
+      paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * dpr));
       paperKey = null; // resizing blanked the paper
       if (reduced) draw(STILL_TIME, performance.now());
     };
@@ -555,7 +590,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
 
   return (
     <>
-      <canvas ref={paperRef} className="wl-backdrop wl-live" aria-hidden="true" />
+      <canvas ref={paperRef} className="wl-backdrop wl-live wl-paper" aria-hidden="true" />
       <canvas ref={vortexRef} className="wl-backdrop wl-live" aria-hidden="true" />
       <canvas ref={frontRef} className="wl-backdrop wl-live wl-portal-lips" aria-hidden="true" />
     </>

@@ -57,6 +57,14 @@
   pointer-events: none;
 }
 
+/* The paper overhangs the screen so a tilt can slide it without showing an
+   edge (PAPER_PAD in LoadingPortal.jsx). */
+.wl-backdrop.wl-paper {
+  inset: -16px;
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
+}
+
 /* Held still and hidden until LoadingPortal has drawn the portals once. */
 .wl-scene.wl-live,
 .wl-backdrop.wl-live {
