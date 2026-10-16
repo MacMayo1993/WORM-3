@@ -10,10 +10,11 @@
 export const WORM_CAMERA_ZOOM = Object.freeze({ min: 0.85, max: 2, step: 0.05, default: 1.2 });
 export const WORM_CAMERA_ZOOM_KEY = 'worm3_camera_zoom';
 
-// Event shots keep half of their extra pullback beyond the captured chase view.
-// Scaling the entire distance would also change the player's normal framing.
-export const eventCameraDistance = (chaseDistance, overviewDistance) =>
-  chaseDistance + Math.max(0, overviewDistance - chaseDistance) * 0.5;
+// Halve the event's overview distance itself. Averaging chase + overview left
+// most of the old zoom-out intact (a 10 → 30 shot still ended at 20, not 15).
+// These limits belong only to event shots; the normal chase zoom is unchanged.
+export const eventCameraDistance = (chaseDistance, overviewDistance, clearanceDistance = 0) =>
+  Math.max(chaseDistance, clearanceDistance, overviewDistance * 0.5);
 
 /** A safe zoom from anything (stored text, a slider value): clamped, else the default. */
 export function clampWormCameraZoom(value) {

@@ -31,7 +31,7 @@ it('pulls out, completes the circle before zooming in, and returns to the captur
     }
 });
 
-it.each([2, 7, 10, 15])('halves the extra pickup pullback on a %s cube across viewports and expansion', size => {
+it.each([2, 6, 7, 10, 15])('halves the pickup overview radius on a %s cube across viewports and expansion', size => {
     for (const aspect of [9 / 20, 1, 16 / 9]) for (const expansion of [0, 0.65]) {
         const camera = new PerspectiveCamera(65, aspect, 0.1, 1000);
         camera.zoom = 1.2;
@@ -47,7 +47,8 @@ it.each([2, 7, 10, 15])('halves the extra pickup pullback on a %s cube across vi
         const previousRadius = Math.max(initialRadius * 1.35, Math.sqrt(3) * half / Math.sin(limit) * 1.15);
         for (let i = 0; i <= 32; i++) {
             sampleElementalRevealOrbit(orbit, 0.18 + i / 32 * 0.64, eye, look, up);
-            expect(eye.length() - initialRadius).toBeCloseTo((previousRadius - initialRadius) * .5, 8);
+            const expected = Math.max(initialRadius, previousRadius * .5, Math.sqrt(3) * (half - .5) + .15);
+            expect(eye.length()).toBeCloseTo(expected, 8);
             // The closer orbit still clears the board at every angle.
             expect(eye.length()).toBeGreaterThan(Math.sqrt(3) * (half - .5));
         }

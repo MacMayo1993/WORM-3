@@ -1,8 +1,8 @@
 // sliceShot.js — where the camera stands to show a slice hazard land.
 //
 // Slice deaths and surviving tail cuts share a three-quarter view of the
-// cutting layer. Keep half the old overview's extra distance beyond the chase
-// view, so the action remains readable on phones and large boards.
+// cutting layer. Halve the old overview distance itself, bounded by the chase
+// distance, so the action remains readable on phones and large boards.
 //
 // Pure maths: the camera module blends toward the result, tests project it.
 import * as THREE from 'three';
