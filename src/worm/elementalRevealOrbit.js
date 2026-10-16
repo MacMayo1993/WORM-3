@@ -1,13 +1,14 @@
 import { Vector3, Quaternion } from 'three';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
+import { eventCameraDistance } from './wormCameraZoom.js';
 
 const smooth = t => {
     t = Math.max(0, Math.min(1, t));
     return t * t * t * (t * (t * 6 - 15) + 10);
 };
 
-// Pull out, orbit once at the full-cube framing, then return to the captured pose.
-// A bounding sphere fits every orientation, including portrait screens and mega cubes.
+// Orbit with half the original overview pullback, then return to the captured pose.
+// Use the same portrait/expanded-board fit as the reference distance.
 export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0, reducedMotion = false } = {}) {
     const position = camera.position.clone();
     const radial = position.clone().normalize();
@@ -24,7 +25,7 @@ export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0
     const limitingHalfFov = Math.min(verticalHalfFov, Math.atan(Math.tan(verticalHalfFov) * camera.aspect));
     const halfExtent = (size - 1) * cubeExpansionScale(size, expansion) / 2 + 1;
     const fitRadius = Math.sqrt(3) * halfExtent / Math.sin(limitingHalfFov) * 1.15;
-    const revealRadius = Math.max(position.length() * 1.35, fitRadius);
+    const revealRadius = eventCameraDistance(position.length(), Math.max(position.length() * 1.35, fitRadius));
     return { revealRadius, reducedMotion, position, look: target, up: camera.up.clone(), quaternion: camera.quaternion.clone(),
         axis, viewUp, fov: camera.fov, rotation: new Quaternion() };
 }
