@@ -15,7 +15,9 @@ let browser;
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined,
     args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage(args.mobile
+    ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true }
+    : { viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on('pageerror', e => { if (!/\.hdr/.test(e.message)) errors.push(e.message); });
   page.on('console', m => { if (m.type() === 'error' && /THREE.WebGLProgram|VALIDATE_STATUS|shader error/i.test(m.text())) errors.push(m.text()); });

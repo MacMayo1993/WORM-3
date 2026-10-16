@@ -148,9 +148,11 @@ Build with `vite.perf.config.mjs` first. It uses local `playwright-core`, or
 node scripts/perf-worm/travel.mjs --out=/tmp/travel.json
 node scripts/perf-worm/travel.mjs --size=10 --out=/tmp/travel10.json
 node scripts/perf-worm/travel.mjs --pairs=5 --patterns --shots=/tmp/travel-shots
+node scripts/perf-worm/travel.mjs --size=6 --pairs=5 --patterns --mobile --shots=/tmp/travel-phone
 ```
 
 The default is a seeded 3×3 board, one pair, full FX and a 1280×800 viewport.
+`--mobile` uses a 412×915 touch viewport to inspect the portrait ride framing.
 `--size=10` stages the same controlled fixture on a 10×10 board; `--pairs` adds other live connections.
 The script asserts entry, every travel phase, survival and shader compilation.
 Per-phase output includes CPU p50/p95, submitted draws/triangles and shader

@@ -17,17 +17,17 @@ export const tunnelCameraUniforms = {
 // the rider's published position also keeps mirror captures from moving this
 // opening to their own probe camera.
 //
-// Bands are cut away inside the antipodal core (it is solid), except the one
-// being ridden (uCoreClipOff): that one runs through the mirror room carved
-// for the ride, and without it the worm crossed the room on nothing.
+// Every band stops at the core shell, including the occupied route. Inside is
+// a mirror room: carrying a wide, twisting patterned strip through it fills the
+// lens and feeds the same strip back into the reflections. The worm's recorded
+// route remains continuous; only the decorative ribbon is clipped.
 export const tunnelCameraClearanceGLSL = `
   ${tunnelCoreClipGLSL}
   ${cautionOpeningGLSL}
   uniform float uCameraClearance;
-  uniform float uCoreClipOff;
   uniform vec3 uCameraAhead, uTunnelCameraPosition;
   float tunnelCameraVisibility(vec3 worldPoint) {
-    if ((uCoreClipOff < 0.5 && outsideTunnelCore(worldPoint) < 0.5) || insideCautionOpening(worldPoint)) return 0.0;
+    if (outsideTunnelCore(worldPoint) < 0.5 || insideCautionOpening(worldPoint)) return 0.0;
     if (uCameraClearance < 0.5) return 1.0;
     vec3 toPoint = worldPoint - uTunnelCameraPosition;
     float along = clamp(dot(toPoint, uCameraAhead), 0.0, 0.35);
@@ -35,7 +35,7 @@ export const tunnelCameraClearanceGLSL = `
     return smoothstep(0.38, 0.5, clearance);
   }
   void clearTunnelCamera(vec3 worldPoint) {
-    if ((uCoreClipOff < 0.5 && outsideTunnelCore(worldPoint) < 0.5) || insideCautionOpening(worldPoint)) discard;
+    if (outsideTunnelCore(worldPoint) < 0.5 || insideCautionOpening(worldPoint)) discard;
     if (uCameraClearance < 0.5) return;
     float visibility = tunnelCameraVisibility(worldPoint);
     // A single world-space contour replaces the noisy pixel dissolve. The
