@@ -24,6 +24,11 @@
  * until the first frame is drawn (`wl-ready`), so the cover fades in whole. The
  * RAF loop is torn down on unmount; reduced motion draws a still frame on a
  * flat, unmoving sheet.
+ *
+ * `playRef` holds the cover's play controller (loadingPlay.js): each frame it is
+ * stepped first, then its dive and kick shape the drawing — the portals spring
+ * open as the cover arrives, a kick rings both and gives the vortex an extra
+ * turn, and a dive brightens the vortex arms and winds the paper tighter.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -44,6 +49,7 @@ import {
   spinAngle,
   wormPose
 } from './loadingWormhole.js';
+import { KICK, OPEN, portalOpen } from './loadingPlay.js';
 
 const TAU = Math.PI * 2;
 const INK = '#26372d';
@@ -243,7 +249,7 @@ function drawWorm(ctx, well, t) {
 // ── The funnel ───────────────────────────────────────────────────────────────
 // Both portals open onto the same tunnel. `traffic` adds what lives in the one
 // on the paper: sticker confetti falling through and the worm.
-function drawFunnel(ctx, well, t, spin, pulse, traffic = true) {
+function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
   const { cx, cy, a, b } = well;
   const throatY = cy + funnelSink(1) * b;
   ctx.save();
@@ -291,8 +297,8 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true) {
         if (step === 0) ctx.moveTo(at.x, at.y);
         else ctx.lineTo(at.x, at.y);
       }
-      ctx.lineWidth = width * (a / 200);
-      ctx.strokeStyle = rgba(rgb, coloured ? 0.85 : 0.3);
+      ctx.lineWidth = width * (a / 200) * (1 + 0.7 * boost);
+      ctx.strokeStyle = rgba(rgb, coloured ? 0.85 : 0.3 + 0.35 * boost);
       ctx.stroke();
     }
   }
@@ -375,6 +381,27 @@ function drawRim(ctx, well, spin, pulse, half) {
   ctx.restore();
 }
 
+// A kick's shockwave: a ring in the next rim colour racing out from the lip.
+function drawKickRing(ctx, well, since, kicks) {
+  const u = since / KICK.ring;
+  if (u < 0 || u >= 1) return;
+  const { cx, cy, a, b } = well;
+  const grow = 1 + RIM + 0.85 * (1 - (1 - u) * (1 - u));
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, a * grow, b * grow, 0, 0, TAU);
+  ctx.lineWidth = Math.max(1, 5 * (1 - u));
+  ctx.strokeStyle = rgba(FACE_RGB[RIM_ORDER[kicks % RIM_ORDER.length]], 0.9 * (1 - u));
+  ctx.stroke();
+}
+
+// Scale a measured mouth about its centre as it springs open; null while shut.
+function opened(well, open) {
+  if (!well || open < 0.02) return null;
+  well.a *= open;
+  well.b *= open;
+  return well;
+}
+
 // The fall's CSS animation, whose clock the portals keep. Null where the
 // browser has no Web Animations API or the fall does not run (reduced motion).
 function fallAnimation(el) {
@@ -397,7 +424,7 @@ function drawHalo(ctx, well, pulse) {
   ctx.restore();
 }
 
-export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, translucent = false }) {
+export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, playRef, translucent = false }) {
   const paperRef = useRef(null);
   const vortexRef = useRef(null);
   const frontRef = useRef(null);
@@ -443,15 +470,19 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, tran
 
     const draw = (t, now) => {
       if (!W || !H) return;
+      const play = playRef?.current;
+      play?.frame(t, now);
       const box = canvas.getBoundingClientRect();
-      const well = measure(wellRef, box);
-      const top = measure(topRef, box);
-      const pulse = reduced ? 0 : passPulse(t);
+      const top = opened(measure(topRef, box), reduced ? 1 : portalOpen(t));
+      const well = opened(measure(wellRef, box), reduced ? 1 : portalOpen(t, OPEN.floorDelay));
+      const kick = play?.kick ?? 0;
+      const boost = Math.max(play?.warp ?? 0, kick);
+      const pulse = reduced ? 0 : Math.max(passPulse(t), kick);
       const key = well ? `${Math.round(well.cx)},${Math.round(well.cy)},${Math.round(well.a)}` : '';
       if (key !== paperKey || now - paperAt >= PAPER_INTERVAL) {
         paper.setTransform(dpr, 0, 0, dpr, 0, 0);
         paper.clearRect(0, 0, W, H);
-        drawPaper(paper, W, H, t, reduced ? 0 : 1, well, pulse, translucent ? 0.84 : 1, dpr);
+        drawPaper(paper, W, H, t, reduced ? 0 : 1, well, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr);
         paperAt = now;
         paperKey = key;
       }
@@ -459,16 +490,19 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, tran
         layer.setTransform(dpr, 0, 0, dpr, 0, 0);
         layer.clearRect(0, 0, W, H);
       }
-      const spin = spinAngle(t);
+      const spin = spinAngle(t) + (play?.spin ?? 0);
+      const kickSince = play?.kickSince ?? Infinity;
       // Behind the cube: both tunnels and their far lips. The cube is seen
       // from above, so it falls in front of each mouth's far side.
       if (top) {
         drawHalo(ctx, top, pulse);
-        drawFunnel(ctx, top, t, spin, pulse, false);
+        drawKickRing(ctx, top, kickSince, play?.kicks ?? 0);
+        drawFunnel(ctx, top, t, spin, pulse, false, boost);
         drawRim(ctx, top, spin, pulse, 'back');
       }
       if (well) {
-        drawFunnel(ctx, well, t, spin, pulse);
+        drawKickRing(ctx, well, kickSince, play?.kicks ?? 0);
+        drawFunnel(ctx, well, t, spin, pulse, true, boost);
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
@@ -517,7 +551,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, tran
       observer?.disconnect();
       if (!observer) window.removeEventListener('resize', resize);
     };
-  }, [sceneRef, fallRef, wellRef, topRef, translucent]);
+  }, [sceneRef, fallRef, wellRef, topRef, playRef, translucent]);
 
   return (
     <>

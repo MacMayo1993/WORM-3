@@ -14,14 +14,22 @@
  * the main thread is busy parsing; the paper and portals are 2D canvases (never
  * WebGL, which would compete with the app's R3F canvas for a context).
  *
+ * It is also a toy (loadingPlay.js): the portals spring open as the cover
+ * arrives, holding anywhere dives faster (every animation and both canvases
+ * speed up together, with speed lines round the shaft), a tap kicks the cube
+ * into a spin and rings both portals, and MOBI keeps count of the loops with a
+ * line every couple of them.
+ *
  * Lazy-loaded by LoadingScreen, with its stylesheet, to keep both off the
  * initial route; preloadAssets.js warms the chunk during the opening.
  */
 
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
 import { shaftClipPath } from './loadingWormhole.js';
+import { createLoadingPlay } from './loadingPlay.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScene.css';
 
@@ -40,16 +48,19 @@ function Face({ face }) {
 const Cube = React.memo(function Cube() {
   return (
     <div className="wl-cube" style={{ '--wl-yaw': `${CUBE_YAW}deg` }}>
-      {LOADING_CUBE.map((layer) => (
-        <div key={layer.key} className={`wl-layer wl-layer-${layer.key}`}>
-          {layer.faces.map((face) => (
-            <Face key={face.side} face={face} />
-          ))}
-          {layer.plastic.map((side) => (
-            <div key={side} className={`wl-face wl-cap wl-${side}`} />
-          ))}
-        </div>
-      ))}
+      {/* A tap spins this about the cube's own vertical axis. */}
+      <div className="wl-spin">
+        {LOADING_CUBE.map((layer) => (
+          <div key={layer.key} className={`wl-layer wl-layer-${layer.key}`}>
+            {layer.faces.map((face) => (
+              <Face key={face.side} face={face} />
+            ))}
+            {layer.plastic.map((side) => (
+              <div key={side} className={`wl-face wl-cap wl-${side}`} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 });
@@ -77,18 +88,66 @@ const Airflow = React.memo(function Airflow() {
 
 // Between the two portals' near lips.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
+const MOBI_STYLE = { '--wl-mobi': `url("${import.meta.env.BASE_URL}Mobi.webp")` };
 
 export default function LoadingScene({ translucent = false }) {
   const sceneRef = useRef(null);
   const fallRef = useRef(null);
   const wellRef = useRef(null);
   const topRef = useRef(null);
+  const lineRef = useRef(null);
+  const badgeRef = useRef(null);
+  const playRef = useRef(null);
+  const veilRef = useRef(null);
+
+  // The toy: a press dives and kicks, letting go (anywhere) eases off. The whole
+  // cover is the touch surface; nothing here sets React state.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const root = scene?.parentElement;
+    if (!scene || !root) return undefined;
+    const play = createLoadingPlay({
+      scene,
+      veil: veilRef.current,
+      line: lineRef.current,
+      badge: badgeRef.current,
+      reduced: prefersReducedMotion()
+    });
+    playRef.current = play;
+    const press = (e) => {
+      if (e.button > 0) return;
+      play.press();
+    };
+    const release = () => play.release();
+    const noMenu = (e) => e.preventDefault();
+    root.addEventListener('pointerdown', press);
+    root.addEventListener('contextmenu', noMenu);
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    window.addEventListener('blur', release);
+    return () => {
+      playRef.current = null;
+      root.removeEventListener('pointerdown', press);
+      root.removeEventListener('contextmenu', noMenu);
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
+
   // `wl-live` holds the scene still and hidden until LoadingPortal has drawn
   // the portals once and adds `wl-ready`; the portals then run off the fall's
   // own clock, so they stay in step with the cube.
   return (
     <>
-      <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} translucent={translucent} />
+      <LoadingPortal
+        sceneRef={sceneRef}
+        fallRef={fallRef}
+        wellRef={wellRef}
+        topRef={topRef}
+        playRef={playRef}
+        translucent={translucent}
+      />
       <div className="wl-scene wl-live" ref={sceneRef}>
         <div className="wl-well" ref={topRef} />
         <div className="wl-gap" />
@@ -110,6 +169,18 @@ export default function LoadingScene({ translucent = false }) {
             </div>
           </div>
         </div>
+      </div>
+      {/* Speed lines round the shaft while diving. */}
+      <i className="wl-veil" ref={veilRef} aria-hidden="true" />
+      {/* MOBI's company. Decorative: the status line is what the cover announces. */}
+      <div className="wl-mobi" aria-hidden="true">
+        <span className="wl-mobi-face" style={MOBI_STYLE}>
+          <b className="wl-loops" ref={badgeRef} />
+        </span>
+        <span className="wl-mobi-say">
+          <span className="wl-mobi-name">MOBI</span>
+          <span className="wl-mobi-line" ref={lineRef} />
+        </span>
       </div>
     </>
   );
