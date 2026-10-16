@@ -1,15 +1,12 @@
 // sliceShot.js — where the camera stands to show a slice hazard land.
 //
-// The WORM'D beats (a tail cut the worm survives, and a slice death) used to
-// push in on the impact point. On a phone that framed a few tiles of worm and
-// none of the layer that did the cutting, so the player saw a flash but not
-// what hit them. This shot pulls back far enough to hold the WHOLE cube in the
-// lens, aims between the turning layer's centre and the impact, and comes in on
-// a three-quarter angle off the impact face so the layer reads as a band
-// across the cube with its turning edge visible.
+// Slice deaths and surviving tail cuts share a three-quarter view of the
+// cutting layer. Keep half the old overview's extra distance beyond the chase
+// view, so the action remains readable on phones and large boards.
 //
 // Pure maths: the camera module blends toward the result, tests project it.
 import * as THREE from 'three';
+import { eventCameraDistance } from './wormCameraZoom.js';
 
 const _n = new THREE.Vector3();
 const _axis = new THREE.Vector3();
@@ -35,9 +32,9 @@ export const AXIS_VECTORS = {
  *   slice (a bomb), which frames the whole cube leaning toward the impact
  * @param {number|null} layer turning layer index (0 … size-1)
  * @param {number} size cube size
- * @param {{scale?:number, fov?:number, aspect?:number}} lens cubie spacing (1 unless exploded), vertical FOV in degrees, aspect
+ * @param {{scale?:number, fov?:number, aspect?:number, chaseDistance?:number, focusImpact?:boolean}} lens
  */
-export function sliceShotInto(out, impact, axis, layer, size, { scale = 1, fov = 60, aspect = 1 } = {}) {
+export function sliceShotInto(out, impact, axis, layer, size, { scale = 1, fov = 60, aspect = 1, chaseDistance = 0, focusImpact = false } = {}) {
   const k = (size - 1) / 2;
   const impactV = Array.isArray(impact) ? _centre.fromArray(impact) : _centre.copy(impact);
 
@@ -76,7 +73,9 @@ export function sliceShotInto(out, impact, axis, layer, size, { scale = 1, fov =
   const radius = Math.sqrt(3) * half + FRAME_MARGIN;
   const halfV = THREE.MathUtils.degToRad(fov) / 2;
   const halfH = Math.atan(Math.tan(halfV) * aspect);
-  const distance = radius / Math.sin(Math.min(halfV, halfH)) + out.look.length();
+  const overviewDistance = radius / Math.sin(Math.min(halfV, halfH)) + out.look.length();
+  const distance = eventCameraDistance(chaseDistance, overviewDistance);
+  if (focusImpact) out.look.copy(impactV);
   out.cam.copy(out.look).addScaledVector(_dir, distance);
 
   // Level horizon: world up, unless the shot looks nearly straight up or down.

@@ -31,7 +31,7 @@ it('pulls out, completes the circle before zooming in, and returns to the captur
     }
 });
 
-it.each([2, 7, 10, 15])('keeps every corner of a %s cube on screen throughout the full orbit', size => {
+it.each([2, 7, 10, 15])('halves the extra pickup pullback on a %s cube across viewports and expansion', size => {
     for (const aspect of [9 / 20, 1, 16 / 9]) for (const expansion of [0, 0.65]) {
         const camera = new PerspectiveCamera(65, aspect, 0.1, 1000);
         camera.zoom = 1.2;
@@ -40,15 +40,16 @@ it.each([2, 7, 10, 15])('keeps every corner of a %s cube on screen throughout th
         camera.lookAt(0, 0, size / 2);
         const orbit = makeElementalRevealOrbit(camera, new Vector3(0, 0, size / 2), { size, expansion });
         const eye = new Vector3(), look = new Vector3(), up = new Vector3();
-        const half = (size - 1) / 2 * cubeExpansionScale(size, expansion) + 0.8;
+        const initialRadius = camera.position.length();
+        const halfFov = camera.getEffectiveFOV() * Math.PI / 360;
+        const limit = Math.min(halfFov, Math.atan(Math.tan(halfFov) * aspect));
+        const half = (size - 1) / 2 * cubeExpansionScale(size, expansion) + 1;
+        const previousRadius = Math.max(initialRadius * 1.35, Math.sqrt(3) * half / Math.sin(limit) * 1.15);
         for (let i = 0; i <= 32; i++) {
             sampleElementalRevealOrbit(orbit, 0.18 + i / 32 * 0.64, eye, look, up);
-            camera.position.copy(eye); camera.up.copy(up); camera.lookAt(look); camera.updateMatrixWorld();
-            for (const x of [-half, half]) for (const y of [-half, half]) for (const z of [-half, half]) {
-                const projected = new Vector3(x, y, z).project(camera);
-                expect(Math.abs(projected.x)).toBeLessThan(0.95);
-                expect(Math.abs(projected.y)).toBeLessThan(0.95);
-            }
+            expect(eye.length() - initialRadius).toBeCloseTo((previousRadius - initialRadius) * .5, 8);
+            // The closer orbit still clears the board at every angle.
+            expect(eye.length()).toBeGreaterThan(Math.sqrt(3) * (half - .5));
         }
     }
 });

@@ -20,6 +20,7 @@ import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeCautionFall, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { CAUTION_OPENING_RADIUS } from '../worm/healerWorm/cautionOpening.js';
+import { CUT_FOCUS_DURATION, CUT_FOCUS_IN, CUT_FOCUS_HOLD } from '../worm/healerWorm/constants.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -83,6 +84,36 @@ afterEach(() => {
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   victoryViewport.current = null; resetVictoryView();
+});
+
+it.each([true, false])('holds the actual tail-cut point still for one second (mobile=%s)', mobile => {
+  scene.mobile = mobile;
+  const size = 6, worm = makeWorm(size);
+  useGameStore.setState({ wormGamePhase: 'active' });
+  render(worm, size);
+  for (let i = 0; i < 180; i++) tick();
+  const start = scene.camera.position.clone();
+  const impact = new Vector3(-1, 1, size / 2 + .08);
+  worm.cutFocusT = ref(CUT_FOCUS_DURATION);
+  worm.cutFocusPos = ref(impact.toArray());
+  worm.cutFocusSlice = ref({ axis: 'row', layer: 3 });
+  tick();
+  expect(scene.camera.position.distanceTo(start)).toBeLessThan(1e-8);
+  let held, orientation;
+  for (let i = 0; i <= 60; i++) {
+    worm.cutFocusT.current = CUT_FOCUS_DURATION - CUT_FOCUS_IN - i / 60 * CUT_FOCUS_HOLD;
+    tick();
+    const hit = impact.clone().project(scene.camera);
+    expect(hit.x).toBeCloseTo(0, 6); expect(hit.y).toBeCloseTo(0, 6);
+    if (!held) { held = scene.camera.position.clone(); orientation = scene.camera.quaternion.clone(); }
+    expect(scene.camera.position.distanceTo(held)).toBeLessThan(1e-8);
+    expect(scene.camera.quaternion.angleTo(orientation)).toBeLessThan(1e-6);
+  }
+  worm.cutFocusT.current = .000001; tick();
+  expect(scene.camera.position.distanceTo(start)).toBeLessThan(1e-7);
+  worm.cutFocusT.current = 0; worm.cutFocusPos.current = null;
+  for (let i = 0; i < 180; i++) tick();
+  if (mobile) expectCentered(worm, size);
 });
 
 it.each([2, 3, 4, 15])('keeps the entire size-%i victory orbit inside the clear stage, then restores the camera on retry', size => {
