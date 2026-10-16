@@ -61,14 +61,16 @@ export async function openWormEntry(page, options) {
 /** Main menu → WORM → Customize: the worm profile editor with its closet of pieces. */
 export async function openProfile(page) {
   await openWormEntry(page, { unlock: true });
-  await press(page, /customize/i);
+  await page.getByRole('combobox', { name: 'Worm mode section', exact: true }).selectOption('customize');
   await expect(page.getByRole('tab', { name: /^worm/i })).toBeVisible();
 }
 
 /** Walk the Free Play wizard and Mobi's intro until the run's HUD is up. */
 export async function startFreePlay(page, { viewport } = {}) {
   await openWormEntry(page);
-  await press(page, /free play/i);
+  const section = page.getByRole('combobox', { name: 'Worm mode section', exact: true });
+  await expect(section).toHaveValue('story');
+  await section.selectOption('free');
   const wizard = page.getByRole('dialog', { name: 'WORM setup', exact: true });
   // Confirm each transition before advancing again. The old generic Next loop
   // could start another click after Launch and wait forever for a vanished key,

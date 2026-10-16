@@ -80,6 +80,12 @@ it.each([false, true])('keeps Random surfaces correct across remixes and turns (
       }
 
       const colors = resolveColors(useGameStore.getState().settings);
+      // Neon view intentionally overrides the manifold finish with a full-face
+      // sign. Count those fronts separately so the audit still catches a neon
+      // material leaking onto another piece during a remix.
+      const neonShader = getTileStyleMaterial('neonSign', '#ffffff').fragmentShader;
+      const allowedShaders = styles.map(style => getTileStyleMaterial(style, '#ffffff').fragmentShader);
+      let neonFaces = 0;
       scene.traverse(mesh => {
         if (mesh.name !== 'sticker-front') return;
         addPosition(mesh.matrixWorld);
@@ -89,21 +95,24 @@ it.each([false, true])('keeps Random surfaces correct across remixes and turns (
         // leaves the shared shader or geometry during the same commit.
         const mat = mesh.material;
         if (mat.isShaderMaterial && mat.transparent !== true) {
-          expect(styles.map(style => getTileStyleMaterial(style, '#ffffff').fragmentShader)).toContain(mat.fragmentShader);
+          if (mat.fragmentShader === neonShader) neonFaces++;
+          else expect(allowedShaders).toContain(mat.fragmentShader);
           expect(Object.values(colors).map(c => new THREE.Color(c).getHexString())).toContain(mat.uniforms.baseColor.value.getHexString());
         }
       });
-      let expectedFaces = 0, expectedNumbers = 0;
+      let expectedFaces = 0, expectedNumbers = 0, expectedNeonFaces = 0;
       const expectedGrid = [];
       for (const cubie of useGameStore.getState().cubies.flat(2)) {
         const stickers = Object.values(cubie.stickers), home = stickers[0]?.origPos ?? cubie;
         const view = pickCubeletViewStyle(home.x, home.y, home.z, tick,
           mobile ? LIGHT_CUBELET_VIEW_STYLES : PER_CUBELET_VIEW_STYLES);
         if (view !== 'wireframe') expectedFaces += stickers.length;
+        if (view === 'neon') expectedNeonFaces += stickers.length;
         if (view === 'sudokube') expectedNumbers += stickers.length;
         if (view === 'grid') expectedGrid.push(...stickers.map(sticker => getManifoldGridId(sticker, size)));
       }
       expect(positions.size).toBe(expectedFaces);
+      expect(neonFaces).toBe(expectedNeonFaces);
       const grid = [], numbers = [];
       scene.traverse(object => {
         if (object.name.startsWith('GridLabel:')) grid.push(object.name.slice(10));
