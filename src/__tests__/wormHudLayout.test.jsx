@@ -22,7 +22,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ captureMode: false, demoMode: false, wormHealerMode: true, wormAlive: true,
     wormStoryLevel: null, wormStoryStarted: false, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
-    wormElementalTheme: null, wormElementalPartner: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
+    wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null, wormViewPower: null, wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
     wormRunAchievements: [], settings: { ...useGameStore.getState().settings, wormQuestsMinimized: false } });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
@@ -190,8 +190,8 @@ it('shows element timers and momentum in the compact chip and instructions only 
   expect(host.querySelector('.worm-power-detail')).toBeNull();
   act(() => chip.click());
   expect(useGameStore.getState().wormPaused).toBe(true);
-  expect(host.querySelector('.worm-pause-card').textContent).toContain('Momentum +20%');
-  expect(host.querySelector('.worm-pause-card').textContent).toContain('Turns retain 65% momentum');
+  expect(host.querySelector('.worm-power-info').textContent).toContain('Momentum +20%');
+  expect(host.querySelector('.worm-power-info').textContent).toContain('Turns retain 65% momentum');
   act(() => vi.advanceTimersByTime(2000));
   expect(chip.textContent).toContain('10s');
   act(() => host.querySelector('.worm-pause-resume').click());
@@ -354,14 +354,16 @@ it('shows physical tile length and reserve without changing the carried-orb coun
   expect(useGameStore.getState().wormBodyTiles).toBe(4);
 });
 
-it('previews the ordered next pickup and keeps the full recipe guide inside Pause', () => {
+it('opens ordered recipe details directly from the top power bubble', () => {
   useGameStore.setState({ wormElementalTheme: 'water', wormElementalPartner: null,
     wormSpecials: [{ type: 'fire', id: 'partner' }] });
   wormBuffs.elementalT = 8; wormBuffs.elementalMaxT = 10;
   renderPhase('crawling');
-  expect(host.querySelector('.worm-fusion-preview').textContent).toContain('Fire → Quench');
+  expect(host.querySelector('.worm-fusion-preview')).toBeNull();
   expect(host.querySelector('.worm-fusion-guide')).toBeNull();
-  act(() => host.querySelector('.worm-fusion-preview').click());
+  act(() => host.querySelector('.worm-buff-chip').click());
+  expect(host.querySelector('[aria-label="Active power information"]')).not.toBeNull();
+  expect(host.querySelector('.worm-fusion-preview').textContent).toContain('Water → Fire: Quench');
   expect(useGameStore.getState().wormPaused).toBe(true);
   const guide = host.querySelector('.worm-fusion-guide');
   expect(guide.open).toBe(false);
@@ -377,39 +379,79 @@ it('previews the ordered next pickup and keeps the full recipe guide inside Paus
   wormBuffs.elementalT = 0;
 });
 
-it('shows both fused elements and their live benefit without opening Pause', () => {
+it('keeps the fusion bubble compact and shows its benefits only after a tap', () => {
   wormBuffs.elementalT = 10; wormBuffs.elementalMaxT = 10; wormBuffs.waterMomentum = 1;
   useGameStore.setState({ wormElementalTheme: 'ice', wormElementalPartner: 'water', wormSpecials: [] });
   renderPhase('crawling');
   const fusion = () => host.querySelector('.worm-buff-item.is-fusion');
   expect(fusion().textContent).toContain('Fusion active');
   expect(fusion().textContent).toContain('Slipstream');
-  expect(fusion().textContent).toContain('Water → Ice · Both active');
-  expect(fusion().textContent).toContain('+40%');
+  expect(fusion().textContent).not.toContain('+40%');
+  expect(host.querySelector('.worm-fusion-live')).toBeNull();
   expect(fusion().querySelectorAll('.worm-element-medal')).toHaveLength(2);
   expect(host.querySelector('.worm-pause-card')).toBeNull();
   act(() => useGameStore.setState({ wormElementalTheme: 'grass', wormElementalPartner: 'water' }));
   expect(fusion().textContent).toContain('Bloom');
-  expect(fusion().textContent).toContain('Rain grows a pad every 4 tiles');
+  act(() => fusion().querySelector('button').click());
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(host.querySelector('.worm-power-info').textContent).toContain('Rain grows a pad every 4 tiles');
+  act(() => host.querySelector('.worm-power-info .worm-pause-resume').click());
+  expect(useGameStore.getState().wormPaused).toBe(false);
   act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null }));
   expect(fusion()).toBeNull();
   wormBuffs.elementalT = 0;
 });
 
-it('announces a new fusion with a FUSION banner naming the ordered recipe and its rule', () => {
+it.each([
+  ['water', null, null],
+  ['fire', 'ice', { key: 'ice>fire', seq: 1 }],
+])('does not replay a power announcement or open a dialog after a tunnel (%s, %s)', (theme, partner, notice) => {
   wormBuffs.elementalT = 10; wormBuffs.elementalMaxT = 10;
-  useGameStore.setState({ wormElementalTheme: 'fire', wormElementalPartner: 'ice', wormSpecials: [], wormFusionNotice: null });
+  useGameStore.setState({ wormElementalTheme: theme, wormElementalPartner: partner, wormSpecials: [] });
   renderPhase('crawling');
-  expect(host.querySelector('.worm-fusion-banner')).toBeNull();
-  act(() => useGameStore.setState({ wormFusionNotice: { key: 'ice>fire', seq: 1 } }));
-  const banner = host.querySelector('.worm-fusion-banner');
-  expect(banner.textContent).toContain('Ice → Fire');
-  expect(banner.textContent).toContain('Meltdown');
-  expect(banner.textContent).toContain('30% dash');
-  expect(banner.querySelector('.worm-fusion-ignite').textContent).toContain('melt the ground');
-  act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null }));
-  expect(host.querySelector('.worm-fusion-banner')).toBeNull();
+  act(() => useGameStore.setState({ wormFusionNotice: notice }));
+  for (let pass = 0; pass < 2; pass++) {
+    for (const phase of ['windup', 'entering', 'tunnel', 'exiting', 'windout', 'crawling']) {
+      renderPhase(phase);
+      act(() => vi.advanceTimersByTime(4000));
+      expect(host.querySelector('.worm-fusion-banner')).toBeNull();
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(useGameStore.getState().wormPaused).toBe(false);
+    }
+  }
+  const bubble = host.querySelector('.worm-buff-chip');
+  expect(bubble.tagName).toBe('BUTTON');
+  expect(bubble.getAttribute('aria-haspopup')).toBe('dialog');
+  bubble.focus();
+  act(() => bubble.click()); // Touch click and keyboard activation share this handler.
+  const panel = host.querySelector('.worm-power-info');
+  expect(panel).not.toBeNull();
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(useGameStore.getState().wormPauseMenuOpen).toBe(true);
+  if (partner) {
+    expect(panel.textContent).toContain('Ice → Fire: Meltdown');
+    expect(panel.textContent).toContain('melt the ground');
+  } else expect(panel.textContent).toContain('Water');
+  act(() => panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(useGameStore.getState().wormPaused).toBe(false);
+  expect(useGameStore.getState().wormPauseMenuOpen).toBe(false);
+  expect(document.activeElement).toBe(bubble);
   wormBuffs.elementalT = 0;
+});
+
+it('opens view-pickup information from its bubble and resumes on dismissal', () => {
+  useGameStore.setState({ wormViewPower: 'view-glass' });
+  renderPhase('crawling');
+  const bubble = host.querySelector('.worm-buff-chip');
+  expect(bubble).not.toBeNull();
+  act(() => bubble.click());
+  const panel = host.querySelector('.worm-power-info');
+  expect(panel.textContent).toContain('Glass Cube');
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  act(() => panel.parentElement.click());
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(useGameStore.getState().wormPaused).toBe(false);
 });
 
 it('lets the arrival pause and resume without releasing gameplay early', () => {

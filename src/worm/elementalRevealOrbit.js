@@ -7,7 +7,8 @@ const smooth = t => {
     return t * t * t * (t * (t * 6 - 15) + 10);
 };
 
-// Orbit at half the original overview radius, then return to the captured pose.
+// Pickup reveals stand 25% farther back than the reduced event shot, then return
+// to the captured pose. Slice and tail-cut event distances stay unchanged.
 // Use the same portrait/expanded-board fit as the reference distance.
 export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0, reducedMotion = false } = {}) {
     const position = camera.position.clone();
@@ -27,7 +28,7 @@ export function makeElementalRevealOrbit(camera, look, { size = 3, expansion = 0
     const fitRadius = Math.sqrt(3) * halfExtent / Math.sin(limitingHalfFov) * 1.15;
     // A close full orbit must still clear the corners on wide/expanded boards.
     const clearanceRadius = Math.sqrt(3) * (halfExtent - 0.5) + 0.15;
-    const revealRadius = eventCameraDistance(position.length(), Math.max(position.length() * 1.35, fitRadius), clearanceRadius);
+    const revealRadius = 1.25 * eventCameraDistance(position.length(), Math.max(position.length() * 1.35, fitRadius), clearanceRadius);
     return { revealRadius, reducedMotion, position, look: target, up: camera.up.clone(), quaternion: camera.quaternion.clone(),
         axis, viewUp, fov: camera.fov, rotation: new Quaternion() };
 }
