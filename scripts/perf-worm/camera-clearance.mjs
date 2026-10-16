@@ -20,7 +20,7 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
       const camera = new THREE.PerspectiveCamera(), scene = new THREE.Scene();
       const uniforms = {
         ...tunnelCameraUniforms, ...tunnelCoreClipUniforms, ...makeCautionOpeningUniforms(),
-        uCameraClearance: { value: 1 }, uCoreClipOff: { value: 1 },
+        uCameraClearance: { value: 1 },
         point: { value: new THREE.Vector3() },
       };
       const shader = mode => new THREE.ShaderMaterial({ uniforms,
@@ -43,6 +43,21 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
       const local = (x, y, z) => new THREE.Vector3(x, y, z).applyQuaternion(camera.quaternion).add(camera.position);
       for (const mode of ['opaque', 'veil']) {
         quad.material.dispose(); quad.material = shader(mode);
+        // The occupied band must also disappear inside the mirror room, at
+        // every zoom and translated dock. The exterior approach stays intact.
+        uniforms.uCameraClearance.value = 0;
+        for (const half of [.2, .6, 1.2]) {
+          uniforms.uTunnelCoreHalf.value = half;
+          uniforms.uTunnelCoreCenter.value.set(.7, -.4, .2);
+          const center = uniforms.uTunnelCoreCenter.value;
+          check('core center', center, false);
+          for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+            check('inside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * .99), false);
+            check('outside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * 1.01), true);
+          }
+        }
+        uniforms.uTunnelCoreHalf.value = 0;
+        uniforms.uCameraClearance.value = 1;
         for (const bank of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
           camera.position.set(2.3, -1.7, .8);
           camera.rotation.set(.3, -.7, bank); camera.updateMatrixWorld();

@@ -337,6 +337,13 @@ function VoidCore({ cubieRefs = null }) {
     updateCoreSightline(passage, camera.position,
       wormMode && tunnelState.active ? tunnelState.rideHead : null, size);
     mirrors.group.visible = wormMode && passage.uniforms.uPassageOpen.value > .5;
+    // Publish this frame's bounds before the mirror capture. Otherwise the
+    // probe sees the previous frame's cutouts while the room moves, exposing
+    // ribbon fragments and clipping the wrong section of its walls.
+    passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? (CORE_MIRROR_HALF + .001) * f.zoom : 0;
+    passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
+    tunnelCoreClipUniforms.uTunnelCoreHalf.value = wormMode ? CORE_HALF * f.zoom + .002 : 0;
+    tunnelCoreClipUniforms.uTunnelCoreCenter.value.copy(passage.uniforms.uCoreRoomCenter.value);
     if (probe) {
       // Link the room's programs, and every program its capture draws with, while
       // the board is still hidden behind the scramble or briefing; never mid-ride.
@@ -355,11 +362,6 @@ function VoidCore({ cubieRefs = null }) {
         probe.capture(gl, scene, mirrors, { delta: rawDt, interval: light ? 1 / 20 : 1 / 30, faces: light ? 2 : 3 });
       }
     }
-    // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.
-    passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? (CORE_MIRROR_HALF + .001) * f.zoom : 0;
-    passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
-    tunnelCoreClipUniforms.uTunnelCoreHalf.value = wormMode ? CORE_HALF * f.zoom + .002 : 0;
-    tunnelCoreClipUniforms.uTunnelCoreCenter.value.copy(passage.uniforms.uCoreRoomCenter.value);
 
     const energy = 0.35 + 0.65 * charge;
     _tint.copy(LIGHT_BASE).lerp(f.tint, 0.65 * f.tintMix);

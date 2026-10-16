@@ -331,7 +331,6 @@ const MobiusTunnel = ({
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
     uCameraClearance: { value: 0 },
-    uCoreClipOff: { value: 0 },
     ...tunnelCameraUniforms,
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
@@ -357,7 +356,6 @@ const MobiusTunnel = ({
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
-    uCoreClipOff: uniforms.uCoreClipOff,
     ...tunnelCameraUniforms,
     uGrowT: uniforms.uGrowT,
     uTime: uniforms.uTime,
@@ -397,8 +395,6 @@ const MobiusTunnel = ({
     // only fragments near the lens instead of removing whole alternate routes.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
-    // The band being ridden runs on through the core's mirror room.
-    uniforms.uCoreClipOff.value = wormMode && tunnelState.active && tunnelState.activeTunnelId === tunnelId ? 1 : 0;
     const mirror = mirrored.current, root = rootRef.current;
     if (root && wormMode) {
       // Link the variants a ride draws the band with when it appears (with its
@@ -410,7 +406,7 @@ const MobiusTunnel = ({
         gl.compile?.(root, _state.camera, scene);
         warmMirrorPrograms(gl, scene, [root]);
       }
-      const ridden = uniforms.uCoreClipOff.value > 0;
+      const ridden = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
       if (ridden !== mirror.ridden) {
         mirror.ridden = ridden;
         if (ridden) addMirrorSubject(root); else removeMirrorSubject(root);
