@@ -58,7 +58,9 @@ test('reloads once and carries on when a deploy has deleted a chunk', async ({ p
   // The reload lands back on the opening; the player can go on to where they were headed.
   await skipIntro(page);
   await playWorm(page);
-  await expect(page.locator('button:visible', { hasText: /free play/i }).first()).toBeVisible({ timeout: 90_000 });
+  const section = page.getByRole('combobox', { name: 'Worm mode section', exact: true });
+  await expect(section).toBeVisible({ timeout: 90_000 });
+  await expect(section).toHaveValue('story');
 });
 
 test('shows a way back, not a blank page, when the chunk stays missing', async ({ page }) => {
