@@ -28,6 +28,7 @@ import {
   SPECIAL_SPAWN_RADIUS,
   SPECIAL_SPAWN_RETRY,
   ROCKET_DURATION,
+  ROCKET_LANDING_GRACE,
   ROCKET_SPEED_MULT,
   ROCKET_FLIGHT_TAKEOFF,
   ROCKET_FLIGHT_LANDING,
@@ -949,6 +950,24 @@ describe('spawn placement in the sim', () => {
 // ─── Rocket overdrive ────────────────────────────────────────────────────────
 
 describe('rocket overdrive', () => {
+  it.each([1, 3.5])('restores body-collision deaths after landing at speed %s', speed => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => speed });
+    sim.specialTimer = sim.elementalSpawnTimer = 9999;
+    // A body longer than a circuit will be waiting when the head comes around.
+    sim.tailLength = 400;
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION + ROCKET_LANDING_GRACE / 2);
+    expect(sim.rocketActive).toBe(false);
+    expect(sim.landingGraceT).toBeGreaterThan(0);
+    expect(sim.alive).toBe(true);
+    // Enough time to cross our body, but far short of fifty protected tiles.
+    run(sim, ctx, ROCKET_LANDING_GRACE + 25 / speed);
+    expect(sim.alive).toBe(false);
+    expect(eventsOf(ctx, 'death')).toHaveLength(1);
+    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
+    expect(sim.landingGraceT).toBe(0);
+  });
+
   it('keeps flight below double crawl speed for readable steering', () => {
     expect(ROCKET_SPEED_MULT).toBeGreaterThan(1);
     expect(ROCKET_SPEED_MULT).toBeLessThan(2);
