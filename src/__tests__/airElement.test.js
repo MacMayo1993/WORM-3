@@ -66,11 +66,23 @@ it('combines an Earth spring pad with Air lift', () => {
   expect(sim.jumpHeight).toBeCloseTo(1.8 * 1.4);
   expect(sim.jumpSpan).toBeCloseTo(2.2 * 1.35);
 });
-it('offers Air for a missing sixth element, and awards mastery only after landing', () => {
+it.each([0, 1, 2, 3, 4, 5])('offers Air within two refills from deal slot %i, and awards mastery only after landing', slot => {
   const { sim, ctx, practice, level } = setup(70);
+  practice.elementOrder = STORY_ELEMENTS.filter(type => type !== 'air');
+  practice.elementOrder.splice(slot, 0, 'air');
   practice.elements = new Set(STORY_ELEMENTS.slice(0, 5));
   practice.mechanics = { fusions: 999 }; practice.viewOffered = true; practice.powerDelay = 0; practice.elementSupplyDelay = 0;
   expect(offerStoryPower(sim, practice, level, level.cubeSize, practice.cubies)).toBe(true);
+  // Level 70 starts with the worm blocking one face center. The sixth dealt
+  // element waits for a refill instead of spawning inside the body.
+  expect(sim.specials.map(s => s.type)).toEqual(practice.elementOrder.slice(0, 5));
+  if (slot === 5) {
+    expect(practice.elementSupplyCursor).toBe(5);
+    sim.specials = []; // The first uncollected batch has expired.
+    for (let i = 0; i < 31; i++) updateMastery(sim, practice, level, 0.1);
+    expect(offerStoryPower(sim, practice, level, level.cubeSize, practice.cubies)).toBe(true);
+    expect(sim.specials[0].type).toBe('air');
+  }
   expect(sim.specials.some(s => s.type === 'air')).toBe(true);
   startElemental(sim, ctx, 'air'); sim.elementalFocusT = 0;
   updateMastery(sim, practice, level, 0.1);
