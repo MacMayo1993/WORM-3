@@ -2,7 +2,11 @@
 
 WORM can collect nine cube-view orbs: Classic, Grid, Sudoku, Wireframe, Glass,
 Chrome, Neon, Gap, and LEGO. Each uses the existing whole-cube renderer and the
-elemental orb presentation and claim burst.
+elemental orb presentation and claim burst. Classic temporarily replaces level tile
+patterns, face textures, and biome art with rounded glossy stickers in the six
+classic Rubik's colors and an opaque black plastic chassis. Live tile colors,
+rotations, tunnel mouths, and spent-tile indicators still follow gameplay; the
+previous palette and tile appearance return when the pickup expires.
 
 - Effects last 20 seconds of crawling. Pause, tunnel transit, and pickup reveals
   hold the timer. Another view replaces or refreshes it rather than stacking time.
