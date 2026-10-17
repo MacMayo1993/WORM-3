@@ -8,6 +8,18 @@ const pad = (r, n) => ({ x: r.x - n, y: r.y - n, width: r.width + 2 * n, height:
 export function placeAntipodalPanel({ width, height, obstacles = [], cube = null, compact = false, expanded = false, corner = 0, previous = null, insets = {} }) {
   const left = 10 + (insets.left || 0), top = 10 + (insets.top || 0);
   const right = width - 10 - (insets.right || 0), bottom = height - 10 - (insets.bottom || 0);
+  // Once placed, this is a user-controlled dock. Moving camera bounds, alerts
+  // and quest text must never move, fold, or reopen it. A resize may only shrink
+  // and clamp the existing panel inside the safe area. Explicit controls clear
+  // `previous` before asking for a new placement.
+  if (previous) {
+    const w = Math.min(previous.width, right - left,
+      previous.compact ? Infinity : (bottom - top - 50) / 0.75 + 14);
+    const h = previous.compact ? 40 : 50 + (w - 14) * 0.75;
+    if (w <= 0 || h > bottom - top) return null;
+    return { x: Math.max(left, Math.min(previous.x, right - w)),
+      y: Math.max(top, Math.min(previous.y, bottom - h)), width: w, height: h, compact: previous.compact };
+  }
   const blocked = obstacles.map(r => pad(r, 6));
   const body = cube && pad(cube, 6);
   const preferRight = corner < 2, preferBottom = corner === 1 || corner === 2;
@@ -15,15 +27,13 @@ export function placeAntipodalPanel({ width, height, obstacles = [], cube = null
     let best = null, bestScore = Infinity;
     const ys = new Set([top, bottom - h]);
     for (const r of [...blocked, ...(body ? [body] : [])]) { ys.add(r.y - h); ys.add(r.y + r.height); }
-    if (previous?.width === w && previous.compact === folded) ys.add(previous.y);
     for (const x of [left, right - w]) for (const y of ys) {
       const rect = { x, y, width: w, height: h, compact: folded };
       if (x < left || x + w > right || y < top || y + h > bottom || blocked.some(r => overlapArea(rect, r) > 0)) continue;
       const cover = overlapArea(rect, body);
       if (!folded && !expanded && cover > 0) continue;
       const distance = Math.abs(x - (preferRight ? right - w : left)) + Math.abs(y - (preferBottom ? bottom - h : top));
-      const stable = previous && previous.compact === folded && previous.x === x && previous.y === y ? 40 : 0;
-      const score = distance + cover * 100 - stable;
+      const score = distance + cover * 100;
       if (score < bestScore) { best = rect; bestScore = score; }
     }
     return best;
