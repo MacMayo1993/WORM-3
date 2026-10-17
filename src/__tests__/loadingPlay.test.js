@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FALL, PASS_AT, funnelPoint } from '../components/screens/loadingWormhole.js';
+import { getFusion } from '../worm/healerWorm/elementalFusion.js';
 import {
   KICK,
   HINT_MS,
@@ -271,6 +272,16 @@ describe('MOBI on the loading cover', () => {
     // And it is said once, not again on the next loop.
     play.frame(PASS_AT + 11 * FALL.period + 0.01, 3300);
     expect(line.textContent).toBe(MOBI_MILESTONES[10]);
+  });
+
+  it('names every fusion in pickup order exactly as the game makes it', () => {
+    // "Fire then Water is Steam": first pickup is the base, second the catalyst.
+    const element = { fire: 'fire', water: 'water', ice: 'ice', earth: 'grass', lightning: 'lightning', air: 'air' };
+    const claims = MOBI_TIPS.flatMap((tip) => [...tip.matchAll(/(\w+) then (\w+) is (\w+)/g)]);
+    expect(claims.length).toBeGreaterThan(0);
+    for (const [, base, catalyst, name] of claims) {
+      expect(getFusion(element[base.toLowerCase()], element[catalyst.toLowerCase()])?.label).toBe(name);
+    }
   });
 
   it('keeps every line short enough to read in one go', () => {

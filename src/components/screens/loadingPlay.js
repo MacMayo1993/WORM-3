@@ -143,7 +143,7 @@ export const MOBI_TIPS = [
   'Riding a turning layer is safe, but it cuts your tail at the seam. Never cross it head-first.',
   'Lost some tail? Your orbs scatter. Grab them back within 5 seconds, before they blink out.',
   "An orb pays out in its tile's twin colour: one on a white tile gives you a yellow bead.",
-  'Two elements fuse, and order matters: Water then Fire is Steam, Fire then Water is Quench.',
+  'Two elements fuse, and order matters: Fire then Water is Steam, Water then Fire is Quench.',
   'Under Ice, layer turns come half as often. A good time to cross the board.',
   "Ride under Water and your tunnels don't wear out.",
   "Fire pays part of every tunnel's toll for you.",
