@@ -82,3 +82,32 @@ it('preserves a manually moved open camera through temporary hiding even if cube
   expect(host.querySelector('section').style.cssText).toBe(first);
   expect(antipodalViewport.rect).not.toBeNull();
 });
+it('remeasures an expanded camera when Move resolves to the same only available dock', () => {
+  render(true);
+  const panel = host.querySelector('section'), first = panel.style.cssText;
+  const viewport = { ...antipodalViewport.rect };
+  const x = parseFloat(panel.style.left), y = parseFloat(panel.style.top);
+  const height = 50 + (parseFloat(panel.style.width) - 14) * 0.75;
+  // Leave only the existing top-right dock free, including the six-pixel
+  // obstacle padding. All other corners and lower candidate positions overlap.
+  const obstacles = [new DOMRect(0, 0, x - 6, window.innerHeight),
+    new DOMRect(0, y + height + 6, window.innerWidth, window.innerHeight)];
+  const elements = obstacles.map(rect => {
+    const element = document.createElement('div');
+    element.dataset.cameraAvoid = '';
+    element.style.opacity = '1';
+    element.getBoundingClientRect = () => rect;
+    document.body.append(element);
+    return element;
+  });
+  try {
+    for (let move = 0; move < 4; move++) {
+      click('Move far-side camera');
+      expect(panel.style.cssText).toBe(first);
+      expect(host.querySelector('[aria-expanded]').getAttribute('aria-expanded')).toBe('true');
+      expect(antipodalViewport.rect).toEqual(viewport);
+    }
+  } finally {
+    elements.forEach(element => element.remove());
+  }
+});

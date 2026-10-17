@@ -45,7 +45,9 @@ export default function AntipodalCameraPanel({ active }) {
         antipodalViewport.rect = null; // Never render into the frame's old position.
         previous.current = next;
       }
-      setPlacement(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+      // Even an identical dock needs a fresh layout measurement: changing the
+      // preference cleared the published viewport in this effect's cleanup.
+      setPlacement(next);
     };
     measure();
     window.addEventListener('resize', measure);
