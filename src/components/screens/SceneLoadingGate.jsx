@@ -27,7 +27,8 @@ export default function SceneLoadingGate({
   transparent = false,
   showTitle = false,
   eager = false,
-  minVisibleMs = 650,
+  // Long enough to see the cube through a full loop and read one of MOBI's tips.
+  minVisibleMs = 2400,
   probeMs = 500,
   maxVisibleMs = 12000,
   fadeMs = 480,

@@ -6,6 +6,7 @@ import { LOADING_CUBE, RING, WAVE_SPREAD } from '../components/screens/loadingCu
 import {
   FALL,
   PASS_AT,
+  crossing,
   THROAT,
   MOTE_COUNT,
   WORM_SEGMENTS,
@@ -111,17 +112,24 @@ describe('loading screen timing', () => {
 });
 
 describe('the shaft between the portals', () => {
-  const clip = shaftClipPath('R', 12);
+  const clip = shaftClipPath('R', 'C', 12);
   const points = clip.slice('polygon('.length, -1).split(', ');
 
-  it("cuts the cube along each portal's near lip", () => {
+  it("cuts the cube on each portal's surface, through its centre and a little in front of it", () => {
     expect(points).toHaveLength(26);
-    expect(points[0]).toBe('0% calc(R + R * 0)');
-    expect(points[6]).toBe('50% calc(R + R * 1)'); // the upper portal's near lip
-    expect(points[12]).toBe('100% calc(R + R * 0)');
-    expect(points[13]).toBe('100% calc(100% - R + R * 0)');
-    expect(points[19]).toBe('50% calc(100% - R + R * 1)'); // the floor portal's near lip
-    expect(points[25]).toBe('0% calc(100% - R + R * 0)');
+    expect(points[0]).toBe('0% calc(R + C * 0)');
+    expect(points[6]).toBe('50% calc(R + C * 1)'); // the upper portal's surface, at the front
+    expect(points[12]).toBe('100% calc(R + C * 0)');
+    expect(points[13]).toBe('100% calc(100% - R + C * 0)');
+    expect(points[19]).toBe('50% calc(100% - R + C * 1)'); // the floor portal's surface, at the front
+    expect(points[25]).toBe('0% calc(100% - R + C * 0)');
+    // Inside the mouth, so the cube is seen coming out of it (and going in),
+    // not sliding out from behind its rim: the cut is shallower than the near
+    // lip, which lies the mouth's half-height (0.18 of a mouth 2.4 cubes wide)
+    // in front of the centre.
+    expect(FALL.cut).toBeGreaterThan(0);
+    expect(FALL.cut).toBeLessThan(2.4 * 0.18 - 0.15);
+    expect(shaftClipPath()).toContain(`calc(var(--wl-cube) * ${FALL.cut})`);
   });
 
   it('cuts the cube and its twin, one drop apart, on the same line, so it is never in both portals', () => {
@@ -134,21 +142,30 @@ describe('the shaft between the portals', () => {
   });
 
   it('passes through, half in each portal, mid-fall', () => {
-    // The lip is the mouth's half-height: 0.18 of a mouth 2.4 cubes wide.
-    expect(FALL.lip).toBeCloseTo(2.4 * 0.18, 6);
     expect(shellCss).toContain('aspect-ratio: 1 / 0.36;');
     expect(css).toContain('--wl-wb: calc(var(--wl-well-w) * 0.18);');
-    expect(shellCss).toContain('--wl-well-w: min(calc(var(--wl-cube) * 2.4), 88vw);');
     expect(PASS_AT / FALL.period).toBeCloseTo(0.5, 6);
   });
 
   it('restarts the fall with the cube hidden inside the top portal and its twin sunk into the paper', () => {
     // Conservative projected half-height of the tilted CSS cube, in cubes.
     const halfCube = 0.9;
-    // The cube starting the fall is wholly above the upper portal's near lip ...
-    expect(-FALL.lead + halfCube).toBeLessThan(FALL.lip - 0.4);
+    // The cube starting the fall is wholly above the upper portal's cut ...
+    expect(-FALL.lead + halfCube).toBeLessThan(FALL.cut - 0.4);
     // ... and the twin ending it wholly below the floor portal's.
-    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.lip + 0.4);
+    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.cut + 0.4);
+  });
+
+  it("lights the portals' surfaces while the cube breaks through them, and not at the restart", () => {
+    expect(crossing(PASS_AT)).toBeCloseTo(1, 6);
+    expect(crossing(PASS_AT + FALL.period)).toBeCloseTo(1, 6);
+    expect(crossing(0)).toBe(0);
+    expect(crossing(FALL.period - 0.001)).toBe(0);
+    let last = crossing(0);
+    for (let t = 0.01; t < 3 * FALL.period; t += 0.01) {
+      expect(Math.abs(crossing(t) - last)).toBeLessThan(0.05);
+      last = crossing(t);
+    }
   });
 });
 

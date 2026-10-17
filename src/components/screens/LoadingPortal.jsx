@@ -20,8 +20,8 @@
  * The portals sit wherever LoadingScene's `.wl-well` elements are, so the cube's
  * CSS fall, shadow and ripple always line up with them. Time is read from the
  * fall's own CSS animation, so both portals kick as the cube passes through even
- * when the cover mounts in a busy frame. The scene is held still and hidden
- * until the first frame is drawn (`wl-ready`), so the cover fades in whole. The
+ * when the cover mounts in a busy frame or the main thread stalls. The canvases
+ * fade in over CSS stand-ins on their first drawn frame (`wl-ready`). The
  * RAF loop is torn down on unmount; reduced motion draws a still frame on a
  * flat, unmoving sheet.
  *
@@ -39,6 +39,8 @@ import {
   MOTE_COUNT,
   THROAT,
   WORM_SEGMENTS,
+  FALL,
+  crossing,
   funnelLean,
   funnelPoint,
   funnelRadius,
@@ -64,7 +66,6 @@ const PAPER_INTERVAL = 30; // ms between paper redraws: every other frame at 60H
 // The paper canvas overhangs the screen by this much (LoadingScene.css), so a
 // tilt can slide it without showing an edge.
 const PAPER_PAD = 16;
-const REVEAL_LIMIT = 700; // ms: show the scene even if the portals never draw
 
 const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const FACE_RGB = Object.fromEntries(Object.entries(RUBIKS_FACE_COLORS).map(([id, hex]) => [id, rgbOf(hex)]));
@@ -400,6 +401,33 @@ function drawKickRing(ctx, well, since, kicks) {
   ctx.stroke();
 }
 
+// The portal's surface where the cube breaks it: the front half of the flat
+// ellipse the shaft is clipped on (shaftClipPath), lit while the cube is half
+// through, brightest at the middle and fading toward the rim. Drawn over the
+// cube, so the cut edge reads as a glowing membrane, not a hard crop.
+function drawMembrane(ctx, well, cutPx, strength) {
+  if (strength <= 0.01 || cutPx <= 0) return;
+  const { cx, cy, a } = well;
+  const glow = ctx.createLinearGradient(cx - a, 0, cx + a, 0);
+  glow.addColorStop(0, 'rgba(255,253,242,0)');
+  glow.addColorStop(0.5, `rgba(255,253,242,${0.95 * strength})`);
+  glow.addColorStop(1, 'rgba(255,253,242,0)');
+  const halo = ctx.createLinearGradient(cx - a, 0, cx + a, 0);
+  halo.addColorStop(0, 'rgba(120,214,255,0)');
+  halo.addColorStop(0.5, `rgba(120,214,255,${0.45 * strength})`);
+  halo.addColorStop(1, 'rgba(120,214,255,0)');
+  for (const [style, width] of [
+    [halo, 7],
+    [glow, 2]
+  ]) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, a, cutPx, 0, 0, Math.PI);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = style;
+    ctx.stroke();
+  }
+}
+
 // Scale a measured mouth about its centre as it springs open; null while shut.
 function opened(well, open) {
   if (!well || open < 0.02) return null;
@@ -442,19 +470,16 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     const paper = paperCanvas?.getContext('2d');
     const ctx = canvas?.getContext('2d');
     const front = frontCanvas?.getContext('2d');
-    // Let the scene run and fade in: on the first drawn frame, or regardless
-    // once REVEAL_LIMIT has passed so the cube never waits on the canvases.
+    // On the first drawn frame the canvases fade in over the CSS stand-in
+    // portals (LoadingScene.css). The cube never waits for this: it is already
+    // falling on the compositor. Without a 2D context the stand-ins stay.
     let revealed = false;
     const reveal = () => {
       if (revealed) return;
       revealed = true;
       for (const el of [sceneRef?.current, paperCanvas, canvas, frontCanvas]) el?.classList.add('wl-ready');
     };
-    if (!paper || !ctx || !front) {
-      reveal();
-      return undefined;
-    }
-    const revealTimer = window.setTimeout(reveal, REVEAL_LIMIT);
+    if (!paper || !ctx || !front) return undefined;
     const reduced = prefersReducedMotion();
     const mountedAt = performance.now();
     let fall = null;
@@ -466,6 +491,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     // is redrawn at half rate (or at once when the mouth moves); only the
     // portals above it are drawn every frame.
     let paperAt = -Infinity;
+    let cubePx = 0; // the cube's size, for the depth of the portals' cut
     const paperWell = { cx: 0, cy: 0, a: 1, b: 1 };
     let paperKey = '';
 
@@ -539,9 +565,17 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
-      // Over the cube: both near lips, along the lines the shaft is cut on.
+      // Over the cube: both near lips, and each portal's surface lit where the
+      // cube is breaking through it (the floor's from the second fall, once
+      // something has gone into it).
       if (top) drawRim(front, top, spin, pulse, 'front');
       if (well) drawRim(front, well, spin, pulse, 'front');
+      if (!reduced) {
+        if (!cubePx) cubePx = fallRef?.current?.offsetHeight ?? 0;
+        const through = crossing(t);
+        if (top) drawMembrane(front, top, cubePx * FALL.cut, through);
+        if (well && t >= FALL.period) drawMembrane(front, well, cubePx * FALL.cut, through);
+      }
       reveal();
     };
 
@@ -557,6 +591,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * dpr));
       paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * dpr));
       paperKey = null; // resizing blanked the paper
+      cubePx = 0; // and may have resized the cube
       if (reduced) draw(STILL_TIME, performance.now());
     };
     resize();
@@ -582,7 +617,6 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(still);
-      window.clearTimeout(revealTimer);
       observer?.disconnect();
       if (!observer) window.removeEventListener('resize', resize);
     };

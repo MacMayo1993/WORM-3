@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FALL, PASS_AT, funnelPoint } from '../components/screens/loadingWormhole.js';
+import { getFusion } from '../worm/healerWorm/elementalFusion.js';
 import {
   KICK,
-  LINE_MS,
+  HINT_MS,
   MOBI_FIRST_DIVE,
   MOBI_HINT,
-  MOBI_LINES,
+  MOBI_TIPS,
   MOBI_MILESTONES,
   OPEN,
   TILT,
@@ -14,9 +15,11 @@ import {
   kickPulse,
   kickSpin,
   milestoneCrossed,
+  openingLine,
   orientationAim,
   pointerAim,
   portalOpen,
+  TIP_MS,
   tiltRotate,
   tiltToward,
   warpLevel,
@@ -148,8 +151,8 @@ describe('the portals opening', () => {
   });
 
   it('have the upper portal open before the cube comes out of it', () => {
-    // The cube's lowest point (0.9 cubes below its centre) reaches the upper lip.
-    const emerges = ((FALL.lip - 0.9 + FALL.lead) / FALL.drop) * FALL.period;
+    // The cube's lowest point (0.9 cubes below its centre) reaches the upper portal's cut.
+    const emerges = ((FALL.cut - 0.9 + FALL.lead) / FALL.drop) * FALL.period;
     expect(portalOpen(emerges)).toBeGreaterThan(0.9);
     expect(portalOpen(PASS_AT, OPEN.floorDelay)).toBe(1);
   });
@@ -158,20 +161,58 @@ describe('the portals opening', () => {
 describe('MOBI on the loading cover', () => {
   beforeEach(() => localStorage.clear());
 
+  // MOBI's label and the bar that runs down until his next line.
+  const fakeClock = () => {
+    const runs = [];
+    return { runs, animate: (_frames, opts) => runs.push(opts.duration) };
+  };
+
   it('opens with the hint until the player has dived once, and cheers the first dive', () => {
-    const line = fakeText();
-    const play = createLoadingPlay({ scene: fakeScene(), line, badge: fakeText() });
+    const opening = openingLine();
+    expect(opening).toEqual({ text: MOBI_HINT, kind: 'hint' });
+    const line = { ...fakeText(), textContent: opening.text };
+    const name = fakeText();
+    const play = createLoadingPlay({ scene: fakeScene(), line, name, badge: fakeText(), opening });
     play.frame(0, 0);
     expect(line.textContent).toBe(MOBI_HINT);
     play.press();
     expect(line.textContent).toBe(MOBI_FIRST_DIVE);
     play.release();
-    const next = fakeText();
-    createLoadingPlay({ scene: fakeScene(), line: next, badge: fakeText() }).frame(0, 0);
-    expect(MOBI_LINES).toContain(next.textContent);
+    // From then on every cover opens on a tip.
+    const next = openingLine();
+    expect(next.kind).toBe('tip');
+    expect(MOBI_TIPS).toContain(next.text);
   });
 
-  it('counts the loops and never hurries a line off, even mid-dive', () => {
+  it('opens on a tip with reduced motion, where there is no dive to hint at', () => {
+    const opening = openingLine(true);
+    expect(opening.kind).toBe('tip');
+    expect(MOBI_TIPS).toContain(opening.text);
+  });
+
+  it('cycles through different tips on a clock of its own, with the bar running down each one', () => {
+    const line = fakeText();
+    const name = fakeText();
+    const clock = fakeClock();
+    const play = createLoadingPlay({ scene: fakeScene(), line, name, clock, badge: fakeText() });
+    play.frame(0, 0);
+    expect(line.textContent).toBe(MOBI_HINT);
+    expect(clock.runs).toEqual([HINT_MS]);
+    play.frame(0.5, HINT_MS - 1);
+    expect(line.textContent).toBe(MOBI_HINT);
+    play.frame(0.6, HINT_MS);
+    expect(MOBI_TIPS).toContain(line.textContent);
+    expect(name.textContent).toBe('MOBI · TIP');
+    const seen = [line.textContent];
+    for (let k = 1; k < 4; k++) {
+      play.frame(0.7, HINT_MS + k * TIP_MS);
+      expect(seen).not.toContain(line.textContent);
+      seen.push(line.textContent);
+    }
+    expect(clock.runs).toEqual([HINT_MS, TIP_MS, TIP_MS, TIP_MS, TIP_MS]);
+  });
+
+  it('counts the loops and never hurries a tip off, even mid-dive', () => {
     localStorage.setItem('worm3_loader_dived', '1');
     const line = fakeText();
     const badge = fakeText();
@@ -182,12 +223,12 @@ describe('MOBI on the loading cover', () => {
     let since = 0;
     let now = 0;
     let t = 0;
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 2000; i++) {
       now += 16;
       t += 0.016 * play.rate;
       play.frame(t, now);
       if (line.textContent !== shown) {
-        if (!Object.values(MOBI_MILESTONES).includes(line.textContent)) expect(now - since).toBeGreaterThanOrEqual(LINE_MS);
+        if (!Object.values(MOBI_MILESTONES).includes(line.textContent)) expect(now - since).toBeGreaterThanOrEqual(TIP_MS);
         shown = line.textContent;
         since = now;
       }
@@ -233,9 +274,21 @@ describe('MOBI on the loading cover', () => {
     expect(line.textContent).toBe(MOBI_MILESTONES[10]);
   });
 
+  it('names every fusion in pickup order exactly as the game makes it', () => {
+    // "Fire then Water is Steam": first pickup is the base, second the catalyst.
+    const element = { fire: 'fire', water: 'water', ice: 'ice', earth: 'grass', lightning: 'lightning', air: 'air' };
+    const claims = MOBI_TIPS.flatMap((tip) => [...tip.matchAll(/(\w+) then (\w+) is (\w+)/g)]);
+    expect(claims.length).toBeGreaterThan(0);
+    for (const [, base, catalyst, name] of claims) {
+      expect(getFusion(element[base.toLowerCase()], element[catalyst.toLowerCase()])?.label).toBe(name);
+    }
+  });
+
   it('keeps every line short enough to read in one go', () => {
-    for (const text of [MOBI_HINT, MOBI_FIRST_DIVE, ...MOBI_LINES, ...Object.values(MOBI_MILESTONES)]) {
-      expect(text.length).toBeLessThanOrEqual(80);
+    expect(MOBI_TIPS.length).toBeGreaterThanOrEqual(10);
+    expect(new Set(MOBI_TIPS).size).toBe(MOBI_TIPS.length);
+    for (const text of [MOBI_HINT, MOBI_FIRST_DIVE, ...MOBI_TIPS, ...Object.values(MOBI_MILESTONES)]) {
+      expect(text.length).toBeLessThanOrEqual(100);
       expect(text.toLowerCase()).not.toContain('math');
     }
   });

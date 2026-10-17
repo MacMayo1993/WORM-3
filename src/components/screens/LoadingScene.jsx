@@ -26,11 +26,11 @@
  * initial route; preloadAssets.js warms the chunk during the opening.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
 import { shaftClipPath } from './loadingWormhole.js';
-import { createLoadingPlay, orientationAim, pointerAim } from './loadingPlay.js';
+import { createLoadingPlay, openingLine, orientationAim, pointerAim } from './loadingPlay.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScene.css';
@@ -79,13 +79,24 @@ const AIR_STREAMS = [
 ];
 
 const Airflow = React.memo(function Airflow() {
-  return <div className="wl-airflow" aria-hidden="true">
-    {AIR_STREAMS.map((stream, i) => <i key={i} className="wl-air-streak" style={{
-      left: stream.x, height: stream.length, animationDelay: stream.delay, '--wl-air-drift': stream.drift
-    }} />)}
-    <i className="wl-air-wake wl-air-wake-left" />
-    <i className="wl-air-wake wl-air-wake-right" />
-  </div>;
+  return (
+    <div className="wl-airflow" aria-hidden="true">
+      {AIR_STREAMS.map((stream, i) => (
+        <i
+          key={i}
+          className="wl-air-streak"
+          style={{
+            left: stream.x,
+            height: stream.length,
+            animationDelay: stream.delay,
+            '--wl-air-drift': stream.drift
+          }}
+        />
+      ))}
+      <i className="wl-air-wake wl-air-wake-left" />
+      <i className="wl-air-wake wl-air-wake-right" />
+    </div>
+  );
 });
 
 // Between the two portals' near lips.
@@ -101,6 +112,11 @@ export default function LoadingScene({ translucent = false }) {
   const badgeRef = useRef(null);
   const playRef = useRef(null);
   const veilRef = useRef(null);
+  const nameRef = useRef(null);
+  const clockRef = useRef(null);
+  // MOBI's first line is rendered with the cover, so it is there in the first
+  // paint even if the main thread then stalls before any frame callback runs.
+  const [opening] = useState(() => openingLine(prefersReducedMotion()));
 
   // The toy: a press dives and kicks, letting go (anywhere) eases off. The whole
   // cover is the touch surface; nothing here sets React state.
@@ -113,6 +129,9 @@ export default function LoadingScene({ translucent = false }) {
       veil: veilRef.current,
       line: lineRef.current,
       badge: badgeRef.current,
+      name: nameRef.current,
+      clock: clockRef.current,
+      opening,
       reduced: prefersReducedMotion()
     });
     playRef.current = play;
@@ -171,22 +190,16 @@ export default function LoadingScene({ translucent = false }) {
       window.removeEventListener('blur', release);
       window.removeEventListener('deviceorientation', orient);
     };
-  }, []);
+  }, [opening]);
 
-  // `wl-live` holds the scene still and hidden until LoadingPortal has drawn
-  // the portals once and adds `wl-ready`; the portals then run off the fall's
-  // own clock, so they stay in step with the cube.
+  // The cube falls from the first paint, on the compositor, whatever the main
+  // thread is doing. CSS stand-ins hold the portals' places until LoadingPortal
+  // has drawn them once and adds `wl-ready`; the canvases then run off the
+  // fall's own clock, so they are in step with the cube however late they start.
   return (
     <>
-      <LoadingPortal
-        sceneRef={sceneRef}
-        fallRef={fallRef}
-        wellRef={wellRef}
-        topRef={topRef}
-        playRef={playRef}
-        translucent={translucent}
-      />
-      <div className="wl-scene wl-live" ref={sceneRef}>
+      <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} playRef={playRef} translucent={translucent} />
+      <div className="wl-scene" ref={sceneRef}>
         <div className="wl-well" ref={topRef} />
         <div className="wl-gap" />
         <div className="wl-well" ref={wellRef}>
@@ -216,8 +229,14 @@ export default function LoadingScene({ translucent = false }) {
           <b className="wl-loops" ref={badgeRef} />
         </span>
         <span className="wl-mobi-say">
-          <span className="wl-mobi-name">MOBI</span>
-          <span className="wl-mobi-line" ref={lineRef} />
+          <span className="wl-mobi-name" ref={nameRef}>
+            {opening.kind === 'tip' ? 'MOBI · TIP' : 'MOBI'}
+          </span>
+          <span className="wl-mobi-line" ref={lineRef}>
+            {opening.text}
+          </span>
+          {/* Runs down until MOBI's next line. */}
+          <span className="wl-mobi-clock" ref={clockRef} />
         </span>
       </div>
     </>
