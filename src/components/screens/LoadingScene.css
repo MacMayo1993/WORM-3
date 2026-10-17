@@ -29,12 +29,14 @@
  * on the scene: every animation in it plays faster together, the cube
  * stretches, the airflow lengthens and speed lines close in round the shaft),
  * a tap spins the cube (`.wl-spin`), and MOBI sits at the foot of the cover with
- * a line and a loop count.
+ * a loop count, cycling through gameplay tips.
  *
- * Nothing moves until the portals have drawn their first frame: until then the
- * scene and the canvases are hidden and every animation in it is paused, so the
- * cover fades in on a whole picture and the canvases, which read their clock
- * from the fall itself, start in step with the cube.
+ * The cube never waits on the main thread: it falls from the first paint, and
+ * the cover usually goes up exactly while the main thread is busy decoding.
+ * Until LoadingPortal's canvases draw their first frame (`wl-ready`), CSS
+ * stand-ins (the `.wl-well` pseudo-elements) hold the portals' places; then the
+ * canvases fade in over them. The canvases read their clock from the fall
+ * itself, so they start in step with the cube however late they start.
  *
  * Over four falls (--wl-cycle) the top layer gives two half twists, each while
  * the cube is in the open (16.5% and 66.5% of the cycle), and the flip wave
@@ -45,8 +47,8 @@
   --wl-c: calc(var(--wl-cube) / 3);
   --wl-half: calc(var(--wl-cube) / 2);
   --wl-wb: calc(var(--wl-well-w) * 0.18);
-  --wl-beat: 1.5s;
-  --wl-cycle: 6s;
+  --wl-beat: 2s;
+  --wl-cycle: 8s;
 }
 
 .wl-backdrop {
@@ -65,22 +67,55 @@
   height: calc(100% + 32px);
 }
 
-/* Held still and hidden until LoadingPortal has drawn the portals once. */
-.wl-scene.wl-live,
+/* The canvases fade in once LoadingPortal has drawn them. */
 .wl-backdrop.wl-live {
   opacity: 0;
   transition: opacity 0.3s ease-out;
 }
 
-.wl-scene.wl-live:not(.wl-ready) *,
-.wl-scene.wl-live:not(.wl-ready) *::before,
-.wl-scene.wl-live:not(.wl-ready) *::after {
-  animation-play-state: paused !important;
-}
-
-.wl-scene.wl-ready,
 .wl-backdrop.wl-ready {
   opacity: 1;
+}
+
+/* Stand-in portals in plain CSS, there from the first paint: a ring of the six
+   sticker colours (the lip) round a dark funnel. They fade out as the canvases'
+   portals fade in over them. Painted under the well's own children. */
+.wl-well::before,
+.wl-well::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--wl-ink);
+  transition: opacity 0.3s ease-out;
+}
+
+.wl-well::before {
+  inset: -4.5%;
+  background: conic-gradient(
+    var(--wl-red) 0 30deg,
+    var(--wl-orange) 0 60deg,
+    var(--wl-yellow) 0 90deg,
+    var(--wl-green) 0 120deg,
+    var(--wl-blue) 0 150deg,
+    var(--wl-white) 0 180deg,
+    var(--wl-red) 0 210deg,
+    var(--wl-orange) 0 240deg,
+    var(--wl-yellow) 0 270deg,
+    var(--wl-green) 0 300deg,
+    var(--wl-blue) 0 330deg,
+    var(--wl-white) 0 360deg
+  );
+}
+
+.wl-well::after {
+  inset: 4.5%;
+  background: radial-gradient(ellipse 85% 85% at 50% 72%, #101729 0 14%, #2f3a44 34%, #8f9486 66%, #d9d3bf 100%);
+}
+
+.wl-scene.wl-ready .wl-well::before,
+.wl-scene.wl-ready .wl-well::after {
+  opacity: 0;
 }
 
 /* The clipped halves of the portal lips, over the falling cube. Keep this
@@ -428,13 +463,17 @@
   box-shadow: 0 4px 0 var(--wl-ink), 0 12px 26px rgba(38, 55, 45, 0.14);
   pointer-events: none;
   transform: translateX(-50%);
-  transition: opacity 0.35s ease-out, transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
-/* It pops up with the scene, once the portals have drawn. */
-.wl-scene.wl-live:not(.wl-ready) ~ .wl-mobi {
-  opacity: 0;
-  transform: translate(-50%, 14px);
+/* It pops up with the cover (a compositor animation, so a busy main thread
+   can't hold it back). */
+.wl-mobi {
+  animation: wl-mobi-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) 0.1s both;
+}
+
+@keyframes wl-mobi-in {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 .wl-mobi-face {
@@ -490,6 +529,17 @@
   color: var(--wl-ink);
 }
 
+/* Runs down until MOBI's next line (loadingPlay.js restarts it each line). */
+.wl-mobi-clock {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--wl-ink);
+  opacity: 0.3;
+  transform-origin: 0 50%;
+}
+
 /* No room for him beside the title card or on a short screen. */
 .wl-title-card ~ .wl-mobi {
   display: none;
@@ -506,6 +556,7 @@
   .wl-airflow { display: none; }
   .wl-veil { display: none; }
   .wl-mobi, .wl-view, .wl-airflow { transition: none; }
+  .wl-mobi { animation: none; }
   .wl-air-streak, .wl-air-wake { animation: none; }
   .wl-fall,
   .wl-cube,

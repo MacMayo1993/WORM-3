@@ -440,14 +440,15 @@ export default function WORM3() {
   const [sceneGateToken, setSceneGateToken] = useState(0);
   const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
   const [sceneGateEager, setSceneGateEager] = useState(false);
-  const [sceneGateHold, setSceneGateHold] = useState(650);
+  // The loading cover's floor: long enough for a full loop and one of MOBI's tips.
+  const [sceneGateHold, setSceneGateHold] = useState(2400);
   const [sceneGateZ, setSceneGateZ] = useState(9996);
   // opts.eager shows the cube at once and holds for opts.holdMs (vs. the default
   // probe that only shows if a decode registers); opts.z overrides the layer.
   const armSceneGate = useCallback((label = 'Loading', opts = {}) => {
     setSceneGateLabel(label);
     setSceneGateEager(!!opts.eager);
-    setSceneGateHold(opts.holdMs ?? 650);
+    setSceneGateHold(opts.holdMs ?? 2400);
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);

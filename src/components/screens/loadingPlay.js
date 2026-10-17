@@ -22,14 +22,12 @@ export const KICK = { decay: 0.4, spin: 2.4, ring: 0.6, cubeMs: 900 };
 /** How long each portal takes to spring open as the cover arrives, and the floor's lag. */
 export const OPEN = { duration: 0.42, floorDelay: 0.1 };
 /**
- * MOBI changes his line every LINE_LOOPS loops (the hint stays a loop longer),
- * but never sooner than LINE_MS real milliseconds, so a dive can't hurry a line
- * off before it's read; with reduced motion, every LINE_MS_STILL ms.
+ * How long MOBI holds each line, in real milliseconds (a dive never hurries a
+ * tip off before it's read): a gameplay tip for TIP_MS, the hold-to-dive hint
+ * for HINT_MS. A milestone or the first dive cuts in at once and holds for TIP_MS.
  */
-export const LINE_LOOPS = 2;
-export const HINT_LOOPS = 3;
-export const LINE_MS = 2800;
-export const LINE_MS_STILL = 3500;
+export const TIP_MS = 4000;
+export const HINT_MS = 3000;
 
 /**
  * The tilt: where the viewer leans, as -1…1 across and down the screen.
@@ -132,21 +130,27 @@ export function kickSpin(t, kickAt, base) {
 }
 
 // MOBI's lines (docs/COPY_STYLE.md: warm, practical, a little funny; he calls the
-// player "partner" and never says "math").
+// player "partner" and never says "math"). The tips state real rules: each names
+// the mechanic it teaches, and the numbers are the game's own (dropped orbs last
+// DROPPED_ORB_LIFETIME, Ice runs the turn clock at coldSnapRate, and so on).
 export const MOBI_HINT = 'Hold anywhere to dive faster, partner. Tap to give it a spin.';
 export const MOBI_FIRST_DIVE = 'Wheee! I mean… ahem. Very professional.';
-export const MOBI_LINES = [
-  'Every tile on the Flip Cube has a twin, straight through the middle.',
-  'Flip a tile and its twin flips too. Doors on this ship come in pairs.',
+export const MOBI_TIPS = [
+  'Every tile has a twin straight through the middle. Flip one and its twin flips too.',
+  "Tiles wear out: every flip spends some of a tile's life, so keep an eye on its health bar.",
+  'Jump onto a raised flip pad to dive into its tunnel.',
   'Ride a tunnel and you come out at your twin, mirrored.',
-  'The Core is the one spot on the ship that is its own twin.',
-  'A turning layer can cut your tail off at the seam. Keep your head out of it.',
-  'Lost your tail? Grab the dropped orbs back before they blink out.',
-  'Two elements fuse, and order matters: Water then Fire makes Steam.',
-  "I don't have a stomach, so all this falling is fine by me.",
-  'This ship survived W³, the Great Worm War. It can survive a loading screen.',
-  'Same cube out the top as went in the bottom. Nothing lost, nothing doubled.',
-  'Healing the Flip Cube is how I get home. Thanks for the help, partner.'
+  'Riding a turning layer is safe, but it cuts your tail at the seam. Never cross it head-first.',
+  'Lost some tail? Your orbs scatter. Grab them back within 5 seconds, before they blink out.',
+  "An orb pays out in its tile's twin colour: one on a white tile gives you a yellow bead.",
+  'Two elements fuse, and order matters: Water then Fire is Steam, Fire then Water is Quench.',
+  'Under Ice, layer turns come half as often. A good time to cross the board.',
+  "Ride under Water and your tunnels don't wear out.",
+  "Fire pays part of every tunnel's toll for you.",
+  'Lightning marks its tiles before it strikes. Be off the ring, or in the air, when it lands.',
+  'Jump again in mid-air for a double jump.',
+  'Every ten WORM Story levels you clear unlocks a new worm.',
+  'New modes open as you clear WORM Story levels. The Store opens after your first.'
 ];
 export const MOBI_MILESTONES = {
   10: "Ten loops! Good thing I don't get dizzy.",
@@ -173,8 +177,8 @@ export function milestoneCrossed(from, to) {
   return crossed;
 }
 
-// Where MOBI's deck is in this session, so the next cover carries on from the
-// last instead of opening on the same line every time.
+// Where MOBI's tips are in this session, so the next cover carries on from the
+// last instead of opening on the same tip every time.
 let deck = 0;
 const DIVED_KEY = 'worm3_loader_dived';
 
@@ -194,11 +198,21 @@ function writeDived() {
   }
 }
 
-/** The next line from MOBI's deck. */
-export function nextDeckLine() {
-  const line = MOBI_LINES[deck % MOBI_LINES.length];
+/** The next tip from MOBI's deck. */
+export function nextTip() {
+  const tip = MOBI_TIPS[deck % MOBI_TIPS.length];
   deck += 1;
-  return line;
+  return tip;
+}
+
+/**
+ * What MOBI says as the cover appears: the hold-to-dive hint until the player
+ * has dived once (never with reduced motion, where there is no dive), else the
+ * next tip. Rendered with the cover itself, so his first line never waits on a
+ * busy main thread for the first frame.
+ */
+export function openingLine(reduced = false) {
+  return !reduced && !readDived() ? { text: MOBI_HINT, kind: 'hint' } : { text: nextTip(), kind: 'tip' };
 }
 
 const vibrate = (ms) => {
@@ -215,14 +229,18 @@ const LINE_IN = [
   { opacity: 1, transform: 'none' }
 ];
 const SPIN = [{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(360deg)' }];
+const CLOCK = [{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }];
+const NAME = { tip: 'MOBI · TIP', hint: 'MOBI', say: 'MOBI' };
 
 /**
  * The cover's play controller. `scene` is the `.wl-scene` element (its
  * animations are the ones a dive speeds up, and `wl-warp` on it shows the dive),
- * `veil` the speed lines centred on it, `line`/`badge` MOBI's line and loop count. LoadingPortal calls `frame(t, now)` once per drawn frame, then
+ * `veil` the speed lines centred on it, `line`/`badge` MOBI's line and loop count,
+ * `name` the label over his line, `clock` the bar that runs down until the next
+ * one, and `opening` the line the cover was rendered with (`openingLine`). LoadingPortal calls `frame(t, now)` once per drawn frame, then
  * reads `warp`, `kick`, `kickSince` and `spin` to draw.
  */
-export function createLoadingPlay({ scene, veil, line, badge, reduced = false }) {
+export function createLoadingPlay({ scene, veil, line, badge, name, clock, opening = null, reduced = false }) {
   const play = {
     tiltX: 0,
     tiltY: 0,
@@ -249,13 +267,20 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
   let kickPending = false;
   let spinBase = 0;
   let lastNow = null;
-  let lineLoops = 0;
   let lineAt = 0;
+  let lineKind = opening?.kind ?? null;
   let dived = readDived();
   let started = false;
 
-  const say = (text, now = lastNow ?? 0) => {
+  const holdFor = (kind) => (kind === 'hint' ? HINT_MS : TIP_MS);
+  const runClock = (kind) => {
+    clock?.animate?.(CLOCK, { duration: holdFor(kind), easing: 'linear', fill: 'forwards' });
+  };
+  const say = (text, kind, now = lastNow ?? 0) => {
     lineAt = now;
+    lineKind = kind;
+    if (name && name.textContent !== NAME[kind]) name.textContent = NAME[kind];
+    runClock(kind);
     if (!line || line.textContent === text) return;
     line.textContent = text;
     line.animate?.(LINE_IN, { duration: 280, easing: 'ease-out' });
@@ -288,8 +313,7 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     if (!dived) {
       dived = true;
       writeDived();
-      say(MOBI_FIRST_DIVE);
-      lineLoops = play.loops;
+      say(MOBI_FIRST_DIVE, 'say');
     }
   }
 
@@ -318,7 +342,11 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     lastNow = now;
     if (!started) {
       started = true;
-      say(dived || reduced ? nextDeckLine() : MOBI_HINT, now);
+      // The cover arrived already saying `opening`; its time starts now.
+      if (opening) {
+        lineAt = now;
+        runClock(opening.kind);
+      } else say(dived || reduced ? nextTip() : MOBI_HINT, dived || reduced ? 'tip' : 'hint', now);
     }
 
     if (kickPending) {
@@ -353,8 +381,8 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
     const rate = warpRate(play.warp);
     if (rate !== play.rate) retime(rate);
 
-    // Loops: the badge pops each pass; MOBI moves on every LINE_LOOPS, and
-    // marks the milestones. A dive buzzes the phone once per pass.
+    // Loops: the badge pops each pass and MOBI marks the milestones. A dive
+    // buzzes the phone once per pass.
     const loops = reduced ? 0 : passes(t);
     if (loops !== play.loops) {
       const milestone = milestoneCrossed(play.loops, loops);
@@ -365,18 +393,10 @@ export function createLoadingPlay({ scene, veil, line, badge, reduced = false })
         badge.animate?.(POP, { duration: milestone ? 520 : 260, easing: 'ease-out' });
       }
       if (play.holding) vibrate(12);
-      if (milestone) {
-        say(MOBI_MILESTONES[milestone], now);
-        lineLoops = loops;
-      }
+      if (milestone) say(MOBI_MILESTONES[milestone], 'say', now);
     }
-    const due = reduced
-      ? now - lineAt >= LINE_MS_STILL
-      : now - lineAt >= LINE_MS && loops - lineLoops >= (line?.textContent === MOBI_HINT ? HINT_LOOPS : LINE_LOOPS);
-    if (due) {
-      say(nextDeckLine(), now);
-      lineLoops = loops;
-    }
+    // MOBI moves on to the next tip once the line up now has had its time.
+    if (now - lineAt >= holdFor(lineKind)) say(nextTip(), 'tip', now);
   }
 
   return play;

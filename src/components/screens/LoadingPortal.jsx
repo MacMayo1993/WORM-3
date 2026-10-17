@@ -20,8 +20,8 @@
  * The portals sit wherever LoadingScene's `.wl-well` elements are, so the cube's
  * CSS fall, shadow and ripple always line up with them. Time is read from the
  * fall's own CSS animation, so both portals kick as the cube passes through even
- * when the cover mounts in a busy frame. The scene is held still and hidden
- * until the first frame is drawn (`wl-ready`), so the cover fades in whole. The
+ * when the cover mounts in a busy frame or the main thread stalls. The canvases
+ * fade in over CSS stand-ins on their first drawn frame (`wl-ready`). The
  * RAF loop is torn down on unmount; reduced motion draws a still frame on a
  * flat, unmoving sheet.
  *
@@ -64,7 +64,6 @@ const PAPER_INTERVAL = 30; // ms between paper redraws: every other frame at 60H
 // The paper canvas overhangs the screen by this much (LoadingScene.css), so a
 // tilt can slide it without showing an edge.
 const PAPER_PAD = 16;
-const REVEAL_LIMIT = 700; // ms: show the scene even if the portals never draw
 
 const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const FACE_RGB = Object.fromEntries(Object.entries(RUBIKS_FACE_COLORS).map(([id, hex]) => [id, rgbOf(hex)]));
@@ -442,19 +441,16 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     const paper = paperCanvas?.getContext('2d');
     const ctx = canvas?.getContext('2d');
     const front = frontCanvas?.getContext('2d');
-    // Let the scene run and fade in: on the first drawn frame, or regardless
-    // once REVEAL_LIMIT has passed so the cube never waits on the canvases.
+    // On the first drawn frame the canvases fade in over the CSS stand-in
+    // portals (LoadingScene.css). The cube never waits for this: it is already
+    // falling on the compositor. Without a 2D context the stand-ins stay.
     let revealed = false;
     const reveal = () => {
       if (revealed) return;
       revealed = true;
       for (const el of [sceneRef?.current, paperCanvas, canvas, frontCanvas]) el?.classList.add('wl-ready');
     };
-    if (!paper || !ctx || !front) {
-      reveal();
-      return undefined;
-    }
-    const revealTimer = window.setTimeout(reveal, REVEAL_LIMIT);
+    if (!paper || !ctx || !front) return undefined;
     const reduced = prefersReducedMotion();
     const mountedAt = performance.now();
     let fall = null;
@@ -582,7 +578,6 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(still);
-      window.clearTimeout(revealTimer);
       observer?.disconnect();
       if (!observer) window.removeEventListener('resize', resize);
     };

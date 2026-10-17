@@ -25,7 +25,7 @@
  * That also leaves the restart (cube fully inside the top portal, twin fully
  * sunk) as far from either lip as the cube's height allows.
  */
-export const FALL = { period: 1.5, drop: 2.8, lip: 0.432, lead: 0.968 };
+export const FALL = { period: 2, drop: 2.8, lip: 0.432, lead: 0.968 };
 /** Seconds into each fall at which the cube passes through the portals. */
 export const PASS_AT = (FALL.period * (FALL.lead + FALL.lip)) / FALL.drop;
 
