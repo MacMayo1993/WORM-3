@@ -1,0 +1,10 @@
+/* The Cube page's tabs (CubeLookSettings). Each host makes the strip sticky to
+   its own card padding: --cube-look-pad-top / --cube-look-pad-x, and paints
+   behind it with --cube-look-card. */
+.cube-look-tabs { position:sticky; top:calc(-1 * var(--cube-look-pad-top, 0px)); z-index:2; display:flex; gap:6px;
+  margin:0 calc(-1 * var(--cube-look-pad-x, 0px)) 10px; padding:8px var(--cube-look-pad-x, 0px); background:var(--cube-look-card, #fffcf1); }
+.cube-look-tab { flex:1; min-height:44px; border:2px solid var(--arcade-ink,#26372d); border-radius:12px; background:#fffcf1; color:var(--arcade-ink,#26372d);
+  font:800 12px/1.1 var(--heading-font,inherit); letter-spacing:.06em; text-transform:uppercase; box-shadow:0 3px 0 var(--arcade-ink,#26372d); cursor:pointer; }
+.cube-look-tab[aria-selected="true"] { background:var(--cube-look-accent, var(--arcade-accent,#4caf50)); color:var(--cube-look-accent-ink, var(--arcade-accent-ink,#10220f)); }
+.cube-look-tab:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
+.cube-look-tabpanel { text-align:left; padding:0; }

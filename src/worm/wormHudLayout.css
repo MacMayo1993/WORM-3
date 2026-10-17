@@ -331,12 +331,6 @@
   background:#fffcf1; color:var(--arcade-ink,#26372d); box-shadow:0 3px 0 var(--arcade-ink,#26372d); cursor:pointer; }
 .worm-pause-back:active { transform:translateY(2px); box-shadow:0 1px 0 var(--arcade-ink,#26372d); }
 .worm-pause-back:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
-.worm-pause-tabs { display:flex; gap:6px; margin-bottom:10px; }
-.worm-pause-tab { flex:1; min-height:44px; border:2px solid var(--arcade-ink,#26372d); border-radius:12px; background:#fffcf1; color:var(--arcade-ink,#26372d);
-  font:800 12px/1.1 var(--heading-font,inherit); letter-spacing:.06em; text-transform:uppercase; box-shadow:0 3px 0 var(--arcade-ink,#26372d); cursor:pointer; }
-.worm-pause-tab[aria-selected="true"] { background:var(--arcade-accent,#4caf50); color:var(--arcade-accent-ink,#10220f); }
-.worm-pause-tab:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
-.worm-pause-tabpanel { text-align:left; padding:0; }
 .worm-pause-loading { margin:16px 0; color:var(--arcade-muted,#6a705e); }
-/* The Cube page's lists are long: its tabs stay at the top of the card as it scrolls. */
-.worm-pause-card .worm-pause-tabs { position:sticky; top:-14px; z-index:2; margin:0 -16px 10px; padding:8px 16px; background:var(--arcade-card,#fffcf1); }
+/* The Cube page's lists are long: its tabs (cubeLookSettings.css) stay at the top of the card as it scrolls. */
+.worm-pause-card { --cube-look-pad-top:14px; --cube-look-pad-x:16px; --cube-look-card:var(--arcade-card,#fffcf1); }

@@ -64,8 +64,38 @@ it('keeps settings, wallet and secondary stats in the session menu and closes on
   expect(menu.textContent).toContain('Flips7');
   act(() => menu.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
   expect(menu.open).toBe(false);
-  act(() => { menu.querySelector('summary').click(); [...menu.querySelectorAll('button')].find(b=>b.textContent==='Settings').click(); });
+  const button = label => [...menu.querySelectorAll('button')].find(b=>b.textContent===label);
+  act(() => { menu.querySelector('summary').click(); button('Settings').click(); });
+  // Settings is a page of the menu; the full sheet is one key further.
+  expect(settings).not.toHaveBeenCalled();
+  expect(menu.querySelector('.instrument-menu-panel').classList.contains('is-settings')).toBe(true);
+  expect(menu.textContent).toContain('Sound');
+  act(() => button('All settings').click());
   expect(settings).toHaveBeenCalledTimes(1); expect(menu.open).toBe(false);
+});
+it('pages the session menu like the WORM pause card: Escape steps back, then closes', () => {
+  const home = vi.fn();
+  act(() => root.render(<TopMenuBar cubies={[[[{stickers:{PZ:{curr:1}}}]]]} size={3} metrics={{flips:0,wormholes:0}} onHome={home} />));
+  const menu = host.querySelector('details');
+  const panel = () => menu.querySelector('.instrument-menu-panel');
+  const escape = () => act(() => panel().dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
+  act(() => menu.querySelector('summary').click());
+  expect([...menu.querySelectorAll('.instrument-session-key')].map(b=>b.textContent)).toEqual(['Settings', 'Cube', 'Home']);
+  act(() => [...menu.querySelectorAll('button')].find(b=>b.textContent==='Settings').click());
+  expect(panel().classList.contains('is-settings')).toBe(true);
+  escape();
+  expect(panel().classList.contains('is-main')).toBe(true); expect(menu.open).toBe(true);
+  escape();
+  expect(menu.open).toBe(false);
+  // A key typed inside the open menu stays there instead of reaching the cube's shortcuts.
+  const onWindowKey = vi.fn();
+  window.addEventListener('keydown', onWindowKey);
+  act(() => menu.querySelector('summary').click());
+  act(() => panel().dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowLeft',bubbles:true})));
+  window.removeEventListener('keydown', onWindowKey);
+  expect(onWindowKey).not.toHaveBeenCalled();
+  act(() => [...menu.querySelectorAll('button')].find(b=>b.textContent==='Home').click());
+  expect(home).toHaveBeenCalledTimes(1); expect(menu.open).toBe(false);
 });
 it('keeps Reset and Shuffle reachable in More and suppresses Shuffle during chaos', () => {
   const reset = vi.fn(), shuffle = vi.fn();

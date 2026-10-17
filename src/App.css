@@ -3328,8 +3328,11 @@ select.btn-compact:disabled {
   color: var(--night-text-muted) !important;
 }
 
+/* The selected card is tinted moss: its label stays ink, weighted, so it reads
+   on the light sheet (moss-light text measured 1.5:1 there). */
 .style-card.selected .style-card-label {
-  color: var(--ui-moss-light) !important;
+  color: var(--night-text) !important;
+  font-weight: 800;
 }
 
 /* Per-face and tile selects */
