@@ -313,3 +313,30 @@
 @media (pointer:coarse) {
   .worm-hud-telemetry .worm-buff-chip { min-height:44px; min-width:44px; }
 }
+
+/* Pause, compact: a slimmer heading and Resume, the four keys, one row of
+   numbers. Settings and Cube are pages of the same card, under a Back key. */
+.worm-pause-card .screen-heading { padding:2px 0 8px; gap:12px; }
+.worm-pause-card .screen-heading h1 { font-size:clamp(24px,6vw,32px); }
+.worm-pause-card .screen-heading>.mode-artwork { width:56px; }
+.worm-pause-card .worm-pause-resume { margin:4px 0 10px; min-height:48px; }
+.worm-pause-card .worm-pause-quick { gap:4px; margin:4px 0 2px; }
+.worm-pause-card .worm-pause-key > svg { width:22px; height:22px; padding:11px; }
+.worm-pause-card .screen-disclosure { margin:10px 0 0; }
+.worm-pause-card .screen-disclosure > summary { box-sizing:border-box; min-height:44px; padding:13px 2px; }
+.worm-pause-card .worm-quest-setting { width:100%; margin:10px 0 4px; }
+.worm-pause-page-head { display:flex; align-items:center; gap:10px; margin:0 0 10px; text-align:left; }
+.worm-pause-page-head h2 { margin:0; font:400 20px/1.1 var(--display-font,'Bungee',sans-serif); text-transform:uppercase; color:var(--arcade-ink,#26372d); }
+.worm-pause-back { display:grid; place-items:center; width:44px; height:44px; flex:none; padding:0; border:2px solid var(--arcade-ink,#26372d); border-radius:50%;
+  background:#fffcf1; color:var(--arcade-ink,#26372d); box-shadow:0 3px 0 var(--arcade-ink,#26372d); cursor:pointer; }
+.worm-pause-back:active { transform:translateY(2px); box-shadow:0 1px 0 var(--arcade-ink,#26372d); }
+.worm-pause-back:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
+.worm-pause-tabs { display:flex; gap:6px; margin-bottom:10px; }
+.worm-pause-tab { flex:1; min-height:44px; border:2px solid var(--arcade-ink,#26372d); border-radius:12px; background:#fffcf1; color:var(--arcade-ink,#26372d);
+  font:800 12px/1.1 var(--heading-font,inherit); letter-spacing:.06em; text-transform:uppercase; box-shadow:0 3px 0 var(--arcade-ink,#26372d); cursor:pointer; }
+.worm-pause-tab[aria-selected="true"] { background:var(--arcade-accent,#4caf50); color:var(--arcade-accent-ink,#10220f); }
+.worm-pause-tab:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
+.worm-pause-tabpanel { text-align:left; padding:0; }
+.worm-pause-loading { margin:16px 0; color:var(--arcade-muted,#6a705e); }
+/* The Cube page's lists are long: its tabs stay at the top of the card as it scrolls. */
+.worm-pause-card .worm-pause-tabs { position:sticky; top:-14px; z-index:2; margin:0 -16px 10px; padding:8px 16px; background:var(--arcade-card,#fffcf1); }
