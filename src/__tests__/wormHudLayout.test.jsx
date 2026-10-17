@@ -327,6 +327,8 @@ it('minimizes quests from the top bar, remembers the choice and restores them', 
   act(() => host.querySelector('[aria-label="Show quests"]').click());
   expect(host.querySelector('.worm-mission-glance')).not.toBeNull();
   act(() => host.querySelector('[aria-label="Pause"]').click());
+  // The quests switch lives on the pause card's Settings page.
+  act(() => [...host.querySelectorAll('.worm-pause-key')].find(b => b.textContent === 'Settings').click());
   act(() => host.querySelector('.worm-quest-setting').click());
   expect(useGameStore.getState().settings.wormQuestsMinimized).toBe(true);
 });

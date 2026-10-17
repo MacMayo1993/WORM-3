@@ -67,6 +67,9 @@ it('returns from inspection to Pause and keeps Pause usable during tunnel transi
   try {
     await act(async () => root.render(<><WormCrawlerHUD phase="crawling" /><InspectionLens /></>));
     act(() => host.querySelector('[aria-label="Pause"]').click());
+    // The inspection tools live on the pause card's Settings page, and closing the
+    // lens comes back to that page.
+    act(() => [...host.querySelectorAll('.worm-pause-key')].find(b => b.textContent === 'Settings').click());
     const inspect = () => [...host.querySelectorAll('button')].find(b => b.textContent.includes('inside the cube'));
     act(() => inspect().click());
     expect(host.querySelector('[aria-label="Game paused"]')).toBeNull();

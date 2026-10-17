@@ -37,25 +37,36 @@
   animation: worm-death-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
 }
 
-/* Caution tape along the top of the card, in the cause's colour. */
+/* Caution tape along the top of the card, in the cause's colour. Its margins
+   undo the card's padding (14px 16px, set in DeathScreens.jsx). */
 .worm-death-tape {
-  height: 12px;
-  margin: calc(-1 * clamp(15px, 3.2vh, 26px)) -22px clamp(12px, 2.4vh, 20px);
+  height: 10px;
+  margin: -14px -16px 12px;
   border-bottom: 2px solid var(--death-ink-line);
   background: repeating-linear-gradient(-45deg, var(--death) 0 12px, var(--death-deep) 12px 24px);
   background-size: 34px 100%;
   animation: worm-death-tape 1.2s linear infinite;
 }
 
+/* The head: the cause's badge beside its eyebrow and title, one compact row. */
+.worm-death-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.worm-death-heading { min-width: 0; }
+
 /* The badge: a glossy sticker in a black-plastic bezel, like the menu's keys. */
 .worm-death-badge {
   position: relative;
-  width: clamp(92px, 26vw, 118px);
+  width: 66px;
   aspect-ratio: 1;
-  margin: 0 auto;
-  padding: 6px;
+  margin: 0;
+  padding: 4px;
   box-sizing: border-box;
-  border-radius: 26px;
+  border-radius: 18px;
   background: linear-gradient(180deg, #2c2c31, #141416 42%);
   box-shadow: 0 6px 0 #050506, 0 14px 26px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   animation: worm-death-badge 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.4) 0.08s both;
@@ -65,7 +76,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 14px;
   background-color: var(--death);
   box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.6), inset 0 -4px 6px rgba(0, 0, 0, 0.25);
 }
@@ -99,16 +110,16 @@
 /* The cause, as a strip of tape. */
 .worm-death-eyebrow {
   display: inline-block;
-  margin-top: clamp(12px, 2.4vh, 18px);
-  padding: 4px 12px 3px;
+  margin: 0 0 2px 2px;
+  padding: 3px 9px 2px;
   border: 2px solid var(--death-ink-line);
   border-radius: 6px;
   background: var(--death);
   color: var(--death-ink);
-  font: 800 11px/1.3 var(--heading-font, 'Outfit Variable', sans-serif);
+  font: 800 10px/1.3 var(--heading-font, 'Outfit Variable', sans-serif);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  box-shadow: 0 3px 0 var(--death-ink-line);
+  box-shadow: 0 2px 0 var(--death-ink-line);
   transform: rotate(-2deg);
   animation: worm-death-rise 0.4s ease-out 0.2s both;
 }
@@ -117,18 +128,18 @@
 .worm-death-title {
   position: relative;
   display: grid;
-  margin: clamp(8px, 1.6vh, 12px) 0 0;
-  font: 400 clamp(30px, 9.5vw, 50px)/1.02 var(--display-font, 'Bungee', 'Arial Black', sans-serif);
+  margin: 4px 0 0;
+  font: 400 clamp(26px, 8vw, 36px)/1.02 var(--display-font, 'Bungee', 'Arial Black', sans-serif);
   text-transform: uppercase;
   letter-spacing: 0.01em;
   color: var(--death);
   -webkit-text-stroke: 2px var(--death-ink-line);
   paint-order: stroke fill;
-  text-shadow: 0 4px 0 var(--death-ink-line);
+  text-shadow: 0 3px 0 var(--death-ink-line);
   animation: worm-death-slam 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.35) 0.15s both;
 }
 .worm-death-title > span { grid-area: 1 / 1; }
-.worm-death-title.is-long { font-size: clamp(25px, 7.4vw, 40px); }
+.worm-death-title.is-long { font-size: clamp(19px, 5.6vw, 27px); }
 
 /* SLICED arrives in two halves that meet along the cut. */
 .worm-death-title.is-sliced .is-top { clip-path: polygon(0 0, 100% 0, 100% 40%, 0 66%); animation: worm-death-slice-top 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.2s both; }
@@ -140,83 +151,50 @@
 .worm-death-title.is-time-up, .worm-death-title.is-tail-bite { animation: worm-death-slam 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.35) 0.15s both, worm-death-wobble 0.8s ease-in-out 0.65s 1; }
 .worm-death-title.is-event-horizon { animation: worm-death-vortex 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.25) 0.15s both, eh-glitch 0.9s ease-out 0.85s 1; }
 
-/* The run's length: the number counts up over a row of beads in the worm's colour. */
-.worm-death-hero {
-  position: relative;
-  margin-top: clamp(12px, 2.2vh, 20px);
-  padding: clamp(10px, 1.8vh, 14px) 12px clamp(9px, 1.6vh, 12px);
-  border: 2px solid var(--death-ink-line);
-  border-radius: 18px;
-  background: #f7f2e3;
-  box-shadow: 0 5px 0 var(--death-ink-line), inset 0 -5px 0 color-mix(in srgb, var(--death) 55%, transparent);
-  animation: worm-death-rise 0.45s ease-out 0.3s both;
-}
-.worm-death-hero-value {
-  font: 800 clamp(38px, min(13vw, 9vh), 62px)/1 var(--heading-font, 'Outfit Variable', sans-serif);
-  color: #26372d;
-  font-variant-numeric: tabular-nums;
-}
-.worm-death-hero-label {
-  margin-top: 4px;
-  font: 800 10.5px/1.3 var(--heading-font, 'Outfit Variable', sans-serif);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #6a705e;
-}
-.worm-death-beads {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 26px;
-  margin-top: clamp(6px, 1.2vh, 10px);
-}
-.worm-death-bead {
-  flex: none;
-  width: var(--bead, 14px);
-  height: var(--bead, 14px);
-  margin-left: -3px;
-  border: 2px solid var(--death-ink-line);
-  border-radius: 50%;
-  box-sizing: border-box;
-  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.7) 0 18%, transparent 46%), var(--worm);
-  animation: worm-death-bead 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.5) both;
-  animation-delay: calc(0.35s + var(--i) * 0.035s);
-}
-.worm-death-bead:first-child { margin-left: 0; }
-.worm-death-bead.is-head { position: relative; display: grid; place-items: center; }
-.worm-death-bead.is-head svg { width: 70%; height: 70%; }
-.worm-death-more {
-  margin-left: 6px;
-  font: 800 12px/1 var(--heading-font, 'Outfit Variable', sans-serif);
+/* The line of plain English under the head. */
+.worm-death-blurb {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
   color: #6a705e;
 }
 
-/* Supporting numbers as three ivory keys, each with a small icon. */
+/* The run in one strip of four small ivory keys. The orbs collected lead,
+   on the cause's colour, a little larger than the rest. */
 .worm-death-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: clamp(10px, 1.8vh, 14px);
+  grid-template-columns: 1.25fr 1fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 12px;
 }
 .worm-death-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: clamp(7px, 1.4vh, 10px) 4px;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 2px 5px;
   border: 2px solid #c6c5ac;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #fffcf1;
-  box-shadow: 0 4px 0 #c6c5ac, inset 0 2px 0 #fff;
+  box-shadow: 0 3px 0 #c6c5ac, inset 0 2px 0 #fff;
   animation: worm-death-rise 0.4s ease-out both;
-  animation-delay: calc(0.4s + var(--i) * 0.07s);
+  animation-delay: calc(0.3s + var(--i) * 0.06s);
 }
-.worm-death-stat svg { width: 20px; height: 20px; color: var(--death-deep); }
-.worm-death-stat strong { font: 800 18px/1.1 var(--heading-font, 'Outfit Variable', sans-serif); color: #26372d; font-variant-numeric: tabular-nums; }
-.worm-death-stat span { font: 800 9.5px/1.3 var(--heading-font, 'Outfit Variable', sans-serif); letter-spacing: 0.08em; text-transform: uppercase; color: #6a705e; }
+.worm-death-stat svg { width: 16px; height: 16px; color: var(--death-deep); }
+.worm-death-stat strong { font: 800 16px/1.1 var(--heading-font, 'Outfit Variable', sans-serif); color: #26372d; font-variant-numeric: tabular-nums; }
+.worm-death-stat > span { font: 800 9px/1.3 var(--heading-font, 'Outfit Variable', sans-serif); letter-spacing: 0.07em; text-transform: uppercase; color: #6a705e; }
+.worm-death-stat.is-hero {
+  border-color: var(--death-ink-line);
+  background: color-mix(in srgb, var(--death) 16%, #fffcf1);
+  box-shadow: 0 3px 0 var(--death-ink-line), inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+.worm-death-stat.is-hero strong { font-size: 22px; }
+.worm-death-stat.is-hero > span { color: #26372d; }
 
 .worm-death-retry { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
-.worm-death-card .screen-disclosure { margin-top: 18px; }
+.worm-death-card .screen-disclosure { margin: 10px 0 0; }
 .worm-death-retry svg { width: 1.05em; height: 1.05em; flex: none; }
 
 /* ── Emblem parts ─────────────────────────────────────────────────────────── */
@@ -263,7 +241,6 @@
 @keyframes worm-death-flicker { 0%, 30%, 60% { opacity: 1; } 15%, 45% { opacity: 0.35; } }
 @keyframes worm-death-slice-top { from { opacity: 0; transform: translate(-46px, -10px); } 50% { opacity: 1; } 70% { transform: translate(3px, 1px); } }
 @keyframes worm-death-slice-bottom { from { opacity: 0; transform: translate(46px, 10px); } 50% { opacity: 1; } 70% { transform: translate(-3px, -1px); } }
-@keyframes worm-death-bead { from { opacity: 0; transform: scale(0.2); } }
 @keyframes de-slash { 0% { stroke-dashoffset: 170; } 55%, 100% { stroke-dashoffset: -10; } }
 @keyframes de-slide-top { 0%, 100% { transform: translate(-2px, -1px); } 50% { transform: translate(-7px, -3px); } }
 @keyframes de-slide-bot { 0%, 100% { transform: translate(2px, 1px); } 50% { transform: translate(7px, 3px); } }
@@ -279,25 +256,17 @@
    right, so Try again is on screen without scrolling. */
 @media (max-height: 560px) and (orientation: landscape) {
   .worm-death-card {
-    width: min(94vw, 760px) !important;
+    width: min(94vw, 720px) !important;
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    column-gap: 22px;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    column-gap: 18px;
     align-items: center;
   }
   .worm-death-tape { grid-column: 1 / -1; }
-  .worm-death-badge { width: 76px; border-radius: 20px; padding: 4px; }
-  .worm-death-badge-face { border-radius: 16px; }
-  .worm-death-eyebrow { margin-top: 10px; }
-  .worm-death-title, .worm-death-title.is-long { font-size: clamp(22px, 4.2vw, 34px); }
-  .worm-death-hero { margin-top: 0; }
-  .worm-death-hero-value { font-size: 34px; }
-  .worm-death-beads { min-height: 20px; margin-top: 4px; }
+  .worm-death-blurb { grid-column: 1; grid-row: 3; margin-top: 6px; }
+  .worm-death-body { grid-column: 2; grid-row: 2 / span 2; }
+  .worm-death-stats { margin-top: 0; }
   .worm-death-card .screen-disclosure { margin: 8px 0 0; }
-}
-@media (max-height: 560px) and (orientation: portrait) {
-  .worm-death-badge { width: 70px; }
-  .worm-death-beads { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -306,3 +275,7 @@
 .worm-death.is-still *, .worm-death.is-still *::before, .worm-death.is-still *::after { animation: none !important; }
 
 .worm-death-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The disclosure's summary is a 48px content box plus 15px padding each way
+   elsewhere; here it is one 44px row so the card ends where its content does. */
+.worm-death-card .screen-disclosure > summary { box-sizing: border-box; min-height: 44px; padding: 13px 2px; }

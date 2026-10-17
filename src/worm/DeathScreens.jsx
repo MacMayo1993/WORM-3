@@ -10,9 +10,14 @@ import WormMissionCard from './WormMissionCard.jsx';
 // with the pause menu (./wormOverlayUI.jsx), so both screens that stop the game
 // look like the same game.
 //
-// Reading order:
-//   eyebrow → title → one line of plain English → the run's headline number →
-//   supporting stats → where it happened → what to do next
+// Reading order, kept to one phone screen with room to spare:
+//   badge beside eyebrow and title → one line of plain English → one strip of
+//   numbers led by the orbs collected → what to do next
+//
+// It is compact on purpose: the card covers the board you just died on, and the
+// player's next move is almost always Try again. The run's tile length is not on
+// it (the HUD shows that while you play); the headline is the orbs you collected
+// this run (wormSessionOrbs, which a recovered dropped orb does not add to).
 //
 // Two things these deliberately no longer do:
 //
@@ -24,8 +29,8 @@ import WormMissionCard from './WormMissionCard.jsx';
 // still there behind it. The cause lives on the card itself (deathScreen.css):
 // caution tape in its colour, a glossy badge holding its animated emblem
 // (DeathEmblem.jsx), sticker lettering that arrives the way the cause hit (SLICED
-// in two halves, the blast shaking), and the run's length counting up over a row
-// of beads in the worm's own colour. Rays turn in the paper behind; none of it
+// in two halves, the blast shaking), and the orbs collected counting up. Rays
+// turn in the paper behind; none of it
 // crosses the text, and all of it stops under reduced motion.
 //
 // And there is no monospace diagnostics block. It read "Head tile / Body tile
@@ -39,7 +44,7 @@ import { prefersReducedMotion } from '../utils/device.js';
 import DeathEmblem from './DeathEmblem.jsx';
 import {
     overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS,
-    OverlayBlurb, OverlayChip,
+    OverlayChip,
     primaryBtnStyle, SECONDARY_BTN_STYLE, TERTIARY_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
 import './deathScreen.css';
@@ -153,26 +158,8 @@ function useCountUp(target, still, ms = 900) {
     return shown;
 }
 
-const MAX_BEADS = 16;
-
-/** The worm as it ended: a row of beads in its colour, its head knocked out. */
-function WormBeads({ length, color }) {
-    const count = Math.max(1, Math.min(length, MAX_BEADS));
-    const more = length > MAX_BEADS ? length - MAX_BEADS : 0;
-    return (
-        <div className="worm-death-beads" aria-hidden="true" style={{ '--worm': color }}>
-            {Array.from({ length: count - 1 }, (_, i) => (
-                <span key={i} className="worm-death-bead" style={{ '--i': i, '--bead': `${11 + 7 * (i / Math.max(1, count - 2))}px` }} />
-            ))}
-            <span className="worm-death-bead is-head" style={{ '--i': count - 1, '--bead': '24px' }}>
-                <svg viewBox="0 0 20 20"><path d="M4 6l4 4M8 6l-4 4M12 6l4 4M16 6l-4 4" stroke="#17201b" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            </span>
-            {more > 0 && <span className="worm-death-more">+{more}</span>}
-        </div>
-    );
-}
-
 const STAT_ICONS = {
+    Orbs: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><circle cx="12" cy="12" r="8.5" /><circle cx="9" cy="9" r="2.4" fill="currentColor" stroke="none" /></svg>,
     Time: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l3 2M10 3h4" /></svg>,
     Healed: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>,
     Tunnels: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><ellipse cx="12" cy="12" rx="9" ry="6" /><ellipse cx="12" cy="12" rx="4" ry="2.4" fill="currentColor" /></svg>,
@@ -194,12 +181,11 @@ function DeathTitle({ kind, long, children }) {
 
 // ─── Entry point ────────────────────────────────────────────────────────────────
 export default function DeathScreen({
-    deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles, wormLengthTiles = 0,
+    deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormSessionOrbs = 0,
     formatTime, onRetry, onNewGame, onExamine,
 }) {
     const dialogRef = useRef(null);
     const onDialogKeyDown = useDialogBehavior(dialogRef);
-    const wormColor = useGameStore(s => s.wormColor) || '#3fbf5f';
     const [still] = useState(() => !!useGameStore.getState().settings?.reducedMotion || prefersReducedMotion());
     const kind = classifyDeath(deathDetails?.reason);
     const config = DEATHS[kind];
@@ -209,8 +195,8 @@ export default function DeathScreen({
     // Examine hides the overlay to show the board behind it, which is only worth
     // offering when there is a spot on the board to go and look at.
     const canExamine = !!onExamine && kind === 'tail-bite' && !!location;
-    const length = wormBodyTiles ?? 0;
-    const shownLength = useCountUp(Math.round(wormLengthTiles * 100), still) / 100;
+    const orbs = wormSessionOrbs ?? 0;
+    const shownOrbs = useCountUp(orbs, still);
     const stats = [
         ['Time', formatTime(wormTimeAlive)],
         ['Healed', wormHealedCount],
@@ -224,26 +210,29 @@ export default function DeathScreen({
                 <div className="worm-death-rays" aria-hidden="true" />
                 <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title}
                     className={`run-result worm-death-card ${OVERLAY_CARD_CLASS}`}
-                    style={{ ...overlayCardStyle(config.color), boxShadow: '0 6px 0 #17201b, 0 22px 50px rgba(23,32,27,0.28)', border: '2px solid #17201b', '--mode-accent': config.color }}>
+                    style={{ ...overlayCardStyle(config.color, { width: 400 }), padding: '14px 16px 12px', boxShadow: '0 6px 0 #17201b, 0 22px 50px rgba(23,32,27,0.28)', border: '2px solid #17201b', '--mode-accent': config.color }}>
                     <div className="worm-death-tape" aria-hidden="true" />
                     <div className="worm-death-head">
-                    <div className="worm-death-badge" aria-hidden="true">
-                        <div className="worm-death-badge-face"><DeathEmblem kind={kind} /></div>
+                        <div className="worm-death-badge" aria-hidden="true">
+                            <div className="worm-death-badge-face"><DeathEmblem kind={kind} /></div>
+                        </div>
+                        <div className="worm-death-heading">
+                            <div className="worm-death-eyebrow">{config.eyebrow}</div>
+                            <DeathTitle kind={kind} long={config.long}>{config.title}</DeathTitle>
+                        </div>
                     </div>
-                    <div className="worm-death-eyebrow">{config.eyebrow}</div>
-                    <DeathTitle kind={kind} long={config.long}>{config.title}</DeathTitle>
-                    <OverlayBlurb>{blurb}</OverlayBlurb>
-                    </div>
+                    <p className="worm-death-blurb">{blurb}</p>
 
                     <div className="worm-death-body">
-                    <div className="worm-death-hero">
-                        <div className="worm-death-hero-value" aria-hidden="true">{shownLength}</div>
-                        <WormBeads length={length} color={wormColor} />
-                        <div className="worm-death-hero-label">Final length · tiles<span className="worm-death-sr">: {wormLengthTiles}</span></div>
-                    </div>
+                    {/* One strip: the orbs collected lead, then the run's other numbers. */}
                     <div className="worm-death-stats">
+                        <div className="worm-death-stat is-hero" style={{ '--i': 0 }}>
+                            {STAT_ICONS.Orbs}
+                            <strong aria-hidden="true">{shownOrbs}</strong>
+                            <span>Orbs<span className="worm-death-sr">: {orbs}</span></span>
+                        </div>
                         {stats.map(([label, value], i) => (
-                            <div key={label} className="worm-death-stat" style={{ '--i': i }}>
+                            <div key={label} className="worm-death-stat" style={{ '--i': i + 1 }}>
                                 {STAT_ICONS[label]}
                                 <strong>{value}</strong>
                                 <span>{label}</span>
@@ -251,9 +240,9 @@ export default function DeathScreen({
                         ))}
                     </div>
 
-                    <div style={ACTION_ROW_STYLE}>
-                        <button onClick={onRetry} className="worm-death-retry" style={primaryBtnStyle()}>{RETRY_ICON}Try again</button>
-                        <button onClick={onNewGame} style={SECONDARY_BTN_STYLE}>New game</button>
+                    <div className="worm-death-actions" style={{ ...ACTION_ROW_STYLE, marginTop: 12 }}>
+                        <button onClick={onRetry} className="worm-death-retry" style={{ ...primaryBtnStyle(), minHeight: 48 }}>{RETRY_ICON}Try again</button>
+                        <button onClick={onNewGame} style={{ ...SECONDARY_BTN_STYLE, minHeight: 48 }}>New game</button>
                     </div>
                     {canExamine && (
                         <button onClick={onExamine} style={TERTIARY_BTN_STYLE}>Examine the board</button>

@@ -1071,13 +1071,47 @@ function SignatureGuide() {
     return def && !def.passive ? <section className="worm-signature-guide"><strong>{def.name}</strong><p>{def.hint}</p></section> : null;
 }
 
-function PauseMenu({ onResume, onHome, onRetry, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
+// The pause card is three pages in one sheet, so nothing about the run is ever
+// a full-screen detour away. The main page is what a paused player reaches for:
+// Resume, the four round keys (Restart, Home, Settings, Cube), the run in one
+// row of numbers and the objective. Settings holds how the game plays (sound,
+// buzz, quests, speed, turns, horizon, camera distance, the inspection tools);
+// Cube holds how the cube looks (the Settings sheet's own Colors, Tiles and Scene
+// panels, PauseCubeSettings.jsx). Escape steps back a page, then resumes.
+const PauseCubeSettings = React.lazy(() => import('./PauseCubeSettings.jsx'));
+
+const PAUSE_ICONS = {
+    restart: <path d="M5 12a7 7 0 1 0 2-5M5 4v4h4" />,
+    home: <path d="M4 11 12 4l8 7M6 10v9h12v-9" />,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" /></>,
+    cube: <><path d="M12 3 4 7.5v9L12 21l8-4.5v-9Z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></>,
+    back: <path d="M15 5 8 12l7 7" />,
+};
+
+function PausePageHeader({ title, onBack }) {
+    return <div className="worm-pause-page-head">
+        <button type="button" className="worm-pause-back" onClick={onBack} aria-label="Back to pause menu">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{PAUSE_ICONS.back}</svg>
+        </button>
+        <h2>{title}</h2>
+    </div>;
+}
+
+function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
     const storyId = useGameStore(s => s.wormStoryLevel);
     const inTunnel = useGameStore(s => ['entering', 'tunnel', 'exiting'].includes(s.wormPhase));
     const green = UI_MOSS_LIGHT;
     const blue = UI_MOSS_LIGHT;
     const dialogRef = useRef(null);
-    const onDialogKeyDown = useDialogBehavior(dialogRef, onResume);
+    const back = useCallback(() => setPage('main'), [setPage]);
+    const onDialogKeyDown = useDialogBehavior(dialogRef, page === 'main' ? onResume : back);
+    // A new page starts at its top, with focus on the card so Tab begins there.
+    useEffect(() => {
+        const card = dialogRef.current;
+        if (!card) return;
+        card.scrollTop = 0;
+        card.focus?.({ preventScroll: true });
+    }, [page]);
     const cameraHorizon = useGameStore(s => s.wormCameraHorizon ?? 'face');
     const toggleCameraHorizon = useGameStore(s => s.toggleWormCameraHorizon);
     const questsMinimized = useGameStore(s => s.settings?.wormQuestsMinimized ?? false);
@@ -1094,112 +1128,116 @@ function PauseMenu({ onResume, onHome, onRetry, onSettings, onToggleAntipodal, a
         // Not fixed: the pause menu lives inside the HUD's stacking context and must
         // not escape it, so the scrim is absolute against that instead of the viewport.
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
-            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className={`worm-pause-card ${OVERLAY_CARD_CLASS}`} role="dialog" aria-modal="true" aria-label="Game paused" style={{ ...overlayCardStyle(green, { width: 420 }), ...arcadeModeVars('worm') }} onClick={e => e.stopPropagation()}>
-                <ScreenHeading mode="pause" title="Paused" />
-                <button type="button" className="worm-pause-resume arcade-primary" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
-                {/* Chart-style quick row: big round keys for what a paused player reaches for. */}
-                <div className="worm-pause-quick">
-                    {onRetry && <PauseKey label="Restart" onClick={onRetry} icon={<path d="M5 12a7 7 0 1 0 2-5M5 4v4h4" />} />}
-                    {onHome && <PauseKey label="Home" onClick={onHome} icon={<path d="M4 11 12 4l8 7M6 10v9h12v-9" />} />}
-                    {onSettings && <PauseKey label="Settings" onClick={onSettings} icon={<><circle cx="12" cy="12" r="3" /><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" /></>} />}
-                    <PauseKey label={sfxOn ? 'Sound' : 'Muted'} pressed={sfxOn} onClick={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
-                        icon={sfxOn ? <path d="M4 9h4l5-4v14l-5-4H4ZM16 9a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12" /> : <path d="M4 9h4l5-4v14l-5-4H4ZM16 9l5 6m0-6-5 6" />} />
-                    <PauseKey label={hapticsOn ? 'Vibrate' : 'No buzz'} pressed={hapticsOn} onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
-                        icon={<><rect x="8" y="4" width="8" height="16" rx="2" />{hapticsOn ? <path d="M4 9v6M20 9v6" /> : <path d="M4 4l16 16" />}</>} />
-                </div>
-                <button type="button" className="worm-quest-setting" aria-pressed={questsMinimized}
-                    onClick={() => setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }))}>
-                    {questsMinimized ? 'Show quests during play' : 'Minimize quests during play'}
-                </button>
-                <small>{TILE_GROWTH_HELP}</small>
-                {storyId && <StoryObjectiveCard />}
-                <WormMissionCard summary />
-                <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
-                  <BuffStrip detailed /><FusionGuide /><TunnelNeedsCard /><SignatureGuide />
-                </details>
-                <details className="screen-disclosure"><summary>Run rewards</summary>
-                  <ParityWallet /><XpRunSummary mode="worm" />
-                </details>
-
-                <StatTiles columns={2} stats={[
-                    ['Time', formatTime(wormTimeAlive)],
-                    ['Healed', wormHealedCount],
-                    ['Collected', wormSessionOrbs],
-                    storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next burrow', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
-                ]} />
-
-                <details className="screen-disclosure"><summary>Controls & camera</summary>
-                {/* Named speed presets — keep the underlying multipliers out of the UI. */}
-                <div style={{ ...SETTING_ROW_STYLE, marginTop: 'clamp(10px, 2vh, 16px)' }}>
-                    <span style={SETTING_LABEL_STYLE}>{storyId ? 'Level speed' : 'Speed'}</span>
-                    <div style={{ display: 'flex', gap: 5, flex: 1 }}>
-                        {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Story pace · fixed for this level</span> : WORM_SPEED_OPTIONS.map(option => (
-                            <button
-                                key={option.label}
-                                type="button"
-                                disabled={!wormAlive || !!storyId}
-                                onClick={() => wormAlive && setWormSpeed(option.value)}
-                                style={segmentStyle(wormSpeed === option.value, blue, wormAlive && !storyId)}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
+            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className={`worm-pause-card is-${page} ${OVERLAY_CARD_CLASS}`} role="dialog" aria-modal="true" aria-label="Game paused" style={{ ...overlayCardStyle(green, { width: page === 'cube' ? 460 : 400 }), padding: '14px 16px 14px', ...arcadeModeVars('worm') }} onClick={e => e.stopPropagation()}>
+                {page === 'main' && <>
+                    <ScreenHeading mode="pause" title="Paused" />
+                    <button type="button" className="worm-pause-resume arcade-primary" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
+                    {/* The four round keys a paused player reaches for. */}
+                    <div className="worm-pause-quick">
+                        {onRetry && <PauseKey label="Restart" onClick={onRetry} icon={PAUSE_ICONS.restart} />}
+                        {onHome && <PauseKey label="Home" onClick={onHome} icon={PAUSE_ICONS.home} />}
+                        <PauseKey label="Settings" onClick={() => setPage('settings')} icon={PAUSE_ICONS.settings} />
+                        <PauseKey label="Cube" onClick={() => setPage('cube')} icon={PAUSE_ICONS.cube} />
                     </div>
-                </div>
 
-                {/* Control mode toggle */}
-                <div style={SETTING_ROW_STYLE}>
-                    <span style={SETTING_LABEL_STYLE}>Controls</span>
-                    <button
-                        onClick={() => toggleWormControlMode()}
-                        style={togglePillStyle(wormControlMode === 'oriented', blue)}
-                    >
-                        {wormControlMode === 'oriented' ? 'Relative turns' : 'Fixed turns'}
+                    <StatTiles columns={4} stats={[
+                        ['Time', formatTime(wormTimeAlive)],
+                        ['Healed', wormHealedCount],
+                        ['Orbs', wormSessionOrbs],
+                        storyId ? [`Ch ${storyChapterId(storyId)}`, `${storyChapterIndex(storyId)}/${STORY_CHAPTER_SIZE}`] : ['Burrow', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
+                    ]} />
+
+                    {storyId && <StoryObjectiveCard />}
+                    <WormMissionCard summary />
+                    <details className="screen-disclosure"><summary>Abilities & rewards</summary>
+                      <small>{TILE_GROWTH_HELP}</small>
+                      <BuffStrip detailed /><FusionGuide /><TunnelNeedsCard /><SignatureGuide />
+                      <ParityWallet /><XpRunSummary mode="worm" />
+                    </details>
+                </>}
+
+                {page === 'settings' && <>
+                    <PausePageHeader title="Settings" onBack={back} />
+                    <div className="worm-pause-quick">
+                        <PauseKey label={sfxOn ? 'Sound' : 'Muted'} pressed={sfxOn} onClick={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
+                            icon={sfxOn ? <path d="M4 9h4l5-4v14l-5-4H4ZM16 9a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12" /> : <path d="M4 9h4l5-4v14l-5-4H4ZM16 9l5 6m0-6-5 6" />} />
+                        <PauseKey label={hapticsOn ? 'Vibrate' : 'No buzz'} pressed={hapticsOn} onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
+                            icon={<><rect x="8" y="4" width="8" height="16" rx="2" />{hapticsOn ? <path d="M4 9v6M20 9v6" /> : <path d="M4 4l16 16" />}</>} />
+                    </div>
+                    <button type="button" className="worm-quest-setting" aria-pressed={questsMinimized}
+                        onClick={() => setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }))}>
+                        {questsMinimized ? 'Show quests during play' : 'Minimize quests during play'}
                     </button>
-                </div>
 
-                {/* Which way is up while crawling. A feel call rather than a right
-                    answer, and one you can only judge in motion, so it is here in
-                    the run rather than buried in setup: FACE rolls the horizon with
-                    the cube face you are on, Keep level keeps it world-up. */}
-                <div style={SETTING_ROW_STYLE}>
-                    <span style={SETTING_LABEL_STYLE}>Horizon</span>
-                    <button
-                        onClick={() => toggleCameraHorizon?.()}
-                        style={togglePillStyle(cameraHorizon === 'face', blue)}
-                    >
-                        {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
-                    </button>
-                </div>
+                    {/* Named speed presets — keep the underlying multipliers out of the UI. */}
+                    <div style={SETTING_ROW_STYLE}>
+                        <span style={SETTING_LABEL_STYLE}>{storyId ? 'Level speed' : 'Speed'}</span>
+                        <div style={{ display: 'flex', gap: 5, flex: 1 }}>
+                            {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Story pace · fixed for this level</span> : WORM_SPEED_OPTIONS.map(option => (
+                                <button
+                                    key={option.label}
+                                    type="button"
+                                    disabled={!wormAlive || !!storyId}
+                                    onClick={() => wormAlive && setWormSpeed(option.value)}
+                                    style={segmentStyle(wormSpeed === option.value, blue, wormAlive && !storyId)}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                {/* How far back the chase camera stands. Judged against the run
-                    behind the menu; the mouse wheel sets it too while crawling. */}
-                <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
-
-                </details>
-                {/* Secondary tools */}
-                <details className="screen-disclosure"><summary>More</summary>
-                <div className="worm-pause-actions">
-                    <button disabled={inTunnel} onClick={() => useGameStore.getState().setShowCutawayLens(true)} style={{ ...LIST_BTN_STYLE, opacity: inTunnel ? 0.5 : 1 }}>
-                        <span aria-hidden="true">⌕</span><span>{inTunnel ? 'Cutaway available on the surface' : 'Inspect inside the cube'}</span>
-                    </button>
-                    {onToggleAntipodal && (
-                        <button
-                            onClick={onToggleAntipodal}
-                            aria-pressed={antipodalActive}
-                            style={{
-                                ...LIST_BTN_STYLE,
-                                ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK } : {}),
-                            }}
-                        >
-                            <span aria-hidden="true">⊕</span>
-                            <span>Twin camera {antipodalActive ? '(On)' : '(Off)'}</span>
+                    {/* Control mode toggle */}
+                    <div style={SETTING_ROW_STYLE}>
+                        <span style={SETTING_LABEL_STYLE}>Controls</span>
+                        <button onClick={() => toggleWormControlMode()} style={togglePillStyle(wormControlMode === 'oriented', blue)}>
+                            {wormControlMode === 'oriented' ? 'Relative turns' : 'Fixed turns'}
                         </button>
-                    )}
-                </div>
-                </details>
+                    </div>
 
+                    {/* Which way is up while crawling: FACE rolls the horizon with the
+                        cube face you are on, Keep level keeps it world-up. */}
+                    <div style={SETTING_ROW_STYLE}>
+                        <span style={SETTING_LABEL_STYLE}>Horizon</span>
+                        <button onClick={() => toggleCameraHorizon?.()} style={togglePillStyle(cameraHorizon === 'face', blue)}>
+                            {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
+                        </button>
+                    </div>
 
+                    {/* How far back the chase camera stands. Judged against the run
+                        behind the menu; the mouse wheel sets it too while crawling. */}
+                    <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
+
+                    <div className="worm-pause-actions">
+                        <button disabled={inTunnel} onClick={() => useGameStore.getState().setShowCutawayLens(true)} style={{ ...LIST_BTN_STYLE, opacity: inTunnel ? 0.5 : 1 }}>
+                            <span aria-hidden="true">⌕</span><span>{inTunnel ? 'Cutaway available on the surface' : 'Inspect inside the cube'}</span>
+                        </button>
+                        {onToggleAntipodal && (
+                            <button
+                                onClick={onToggleAntipodal}
+                                aria-pressed={antipodalActive}
+                                style={{
+                                    ...LIST_BTN_STYLE,
+                                    ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK } : {}),
+                                }}
+                            >
+                                <span aria-hidden="true">⊕</span>
+                                <span>Twin camera {antipodalActive ? '(On)' : '(Off)'}</span>
+                            </button>
+                        )}
+                        {/* The rest of the Settings sheet (capture, modes, about). */}
+                        {onSettings && <button onClick={onSettings} style={LIST_BTN_STYLE}>
+                            <span aria-hidden="true">…</span><span>All settings</span>
+                        </button>}
+                    </div>
+                </>}
+
+                {page === 'cube' && <>
+                    <PausePageHeader title="Cube" onBack={back} />
+                    <React.Suspense fallback={<p className="worm-pause-loading">Loading…</p>}>
+                        <PauseCubeSettings />
+                    </React.Suspense>
+                </>}
             </div>
         </div>
     );
@@ -1233,6 +1271,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const showCutawayLens = useGameStore(s => s.showCutawayLens && !inspectionSuspended(s));
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    // The pause card's page lives here, not in PauseMenu: the cutaway lens
+    // unmounts the card while it is open, and closing the lens should land the
+    // player back on the page they opened it from. Resuming starts it over.
+    const [pausePage, setPausePage] = useState('main');
+    useEffect(() => { if (!isPaused) setPausePage('main'); }, [isPaused]);
     const [showPowerInfo, setShowPowerInfo] = useState(false);
     const captureMode = useGameStore(s => s.captureMode);
 
@@ -1479,6 +1522,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {isPaused && !showCutawayLens && showPowerInfo && <PowerInfo onResume={handleResume} />}
             {isPaused && !showCutawayLens && !showPowerInfo && (
                 <PauseMenu
+                    page={pausePage}
+                    setPage={setPausePage}
                     onResume={handleResume}
                     onHome={onHome}
                     onRetry={onRetry}
@@ -1540,8 +1585,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     wormTimeAlive={wormTimeAlive}
                     wormHealedCount={wormHealedCount}
                     wormTunnelCount={wormTunnelCount}
-                    wormBodyTiles={wormBodyTiles}
-                    wormLengthTiles={wormLengthTiles}
+                    wormSessionOrbs={wormSessionOrbs}
                     formatTime={formatTime}
                     onRetry={onRetry}
                     onNewGame={onNewGame}
