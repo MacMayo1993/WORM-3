@@ -13,6 +13,7 @@ import {
   createLoadingPlay,
   kickPulse,
   kickSpin,
+  milestoneCrossed,
   orientationAim,
   pointerAim,
   portalOpen,
@@ -202,6 +203,33 @@ describe('MOBI on the loading cover', () => {
     play.frame(0, 0);
     play.frame(PASS_AT + 9 * FALL.period + 0.01, 100);
     expect(play.loops).toBe(10);
+    expect(line.textContent).toBe(MOBI_MILESTONES[10]);
+  });
+
+  it('finds the milestones a stalled frame jumps over', () => {
+    expect(milestoneCrossed(9, 10)).toBe(10);
+    expect(milestoneCrossed(9, 11)).toBe(10);
+    expect(milestoneCrossed(10, 11)).toBeNull();
+    expect(milestoneCrossed(0, 9)).toBeNull();
+    // A jump across several marks the latest.
+    expect(milestoneCrossed(8, 30)).toBe(25);
+    expect(milestoneCrossed(99, 140)).toBe(100);
+  });
+
+  it('still marks a milestone when a busy main thread skips the frame that reached it', () => {
+    const line = fakeText();
+    const badge = fakeText();
+    const play = createLoadingPlay({ scene: fakeScene(), line, badge });
+    play.frame(0, 0);
+    play.frame(PASS_AT + 8 * FALL.period + 0.01, 100);
+    expect(play.loops).toBe(9);
+    // Stalled from loop 9 straight to loop 11: no frame ever saw loop 10.
+    play.frame(PASS_AT + 10 * FALL.period + 0.01, 3200);
+    expect(play.loops).toBe(11);
+    expect(line.textContent).toBe(MOBI_MILESTONES[10]);
+    expect(badge.textContent).toBe('×11');
+    // And it is said once, not again on the next loop.
+    play.frame(PASS_AT + 11 * FALL.period + 0.01, 3300);
     expect(line.textContent).toBe(MOBI_MILESTONES[10]);
   });
 
