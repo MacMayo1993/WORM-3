@@ -14,7 +14,7 @@ import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { tileDisplayAngle, advanceTileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
 import { liveRotation } from '../worm/liveRotation.js';
-import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
+import { COLORS, FACE_COLORS, RUBIKS_FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -243,18 +243,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipPads: effectiveFlipPads(s),
       faceTextures: s.faceTextures,
       wormHealerMode: s.wormHealerMode ?? false,
+      wormViewPower: s.wormViewPower,
       perfReducedFX: s.perfReducedFX ?? false,
     }))
   );
   // Cinematics render real stickers with local styling, never changing saved settings.
-  const { biomeEnabled: configuredBiome, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  const { biomeEnabled: configuredBiome, chaosLevel, disparityFlipCap, settings, faceTextures: configuredTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  // A Classic pickup is a complete temporary look, not just the chassis mode.
+  // Keep saved textures/styles intact so expiry restores the level's appearance.
+  const isClassicPickup = !presentation && wormHealerMode && gameConfig.wormViewPower === 'view-classic' && mode === 'classic';
+  const faceTextures = isClassicPickup ? null : configuredTextures;
   const isChrome = mode === 'chrome';
   const isNeon = mode === 'neon';
-  const biomeEnabled = configuredBiome && !isChrome && !isNeon;
+  const biomeEnabled = configuredBiome && !isChrome && !isNeon && !isClassicPickup;
   const flipPads = presentation ? settings?.flipPads : gameConfig.flipPads;
   const fc = useMemo(
-    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
-    [settings]
+    () => isClassicPickup ? RUBIKS_FACE_COLORS : resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
+    [settings, isClassicPickup]
   );
   // Chaos keeps the shared gameplay snap and crossing effects. Only the
   // cinematic opts into the quieter pose; both preserve the actual styled
@@ -262,7 +267,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const quietFlip = presentation?.flipAnimation === 'chaos';
   const chaosFlip = !presentation && chaosLevel > 0 && !wormHealerMode;
   const preserveFlipStyle = quietFlip || chaosFlip;
-  const manifoldStyles = settings?.manifoldStyles;
+  const manifoldStyles = isClassicPickup ? null : settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   // Same decision as selectEffectiveFlipCap, kept local because both inputs are
   // already in this component's batched subscription above.

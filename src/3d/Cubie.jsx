@@ -132,6 +132,7 @@ const Cubie = React.forwardRef(function Cubie({
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
   const powerView = wormMode ? getViewPowerDef(wormViewPower)?.view : null;
+  const classicPickup = powerView === 'classic';
   const mirrorMode = !powerView && storedMirrorMode;
   const effectiveHollowMode = !powerView && hollowMode && size < 15;
   // faceColors needed locally for wireframe edge coloring
@@ -188,17 +189,18 @@ const Cubie = React.forwardRef(function Cubie({
     roughness: _bmp.roughness,
     metalness: _bmp.metalness,
     envMapIntensity: _bmp.envMapIntensity,
-    transparent: !!_bmp.transparent || wormMode || raisedWindow,
-    opacity: raisedWindow ? 0.16 : _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
+    transparent: !!_bmp.transparent || (wormMode && !classicPickup) || raisedWindow,
+    opacity: raisedWindow ? 0.16 : _bmp.opacity ?? (wormMode && !classicPickup ? 0.8 : 1.0),
     // A dark depth-writing shell hid the entire band behind the raised tile.
     depthWrite: !raisedWindow,
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
   // Classic looks wear the menu cube's piece: 0.96 black plastic, clear-coated off mobile.
-  const classicBody = CLASSIC_BODY_MODES.has(effectiveVisualMode) && !wormMode;
-  const bodySize = wormMode ? 0.92 : classicBody ? CLASSIC_BODY_SIZE : 0.98;
-  const coatBody = classicBody && !isMobile;
+  const classicBody = CLASSIC_BODY_MODES.has(effectiveVisualMode) && (!wormMode || classicPickup);
+  const bodySize = classicBody ? CLASSIC_BODY_SIZE : wormMode ? 0.92 : 0.98;
+  // WORM keeps the shared body batch; its plain stickers carry the glossy coat.
+  const coatBody = classicBody && !isMobile && !wormMode;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
   const explodedPos = useMemo(() => {

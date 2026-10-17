@@ -50,3 +50,18 @@ it.each([3, 15])('renders LEGO studs and whole-cubie neon on a %i cube, includin
   expect(restored.find(n => n.type === MergedLedEdges).props.edges).toHaveLength(4);
   expect(restored.filter(n => n.type === StickerPlane).every(n => n.props.mode === 'grid')).toBe(true);
 });
+
+it('gives the Classic pickup a full black plastic chassis and keeps raised tunnel windows', () => {
+  const body = tree => tree.find(n => n.type === 'meshStandardMaterial' || n.type === 'meshPhysicalMaterial');
+  const geometry = tree => tree.find(n => n.type === 'primitive' && n.props.attach === 'geometry').props.object;
+  const ordinary = render(null, { wormMode: false, visualMode: 'classic' });
+  const classic = render('view-classic', { randomMode: true, hollowMode: true, mirrorMode: true });
+  expect(body(classic).props).toMatchObject({ color: '#141416', opacity: 1, transparent: false });
+  expect(geometry(classic)).toBe(geometry(ordinary));
+  expect(classic.some(n => n.type === MergedLedEdges)).toBe(false);
+  expect(classic.filter(n => n.type === StickerPlane).every(n => n.props.mode === 'classic')).toBe(true);
+  const raised = render('view-classic', { flipped: true });
+  expect(body(raised).props).toMatchObject({ opacity: .16, depthWrite: false });
+  expect(raised.some(n => n.type === MergedLedEdges)).toBe(false);
+  expect(body(render(null)).props).toMatchObject({ opacity: .8, transparent: true });
+});
