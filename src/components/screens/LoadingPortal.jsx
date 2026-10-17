@@ -39,6 +39,8 @@ import {
   MOTE_COUNT,
   THROAT,
   WORM_SEGMENTS,
+  FALL,
+  crossing,
   funnelLean,
   funnelPoint,
   funnelRadius,
@@ -399,6 +401,33 @@ function drawKickRing(ctx, well, since, kicks) {
   ctx.stroke();
 }
 
+// The portal's surface where the cube breaks it: the front half of the flat
+// ellipse the shaft is clipped on (shaftClipPath), lit while the cube is half
+// through, brightest at the middle and fading toward the rim. Drawn over the
+// cube, so the cut edge reads as a glowing membrane, not a hard crop.
+function drawMembrane(ctx, well, cutPx, strength) {
+  if (strength <= 0.01 || cutPx <= 0) return;
+  const { cx, cy, a } = well;
+  const glow = ctx.createLinearGradient(cx - a, 0, cx + a, 0);
+  glow.addColorStop(0, 'rgba(255,253,242,0)');
+  glow.addColorStop(0.5, `rgba(255,253,242,${0.95 * strength})`);
+  glow.addColorStop(1, 'rgba(255,253,242,0)');
+  const halo = ctx.createLinearGradient(cx - a, 0, cx + a, 0);
+  halo.addColorStop(0, 'rgba(120,214,255,0)');
+  halo.addColorStop(0.5, `rgba(120,214,255,${0.45 * strength})`);
+  halo.addColorStop(1, 'rgba(120,214,255,0)');
+  for (const [style, width] of [
+    [halo, 7],
+    [glow, 2]
+  ]) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, a, cutPx, 0, 0, Math.PI);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = style;
+    ctx.stroke();
+  }
+}
+
 // Scale a measured mouth about its centre as it springs open; null while shut.
 function opened(well, open) {
   if (!well || open < 0.02) return null;
@@ -462,6 +491,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     // is redrawn at half rate (or at once when the mouth moves); only the
     // portals above it are drawn every frame.
     let paperAt = -Infinity;
+    let cubePx = 0; // the cube's size, for the depth of the portals' cut
     const paperWell = { cx: 0, cy: 0, a: 1, b: 1 };
     let paperKey = '';
 
@@ -535,9 +565,17 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
-      // Over the cube: both near lips, along the lines the shaft is cut on.
+      // Over the cube: both near lips, and each portal's surface lit where the
+      // cube is breaking through it (the floor's from the second fall, once
+      // something has gone into it).
       if (top) drawRim(front, top, spin, pulse, 'front');
       if (well) drawRim(front, well, spin, pulse, 'front');
+      if (!reduced) {
+        if (!cubePx) cubePx = fallRef?.current?.offsetHeight ?? 0;
+        const through = crossing(t);
+        if (top) drawMembrane(front, top, cubePx * FALL.cut, through);
+        if (well && t >= FALL.period) drawMembrane(front, well, cubePx * FALL.cut, through);
+      }
       reveal();
     };
 
@@ -553,6 +591,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * dpr));
       paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * dpr));
       paperKey = null; // resizing blanked the paper
+      cubePx = 0; // and may have resized the cube
       if (reduced) draw(STILL_TIME, performance.now());
     };
     resize();

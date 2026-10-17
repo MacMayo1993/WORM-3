@@ -150,8 +150,8 @@ describe('the portals opening', () => {
   });
 
   it('have the upper portal open before the cube comes out of it', () => {
-    // The cube's lowest point (0.9 cubes below its centre) reaches the upper lip.
-    const emerges = ((FALL.lip - 0.9 + FALL.lead) / FALL.drop) * FALL.period;
+    // The cube's lowest point (0.9 cubes below its centre) reaches the upper portal's cut.
+    const emerges = ((FALL.cut - 0.9 + FALL.lead) / FALL.drop) * FALL.period;
     expect(portalOpen(emerges)).toBeGreaterThan(0.9);
     expect(portalOpen(PASS_AT, OPEN.floorDelay)).toBe(1);
   });
