@@ -120,7 +120,7 @@
   opacity: 0;
 }
 
-/* The clipped halves of the portal lips, over the falling cube. Keep this
+/* The entrance's near lip and glowing cut lines, over the falling cube. Keep this
    separate from .wl-front, which translates the cube's 3D front faces. */
 .wl-backdrop.wl-portal-lips {
   z-index: 3;
@@ -146,6 +146,7 @@
   width: var(--wl-cube);
   height: var(--wl-cube);
   margin: calc(var(--wl-cube) / -2) 0 0 calc(var(--wl-cube) / -2);
+  will-change: transform;
   animation: wl-fall var(--wl-beat) linear infinite;
 }
 
@@ -570,6 +571,7 @@
     animation: none;
   }
   .wl-fall {
+    will-change: auto;
     transform: translateY(calc(var(--wl-drop) * 0.5));
   }
   .wl-twin {
