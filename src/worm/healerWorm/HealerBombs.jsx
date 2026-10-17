@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { FACE_NORMALS, DIR_FORWARD } from './constants.js';
 import { BOMB_FUSE_SECONDS } from './bombs.js';
+import { BOMB_LIFT, createBombPose, updateBombPose } from './bombRotation.js';
 import { addFrameDissolve } from '../../components/intro/introDissolve.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -30,7 +31,6 @@ import {
   BOMB_FIELD_MID, bombDissolveProgress, bombFleck,
 } from './bombDissolve.js';
 
-const BOMB_LIFT = 0.34; // how far the bomb body floats off the tile surface
 const _UP = new THREE.Vector3(0, 1, 0);
 const DISSOLVE_FIELD = new THREE.Matrix4().makeScale(BOMB_FIELD_SCALE, BOMB_FIELD_SCALE, BOMB_FIELD_SCALE)
   .setPosition(0, -BOMB_FIELD_SCALE * BOMB_FIELD_MID, 0);
@@ -99,11 +99,11 @@ function bombPosition(bomb, size) {
 
 // Both states draw exactly the same shell and fuse. Only the disarmed copy owns
 // patched materials: changing its uniforms must never dissolve a nearby live bomb.
-function BombShell({ materials = MAT, quatUp }) {
+function BombShell({ materials = MAT, quatUp, fuseRef }) {
   return <>
     <mesh geometry={GEO.body} material={materials.body} />
     <mesh geometry={GEO.highlight} material={materials.highlight} position={[-BOMB_RADIUS * 0.35, BOMB_RADIUS * 0.5, BOMB_RADIUS * 0.55]} />
-    <group quaternion={quatUp}>
+    <group ref={fuseRef} quaternion={quatUp}>
       <mesh geometry={GEO.fuse} material={materials.fuse} position={[0, BOMB_RADIUS + 0.14, 0]} rotation={[0, 0, 0.25]} />
     </group>
   </>;
@@ -124,7 +124,7 @@ function DisarmedBomb({ bomb, size, hidden, onDone, warmup = false }) {
   const scratch = useMemo(() => ({ dummy: new THREE.Object3D(), color: new THREE.Color() }), []);
   const fleckColors = useMemo(() => new THREE.InstancedBufferAttribute(new Float32Array(BOMB_FLECKS * 3).fill(1), 3), []);
   const quatUp = useMemo(() => new THREE.Quaternion().setFromUnitVectors(_UP,
-    new THREE.Vector3(...(DIR_FORWARD[bomb.tile.dirKey]?.up ?? [0, 1, 0])).normalize()), [bomb.tile.dirKey]);
+    (bomb.up ?? new THREE.Vector3(...(DIR_FORWARD[bomb.tile.dirKey]?.up ?? [0, 1, 0]))).clone().normalize()), [bomb.up, bomb.tile.dirKey]);
 
   useFrame((_, delta) => {
     if (warmup || hidden || done.current) return;
@@ -188,6 +188,9 @@ function drawCountdown(canvas, sec, urgency) {
 
 // ─── One live bomb ─────────────────────────────────────────────────────────────
 function Bomb({ bomb, size }) {
+  const rootRef = useRef();
+  const labelRef = useRef();
+  const pose = useMemo(() => createBombPose(), []);
   const ringRef = useRef();
   const ringMatRef = useRef();
   const glowMatRef = useRef();
@@ -200,22 +203,22 @@ function Bomb({ bomb, size }) {
   useEffect(() => () => texture.dispose(), [texture]);
   const lastSecRef = useRef(-1);
 
-  const dirKey = bomb.tile.dirKey;
-  const normal = FACE_NORMALS[dirKey] ?? _UP;
-  const pos = bombPosition(bomb, size);
-  const up = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
   // Two orientations: the danger ring lies FLAT on the tile (aligned to the face
   // normal); the fuse + embers stand UP along the face's "up" (so they read as
   // sticking up on screen, not poking out toward the camera).
-  const quatFlat = useMemo(() => new THREE.Quaternion().setFromUnitVectors(_UP, (FACE_NORMALS[dirKey] ?? _UP).clone().normalize()), [dirKey]);
-  const quatUp = useMemo(() => {
-    const u = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
-    return new THREE.Quaternion().setFromUnitVectors(_UP, new THREE.Vector3(u[0], u[1], u[2]).normalize());
-  }, [dirKey]);
-  const labelPos = [up[0] * 1.15 + normal.x * 0.35, up[1] * 1.15 + normal.y * 0.35, up[2] * 1.15 + normal.z * 0.35];
+  const flatRef = useRef();
+  const fuseRef = useRef();
+  const sparksRef = useRef();
   const fuseTipY = BOMB_RADIUS + 0.34;
 
   useFrame((_, delta) => {
+    updateBombPose(pose, bomb, size);
+    rootRef.current.position.copy(pose.position);
+    rootRef.current.quaternion.copy(pose.rotation);
+    flatRef.current.quaternion.copy(pose.flat);
+    fuseRef.current.quaternion.copy(pose.up);
+    sparksRef.current.quaternion.copy(pose.up);
+    labelRef.current.position.copy(pose.label);
     const maxFuse = bomb.maxFuse ?? BOMB_FUSE_SECONDS;
     const frac = Math.max(0, Math.min(1, (bomb.fuse ?? 0) / maxFuse)); // 1 at spawn → 0 at blast
     const urgency = 1 - frac;
@@ -253,11 +256,11 @@ function Bomb({ bomb, size }) {
   });
 
   return (
-    <group position={pos}>
-      <BombShell quatUp={quatUp} />
+    <group ref={rootRef} name={`worm-bomb-${bomb.id}`}>
+      <BombShell fuseRef={fuseRef} />
 
       {/* flat furniture on the tile: danger ring + underglow (aligned to normal) */}
-      <group quaternion={quatFlat}>
+      <group ref={flatRef}>
         <mesh ref={ringRef} geometry={GEO.ring} position={[0, -BOMB_LIFT + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <meshBasicMaterial ref={ringMatRef} color="#ff8a1e" transparent opacity={0.8} toneMapped={false} depthWrite={false} />
         </mesh>
@@ -267,7 +270,7 @@ function Bomb({ bomb, size }) {
       </group>
 
       {/* upright furniture: fuse + spark + flame + embers (aligned to face "up") */}
-      <group quaternion={quatUp}>
+      <group ref={sparksRef}>
         <mesh ref={fuseSparkRef} geometry={GEO.spark} material={MAT.spark} position={[0.06, fuseTipY, 0]} />
         <sprite ref={fuseFlameRef} position={[0.06, fuseTipY + 0.12, 0]} scale={[0.2, 0.32, 1]}>
           <spriteMaterial map={FLAME_TEX} transparent opacity={0.85} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
@@ -280,7 +283,7 @@ function Bomb({ bomb, size }) {
       </group>
 
       {/* floating countdown number */}
-      <sprite position={labelPos} scale={[0.8, 0.8, 0.8]}>
+      <sprite ref={labelRef} scale={[0.8, 0.8, 0.8]}>
         <spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
       </sprite>
     </group>

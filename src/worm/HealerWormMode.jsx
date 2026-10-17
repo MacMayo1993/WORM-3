@@ -81,6 +81,7 @@ import { wormBuffs } from './wormBuffs.js';
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { HealerBombs } from './healerWorm/HealerBombs.jsx';
+import { subscribeBombRotations } from './healerWorm/bombRotation.js';
 import { randomFreeTile } from './healerWorm/surfaceTiles.js';
 import {
     BOMB_FUSE_SECONDS,
@@ -477,6 +478,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // can notice the change without serialising the id list every frame.
     const bombMembershipRef = useRef(0);
     const demoHazardAttemptRef = useRef(null);
+
+    useEffect(() => subscribeBombRotations(useGameStore, bombsRef), []);
 
     useEffect(() => {
         setWormTurnCallback(worm.queueTurn);
