@@ -101,3 +101,29 @@
 @keyframes orb-slot-in { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes orb-slot-bump { 40% { transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .orb-reserve .orb-slot, .orb-slot-pickup { animation: none; } }
+
+/* Session menu pages (TopMenuBar): round keys like WORM's pause card, a back
+   header on Settings and Cube, and a wider panel for the Cube page's previews. */
+.instrument-menu-panel { --cube-look-pad-top:18px; --cube-look-pad-x:18px; --cube-look-card:var(--hud-surface);
+  --cube-look-accent:var(--hud-active); --cube-look-accent-ink:var(--hud-text); }
+.instrument-menu-panel.is-cube { width:min(440px, calc(100vw - 28px)); }
+.instrument-menu-panel .instrument-stats { margin:4px 0 10px; }
+.instrument-menu-panel .instrument-stats > div { padding:5px 0; }
+.instrument-session-keys { display:flex; justify-content:center; gap:8px; margin:4px 0 10px; }
+.instrument-session-key { display:flex; flex-direction:column; align-items:center; gap:4px; width:64px; padding:0; border:0; background:none; color:var(--hud-text); cursor:pointer;
+  font:800 10px/1.1 var(--heading-font,inherit); letter-spacing:.05em; text-transform:uppercase; }
+.instrument-session-key > svg { box-sizing:content-box; padding:11px; border:2px solid var(--hud-ink); border-radius:50%; background:var(--hud-raised);
+  box-shadow:0 4px 0 var(--hud-ink); transition:transform .08s, box-shadow .08s; }
+.instrument-session-key:active:not(:disabled) > svg { transform:translateY(3px); box-shadow:0 1px 0 var(--hud-ink); }
+.instrument-session-key[aria-pressed="false"] > svg { background:var(--hud-inset); color:var(--hud-muted); }
+.instrument-session-key:disabled { opacity:.45; cursor:default; }
+.instrument-hud .instrument-session-key:focus-visible { outline:none; }
+.instrument-hud .instrument-session-key:focus-visible > svg { outline:3px solid #2774ad; outline-offset:3px; }
+.instrument-page-head { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+.instrument-page-head h2 { margin:0; font:400 18px/1.1 var(--display-font,'Bungee',sans-serif); text-transform:uppercase; color:var(--hud-text); }
+.instrument-back { display:grid; place-items:center; width:44px; height:44px; flex:none; padding:0; border:2px solid var(--hud-ink); border-radius:50%;
+  background:var(--hud-raised); color:var(--hud-text); box-shadow:0 3px 0 var(--hud-ink); cursor:pointer; }
+.instrument-back:active { transform:translateY(2px); box-shadow:0 1px 0 var(--hud-ink); }
+.instrument-all-settings { width:100%; min-height:44px; padding:10px 12px; background:var(--hud-raised); color:var(--hud-text); border:2px solid var(--hud-border); border-radius:16px;
+  box-shadow:0 4px 0 var(--hud-border), inset 0 2px 0 #fff; font:800 13px/1.2 var(--heading-font,inherit); cursor:pointer; }
+.instrument-loading { margin:16px 0; color:var(--hud-muted); font-size:13px; }

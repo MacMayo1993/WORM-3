@@ -112,7 +112,7 @@ it('opens Cube as a page with the colours, tiles and scene, and Back returns to 
   act(() => host.querySelector('[aria-label="Pause"]').click());
   await act(async () => {
     key('Cube').click();
-    await import('../worm/PauseCubeSettings.jsx');
+    await import('../components/menus/settings/CubeLookSettings.jsx');
   });
   await act(async () => {});
   const card = host.querySelector('.worm-pause-card');

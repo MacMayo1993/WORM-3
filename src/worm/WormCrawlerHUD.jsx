@@ -1077,8 +1077,8 @@ function SignatureGuide() {
 // row of numbers and the objective. Settings holds how the game plays (sound,
 // buzz, quests, speed, turns, horizon, camera distance, the inspection tools);
 // Cube holds how the cube looks (the Settings sheet's own Colors, Tiles and Scene
-// panels, PauseCubeSettings.jsx). Escape steps back a page, then resumes.
-const PauseCubeSettings = React.lazy(() => import('./PauseCubeSettings.jsx'));
+// panels, CubeLookSettings.jsx). Escape steps back a page, then resumes.
+const CubeLookSettings = React.lazy(() => import('../components/menus/settings/CubeLookSettings.jsx'));
 
 const PAUSE_ICONS = {
     restart: <path d="M5 12a7 7 0 1 0 2-5M5 4v4h4" />,
@@ -1235,7 +1235,7 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
                 {page === 'cube' && <>
                     <PausePageHeader title="Cube" onBack={back} />
                     <React.Suspense fallback={<p className="worm-pause-loading">Loading…</p>}>
-                        <PauseCubeSettings />
+                        <CubeLookSettings idPrefix="worm-pause" />
                     </React.Suspense>
                 </>}
             </div>
