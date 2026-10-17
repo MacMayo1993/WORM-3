@@ -14,8 +14,8 @@
  * the main thread is busy parsing; the paper and portals are 2D canvases (never
  * WebGL, which would compete with the app's R3F canvas for a context).
  *
- * It is also a toy (loadingPlay.js): the portals spring open as the cover
- * arrives, holding anywhere dives faster (every animation and both canvases
+ * It is also a toy (loadingPlay.js): holding anywhere dives faster
+ * (every animation and both canvases
  * speed up together, with speed lines round the shaft), a tap kicks the cube
  * into a spin and rings both portals, and MOBI keeps count of the loops with a
  * line every couple of them. The view tilts with the mouse, a finger held on

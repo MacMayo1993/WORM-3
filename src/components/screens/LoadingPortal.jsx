@@ -12,10 +12,9 @@
  *    swirling in, sticker confetti falling through, a worm riding the vortex
  *    out of the throat and back), the same tunnel through the portal hanging
  *    above, and the far halves of their lips. Both are seen from above, as the
- *    cube is, so it comes out from under the upper one's near lip exactly as it
- *    sinks behind the lower one's;
- *  - both portals' near lips, drawn over the cube to hide the cut lines as it
- *    comes out and goes in.
+ *    cube is; the exit rim stays behind the emerging cube, while the entrance
+ *    rim covers it as it sinks into the floor;
+ *  - the floor portal's near lip and both glowing cut lines, over the cube.
  *
  * The portals sit wherever LoadingScene's `.wl-well` elements are, so the cube's
  * CSS fall, shadow and ripple always line up with them. Time is read from the
@@ -26,9 +25,8 @@
  * flat, unmoving sheet.
  *
  * `playRef` holds the cover's play controller (loadingPlay.js): each frame it is
- * stepped first, then its dive and kick shape the drawing — the portals spring
- * open as the cover arrives, a kick rings both and gives the vortex an extra
- * turn, and a dive brightens the vortex arms and winds the paper tighter.
+ * stepped first, then its dive and kick shape the drawing — a kick rings both
+ * portals and gives the vortex an extra turn, and a dive brightens the vortex arms and winds the paper tighter.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -52,7 +50,7 @@ import {
   spinAngle,
   wormPose
 } from './loadingWormhole.js';
-import { KICK, OPEN, TILT, portalOpen } from './loadingPlay.js';
+import { KICK, TILT } from './loadingPlay.js';
 
 const TAU = Math.PI * 2;
 const INK = '#26372d';
@@ -62,7 +60,7 @@ const ARMS = 12;
 const SWIRL = 2.6; // how far an arm winds between rim and throat, radians
 const RIM = 0.045; // half the lip's width, as a fraction of the mouth
 const STILL_TIME = 2.8; // the reduced-motion frame: between passes, worm half out
-const PAPER_INTERVAL = 30; // ms between paper redraws: every other frame at 60Hz
+const PAPER_INTERVAL = 1000 / 24; // The slow paper drift needs fewer redraws than the cube.
 // The paper canvas overhangs the screen by this much (LoadingScene.css), so a
 // tilt can slide it without showing an edge.
 const PAPER_PAD = 16;
@@ -349,7 +347,7 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true, boost = 0) {
 
 // ── The lip: a toy-bright ring of the six sticker colours, turning with the vortex.
 // 'back' and 'front' name the far (upper) and near (lower) screen-space arcs.
-// Each portal draws its back arc behind the cube and its front arc over it.
+// The exit draws both arcs behind the cube; only the entrance's near arc covers it.
 function drawRim(ctx, well, spin, pulse, half) {
   const { cx, cy, a, b } = well;
   const outer = [a * (1 + RIM), b * (1 + RIM)];
@@ -428,14 +426,6 @@ function drawMembrane(ctx, well, cutPx, strength) {
   }
 }
 
-// Scale a measured mouth about its centre as it springs open; null while shut.
-function opened(well, open) {
-  if (!well || open < 0.02) return null;
-  well.a *= open;
-  well.b *= open;
-  return well;
-}
-
 // The fall's CSS animation, whose clock the portals keep. Null where the
 // browser has no Web Animations API or the fall does not run (reduced motion).
 function fallAnimation(el) {
@@ -494,6 +484,8 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     let cubePx = 0; // the cube's size, for the depth of the portals' cut
     const paperWell = { cx: 0, cy: 0, a: 1, b: 1 };
     let paperKey = '';
+    let top = null;
+    let well = null;
 
     const measure = (ref, box) => {
       const rect = ref?.current?.getBoundingClientRect();
@@ -507,8 +499,8 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       play?.frame(t, now);
       // The tilt: the portals' canvases slide with the scene (so the mouths stay
       // on the shaft's cut lines), the paper slides less, and the throats lean
-      // the other way inside their mouths. Written before measuring, so the
-      // canvas and the scene it is measured against have moved together.
+      // the other way inside their mouths. The canvas and scene move together,
+      // so their cached relative bounds stay valid.
       const tx = play?.tiltX ?? 0;
       const ty = play?.tiltY ?? 0;
       if (play?.tiltMoved) {
@@ -517,9 +509,9 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         frontCanvas.style.transform = near;
         paperCanvas.style.transform = tx || ty ? `translate3d(${(-tx * TILT.far).toFixed(2)}px, ${(-ty * TILT.far).toFixed(2)}px, 0)` : '';
       }
-      const box = canvas.getBoundingClientRect();
-      const top = opened(measure(topRef, box), reduced ? 1 : portalOpen(t));
-      const well = opened(measure(wellRef, box), reduced ? 1 : portalOpen(t, OPEN.floorDelay));
+      // Keep the canvas mouths the same size as the CSS stand-ins and shaft
+      // cuts from their first frame. Springing only the canvases open made the
+      // first fall visibly pass through a moving, mismatched portal.
       const kick = play?.kick ?? 0;
       const boost = Math.max(play?.warp ?? 0, kick);
       const pulse = reduced ? 0 : Math.max(passPulse(t), kick);
@@ -558,6 +550,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         drawKickRing(ctx, top, kickSince, play?.kicks ?? 0);
         drawFunnel(ctx, top, t, spin, pulse, false, boost);
         drawRim(ctx, top, spin, pulse, 'back');
+        drawRim(ctx, top, spin, pulse, 'front');
       }
       if (well) {
         drawKickRing(ctx, well, kickSince, play?.kicks ?? 0);
@@ -565,10 +558,8 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
-      // Over the cube: both near lips, and each portal's surface lit where the
-      // cube is breaking through it (the floor's from the second fall, once
-      // something has gone into it).
-      if (top) drawRim(front, top, spin, pulse, 'front');
+      // The upper rim must stay BEHIND the exiting cube. Only the floor's
+      // near lip covers it; both cut lines can glow over the breaking surface.
       if (well) drawRim(front, well, spin, pulse, 'front');
       if (!reduced) {
         if (!cubePx) cubePx = fallRef?.current?.offsetHeight ?? 0;
@@ -581,7 +572,18 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Read layout on resize/font changes, never after writing tilt transforms
+      // in every animation frame. Cube and canvases translate by the same amount.
+      top = measure(topRef, rect);
+      well = measure(wellRef, rect);
+      cubePx = 0;
+      const nextDpr = Math.min(2, window.devicePixelRatio || 1);
+      if (W === rect.width && H === rect.height && dpr === nextDpr) {
+        paperKey = null;
+        if (reduced) draw(STILL_TIME, performance.now());
+        return;
+      }
+      dpr = nextDpr;
       W = rect.width;
       H = rect.height;
       for (const layer of [canvas, frontCanvas]) {
@@ -591,12 +593,13 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * dpr));
       paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * dpr));
       paperKey = null; // resizing blanked the paper
-      cubePx = 0; // and may have resized the cube
       if (reduced) draw(STILL_TIME, performance.now());
     };
     resize();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
     observer?.observe(canvas);
+    if (sceneRef?.current) observer?.observe(sceneRef.current);
+    document.fonts?.addEventListener?.('loadingdone', resize);
     if (!observer) window.addEventListener('resize', resize);
 
     let still = 0;
@@ -618,6 +621,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       cancelAnimationFrame(raf);
       window.clearInterval(still);
       observer?.disconnect();
+      document.fonts?.removeEventListener?.('loadingdone', resize);
       if (!observer) window.removeEventListener('resize', resize);
     };
   }, [sceneRef, fallRef, wellRef, topRef, playRef, translucent]);
