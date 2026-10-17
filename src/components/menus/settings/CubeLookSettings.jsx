@@ -44,7 +44,11 @@ export default function CubeLookSettings({ idPrefix = 'cube-look' }) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     const i = TABS.findIndex((t) => t.id === tab);
-    setTab(TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id);
+    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length].id;
+    setTab(next);
+    // Roving tabindex: focus follows the selection, so the new tab is announced
+    // and the old one (now tabIndex -1) does not keep it.
+    e.currentTarget.querySelector(`#${idPrefix}-tab-${next}`)?.focus();
   };
 
   const panelId = `${idPrefix}-tabpanel`;

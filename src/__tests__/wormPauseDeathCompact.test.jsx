@@ -119,6 +119,16 @@ it('opens Cube as a page with the colours, tiles and scene, and Back returns to 
   expect(card.classList.contains('is-cube')).toBe(true);
   expect([...card.querySelectorAll('[role="tab"]')].map((t) => t.textContent)).toEqual(['Colors', 'Tiles', 'Scene']);
   expect(card.textContent).toContain('Color scheme');
+  // Arrow keys move the selection and the focus together (roving tabindex).
+  const tabs = () => [...card.querySelectorAll('[role="tab"]')];
+  tabs()[0].focus();
+  act(() => tabs()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
+  expect(document.activeElement).toBe(tabs()[1]);
+  act(() => tabs()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+  act(() => tabs()[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+  expect(document.activeElement).toBe(tabs()[2]);
+  expect(tabs()[2].getAttribute('tabindex')).toBe('0');
   act(() => host.querySelector('[aria-label="Back to pause menu"]').click());
   expect(host.querySelector('.worm-pause-card').classList.contains('is-main')).toBe(true);
 });
