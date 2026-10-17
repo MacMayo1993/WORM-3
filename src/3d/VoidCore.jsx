@@ -26,7 +26,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { resolveColors } from '../utils/colorSchemes.js';
+import { resolveCubeViewAppearance } from './cubeViewAppearance.js';
 import { isMobile } from '../utils/device.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
@@ -69,11 +69,12 @@ function VoidCore({ cubieRefs = null }) {
   const settings = useGameStore(s => s.settings);
   const visualMode = useGameStore(s => s.visualMode);
   const wormViewPower = useGameStore(s => s.wormViewPower);
-  const mode = (wormMode ? getViewPowerDef(wormViewPower)?.view : null) ?? visualMode;
+  const activeViewPower = wormMode ? wormViewPower : null;
+  const mode = getViewPowerDef(activeViewPower)?.view ?? visualMode;
 
-  const faceColors = useMemo(
-    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
-    [settings]
+  const { colors: faceColors, manifoldStyles } = useMemo(
+    () => resolveCubeViewAppearance(settings, activeViewPower),
+    [settings, activeViewPower]
   );
   const layout = useMemo(() => coreLayout(size), [size]);
   const stickerAt = useMemo(
@@ -132,7 +133,7 @@ function VoidCore({ cubieRefs = null }) {
   const appearances = useMemo(() => {
     const byColor = new Map();
     for (let id = 1; id <= 6; id++) {
-      const style = mode === 'glass' ? 'glass' : settings?.manifoldStyles?.[id] || 'solid';
+      const style = mode === 'glass' ? 'glass' : manifoldStyles?.[id] || 'solid';
       if (style === 'solid') continue;
       const key = `${id}-${style}`;
       byColor.set(id, {
@@ -143,7 +144,7 @@ function VoidCore({ cubieRefs = null }) {
       });
     }
     return byColor;
-  }, [settings, mode, faceColors, size, passage]);
+  }, [manifoldStyles, mode, faceColors, size, passage]);
   useEffect(() => () => appearances.forEach(b => { b.geometry.dispose(); b.material.dispose(); }), [appearances]);
   const styled = useMemo(() => {
     const groups = new Map(), slots = new Set();
