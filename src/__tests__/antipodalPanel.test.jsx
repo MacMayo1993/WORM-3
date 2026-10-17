@@ -41,3 +41,44 @@ it('hides for Capture or tunnel/settings UI and restores the panel when enabled 
   render(false); expect(antipodalViewport.rect).toBeNull();
   render(true); expect(antipodalViewport.rect).not.toBeNull();
 });
+it('ignores moving cube bounds and HUD updates until the player changes the dock', () => {
+  render(true);
+  const panel = host.querySelector('section'), first = panel.style.cssText;
+  for (const cube of [
+    { x: 0, y: 0, width: 1, height: 1 },
+    { x: 0.6, y: 0, width: 0.4, height: 0.8 },
+    null,
+  ]) {
+    antipodalViewport.cube = cube;
+    act(() => vi.advanceTimersByTime(1000));
+    expect(panel.style.cssText).toBe(first);
+    expect(host.querySelector('[aria-expanded]').getAttribute('aria-expanded')).toBe('true');
+  }
+  click('Move far-side camera');
+  expect(panel.style.cssText).not.toBe(first);
+});
+it('keeps an automatically folded camera closed when space clears and after a tunnel or menu', () => {
+  antipodalViewport.cube = { x: 0, y: 0, width: 1, height: 1 };
+  render(true);
+  const first = host.querySelector('section').style.cssText;
+  expect(host.querySelector('[aria-expanded]').getAttribute('aria-expanded')).toBe('false');
+  antipodalViewport.cube = null;
+  act(() => vi.advanceTimersByTime(1000));
+  render(false); render(true);
+  expect(host.querySelector('section').style.cssText).toBe(first);
+  expect(antipodalViewport.rect).toBeNull();
+  expect(host.querySelector('[aria-expanded]').getAttribute('aria-expanded')).toBe('false');
+  click('Move far-side camera');
+  expect(host.querySelector('[aria-expanded]').getAttribute('aria-expanded')).toBe('false');
+  click('Expand far-side camera');
+  expect(antipodalViewport.rect).not.toBeNull();
+});
+it('preserves a manually moved open camera through temporary hiding even if cube bounds change', () => {
+  render(true); click('Move far-side camera');
+  const first = host.querySelector('section').style.cssText;
+  render(false);
+  antipodalViewport.cube = { x: 0, y: 0, width: 1, height: 1 };
+  render(true);
+  expect(host.querySelector('section').style.cssText).toBe(first);
+  expect(antipodalViewport.rect).not.toBeNull();
+});

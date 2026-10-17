@@ -28,14 +28,36 @@ it('keeps a valid position stable, moves corners on request, and respects safe a
   const moved = placeAntipodalPanel({ ...args, corner: 2 });
   expect(moved.x).toBe(20); expect(moved.y + moved.height).toBe(765);
 });
-it('moves around growing lesson text and hides if a dialog leaves no room even for a tab', () => {
+it('keeps an established dock fixed when lesson text changes, but avoids it during initial placement', () => {
   const args = { width: 390, height: 844, obstacles: [rect(0, 0, 390, 80)] };
   const first = placeAntipodalPanel(args);
   const lesson = rect(10, 86, 370, 420);
   const next = placeAntipodalPanel({ ...args, obstacles: [...args.obstacles, lesson], previous: first });
-  expect(overlapArea(next, lesson)).toBe(0);
-  expect(next.y).toBeGreaterThan(first.y);
+  expect(next).toEqual(first);
+  const initial = placeAntipodalPanel({ ...args, obstacles: [...args.obstacles, lesson] });
+  expect(overlapArea(initial, lesson)).toBe(0);
   expect(placeAntipodalPanel({ ...args, obstacles: [rect(0, 0, 390, 844)] })).toBeNull();
+});
+it('does not fold or reopen an established panel as the cube moves', () => {
+  const args = { width: 390, height: 844 };
+  const open = placeAntipodalPanel(args);
+  const cube = rect(0, 0, 390, 844);
+  expect(placeAntipodalPanel({ ...args, cube, previous: open })).toEqual(open);
+  const folded = placeAntipodalPanel({ ...args, cube });
+  expect(folded.compact).toBe(true);
+  expect(placeAntipodalPanel({ ...args, previous: folded })).toEqual(folded);
+});
+it('clamps an existing dock within a resized viewport and its safe areas without reopening it', () => {
+  for (const compact of [false, true]) {
+    const previous = placeAntipodalPanel({ width: 1200, height: 900, compact, corner: 1 });
+    const next = placeAntipodalPanel({ width: 320, height: 240, previous,
+      insets: { left: 20, right: 30, top: 25, bottom: 15 } });
+    expect(next.compact).toBe(compact);
+    expect(next.x).toBeGreaterThanOrEqual(30);
+    expect(next.y).toBeGreaterThanOrEqual(35);
+    expect(next.x + next.width).toBeLessThanOrEqual(280);
+    expect(next.y + next.height).toBeLessThanOrEqual(215);
+  }
 });
 it('aligns an offset DOM window with the CSS-pixel scissor without double-applying DPR', () => {
   expect(antipodalScissor(rect(230, 100, 180, 135), rect(30, 20, 800, 600), 800, 600))

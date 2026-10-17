@@ -20,7 +20,9 @@ export default function AntipodalCameraPanel({ active }) {
 
   useEffect(() => {
     antipodalViewport.rect = null;
-    if (!enabled) { previous.current = null; setPlacement(null); return; }
+    // Temporary tunnel/menu hiding must not discard the user's dock or reopen a
+    // panel that was folded to fit the screen before the interruption.
+    if (!enabled) { setPlacement(null); return; }
     const measure = () => {
       const canvas = document.querySelector('.canvas-container canvas');
       if (!canvas) return;
@@ -42,13 +44,14 @@ export default function AntipodalCameraPanel({ active }) {
       if (JSON.stringify(next) !== JSON.stringify(previous.current)) {
         antipodalViewport.rect = null; // Never render into the frame's old position.
         previous.current = next;
-        setPlacement(next);
       }
+      setPlacement(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
     };
     measure();
-    const timer = setInterval(measure, 250);
     window.addEventListener('resize', measure);
-    return () => { clearInterval(timer); window.removeEventListener('resize', measure); antipodalViewport.rect = null; };
+    // Gameplay moves the cube and HUD continuously. Only initial placement,
+    // explicit panel controls and viewport resizing may change this dock.
+    return () => { window.removeEventListener('resize', measure); antipodalViewport.rect = null; };
   }, [enabled, preference]);
 
   useLayoutEffect(() => {
@@ -79,7 +82,7 @@ export default function AntipodalCameraPanel({ active }) {
             setPreference(p => ({ ...p, compact: !folded, expanded: folded }));
           }}><span aria-hidden="true">{folded ? '＋' : '−'}</span> Far side</button>
         <button type="button" className="antipodal-panel-move" aria-label="Move far-side camera" title="Move to another corner"
-          onClick={() => { previous.current = null; setPreference(p => ({ ...p, corner: (p.corner + 1) % 4 })); }}>
+          onClick={() => { previous.current = null; setPreference(p => ({ ...p, compact: folded, expanded: !folded, corner: (p.corner + 1) % 4 })); }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6" /></svg>
         </button>
       </div>
