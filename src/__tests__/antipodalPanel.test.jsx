@@ -5,7 +5,7 @@ import AntipodalCameraPanel from '../components/overlays/AntipodalCameraPanel.js
 import { antipodalViewport } from '../3d/antipodalViewport.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 let root, host, canvasHost;
-const render = active => act(() => root.render(<AntipodalCameraPanel active={active} />));
+const render = (active, resting) => act(() => root.render(<AntipodalCameraPanel active={active} resting={resting} />));
 const click = label => act(() => host.querySelector(`[aria-label="${label}"]`).click());
 beforeEach(() => {
   vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -40,4 +40,14 @@ it('hides for Capture or tunnel/settings UI and restores the panel when enabled 
   act(() => useGameStore.setState({ captureMode: false })); expect(antipodalViewport.rect).not.toBeNull();
   render(false); expect(antipodalViewport.rect).toBeNull();
   render(true); expect(antipodalViewport.rect).not.toBeNull();
+});
+it('rests through a tunnel ride instead of disappearing, and draws again after it', () => {
+  render(true); const open = { ...antipodalViewport.rect };
+  render(true, true);
+  expect(host.querySelector('section')).not.toBeNull();
+  expect(host.querySelector('.antipodal-panel-view').textContent).toBe('Back after the tunnel');
+  expect(antipodalViewport.rect).toBeNull();
+  render(true, false);
+  expect(antipodalViewport.rect).toEqual(open);
+  expect(host.querySelector('.antipodal-panel-view').textContent).toBe('');
 });
