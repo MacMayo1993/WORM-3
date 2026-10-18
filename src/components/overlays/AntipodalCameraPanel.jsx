@@ -11,10 +11,13 @@ const rectOf = element => {
 };
 const stop = e => e.stopPropagation();
 
-export default function AntipodalCameraPanel({ active }) {
+// `resting` keeps the window on screen without a picture while the far side has
+// nothing to show (a WORM tunnel ride, where the tunnel camera takes over), so
+// the view the player turned on never vanishes and reappears on its own.
+export default function AntipodalCameraPanel({ active, resting = false }) {
   const capture = useGameStore(s => s.captureMode);
   const enabled = active && !capture;
-  const [preference, setPreference] = useState({ compact: false, expanded: false, corner: 0 });
+  const [preference, setPreference] = useState({ compact: false, corner: 0 });
   const [placement, setPlacement] = useState(null);
   const previous = useRef(null), view = useRef(null), safeArea = useRef(null);
 
@@ -52,7 +55,7 @@ export default function AntipodalCameraPanel({ active }) {
   }, [enabled, preference]);
 
   useLayoutEffect(() => {
-    if (!enabled || !placement || placement.compact) { antipodalViewport.rect = null; return; }
+    if (!enabled || resting || !placement || placement.compact) { antipodalViewport.rect = null; return; }
     const canvas = document.querySelector('.canvas-container canvas');
     const measure = () => {
       antipodalViewport.rect = view.current && rectOf(view.current);
@@ -64,7 +67,7 @@ export default function AntipodalCameraPanel({ active }) {
     if (canvas) observer?.observe(canvas);
     window.addEventListener('resize', measure);
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); antipodalViewport.rect = null; };
-  }, [enabled, placement]);
+  }, [enabled, resting, placement]);
 
   if (!enabled) return null;
   const folded = placement?.compact ?? true;
@@ -76,14 +79,18 @@ export default function AntipodalCameraPanel({ active }) {
         <button type="button" className="antipodal-panel-toggle" aria-expanded={!folded} aria-controls="antipodal-camera-view"
           aria-label={folded ? 'Expand far-side camera' : 'Collapse far-side camera'} onClick={() => {
             previous.current = null;
-            setPreference(p => ({ ...p, compact: !folded, expanded: folded }));
+            setPreference(p => ({ ...p, compact: !folded }));
           }}><span aria-hidden="true">{folded ? '＋' : '−'}</span> Far side</button>
         <button type="button" className="antipodal-panel-move" aria-label="Move far-side camera" title="Move to another corner"
           onClick={() => { previous.current = null; setPreference(p => ({ ...p, corner: (p.corner + 1) % 4 })); }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6" /></svg>
         </button>
       </div>
-      <div className="antipodal-panel-mat" hidden={folded}><div ref={view} id="antipodal-camera-view" className="antipodal-panel-view" /></div>
+      <div className="antipodal-panel-mat" hidden={folded}>
+        <div ref={view} id="antipodal-camera-view" className={`antipodal-panel-view${resting ? ' is-resting' : ''}`}>
+          {resting && <span>Back after the tunnel</span>}
+        </div>
+      </div>
     </section>}
   </>;
 }

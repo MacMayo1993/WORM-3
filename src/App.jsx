@@ -507,7 +507,9 @@ export default function WORM3() {
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
-  const showAntipodalFrame = !showWelcome && !showMainMenu && !showSettings && !showHelp && showAntipodalPiP && !wormholePhaseActive;
+  // A tunnel ride rests the far-side window rather than removing it: the tunnel
+  // camera takes over the view, but the window the player turned on stays put.
+  const showAntipodalFrame = !showWelcome && !showMainMenu && !showSettings && !showHelp && showAntipodalPiP;
 
   // Page visibility — the shared Canvas parks its render loop while the app is
   // backgrounded (tab switched, screen off, another app on top). The scene is
@@ -1473,7 +1475,7 @@ export default function WORM3() {
       </CanvasErrorBoundary>
 
       <CaptureChrome>
-      <AntipodalCameraPanel active={showAntipodalFrame} />
+      <AntipodalCameraPanel active={showAntipodalFrame} resting={wormholePhaseActive} />
 
       {/* Welcome DOM overlay — transparent background, Canvas shows through */}
       {showWelcome && (

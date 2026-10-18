@@ -17,3 +17,4 @@
 .antipodal-panel-move { width: 36px; display: grid; place-items: center; }
 .antipodal-panel-mat { border: 6px solid var(--hud-raised); border-top-width: 4px; }
 .antipodal-panel-view { aspect-ratio: 4 / 3; }
+.antipodal-panel-view.is-resting { display: grid; place-items: center; background: var(--hud-inset); color: var(--hud-muted); font: 700 12px/1.2 var(--ui-font, sans-serif); text-align: center; }
