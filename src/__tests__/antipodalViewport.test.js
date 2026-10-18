@@ -40,6 +40,16 @@ it('holds an open window still while the camera moves the cube under it', () => 
   // And when the text goes, it stays where it went instead of snapping back.
   expect(placeAntipodalPanel({ ...args, cube: rect(0, 60, 1000, 740), previous: moved })).toBe(moved);
 });
+it('stays folded after running out of room until the player expands it', () => {
+  const args = { width: 390, height: 844, obstacles: [rect(0, 0, 390, 80)] };
+  const open = placeAntipodalPanel(args);
+  const crowded = placeAntipodalPanel({ ...args, obstacles: [...args.obstacles, rect(0, 200, 390, 580)], previous: open });
+  expect(crowded.compact).toBe(true);
+  // The dialog goes: the window does not reopen by itself.
+  expect(placeAntipodalPanel({ ...args, previous: crowded }).compact).toBe(true);
+  // The player's expand clears `previous`, and it opens.
+  expect(placeAntipodalPanel({ ...args, previous: null }).compact).toBe(false);
+});
 it('keeps a valid position stable, moves corners on request, and respects safe areas', () => {
   const args = { width: 1000, height: 800, insets: { top: 30, right: 20, bottom: 25, left: 10 } };
   const first = placeAntipodalPanel(args);

@@ -9,7 +9,7 @@ const pad = (r, n) => ({ x: r.x - n, y: r.y - n, width: r.width + 2 * n, height:
 // the cube, but the cube moves with the camera every frame, so it never folds
 // the window or chases it round the corners: an open window holds its spot
 // while that spot still fits, moves only when HUD text or a dialog lands on it,
-// and folds only when no open spot fits at all.
+// and folds only when no open spot fits at all, staying folded after that.
 export function placeAntipodalPanel({ width, height, obstacles = [], cube = null, compact = false, corner = 0, previous = null, insets = {} }) {
   const left = 10 + (insets.left || 0), top = 10 + (insets.top || 0);
   const right = width - 10 - (insets.right || 0), bottom = height - 10 - (insets.bottom || 0);
@@ -36,7 +36,10 @@ export function placeAntipodalPanel({ width, height, obstacles = [], cube = null
     }
     return best;
   }
-  if (!compact) {
+  // A fold forced by a lack of room also stays until the player expands it (the
+  // panel clears `previous` on that press), or the window would reopen itself
+  // the moment the text that crowded it out went away.
+  if (!compact && !previous?.compact) {
     const sizes = width < 600 || height < 500 ? [168, 148] : [208, 168, 148];
     // A spot clear of the cube at any size first; then the one covering least.
     for (const clear of [true, false]) {
