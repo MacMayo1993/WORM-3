@@ -66,6 +66,7 @@ function exhausted(id) {
 it.each(WORM_STORY_LEVELS.filter(l => l.mechanics?.selfPasses || l.mechanics?.multiHeals || l.mechanics?.ringHeals).map(l => l.id))(
   'level %i supplies repeated missed-task attempts and stops when tasks are earned', id => {
     const { p, state, size, seal, refill } = exhausted(id);
+    if (p.traversalTarget) p.tunnels = new Set(Array.from({ length: p.traversalTarget }, (_, i) => `crossed-${i}`));
     for (let attempt = 0; attempt < 3; attempt++) {
       expect(refill()).not.toBeNull(); expect(refill()).not.toBeNull();
       expect(getActiveTunnels(state.cubies, size)).toHaveLength(2);

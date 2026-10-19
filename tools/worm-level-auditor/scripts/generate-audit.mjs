@@ -38,20 +38,28 @@ const records=WORM_STORY_LEVELS.map(level=>{
   const initialOrbs=sim.powerups.length;
   assert.equal(new Set(sim.powerups.map(tileKey)).size,initialOrbs);
   const colorCount=Object.keys(p.orbTargets).length;assert.equal(colorCount,6);
+  const required=[];
+  for(let i=0;i<24;i++){const type=nextStoryPower(p,level);if(!type)break;required.push(type);p.lastPower=type;}
+  p.lastPower=null;
+  p.viewOffered=true;
   const offered=[];let magnetReach=null;
   for(let i=0;i<24;i++){
-   sim.specials=[];p.powerDelay=0;
+   sim.specials=[];p.powerDelay=0;p.elementSupplyDelay=0;
    const type=nextStoryPower(p,level);if(!type)break;
    assert.equal(offerStoryPower(sim,p,level,level.cubeSize,p.cubies),true,'Power placement failed level '+level.id);
-   assert.equal(sim.specials[0].type,type);
+   // A head or tunnel can occupy a face center; the missing element rotates
+   // to the front of the next pulse, so check coverage across repeated offers.
    if(type==='magnet'){
     const orb=sim.specials[0], reach=collectManifoldRing(orb.x,orb.y,orb.z,orb.dirKey,level.cubeSize,MAGNET_RADIUS);
     magnetReach=sim.powerups.filter(o=>reach.has(tileKey(o))&&tileKey(o)!==tileKey(orb)).length;
    }
-   offered.push(type);
+   offered.push(...sim.specials.filter(orb=>!orb.storyBonus).map(orb=>orb.type));
   }
-  const powerCycle=[...new Set(offered)];
-  assert.deepEqual(offered,powerCycle.length?Array.from({length:24},(_,i)=>powerCycle[i%powerCycle.length]):[]);
+  const powerCycle=[...new Set(required)];
+  assert(powerCycle.every(type=>offered.includes(type)),'Missing required power level '+level.id);
+  // Element goals supply all six center choices together; other quest powers
+  // retain their recurring cycle. The inventory, rather than only its first
+  // item, is the supply used by the objective audit.
   sim.specials=[];sim.powerups=[];p.orbRefillDelay=0;
   const added=replenishStoryOrbs(sim,p,{cubies:p.cubies},level.cubeSize,0.1);
   const refillColorCount=new Set(sim.powerups.map(o=>p.cubies[o.x][o.y][o.z].stickers[o.dirKey].orig)).size;

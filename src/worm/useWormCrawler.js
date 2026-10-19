@@ -214,7 +214,7 @@ export function useWormCrawler(size, cubies) {
             allowRingHeal: () => {
                 const level = storyLevel(useGameStore.getState().wormStoryLevel);
                 const p = storyPracticeRef.current;
-                return level?.kind !== 'tunnel' && !(level?.mechanics?.signatures && simRef.current.healed >= level.target - 1 &&
+                return !(level?.mechanics?.signatures && simRef.current.healed >= level.target - 1 &&
                     (p?.mechanics.signatures ?? 0) < level.mechanics.signatures);
             },
             allowTunnelHeal: () => {
