@@ -7,8 +7,8 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { ANTIPODAL_COLOR, FACE_COLORS, SURFACE_OFFSET } from '../../utils/constants.js';
-import { resolveColors } from '../../utils/colorSchemes.js';
+import { ANTIPODAL_COLOR, SURFACE_OFFSET } from '../../utils/constants.js';
+import { resolveCubeViewAppearance } from '../../3d/cubeViewAppearance.js';
 import { withPortalCutout } from '../../3d/portalCutout.js';
 import { makeInteriorPortals, syncInteriorPortals, interiorPortalGLSL } from './interiorPortals.js';
 import { prefersReducedMotion } from '../../utils/device.js';
@@ -110,26 +110,28 @@ export function TunnelInteriorView({ worm, size }) {
         const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
         syncInteriorPortals(portals, tunnel, size, expansion);
 
-        // Refresh batches only on cube, layout or equipped-style changes.
+        // Refresh on cube, layout, equipped styles, or a temporary view changing.
+        // Pickups can change while the same paused tunnel and cube stay mounted.
         const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
+        const viewPower = st.wormHealerMode ? st.wormViewPower : null;
         const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap
-            || materialSnapshot.current.layout !== stickerLayout;
+            || materialSnapshot.current.layout !== stickerLayout || materialSnapshot.current.viewPower !== viewPower;
         if (!st.wormPaused && !st.settings?.reducedMotion && !prefersReducedMotion()) portals.time.value += Math.min(delta, 0.05);
         const portalColors = portalColorSnapshot.current;
-        if (tunnel && (portalColors.tunnel !== tunnel || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings)) {
-            const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+        if (tunnel && (portalColors.tunnel !== tunnel || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings || portalColors.viewPower !== viewPower)) {
+            const { colors: fc } = resolveCubeViewAppearance(st.settings, viewPower);
             for (let side = 0; side < 2; side++) {
                 const cell = side === 0 ? tunnel.entry : tunnel.exit;
                 const sticker = st.cubies?.[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
                 portals.mouths[side].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
             }
-            portalColorSnapshot.current = { tunnel, cubies: st.cubies, settings: st.settings };
+            portalColorSnapshot.current = { tunnel, cubies: st.cubies, settings: st.settings, viewPower };
         }
         // Prepare hidden walls too: the run-start compile sees the exact portal
         // variant used on entry, instead of linking hundreds of tiles mid-dive.
         if (changed) {
-            tiles.sync(stickerLayout, st.cubies, st.settings, cap);
-            materialSnapshot.current = { cubies: st.cubies, settings: st.settings, cap, layout: stickerLayout };
+            tiles.sync(stickerLayout, st.cubies, st.settings, cap, viewPower);
+            materialSnapshot.current = { cubies: st.cubies, settings: st.settings, cap, layout: stickerLayout, viewPower };
         }
         if (groupRef.current) groupRef.current.visible = active;
         if (backingMatRef.current) backingMatRef.current.opacity = active ? 1 : 0;

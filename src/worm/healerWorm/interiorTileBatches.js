@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ANTIPODAL_COLOR, FACE_COLORS } from '../../utils/constants.js';
-import { resolveColors } from '../../utils/colorSchemes.js';
+import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { resolveCubeViewAppearance } from '../../3d/cubeViewAppearance.js';
 import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import { withPortalCutout } from '../../3d/portalCutout.js';
 import { interiorPortalGLSL } from './interiorPortals.js';
@@ -40,8 +40,8 @@ export function makeInteriorTileBatches(portals) {
   };
   return {
     group,
-    sync(layout, cubies, settings, cap) {
-      const colors = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+    sync(layout, cubies, settings, cap, viewPower = null) {
+      const { colors, manifoldStyles } = resolveCubeViewAppearance(settings, viewPower);
       for (const mesh of batches.values()) { mesh.count = 0; mesh.userData.tileKeys.length = 0; }
       for (const tile of layout) {
         const { sx, sy, sz, dirKey, px, py, pz, rx, ry, rz } = tile;
@@ -49,7 +49,7 @@ export function makeInteriorTileBatches(portals) {
         const face = ANTIPODAL_COLOR[sticker?.curr];
         if (!face) continue;
         const dead = sticker.flips >= cap;
-        const style = dead ? 'solid' : settings?.manifoldStyles?.[face] ?? 'solid';
+        const style = dead ? 'solid' : manifoldStyles?.[face] ?? 'solid';
         const source = getTileStyleMaterial(style, dead ? '#555555' : colors[face] ?? '#444',
           false, null, colors[ANTIPODAL_COLOR[face]] ?? '#ffffff');
         let mesh = batches.get(source);

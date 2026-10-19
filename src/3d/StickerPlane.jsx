@@ -14,7 +14,7 @@ import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { tileDisplayAngle, advanceTileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
 import { liveRotation } from '../worm/liveRotation.js';
-import { COLORS, FACE_COLORS, RUBIKS_FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
+import { COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -39,7 +39,7 @@ import NeuralVolume from './styles/NeuralVolume.jsx';
 import CircuitVolume from './styles/CircuitVolume.jsx';
 import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
-import { resolveColors } from '../utils/colorSchemes.js';
+import { resolveCubeViewAppearance } from './cubeViewAppearance.js';
 import FlipParticles from './FlipParticles.jsx';
 import FlipShockwave from './FlipShockwave.jsx';
 import FlipFlash from './FlipFlash.jsx';
@@ -257,8 +257,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const isNeon = mode === 'neon';
   const biomeEnabled = configuredBiome && !isChrome && !isNeon && !isClassicPickup;
   const flipPads = presentation ? settings?.flipPads : gameConfig.flipPads;
-  const fc = useMemo(
-    () => isClassicPickup ? RUBIKS_FACE_COLORS : resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
+  const { colors: fc, manifoldStyles } = useMemo(
+    () => resolveCubeViewAppearance(settings, isClassicPickup ? 'view-classic' : null),
     [settings, isClassicPickup]
   );
   // Chaos keeps the shared gameplay snap and crossing effects. Only the
@@ -267,7 +267,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const quietFlip = presentation?.flipAnimation === 'chaos';
   const chaosFlip = !presentation && chaosLevel > 0 && !wormHealerMode;
   const preserveFlipStyle = quietFlip || chaosFlip;
-  const manifoldStyles = isClassicPickup ? null : settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   // Same decision as selectEffectiveFlipCap, kept local because both inputs are
   // already in this component's batched subscription above.

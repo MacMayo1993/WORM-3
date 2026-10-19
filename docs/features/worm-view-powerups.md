@@ -6,7 +6,10 @@ elemental orb presentation and claim burst. Classic temporarily replaces level t
 patterns, face textures, and biome art with rounded glossy stickers in the six
 classic Rubik's colors and an opaque black plastic chassis. Live tile colors,
 rotations, tunnel mouths, and spent-tile indicators still follow gameplay; the
-previous palette and tile appearance return when the pickup expires.
+previous palette and tile appearance return when the pickup expires. The same
+override applies to tunnel wall backs, portal-mouth tints, the antipodal core,
+and its mirror tints; pickup changes refresh cached tunnel batches immediately,
+even while paused or before entering a tunnel.
 
 - Effects last 20 seconds of crawling. Pause, tunnel transit, and pickup reveals
   hold the timer. Another view replaces or refreshes it rather than stacking time.
