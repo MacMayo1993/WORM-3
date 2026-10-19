@@ -95,9 +95,10 @@ it.each(['wormPaused', 'animState'])('does not refill during %s', flag => {
   expect(h.refill()).not.toBeNull();
 });
 
-it('keeps traversal-only levels finite', () => {
+it('stops traversal-only replenishment after crossing credit is earned', () => {
   const h = setup(storyLevel(2));
   while (h.pairs().length) h.seal();
+  h.practice.tunnels = new Set(Array.from({ length: h.practice.traversalTarget }, (_, i) => `crossed-${i}`));
   h.practice.pendingMouths = [];
   expect(h.refill()).toBeNull();
 });

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { WORM_STORY_LEVELS } from '../../../src/worm/story/levels.js';
 import { stageStory, replenishStoryOrbs, replenishStoryTunnel } from '../../../src/worm/story/runtime.js';
 import { storyElementTypes } from '../../../src/worm/story/elementGoals.js';
-import { updateMastery, recordStoryMechanic, nextStoryPower, offerStoryPower } from '../../../src/worm/story/mastery.js';
+import { updateMastery, recordStoryMechanic, offerStoryPower, STORY_ELEMENTS } from '../../../src/worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../../../src/worm/healerWorm/wormSim.js';
-import { getActiveTunnels } from '../../../src/worm/wormLogic.js';
+import { getActiveTunnels, findStickerByStableKey } from '../../../src/worm/wormLogic.js';
+import { healSticker } from '../../../src/game/cubeState.js';
 import { buildManifoldGridMap, flipStickerPair } from '../../../src/game/manifoldLogic.js';
 import { rotateSliceCubies } from '../../../src/game/cubeRotation.js';
 import { orbCreditFace } from '../../../src/worm/healerWorm/economy.js';
@@ -15,11 +16,12 @@ import { assess } from '../web/audit.js';
 
 const data = JSON.parse(fs.readFileSync(new URL('../dist/data.json',import.meta.url)));
 const seeds = ['opening', 'dense', 'seams', 'recovery', 'sparse', 'repeat'];
-const totals = { seeds: seeds.length, stages: 0, powerOffers: 0, fullInventoryRestores: 0, rotatedRefills: 0, replacementPairs: 0, counterFixtures: 0 };
+const totals = { recoveryAttempts: 0, taskSupplyChecks: 0, seeds: seeds.length, stages: 0, powerOffers: 0, fullInventoryRestores: 0, rotatedRefills: 0, replacementPairs: 0, counterFixtures: 0 };
 const setup = (level, character, seed) => {
   resetLiveRotation(); const sim = makeWormSim(level.cubeSize);
   sim.rand = seededRandom(seed + ':' + level.id + ':' + character);
   const p = stageStory(sim, level.cubeSize, level, character);
+  p.viewOffered = true;
   // A run deals its elements at random; every deal relabels the same slots, so audit the authored one.
   if (p.elementOrder) p.elementOrder = [...storyElementTypes(level)];
   return { sim, p, state: { cubies: p.cubies, wormPaused: false, animState: null } };
@@ -31,7 +33,7 @@ const readColors = (sim, cubies) => sim.powerups.reduce((counts, orb) => {
 
 for (const level of WORM_STORY_LEVELS) {
   const record = data.records.find(r => r.config.id === level.id);
-  const evidence = { variationStages: 0, repeatedPowerOffers: 0, fullInventoryRestores: 0, rotatedRefills: 0, replacementPairs: 0, counters: [], findings: [] };
+  const evidence = { recoveryAttempts: 0, taskSupplyChecks: 0, variationStages: 0, repeatedPowerOffers: 0, fullInventoryRestores: 0, rotatedRefills: 0, replacementPairs: 0, counters: [], findings: [] };
   for (const character of ['glow', 'classic']) {
     const stage = record.stages[character];
     // Pickup bodies credit the antipode of the tile they sit on.
@@ -43,14 +45,17 @@ for (const level of WORM_STORY_LEVELS) {
       assert.equal(Object.keys(p.orbTargets).length, 6);
       if (stage.pickupBudget !== null) assert(opening <= stage.pickupBudget);
       evidence.variationStages++; totals.stages++;
+      const supplied = new Set();
       for (let i = 0; i < cycle.length * 3; i++) {
-        sim.specials = []; p.powerDelay = 0;
-        assert.equal(nextStoryPower(p, level), cycle[i % cycle.length]);
+        sim.specials = []; p.powerDelay = 0; p.elementSupplyDelay = 0;
         assert(offerStoryPower(sim, p, level, level.cubeSize, state.cubies));
-        assert.equal(sim.specials[0].type, cycle[i % cycle.length]);
+        for (const orb of sim.specials) supplied.add(orb.type);
+        assert(!sim.specials.some(orb => !cycle.includes(orb.type) && !STORY_ELEMENTS.includes(orb.type)));
+        assert.equal(new Set(sim.specials.map(tileKey)).size, sim.specials.length);
         assert(!sim.powerups.some(orb => tileKey(orb) === tileKey(sim.specials[0])));
         evidence.repeatedPowerOffers++; totals.powerOffers++;
       }
+      assert(cycle.every(type => supplied.has(type)), `level ${level.id}: recurring power coverage`);
       sim.specials = []; sim.powerups = [];
       for (let pulse = 0; pulse < Math.max(...Object.values(p.orbTargets)) + 2; pulse++) {
         p.orbRefillDelay = 0;
@@ -69,24 +74,62 @@ for (const level of WORM_STORY_LEVELS) {
       evidence.rotatedRefills++; totals.rotatedRefills++;
     }
   }
-  // Close each actual pair and exercise the real replacement transaction.
-  {
-    const { sim, p, state } = setup(level, 'glow', 'replacement');
-    sim.powerups = []; sim.specials = [];
-    const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
-    // This pass measures the finite authored network; retry supply is exercised
-    // separately by storySmallBoardBalance.test.js with these goals unfinished.
-    Object.assign(p.mechanics, p.tunnelGoals);
-    let closed = 0;
-    while (getActiveTunnels(state.cubies, level.cubeSize).length) {
-      const mouth = getActiveTunnels(state.cubies, level.cubeSize)[0].entry;
-      state.cubies = flipStickerPair(state.cubies, level.cubeSize, mouth.x, mouth.y, mouth.z, mouth.dirKey, buildManifoldGridMap(state.cubies, level.cubeSize));
-      closed++; assert(closed <= pairs);
-      const before = p.pendingMouths.length;
-      const replacement = replenishStoryTunnel(sim, p, state, level.cubeSize);
-      if (replacement) { state.cubies = replacement; assert.equal(p.pendingMouths.length, before - 1); evidence.replacementPairs++; totals.replacementPairs++; }
+  // Exhaust actual tunnel pairs without awarding task credit, then recover
+  // each qualifier independently. Counting the opening queue alone missed
+  // blocked mouths, surrounded unvisited pairs and a lone self-pass retry.
+  for (const character of ['glow', 'classic']) {
+    const goals = record.objectives.filter(o => ['healed', 'uniqueTunnels', 'selfPasses', 'multiHeals', 'ringHeals'].includes(o.key));
+    for (const goal of goals) {
+      const { sim, p, state } = setup(level, character, 'recovery:' + goal.key);
+      sim.powerups = []; sim.specials = [];
+      const pairs = () => getActiveTunnels(state.cubies, level.cubeSize);
+      const close = pair => {
+        for (const t of [pair.entry, pair.exit]) state.cubies = healSticker(state.cubies, level.cubeSize, t.x, t.y, t.z, t.dirKey);
+      };
+      const refill = () => {
+        const replacement = replenishStoryTunnel(sim, p, state, level.cubeSize);
+        if (replacement) { state.cubies = replacement; evidence.replacementPairs++; totals.replacementPairs++; }
+        return replacement;
+      };
+      for (let missed = 0; missed < level.target + 3; missed++) {
+        assert(pairs().length > 0, `level ${level.id}: exhausted ${goal.key}`);
+        close(pairs()[0]); refill(); refill();
+        assert.equal(pairs().length, 2, `level ${level.id}: ${goal.key} missed attempt ${missed}`);
+        evidence.recoveryAttempts++; totals.recoveryAttempts++;
+      }
+      // Complete other qualifiers so only this particular task can keep supply alive.
+      sim.healed = p.healTarget ?? 0;
+      Object.assign(p.mechanics, p.tunnelGoals);
+      if (p.traversalTarget && goal.key !== 'uniqueTunnels') {
+        p.tunnels = new Set(Array.from({ length: p.traversalTarget }, (_, i) => `credited-${i}`));
+      }
+      if (goal.key === 'healed') sim.healed = 0;
+      else if (goal.key !== 'uniqueTunnels') p.mechanics[goal.key] = 0;
+      while (pairs().length) close(pairs()[0]);
+      p.pendingMouths = [];
+      for (let count = 0; count < goal.target; count++) {
+        refill(); refill(); assert.equal(pairs().length, 2, `level ${level.id}: ${goal.key} attempt ${count}`);
+        const pair = pairs()[0];
+        if (goal.key === 'uniqueTunnels') {
+          assert(!p.tunnels.has(pair.pairId)); p.tunnels.add(pair.pairId);
+        } else if (goal.key === 'healed') sim.healed++;
+        else recordStoryMechanic(p, goal.key);
+        close(pair);
+      }
+      assert.equal(refill(), null); assert.equal(p.pendingMouths.length, 0);
+      evidence.taskSupplyChecks++; totals.taskSupplyChecks++;
     }
-    assert.equal(closed, pairs); assert.equal(p.pendingMouths.length, 0);
+    // Occupied queued mouths must not stall either traversal or repair supply.
+    if (goals.length) {
+      const { sim, p, state } = setup(level, character, 'blocked-mouths');
+      const first = getActiveTunnels(state.cubies, level.cubeSize)[0].entry;
+      state.cubies = flipStickerPair(state.cubies, level.cubeSize, first.x, first.y, first.z, first.dirKey, buildManifoldGridMap(state.cubies, level.cubeSize));
+      sim.specials = []; sim.powerups = p.pendingMouths.map(key => findStickerByStableKey(state.cubies, level.cubeSize, key));
+      const replacement = replenishStoryTunnel(sim, p, state, level.cubeSize);
+      assert(replacement, `level ${level.id}: blocked mouths never recovered`);
+      assert.equal(getActiveTunnels(replacement, level.cubeSize).length, 2);
+      evidence.taskSupplyChecks++; totals.taskSupplyChecks++;
+    }
   }
   // Source counter fixtures exercise action state transitions. They are not player runs.
   {
@@ -130,6 +173,7 @@ for (const level of WORM_STORY_LEVELS) {
     evidence.findings.push(...findings.map(finding => ({ ...finding, character })));
   }
   record.runtimeAudit = evidence;
+  if (level.id % 10 === 0) console.log(`Audited objective supply through level ${level.id}/${WORM_STORY_LEVELS.length}.`);
 }
 data.checks.extended = totals;
 data.auditSummary = {

@@ -363,7 +363,7 @@ it.each([2, 5, 6])('can reach the healing target for level %i through real movem
   }
   // Healing levels retain the spare choice through the final required heal.
   // Replenishment now stops; the remaining physical pair can be cleared.
-  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(id === 2 ? 0 : 1);
+  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(1);
   if (id === 2) {
     // Healing can spend food before the peak-length target. Claim the clear.
     if (!state().wormStoryResult) {
@@ -565,4 +565,20 @@ it('publishes exact tile length after growth, partial loss and a fresh run', () 
   expect(state().wormLengthTiles).toBe(0.99);
   begin(1);
   expect(state().wormLengthTiles).toBe(0.9);
+});
+
+it('allows a surround in Chapter 10 level 1 without disabling the remaining crossing objective', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 90 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(91);
+  const step = wormSimulation.stepWormSim;
+  let ringAllowed;
+  vi.spyOn(wormSimulation, 'stepWormSim').mockImplementation((sim, dt, size, ctx) => {
+    ringAllowed = ctx.allowRingHeal();
+    return step(sim, dt, size, ctx);
+  });
+  frame();
+  expect(ringAllowed).toBe(true);
+  expect(state().wormStoryChecklist.goals.find(goal => goal.key === 'uniqueTunnels')).toMatchObject({ target: 6, done: false });
 });

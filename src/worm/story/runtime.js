@@ -5,9 +5,9 @@ import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './m
 import { rollStoryElements, storyElementTypes } from './elementGoals.js';
 import { STORY_DOUBLE_HEAL_WINDOW } from '../healerWorm/healChain.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
-import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
+import { flipStickerPair, canFlipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ttAt, ttReset } from '../circularBuffers.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId } from '../../game/coordinates.js';
 import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
 import { getActiveTunnels, getStableKey, findStickerByStableKey } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
@@ -156,7 +156,8 @@ const routeCell = (size, [u, v]) => {
 export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
-  const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
+  const pairCount = Math.max(['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0,
+    level.mechanics?.ringHeals ?? 0, level.mechanics?.selfPasses || level.mechanics?.multiHeals ? 2 : 0);
   const mouths = storyMouths(size, pairCount, level.id, { chain: !!level.mechanics?.multiHeals });
   const mouthKeys = mouths.map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
   const pendingMouths = mouthKeys.slice(2);
@@ -231,6 +232,7 @@ export function stageStory(sim, size, level, character) {
   const chainHeals = !!level.mechanics?.multiHeals;
   const practice = { ...base, pendingMouths, retryMouths: mouthKeys.slice(0, 2), tunnelGoals, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     healTarget: ['collector', 'restore', 'mastery'].includes(level.kind) ? level.target : null,
+    traversalTarget: level.kind === 'tunnel' ? level.target : null,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, elementSupplyDelay: STORY_POWER_OPENING_DELAY, elementSupplyCursor: 0, powerHint: null, lastPower: null, lastElementCompanion: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set(),
@@ -291,8 +293,10 @@ export function replenishStoryOrbs(sim, practice, state, size, delta) {
 // Once that work is earned, do not require extra repairs just because an unused
 // mouth is waiting under food or the body. Traversal levels still need their
 // distinct pairs, and already-open pairs still count until actually healed.
-function storyRepairSupplyComplete(sim, practice) {
-  return practice.healTarget != null && sim.healed >= practice.healTarget &&
+function storyTunnelSupplyComplete(sim, practice) {
+  return (practice.healTarget != null || practice.traversalTarget != null || Object.keys(practice.tunnelGoals ?? {}).length > 0) &&
+    (practice.healTarget == null || sim.healed >= practice.healTarget) &&
+    (practice.traversalTarget == null || practice.tunnels.size >= practice.traversalTarget) &&
     Object.entries(practice.tunnelGoals ?? {}).every(([key, target]) => (practice.mechanics[key] ?? 0) >= target);
 }
 
@@ -327,7 +331,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     bodyJumps: practice.bodyJumps, landed: !sim.isJumping && sim.phase === 'crawling',
     rotations: state.rotationEpoch - practice.rotationEpoch,
     rotationSettled: !state.animState && !liveRotation.active,
-    remaining: activeTunnels.length + (storyRepairSupplyComplete(sim, practice) ? 0 : (practice.pendingMouths?.length ?? 0)),
+    remaining: activeTunnels.length + (storyTunnelSupplyComplete(sim, practice) ? 0 : (practice.pendingMouths?.length ?? 0)),
   };
 }
 
@@ -347,7 +351,7 @@ export function storyTunnelPassagesBlock(sim, practice) {
 }
 
 export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
-  if (storyRepairSupplyComplete(sim, practice)) {
+  if (storyTunnelSupplyComplete(sim, practice)) {
     if (practice.pendingMouths?.length) practice.pendingMouths.length = 0;
     return null;
   }
@@ -362,11 +366,13 @@ export function replenishStoryTunnel(sim, practice, state, size, activeCount = g
       Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target)) {
     practice.pendingMouths = [...(practice.retryMouths ?? [])];
   }
-  // Healing goals need a renewable supply, including the last required heal.
-  // Keep two choices available instead of draining the finite authored queue.
-  const needsHealing = (practice.healTarget != null && sim.healed < practice.healTarget) ||
-    ['ringHeals', 'multiHeals'].some(key => (practice.mechanics[key] ?? 0) < (practice.tunnelGoals?.[key] ?? 0));
-  if (!practice.pendingMouths?.length && !needsHealing) return null;
+  // Every unfinished tunnel qualifier needs renewable attempts. Crossing goals
+  // additionally need new identities: reopening an already-crossed pair cannot
+  // advance them, even when a surround used up the original unvisited network.
+  const needsTraversal = practice.traversalTarget != null && practice.tunnels.size < practice.traversalTarget;
+  const needsSupply = (practice.healTarget != null && sim.healed < practice.healTarget) || needsTraversal ||
+    Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target);
+  if (!practice.pendingMouths?.length && !needsSupply) return null;
   if (!practice.pendingMouths?.length && activeCount === 0 && sim.tunnelPassages.length) return null;
   const map = buildManifoldGridMap(state.cubies, size);
   const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
@@ -379,10 +385,13 @@ export function replenishStoryTunnel(sim, practice, state, size, activeCount = g
     const twin = findAntipodalStickerByGrid(map, sticker, size);
     if (sticker.curr !== sticker.orig || !twin || twin.sticker.curr !== twin.sticker.orig ||
         occupied.has(tileKey(twin))) return null;
+    const pairId = [getManifoldGridId(sticker, size), getManifoldGridId(twin.sticker, size)].sort().join('|');
+    if (needsTraversal && practice.tunnels.has(pairId)) return null;
     const key = [tileKey(pos), tileKey(twin)].sort().join('|');
     // Never reuse a collapsing route, or one still retained by a healing tail.
     if (sim.voidTunnelKeys.has(key) || sim.ringHealedTunnelKeys.has(key) ||
         sim.tunnelPassages.some(p => p.tunnelKey === key || p.heal?.tunnelKey === key)) return null;
+    if (!canFlipStickerPair(state.cubies, size, pos.x, pos.y, pos.z, pos.dirKey, map)) return null;
     return flipStickerPair(state.cubies,size,pos.x,pos.y,pos.z,pos.dirKey,map);
   };
   for (let i=0; i<(practice.pendingMouths?.length ?? 0); i++) {
@@ -392,7 +401,7 @@ export function replenishStoryTunnel(sim, practice, state, size, activeCount = g
     practice.pendingMouths.splice(i,1);
     return cubies;
   }
-  if (needsHealing) {
+  if (needsSupply) {
     // A queued mouth can be covered by food or a long body indefinitely. Use a
     // safe pair elsewhere, consuming that queue slot so it adds no hidden debt.
     const retry = (practice.retryMouths ?? []).map(key => findStickerByStableKey(state.cubies, size, key, map));
