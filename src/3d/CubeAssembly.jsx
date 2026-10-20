@@ -738,8 +738,7 @@ const CubeAssembly = React.memo(({
     const state = useGameStore.getState();
     // Worm uses the same instanced portal face as Flip Cube, including Remix.
     // Warm it before the constrained-style early return to avoid a first-flip hitch.
-    const portalView = powerView ?? state.visualMode;
-    if (portalView !== 'sudokube') warmFlipPortal(gl, camera, scene);
+    warmFlipPortal(gl, camera, scene);
     // Constrained Remix and Numbers tiles use solid surfaces, including backs.
     // Compiling unused decorative shaders here defeats their startup fallback.
     if (state.wormHealerMode && (state.randomMode || state.visualMode === 'sudokube')
