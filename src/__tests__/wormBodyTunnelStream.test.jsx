@@ -353,6 +353,32 @@ it('renders all 1200 Wiggle links through turns without the old gaps at 200 and 
   for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.14);
 });
 
+it.each(['classic', 'prism', 'book'])('draws every %s bead of a 1200-long body at even spacing, with the wave still riding the tail', character => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: character, wormAccessories: {} });
+    root.render(<Harness worm={worm} size={12} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+  sim.tailLength = 1200;
+  const corners = [];
+  for (let row = 0; row < 12; row++) {
+    const left = row % 2 ? 5.5 : -5.5;
+    corners.push(new THREE.Vector3(left, 5.5 - row, 6.08), new THREE.Vector3(-left, 5.5 - row, 6.08));
+  }
+  surfaceRoute(corners, 12);
+  const points = renderPoints();
+  // The old distance LOD drew every 4th bead past 600: 0.36 apart at radius 0.105.
+  // Hairpins swing the wave across the turn, so allow a little over the 0.09 pitch
+  // there, but every bead still overlaps its neighbour (diameter 0.21).
+  expect(points).toHaveLength(1200);
+  for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.16);
+  // Far down the tail the sideways wave is sampled densely enough to read as a wave:
+  // neighbouring beads step smoothly through it instead of aliasing to a zigzag.
+  const sway = points.slice(700, 760).map(p => p.y - Math.round(p.y - 0.5) - 0.5);
+  expect(Math.max(...sway) - Math.min(...sway)).toBeGreaterThan(0.08);
+  for (let i = 1; i < sway.length; i++) expect(Math.abs(sway[i] - sway[i - 1])).toBeLessThan(0.08);
+});
+
 it('keeps Wiggle geometry outside turning tiles, including its head and swollen pickup beads', () => {
   selectWiggle(); sim.tailLength = 25;
   surfaceRoute([new THREE.Vector3(-1, 0, 1.58), new THREE.Vector3(1.3, 0, 1.58)]);

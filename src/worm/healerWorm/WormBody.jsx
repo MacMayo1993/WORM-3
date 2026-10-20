@@ -483,15 +483,12 @@ export function WormBody({ worm, size }) {
             // larger block for each three, preventing overlapping glass boxes
             // from washing out the orb inside. Length/collision history is unchanged.
             if (isMobi && i !== 0 && !isMobiBlockSegment(i, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH)) continue;
-            // Distance LOD: segments far behind the head are visually indistinguishable at
-            // gameplay camera distance, so thin them out — every segment near the head,
-            // every 2nd beyond 200, every 4th beyond 600. Skipped segments never run the
-            // curve-walk math below; the walk's cumulative distance naturally catches up to
-            // the next rendered segment's (larger) target distance. Surviving segments keep
-            // their normal scale so orb growth never changes body-ball size at an LOD boundary.
-            // Wiggle's slender silhouette needs every link, still in one draw.
-            const lodStep = _isWiggle ? 1 : i < 200 ? 1 : (i < 600 ? 2 : 4);
-            if (i !== 0 && i % lodStep !== 0) continue;
+            // Every segment is drawn, however long the worm. There used to be a distance
+            // LOD (every 2nd bead past 200, every 4th past 600), but beads sit
+            // BODY_BALL_SPACING (0.09) apart at radius 0.105: every 4th left 0.36 gaps, and
+            // it sampled the 0.71-long body wave about twice per wavelength, so the tail
+            // aliased into a still or strobing line. It is still one instanced draw, and
+            // the curve walk below visits every history point either way.
 
             const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
@@ -774,9 +771,6 @@ export function WormBody({ worm, size }) {
                 _wormDummy.scale.multiplyScalar(bead.grow);
                 _wormDummy.position.addScaledVector(_bodyCloneNormal, bead.lift);
             }
-            // LOD removes distant instances to control cost, but must never make
-            // the survivors larger: that produced an abrupt size jump at segment
-            // 200/600 and made collected-orb growth look non-uniform.
             // Camera-proximity cull, transit only.
             //
             // Inside a wormhole the camera trails the head along the very centerline
@@ -835,7 +829,7 @@ export function WormBody({ worm, size }) {
             // Publish where this segment actually ended up, for effects that need to
             // aim at the body (the lightning theme's strikes). Recorded here rather
             // than recomputed elsewhere because this position has already been
-            // through the curve walk, the live-slice ride and the LOD thinning —
+            // through the curve walk and the live-slice ride —
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
             if (i > 0) poseBodyAccessories(accessoryRig, writeIdx, _wormDummy.position, _bodySegForward,
@@ -883,10 +877,9 @@ export function WormBody({ worm, size }) {
                     _bodyColor.set(trioOffset === 1 ? orbColors[orbPickupIndex] : baseColor);
                 } else {
                     // The character's pattern: the Brute's belly bands, the Dancer's
-                    // stripes, the Ranger's saddle. Uses writeIdx (not i) so bands keep
-                    // alternating once LOD thinning makes consecutive drawn segments an
-                    // even number of real segments apart.
-                    characterSegmentPattern(_bodyColor.set(baseColor), patternRef.current.character, patternRef.current.skin, writeIdx, _bookPageColor);
+                    // stripes, the Ranger's saddle. Keyed on the segment, not its draw slot,
+                    // so a bead culled near the lens in a tunnel never shifts the bands.
+                    characterSegmentPattern(_bodyColor.set(baseColor), patternRef.current.character, patternRef.current.skin, i, _bookPageColor);
                 }
                 if (experience) {
                     const shimmer = elementalBodyWave(element, characterTimeRef.current, i, tLen);
