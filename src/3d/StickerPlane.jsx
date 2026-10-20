@@ -1819,10 +1819,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       <group ref={burrowDecorRef} name="FlippedTileDecor">
       {/* The flipped face: a bevelled lens onto the antipodal tunnel, home colour at
           the far end. One instanced draw for every portal on the cube, animated in
-          its shader, so a flipped tile needs no frame callback of its own. */}
+          its shader, so a flipped tile needs no frame callback of its own. A closing
+          portal keeps the colour it was leaving, except in Sudoku, whose lens is white. */}
       {(showFlipPortal || closingPortal) && (
         <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
-          color={closingPortal ? fc[ANTIPODAL_COLOR[meta.orig]] : baseColor}
+          color={closingPortal && !isSudokube ? fc[ANTIPODAL_COLOR[meta.orig]] : baseColor}
           seed={closingPortal ? FLIP_PORTAL_OPEN_SEED : flipPortalStart(stickerGridId, meta?.flips ?? 0)}
           data={flipPortalData(origColor, closingPortal ? Math.max(1, closingFlips) : meta?.flips ?? 0, effectiveFlipCap)} />
       )}

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { expect, it, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
-import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/gridIds.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { StickerInstanceProvider } from '../3d/StickerInstances.jsx';
@@ -100,6 +100,20 @@ it.each([3, 15])('shares Flip Cube portals in size-%s Worm, through burrows, tur
     expect(portalBatches()[0].geometry.attributes.aInstanceData.array[3]).toBeCloseTo(flipPortalData(colors[base.orig], 3, FLIP_CAP)[3], 5);
     for (let i = 0; i < 40; i++) await frame();
     expect(portalBatches()).toHaveLength(0);
+    // Closing keeps the colour it is leaving, except in Numbers, whose lens stays white
+    // instead of flashing a face colour until the tile shuts.
+    const portalColor = () => { const c = new THREE.Color(); portalBatches()[0].getColorAt(0, c); return c; };
+    for (const [mode, closing] of [['sudokube', COLORS.white], ['classic', colors[ANTIPODAL_COLOR[base.orig]]]]) {
+      meta = { ...base, flips: 3, curr: ANTIPODAL_COLOR[base.orig] };
+      await render('turned-slot', mode); for (let i = 0; i < 90; i++) await frame();
+      if (mode === 'sudokube') expect(portalColor().getHex()).toBe(new THREE.Color(COLORS.white).getHex());
+      meta = { ...base, flips: 0, curr: base.orig };
+      await render('turned-slot', mode); await frame();
+      expect(portalBatches()).toHaveLength(1);
+      expect(portalColor().getHex()).toBe(new THREE.Color(closing).getHex());
+      for (let i = 0; i < 40; i++) await frame();
+      expect(portalBatches()).toHaveLength(0);
+    }
     sharedUniforms.time.value = 30;
     meta = { ...base, flips: 1, curr: ANTIPODAL_COLOR[base.orig] };
     await render('turned-slot'); await frame();
