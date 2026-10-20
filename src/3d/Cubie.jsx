@@ -251,9 +251,11 @@ const Cubie = React.forwardRef(function Cubie({
     return { faceRow: r, faceCol: c };
   };
 
+  // Labels follow the sticker's view, not the chassis: a flipped piece's body wears
+  // neon (effectiveVisualMode), which used to strip its Sudokube number or grid ID.
   const overlay = (dirKey) => {
     const m = meta(dirKey); if (!m) return '';
-    if (effectiveVisualMode === 'grid') {
+    if (stickerVisualMode === 'grid') {
       // Use the ONE canonical grid ID (same function every flip/antipodal/worker
       // path uses). The previous local formula had drifted for the NZ/NX/NY
       // faces and a GRID_FACE swap hack was layered on top, so the on-screen
@@ -261,7 +263,7 @@ const Cubie = React.forwardRef(function Cubie({
       // visibly flipped "M4-007" (its true same-index partner M4-001, mislabelled).
       return getManifoldGridId(m, size);
     }
-    if (effectiveVisualMode === 'sudokube') {
+    if (stickerVisualMode === 'sudokube') {
       // Show the sticker's IDENTITY number (from its original face + position),
       // not its current cell. Each home cell has a unique number 1..size² (1-9 on
       // a 3×3), and the number travels with the sticker as it moves — using the

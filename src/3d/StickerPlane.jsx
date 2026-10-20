@@ -1503,9 +1503,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
-  // Worm and cube modes share the same batched, animated portal face.
+  // Worm and cube modes share the same batched, animated portal face, in every view:
+  // Sudokube draws it too, with the tile's number laid over the lens.
   // The surface batch applies the traversal/death bore to this face as well.
-  const showFlipPortal = !isDead && !isSudokube && isWormhole;
+  const showFlipPortal = !isDead && isWormhole;
   // Healing removes the old opening time. If the same tile is flipped again at
   // count one it must pop afresh, while turns/view changes keep a live portal open.
   useLayoutEffect(() => {
@@ -1514,7 +1515,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Flipping home: hold the portal it is leaving, fully open, until the tile shuts.
   // Not gated on isDead: a flip that lands home on the cap kills the tile in the
   // same render, and its portal must still close with it rather than vanish.
-  const closingPortal = !isSudokube && !isWormhole && !!meta?.orig && meta.curr === meta.orig
+  const closingPortal = !isWormhole && !!meta?.orig && meta.curr === meta.orig
     && (portalClosingRef.current || hasPendingFlipAnimation);
   // Before the flip's effect runs, prevFlips still holds the departing count.
   const closingFlips = portalClosingRef.current ? portalClosingFlipsRef.current : prevFlips.current;
