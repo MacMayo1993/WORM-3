@@ -5,6 +5,7 @@ import { liveRotation } from '../liveRotation.js';
 import { isTileInSlice } from '../wormLogic.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { shPush } from '../circularBuffers.js';
+import { isPitTile } from './tunnelPits.js';
 
 export const CAUTION_FALL_SECONDS = 3.4;
 export const CAUTION_DISSOLVE_START = 1.7;
@@ -14,16 +15,23 @@ export const CAUTION_DISSOLVE_END = 3.2;
 // The fence belongs to the whole raised cubie, including its ordinary corner
 // faces. Query the same live platform/burrow rules used by jumps, rather than
 // treating every colour mismatch as an open hole.
+//
+// A collapsed tunnel's pit (tunnelPits.js) stops the worm at its rim the same
+// way, with the same moment to turn away or jump clear; it is never waived for a
+// landing grace or a step off a platform, since nothing carries the worm over it.
 export function cautionEntry(sim, next, size, ctx) {
     if (!next || !usesRaisedPlatforms(ctx) || !['active', 'finalHealing'].includes(ctx.getGamePhase()) ||
-        sim.isJumping || sim.padFlight || sim.onRaisedPlatform || sim.raisedDeparture ||
-        sim.rocketActive || sim.landingGraceT > 0 || sim.restRead || sim.signature.sweep ||
+        sim.isJumping || sim.padFlight || sim.rocketActive || sim.restRead || sim.signature.sweep ||
         (sim.signature.character === 'inch' && sim.signature.active > 0)) return null;
     // A moving destination is read at commit by the crossing system. Never
     // turn the outgoing cubie's opening into an invisible obstacle.
     if (liveRotation.active && liveRotation.sliceIndices.some(layer =>
         isTileInSlice(liveRotation.axis, layer, sim.pos.x, sim.pos.y, sim.pos.z) ||
         isTileInSlice(liveRotation.axis, layer, next.x, next.y, next.z))) return null;
+    if (isPitTile(sim, next) && !isPitTile(sim, sim.pos)) {
+        return { tile: { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey }, pit: true };
+    }
+    if (sim.onRaisedPlatform || sim.raisedDeparture || sim.landingGraceT > 0) return null;
     if (!raisedPlatformPosition(next, size, ctx) || raisedPlatformPosition(sim.pos, size, ctx)) return null;
     return { tile: { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey } };
 }

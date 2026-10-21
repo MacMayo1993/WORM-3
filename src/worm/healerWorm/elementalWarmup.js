@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { getElementalParticleMaterial } from './elementalParticleMaterial.js';
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 import { getElementalSurfaceMaterial, getReactionSurfaceMaterial } from '../ElementalSurface.jsx';
+import { getElementalAdornmentMaterial } from './elementalAdornments.js';
 import { FUSION_LOOKS, REACTION_PARTICLES, reactionPatternOf } from './fusionLooks.js';
 import { getFusionParticleMaterial } from './fusionParticleMaterial.js';
 import { sigilEmblemWarmupMaterial } from './fusionSigilTexture.js';
@@ -56,6 +57,10 @@ function collectElementalMaterials() {
         const lq = getElementalSurfaceMaterial(element, def.color, def.accent, false);
         materials.push(hq);
         if (lq !== hq) materials.push(lq);
+        // Water's drips and ice's icicles (elementalAdornments.js), drawn as a
+        // second group of the same mesh.
+        const adorn = getElementalAdornmentMaterial(element, def.color, def.accent);
+        if (adorn) materials.push(adorn);
         break;
       }
       case 'flames':

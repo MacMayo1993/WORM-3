@@ -56,9 +56,11 @@ export const isHealReady = (deposited) => (deposited ?? 0) >= HEAL_COST;
 /**
  * Classify the n-th pass through a tunnel (nextTraversals = previous count + 1):
  *   'safe'     — one of the first maxTraversals passes; nothing happens.
- *   'void-arm' — the pass immediately after the safe ones. The tunnel collapses
- *                when the head reaches its interior midpoint. With the default of 3 safe traversals this is the
- *                documented "void on the 4th" behavior.
+ *   'void-arm' — the pass immediately after the safe ones. The last safe pass
+ *                already collapses the tunnel behind the worm into pits once its
+ *                tail is clear (tunnelPits.js); this is a re-entry made before
+ *                that landed, and it collapses when the head reaches the interior
+ *                midpoint.
  *   'collapse' — any pass beyond that: the tunnel is fully voided and kills on
  *                contact.
  */

@@ -31,6 +31,7 @@ import { skipMatrixWhileHidden } from './hiddenMatrices.js';
 import { bindEffectUniforms } from './sharedEffectMaterials.js';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getWormPress, getWormContact, wormPress } from '../worm/tilePressBridge.js';
+import { getRumbleLift } from '../worm/rumbleBridge.js';
 import { updateTilePressVisual } from '../worm/tilePressVisual.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -353,12 +354,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: wispyTime, // shared reference — advanced once per frame externally
   }));
   const bindFootprint = useMemo(() => bindEffectUniforms(footprintUniforms), [footprintUniforms]);
-  // Split so the press and the flip counter-kick can both drive innerGroupRef.position.z
-  // without either clobbering the other; applyInnerZ() writes their sum.
+  // Split so the press, the flip counter-kick and the Rumbler's heave can all drive
+  // innerGroupRef.position.z without clobbering each other; applyInnerZ() writes their sum.
   const innerShockZ = useRef(0);
   const innerPressZ = useRef(0);
+  const innerRumbleZ = useRef(0);
   const applyInnerZ = () => {
-    if (innerGroupRef.current) innerGroupRef.current.position.z = innerShockZ.current + innerPressZ.current;
+    if (innerGroupRef.current) innerGroupRef.current.position.z = innerShockZ.current + innerPressZ.current + innerRumbleZ.current;
   };
 
   // Dispose shader materials on unmount to prevent GPU program / texture leaks.
@@ -620,6 +622,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevRawP.current = 0;
     blinkBounceRef.current = 0;
     innerShockZ.current = 0;
+    innerRumbleZ.current = 0;
     innerPressZ.current = updateTilePressVisual(
       innerGroupRef.current, footprintGroupRef.current, footprintUniforms, 0, 0, wormPress.color
     );
@@ -886,7 +889,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // being stood on has to run, and — just as important — has to get one last
     // frame at press 0 to put itself back flat before it goes to sleep.
     const press = wormHealerMode ? getWormPress(surfaceTileKey) : 0;
-    const pressBusy = press !== 0 || innerPressZ.current !== 0;
+    // The Rumbler heaves a few cells as a crest passes (worm/rumbleBridge.js).
+    const rumble = wormHealerMode ? getRumbleLift(surfaceTileKey) : 0;
+    const pressBusy = press !== 0 || innerPressZ.current !== 0 || rumble !== 0 || innerRumbleZ.current !== 0;
+    innerRumbleZ.current = rumble;
     // Always clear presentation before the idle gate, including after identity
     // changes, restart, mode exit and spring remapping through a slice turn.
     innerPressZ.current = updateTilePressVisual(

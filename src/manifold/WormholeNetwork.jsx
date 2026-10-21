@@ -41,6 +41,8 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   const flipCap = useGameStore(selectEffectiveFlipCap);
   const cubePads = useGameStore(flipCubePadsEnabled);
   const showCutawayLens = useGameStore(s => s.showCutawayLens);
+  // A collapsed tunnel is a pair of pits, not a route (worm/healerWorm/tunnelPits.js).
+  const pitGrids = useGameStore(s => s.wormPitGrids);
   const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, chaosLevel } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode,
@@ -96,6 +98,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
             const gridId = getManifoldGridId(sticker, size);
             if (processed.has(gridId)) continue;
             processed.add(gridId);
+            if (wormHealerMode && pitGrids.length && pitGrids.includes(gridId)) continue;
 
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
             if (!antipodalLoc) continue;
@@ -149,7 +152,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [deferredCubies, size, visible, raisedBands, manifoldMap, fc, flipCap, settings?.manifoldStyles]);
+  }, [deferredCubies, size, visible, raisedBands, manifoldMap, fc, flipCap, settings?.manifoldStyles, wormHealerMode, pitGrids]);
 
   // The worm's current tunnel lives in mutable module state (written by
   // WormChaseCamera on the Three.js RAF, not through the store). Poll it and

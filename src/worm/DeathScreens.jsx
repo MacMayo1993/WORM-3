@@ -53,7 +53,7 @@ import './deathScreen.css';
 function classifyDeath(reason) {
     if (reason === 'caution-fall') return 'fallen';
     if (reason === 'story-timeout') return 'time-up';
-    if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
+    if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted' || reason === 'pit') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
     if (reason === 'bomb') return 'blasted';
     if (reason === 'lightning') return 'struck';
@@ -189,7 +189,8 @@ export default function DeathScreen({
     const [still] = useState(() => !!useGameStore.getState().settings?.reducedMotion || prefersReducedMotion());
     const kind = classifyDeath(deathDetails?.reason);
     const config = DEATHS[kind];
-    const blurb = deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone'
+    const blurb = deathDetails?.reason === 'pit' ? 'You fell into a collapsed tunnel. Turn away or jump clear at its rim.'
+        : deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone'
         ? 'You entered a collapsed tunnel. Take another route.' : config.blurb;
     const location = locationFor(kind, deathDetails);
     // Examine hides the overlay to show the board behind it, which is only worth

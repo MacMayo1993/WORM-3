@@ -46,6 +46,17 @@ export function ScenePanel({ settings, onSettingsChange }) {
           </label>
         ))}
       </div>
+      <h3 className="settings-section-title">Lightning flashes</h3>
+      <p>Lightning orbs and storm fusions. Reduced keeps every strike and its warning readable, but nothing flashes bright or fast.</p>
+      <div className="settings-radio-group">
+        {[[false, 'Full'], [true, 'Reduced']].map(([value, label]) => (
+          <label key={label} className={`settings-radio${(settings.reduceFlashing === true) === value ? ' active' : ''}`}>
+            <input type="radio" name="reduceFlashing" checked={(settings.reduceFlashing === true) === value}
+              onChange={() => update('reduceFlashing', value)} />
+            <span className="settings-radio-label">{label}</span>
+          </label>
+        ))}
+      </div>
       <h3 className="settings-section-title">Background</h3>
       <div className="settings-radio-group">
         {BG_OPTIONS.map(opt => opt.value === 'projectiscope' ? (

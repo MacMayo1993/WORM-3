@@ -25,6 +25,7 @@ export default function WormDemoLessonCard({ onRetry }) {
     : cause === 'slice-rotation' || cause === 'rotation' ? 'The turning layer caught you. Move clear of its lights.'
     : cause === 'self-collision' || cause === 'self' ? 'You ran into your own body. Steer around it, or press JUMP to hop over it.'
     : cause === 'caution-fall' ? 'The caution-tape timer ran out. Press left, right or jump during the one-second cue to escape.'
+    : cause === 'pit' ? 'You fell into a pit. A tunnel collapses behind you after its third ride; turn away or jump clear at the rim.'
     : cause === 'voided' || cause === 'void-tunnel-exhausted' ? 'That tunnel collapsed. An open tunnel holds for three rides; heal it before then.'
     : 'Your run ended. Try this exercise again with a fresh practice board.';
   const index = s.demoWormLessonIndex ?? 0;

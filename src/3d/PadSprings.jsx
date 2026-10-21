@@ -121,7 +121,9 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
         if (isLiveFlippedFace(member.data.current.meta, cap)) { lifted = true; break; }
       }
       pair.active = (menuPads || wormPads || (flipPads !== 'off' && !wormMode)) && lifted;
-      const openness = wormPads ? (burrowPair(key)?.openness ?? 1) : 1;
+      // A collapsed tunnel's pads drop into their slots for good (tunnelPits.js).
+      const pit = wormPads && state.wormPitGrids?.length > 0 && state.wormPitGrids.includes(key.slice(0, key.indexOf('|')));
+      const openness = wormPads ? (pit ? 0 : burrowPair(key)?.openness ?? 1) : 1;
       const target = pair.active ? pair.pose.lift * openness : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
       else advancePadSpring(pair, target, dt);

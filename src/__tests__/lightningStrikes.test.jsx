@@ -4,10 +4,13 @@ import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { getWormStickerWorldPos } from '../worm/wormExpansion.js';
 import { wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeStorm, STORM } from '../worm/healerWorm/lightningStorm.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { Color } from 'three';
 const { cleanups, frames } = vi.hoisted(() => ({ cleanups: [], frames: [] }));
 vi.mock('react', async original => ({ ...await original(), useMemo: fn => fn(), useEffect: fn => { cleanups.push(fn()); } }));
 vi.mock('@react-three/fiber', async original => ({ ...await original(), useFrame: fn => frames.push(fn) }));
 import { LightningStrikes } from '../worm/healerWorm/LightningStrikes.jsx';
+import { GENTLE_STRIKE } from '../worm/healerWorm/elementalUniforms.js';
 
 let storm, worm, meshes, mouths;
 const TILE = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
@@ -80,4 +83,32 @@ it('disposes every mesh, geometry and material on unmount', () => {
   });
   while (cleanups.length) cleanups.pop()?.();
   listeners.forEach(listener => expect(listener).toHaveBeenCalledTimes(1));
+});
+
+it('under reduced flashing, a strike swells and fades well below full white, and charged mouths hold steady', () => {
+  const before = useGameStore.getState().settings;
+  useGameStore.setState({ settings: { ...before, reduceFlashing: true, reducedMotion: false } });
+  try {
+    const brightness = (mesh, i = 0) => { const c = new Color(); mesh.getColorAt(i, c); return c.r; };
+    const disc = [], column = [];
+    for (let k = 0; k <= 10; k++) {
+      storm.flashes.length = 0;
+      storm.flashes.push({ id: 1, tile: TILE, age: (STORM.flash * k) / 10 });
+      frames[0]({ clock: { elapsedTime: 1 } });
+      // Same meshes as a full strike: the warning reads the same way.
+      expect(counts()).toEqual([0, 0, 1, 1, 0]);
+      disc.push(brightness(meshes[DISC])); column.push(brightness(meshes[COLUMN]));
+    }
+    // No full-white onset: it starts dark, peaks mid-flash, and stays under the cap.
+    expect(disc[0]).toBeCloseTo(0, 5);
+    expect(Math.max(...disc)).toBeCloseTo(GENTLE_STRIKE.disc, 2);
+    expect(Math.max(...column)).toBeLessThanOrEqual(GENTLE_STRIKE.column + 1e-6);
+    expect(Math.max(...disc)).toBeLessThan(0.5);
+    storm.flashes.length = 0;
+    mouths = [{ tunnel: { entry: TILE, exit: { x: 1, y: 0, z: 0, dirKey: 'NZ' } } }];
+    const crackle = [0.1, 0.27, 0.53].map(t => { frames[0]({ clock: { elapsedTime: t } }); return brightness(meshes[CRACKLE]); });
+    expect(new Set(crackle.map(v => v.toFixed(5))).size).toBe(1);
+  } finally {
+    useGameStore.setState({ settings: before });
+  }
 });

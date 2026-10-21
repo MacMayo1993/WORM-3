@@ -32,6 +32,23 @@ export const uCubeGap = { value: 0 };
 /** Half the current expanded hull, world units — how far a flood has to reach. */
 export const uCubeHalf = { value: 1.5 };
 
+// Settings → Scene → Flashing. Lightning's arcs and the storm coat's cloud flashes
+// read this: at 1 they keep their full strike, at the reduced cap they swell and
+// fade at a slow beat (≤ 1 a second) and at a fraction of the brightness, so no part
+// of the cube flashes on and off. One shared value, so the setting reaches every
+// coat without a new program.
+export const FLASH_CAP_REDUCED = 0.3;
+export const uFlashCap = { value: 1 };
+
+// Peak brightness of a lightning strike's disc and column under reduced flashing
+// (LightningStrikes.jsx); a full strike lands at 1.
+export const GENTLE_STRIKE = { disc: 0.45, column: 0.3 };
+
+/** Point every flashing coat at the player's flashing setting. */
+export function publishFlashCap(reduced) {
+  uFlashCap.value = reduced ? FLASH_CAP_REDUCED : 1;
+}
+
 /**
  * Copy the published worm into the shared uniforms. `active` is false under
  * reduced motion or when nothing is published, which disables every proximity

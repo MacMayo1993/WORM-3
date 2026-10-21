@@ -52,7 +52,8 @@ export default function WormSwipeControls({ onTurn, worm }) {
     }, [camera, worm]);
 
     const emitDirection = useCallback((dir) => {
-        if (useGameStore.getState().wormRescueKind === 'caution') {
+        const rescueKind = useGameStore.getState().wormRescueKind;
+        if (rescueKind === 'caution' || rescueKind === 'pit') {
             onTurn(dir);
             return;
         }

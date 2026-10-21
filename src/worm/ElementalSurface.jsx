@@ -31,24 +31,16 @@ import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
-import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
+import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf, uCubeGap, uFlashCap } from './healerWorm/elementalUniforms.js';
+import { adornmentSlots, adornedShellGeometry, getElementalAdornmentMaterial } from './healerWorm/elementalAdornments.js';
+import { WATER_HEIGHT, ICE_DEPTH, CHARGE_DEPTH, EDGE_PAD } from './healerWorm/elementalShell.js';
 import { GLSL_SIGILS, sigilIdOf } from './healerWorm/fusionSigils.js';
 
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3, air: 4 };
 
-// Water depth above the stickers: a base, four ripple waves and one broad swell.
-// Even when every wave bottoms out together the trough stays above the tile, and
-// the crest stays under the worm's back.
-export const WATER_HEIGHT = { base: 0.105, ripple: 0.011, swell: 0.03 };
-// Shell depth for the other two: ice is a thick carved layer, lightning a skin of
-// charge lying on the tiles.
-const ICE_DEPTH = 0.075;
-const CHARGE_DEPTH = 0.016;
-
-// How far the flat part of an edge cell runs past its sticker lattice before the
-// wrap begins: the cell's origin sits SURFACE_OFFSET (0.52) off the cubie centre,
-// so the wrap's axis — shared by both faces — is 0.02 beyond the lattice edge.
-const EDGE_PAD = 0.02;
+// Shell depths (water, ice, lightning) and the wrap's offset live with the
+// adornments that hang off the rims: healerWorm/elementalShell.js.
+export { WATER_HEIGHT } from './healerWorm/elementalShell.js';
 // Seam borders fold exactly onto the border, so neighbouring patches meet edge to
 // edge. An overlap (tried first, to rule out hairline cracks) doubles the layer's
 // alpha in a strip along every seam, which reads as a ruled line across the water.
@@ -257,6 +249,8 @@ const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uCubeHalf;
   uniform vec4 uEnv;
+  // 1, or FLASH_CAP_REDUCED under Settings → Scene → Flashing (elementalUniforms.js).
+  uniform float uFlashCap;
   uniform vec3 uColor;
   uniform vec3 uAccent;
   uniform vec4 uClaimOrigin;
@@ -507,7 +501,9 @@ const fragmentShader = /* glsl */ `
     float along = vertical ? vFaceUV.y : vFaceUV.x;
     float seamPos = (vertical ? vFaceUV.x : vFaceUV.y) + sign(stA) * 0.5 - stA;
     float seamId = floor(seamPos * 2.0 + 0.5) + (vertical ? 0.0 : 101.0) + dot(vFaceN, vec3(211.0, 307.0, 401.0));
-    float jitterT = floor(T * 9.0);
+    // Under reduced flashing the current re-forms at a slow beat, not 9 times a second.
+    bool gentle = uFlashCap < 0.99;
+    float jitterT = floor(T * (gentle ? 2.0 : 9.0));
     // Signed offset of the current from the seam's centre line, in world units
     // along the face axis; each side measures its distance to the same line.
     float jseed = seamId * 3.1 + jitterT * 1.7;
@@ -522,8 +518,11 @@ const fragmentShader = /* glsl */ `
     float nodeHalo = exp(-dot(toNode, toNode) * 22.0);
     // Now and then a short arc jumps straight across a sticker.
     vec2 stickerId = floor((vFaceUV - st) * 2.0 + 0.5) + vFaceN.xy * 57.0 + vFaceN.z * 131.0;
-    float arcSeed = hash12(stickerId * 1.7 + floor(T * 3.0));
-    float arcOn = step(0.86, arcSeed);
+    // Each arc strikes for a beat. Reduced flashing slows the beat and swells each arc
+    // in and out at a fraction of the brightness, so none snaps on and off.
+    float arcRate = gentle ? 1.0 : 3.0;
+    float arcSeed = hash12(stickerId * 1.7 + floor(T * arcRate));
+    float arcOn = step(0.86, arcSeed) * (gentle ? sin(3.14159265 * fract(T * arcRate)) * uFlashCap : 1.0);
     float arcPath = st.y - jag(st.x * 8.0, arcSeed * 50.0) * 0.3 - jag(st.x * 21.0, arcSeed * 71.0) * 0.07;
     float arcSpan = 1.0 - smoothstep(0.35, 0.5, abs(st.x));
     float arc = arcOn * exp(-arcPath * arcPath / 0.0001) * arcSpan;
@@ -656,12 +655,18 @@ const fragmentShader = /* glsl */ `
     float cloud = smoothstep(0.34, 0.8, c1 * 0.65 + c2 * 0.5);
     // Flashes: each beat lights the cloud from inside at a random point on the cube,
     // a soft glow that dies away (never a lit block of the grid).
-    float beat = floor(T * 2.2);
+    // Reduced flashing: under one beat a second, each swelling and fading at a
+    // fraction of the brightness instead of striking at full and dying away.
+    bool gentle = uFlashCap < 0.99;
+    float beatRate = gentle ? 0.8 : 2.2;
+    float beatPh = fract(T * beatRate);
+    float pulse = gentle ? sin(3.14159265 * beatPh) * uFlashCap : 1.0 - beatPh;
+    float beat = floor(T * beatRate);
     vec3 flashAt = (hash33(vec3(beat * 1.37, 4.1, 9.7)) - 0.5) * 2.2 * uCubeHalf;
     float flashOn = step(0.35, hash13(vec3(beat, 2.3, 7.1)));
-    float flash = flashOn * exp(-dot(vWorld - flashAt, vWorld - flashAt) * 0.9) * (1.0 - fract(T * 2.2));
+    float flash = flashOn * exp(-dot(vWorld - flashAt, vWorld - flashAt) * 0.9) * pulse;
     // And the storm hunts the worm: every few beats the cloud over it lights up.
-    float hunt = step(0.6, hash13(vec3(beat, 8.8, 1.9))) * (1.0 - fract(T * 2.2));
+    float hunt = step(0.6, hash13(vec3(beat, 8.8, 1.9))) * pulse;
     flash = max(flash, hunt * exp(-vWormD * vWormD / 0.35) * uEnv.w);
     float streak = pow(0.5 + 0.5 * sin(dot(vWorld, vec3(0.6, 9.0, 0.4)) + T * 14.0), 18.0) * cloud;
     bodyCol = mix(uColor * 0.3, uColor * 0.75, c2);
@@ -740,7 +745,7 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDe
         uWormBody,
         // A fused layer keeps its own original sweep as the second arrives.
         uClaimOrigin: { value: new THREE.Vector4() },
-        uCubeHalf, uCubeGap
+        uCubeHalf, uCubeGap, uFlashCap
       },
       vertexShader,
       fragmentShader,
@@ -780,7 +785,7 @@ export function getReactionSurfaceMaterial(recipeId, look, pattern) {
         uWormHead,
         uWormBody,
         uClaimOrigin: { value: new THREE.Vector4() },
-        uCubeHalf, uCubeGap
+        uCubeHalf, uCubeGap, uFlashCap
       },
       vertexShader,
       fragmentShader,
@@ -817,16 +822,21 @@ export function ReactionSurfaceSkin({ recipe, look, pattern, count, cellData, me
  */
 export function ElementalSurfaceSkin({ element, color, accent, count, cellData, quality, meshRef }) {
   const highDetail = quality?.accents !== false;
-  const material = useMemo(
-    () => getElementalSurfaceMaterial(element, color, accent, highDetail),
-    [element, color, accent, highDetail]
-  );
+  // Water's drips and ice's icicles ride the same mesh as a second group
+  // (elementalAdornments.js): the frame loop already writes every material in it.
+  const slots = adornmentSlots(element, quality);
+  const material = useMemo(() => {
+    const shell = getElementalSurfaceMaterial(element, color, accent, highDetail);
+    const adorn = slots > 0 ? getElementalAdornmentMaterial(element, color, accent) : null;
+    return adorn ? [shell, adorn] : shell;
+  }, [element, color, accent, highDetail, slots]);
 
   const detail = quality?.cellDetail ?? 1;
   const geometry = useMemo(() => {
     const [inner, skirt] = RESOLUTION[element] ?? RESOLUTION.water;
-    return attachCellAttributes(getShellGeometry(Math.max(2, Math.round(inner * Math.sqrt(detail))), detail < 1 ? 1 : skirt).clone(), cellData);
-  }, [element, cellData, detail]);
+    const shell = getShellGeometry(Math.max(2, Math.round(inner * Math.sqrt(detail))), detail < 1 ? 1 : skirt);
+    return attachCellAttributes(slots > 0 ? adornedShellGeometry(shell, slots) : shell.clone(), cellData);
+  }, [element, cellData, detail, slots]);
 
   // Ours to dispose — the clone is per mount. The cached source geometry and the
   // cached material outlive it and must not be touched.

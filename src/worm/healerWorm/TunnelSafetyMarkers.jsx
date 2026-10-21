@@ -11,7 +11,9 @@ import { nearSignScale } from './tunnelReadout.js';
 // Texture signs remain readable without bloom, particles, color vision or motion.
 // Six batched draws for the whole board, with ordinary depth testing: far-side
 // markers cannot show through the cube. Healing affordability lives in the HUD.
-const LABELS = ['3 SAFE', '2 SAFE', '1 SAFE', 'FATAL', 'CLOSED', 'LOCKED'];
+// By rides used: 0, 1, 2 (the last ride is next), 3 (worn out, caving in behind the
+// worm), then a collapsed tunnel's pit and a locked mouth (tunnelPits.js).
+const LABELS = ['3 RIDES', '2 RIDES', 'LAST RIDE', 'CAVING IN', 'PIT', 'LOCKED'];
 const dummy = new THREE.Object3D();
 const cameraPosition = new THREE.Vector3();
 const cameraQuaternion = new THREE.Quaternion();
@@ -50,7 +52,7 @@ function signTextures() {
     ctx.fillStyle = '#ffffff'; ctx.font = 'bold 49px Arial';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 234, 67);
     ctx.font = 'bold 23px Arial';
-    ctx.fillText(danger ? 'DO NOT ENTER' : index === 5 ? 'WAIT TO ENTER' : 'PASSES LEFT', 234, 113);
+    ctx.fillText(danger ? 'DO NOT ENTER' : index === 5 ? 'WAIT TO ENTER' : index === 2 ? 'THEN IT COLLAPSES' : 'RIDES LEFT', 234, 113);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;

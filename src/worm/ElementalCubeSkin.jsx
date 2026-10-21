@@ -51,7 +51,7 @@ import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './he
 import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
-import { publishWormUniforms, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
+import { publishWormUniforms, publishFlashCap, uCubeHalf, uCubeGap } from './healerWorm/elementalUniforms.js';
 import { expandedElementalQuality, elementalHalfExtent } from './healerWorm/elementalExpansion.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { getWormStickerWorldPos, wormExpansion } from './wormExpansion.js';
@@ -145,6 +145,7 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
   // Device budget. Read once per mount: the tier only depends on facts that do not
   // change mid-session, and re-resolving it per frame would churn the cell memo.
   const separated = useGameStore(s => !!s.wormExplodeActive || s.explosionT > 0);
+  const reduceFlashing = useGameStore(s => !!s.settings?.reduceFlashing);
   const quality = useMemo(
     () => expandedElementalQuality(resolveElementalQuality({ mobile: isMobile, reducedMotion: prefersReducedMotion(), cubeSize: size }), size, separated),
     [size, separated]
@@ -255,6 +256,7 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
     // The worm uniforms are shared objects, so one publish reaches every material;
     // reduced motion switches every proximity response off with them.
     publishWormUniforms(quality.animate);
+    publishFlashCap(reduceFlashing);
     const mats = Array.isArray(inst.material) ? inst.material : [inst.material];
     for (let m = 0; m < mats.length; m++) {
       const u = mats[m]?.uniforms;

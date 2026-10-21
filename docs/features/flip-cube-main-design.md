@@ -16,8 +16,29 @@ portal anchors as live WORM runs.
 
 WORM pads hold a fixed landing height, `WORM_PAD_HEIGHT` (0.3 since the low-hover pass);
 cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured jump (0.65 seconds normally; formation can extend it). Rescue
-jumps retain their no-ride provenance. The full Rumbler, animated landing compression and
-launch beats, ghosting and cinematic choreography remain roadmap work.
+jumps retain their no-ride provenance. Animated landing compression and launch beats,
+ghosting, cinematic choreography and the R3 chaser remain roadmap work.
+
+### Rumbler R1 + R2 and lethal pits — 2026-10-21
+
+- **The Rumbler (phase 5) ships R1 and R2** (`healerWorm/rumbler.js`, `Rumbler.jsx`,
+  `rumbleBand.js`), to the §5 contract: belts are walked with `getNextSurfacePosition`,
+  crests use the wrapped belt distance, at most 8 cells lift (none from 8×8 up) through a
+  render bridge, the band carries the rest, the model is seeded and advances only while the
+  game runs (no catch-up), and reduced motion gets a still tint. R2 reads `rotationClock`
+  (axis, every slice index and, new, each plane's turn direction `sliceDirs`) and rides the
+  turning layer round at dispatch. The first crest under the head gets Mobi's §6.3 line in
+  play ("Feel that rumble?…"), once per save. R3 is still open (§13 item 3).
+- **Lethal pits ship, with one rule change** (decided 2026-10-21). With the old rule a pit
+  could never meet a living worm: a tunnel only voided during the fourth ride, which killed
+  it. Now the third ride is the last and collapses the tunnel *behind* the worm once its tail
+  is out and nothing of it lies on either mouth (a funded last ride heals instead). Both pads
+  drop into their slots as pits. Crawling up to one stops the worm at the rim with the
+  caution rescue (turn or jump clear), and a timeout or a landing in it is a fall (death
+  reason `'pit'`); a surround mends it. The HUD's contract-item-7 warning comes before the
+  third ride ("Last ride · then it collapses"). Pits stay visible under reduced motion and
+  with decorative tunnels off. Tunnel-keyed wear now follows its mouths through slice turns
+  (`remapTunnelKeys`), which it did not before. See `healerWorm/tunnelPits.js`.
 
 ### Tape-height WORM platforms — 2026-09-26 correction
 
@@ -165,10 +186,9 @@ short hop above it, and the gap carries the drama instead.
 - **One entry rule.** `tunnelEntryRule(state)` ('pad', or 'crawl' in demo lessons) feeds both
   the crawler and the HUD. The pad route's danger copy says "don't jump on it" and "crawl
   under it", and Mobi's WORM intro says to jump onto a flip pad.
-- **Not yet: lethal pits.** A voided pad still stands, and crawling under it is safe; only
-  landing on it kills. Decision #3 (§4.4) needs the pad to drop into its slot, crawling into
-  the mouth to kill, and the pit to stay visible with reduced motion or tunnels hidden. Until
-  then, the HUD describes what actually happens rather than the decision.
+- **Lethal pits shipped 2026-10-21** (see the checkpoint above): the pad drops into its slot,
+  crawling into the mouth (past the rim's rescue window) or landing in it kills, and the pit
+  stays visible with reduced motion or tunnels hidden.
 
 ### Implementation decisions
 
@@ -407,7 +427,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 
 ### 4.4 Knock-on rules
 
-- **Void.** The thresholds are unchanged: 3 safe rides, and the 4th collapses mid-ride. The worn regime starts at $u = 3$, which is exactly $w = 3/4 \ge k^*$, so a pad warns you on precisely the ride that would kill you (§9.6). Pits (decided) keep the old contact lethality honest: a collapsed tunnel is a hole.
+- **Void.** Revised 2026-10-21: the 3rd ride is the last and collapses the tunnel behind the worm into pits; a 4th ride can only begin before that collapse lands, and it still collapses mid-ride. Originally: 3 safe rides, and the 4th collapses mid-ride. The worn regime starts at $u = 3$, which is exactly $w = 3/4 \ge k^*$, so a pad warns you on precisely the ride that would kill you (§9.6). Pits (decided) keep the old contact lethality honest: a collapsed tunnel is a hole.
 - **Active-tunnel cap.** Open pads no longer block crossings. `MAX_ACTIVE_TUNNEL_PAIRS` was halved to 10 because open holes "became terrain" that the player could not cross without falling in, so re-tune it upward after playtest.
 - **Heals.** Economics are unchanged. On a heal, both pads settle home in a spring cascade, alongside the existing `cubiePops` burst.
 - **Rotations.** Pads ride their layer. A cell whose contents are still turning into place is not enterable until the turn commits (existing rest-read rules).
@@ -704,7 +724,7 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 | 2 | Cube-mode pads, `PadSprings`, symmetric pulses, menu pads. | §3 holds in every cube mode; perf within budget; existing tunnel and flip tests green. |
 | 3 | Mobi and WORM³ copy pass (can run in parallel with 2). | Copy tests updated; `COPY_STYLE.md` updated. |
 | 4 | WORM `tunnelEntry: 'pad'`, beats, HUD, Story and demo updates; switch the default after playtest. | Sim tests parameterised over both rules; Story route tests pass using jumps. |
-| 5 | Rumbler R1 + R2. | No sim writes; gates tested with a fake clock; Mega budget holds. |
+| 5 | Rumbler R1 + R2. **Shipped 2026-10-21.** | No sim writes; gates tested with a fake clock; Mega budget holds. |
 | 6 | Hero passes: intro, loading, victory. | Bundle budgets hold (the intro CSS is at its ceiling). |
 | 7 | R3 chaser experiment; telemetry for the k* boundary. | Behind a flag; one Story level. |
 

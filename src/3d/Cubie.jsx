@@ -4,7 +4,7 @@ import { advancePlatformFormation, platformFormationHeld } from '../worm/platfor
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { burrowBridge, burrowCubieLift } from '../worm/burrowBridge.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, effectiveFlipPads, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, cubiePitFaces, wormPieceRaised, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, effectiveFlipPads, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
@@ -428,8 +428,12 @@ const Cubie = React.forwardRef(function Cubie({
     if (pieceRef.current) delete pieceRef.current.userData.wormPlatformFormation;
   }, [wormRunId]);
   const burrowOffset = useMemo(() => new THREE.Vector3(), []);
+  // A collapsed tunnel's pad drops back into its slot as a pit (tunnelPits.js). The
+  // selector returns only this piece's pit faces, so a collapse re-renders the two
+  // pit pieces and no others. The see-through shell stays: it reads as the hole.
+  const pitFaces = useGameStore(s => wormPads ? cubiePitFaces(cubie, effectiveFlipCap, size, s.wormPitGrids) : '');
   const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && flipPads !== 'off'))
-    && cubieHasFlippedFace(cubie, effectiveFlipCap);
+    && (wormPads ? wormPieceRaised(cubie, effectiveFlipCap, pitFaces) : cubieHasFlippedFace(cubie, effectiveFlipCap));
   // Mega normally omits individual bodies. Materialize a body for a raised
   // piece and keep it through its return; otherwise it would still be a sheet.
   const [returningBody, setReturningBody] = useState(false);

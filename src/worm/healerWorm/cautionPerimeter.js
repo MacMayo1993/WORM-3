@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cubieHasFlippedFace } from '../../game/raisedCubie.js';
+import { cubiePitFaces, wormPieceRaised } from '../../game/raisedCubie.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
 
@@ -9,7 +9,9 @@ const FACES = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // Build the boundary of the exposed floor opening, not a separate fence around
 // every portal sticker. A raised corner exposes three faces; their shared cube
 // edges are inside the opening and must not carry crossing strips of tape.
-export function buildCautionPerimeter(positions, cubies, size, cap, separateCubies = false, rotation = null) {
+// A collapsed tunnel's pit keeps tape round its own mouth, but its piece is no
+// longer raised (pitGrids, tunnelPits.js), so the rest of the piece goes unfenced.
+export function buildCautionPerimeter(positions, cubies, size, cap, separateCubies = false, rotation = null, pitGrids = null) {
   const faces = new Map();
   const visited = new Set();
   const addFace = (tile, dirKey) => {
@@ -21,7 +23,8 @@ export function buildCautionPerimeter(positions, cubies, size, cap, separateCubi
     const key = `${tile.x},${tile.y},${tile.z}`;
     if (visited.has(key)) continue;
     visited.add(key);
-    if (!cubieHasFlippedFace(cubies[tile.x]?.[tile.y]?.[tile.z], cap)) continue;
+    const cubie = cubies[tile.x]?.[tile.y]?.[tile.z];
+    if (!wormPieceRaised(cubie, cap, cubiePitFaces(cubie, cap, size, pitGrids))) continue;
     for (let axis = 0; axis < 3; axis++) {
       if (tile[AXES[axis]] === size - 1) addFace(tile, FACES[axis * 2]);
       if (tile[AXES[axis]] === 0) addFace(tile, FACES[axis * 2 + 1]);

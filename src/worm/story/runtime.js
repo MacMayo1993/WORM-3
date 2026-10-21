@@ -351,18 +351,23 @@ export function storyTunnelPassagesBlock(sim, practice) {
 }
 
 export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
+  // A tunnel worn out by its third ride is a pair of pits now (tunnelPits.js), not an
+  // open pair to ride: it must not hold one of the two slots, or two of them would
+  // stop the level supplying tunnels at all. Its mouths stay flipped, so openPair
+  // below never reopens them; a surround mends them.
+  const open = Math.max(0, activeCount - sim.voidTunnelKeys.size);
   if (storyTunnelSupplyComplete(sim, practice)) {
     if (practice.pendingMouths?.length) practice.pendingMouths.length = 0;
     return null;
   }
   if (!sim.alive || state.wormPaused || sim.phase !== 'crawling' || storyTunnelPassagesBlock(sim, practice) ||
       sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.jumpRescueHeld || sim.elementalFocusT > 0 ||
-      state.animState || liveRotation.active || activeCount >= 2) return null;
+      state.animState || liveRotation.active || open >= 2) return null;
   // A missed chain must not consume the last chance to finish. Reuse the first
   // two stable pairs only after the authored network AND every tail route clear.
   // Pending mouths reserve both endpoints from future food refills; placement
   // below still waits for existing pickups and the body to leave safely.
-  if (!practice.pendingMouths?.length && activeCount === 0 && !sim.tunnelPassages.length &&
+  if (!practice.pendingMouths?.length && open === 0 && !sim.tunnelPassages.length &&
       Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target)) {
     practice.pendingMouths = [...(practice.retryMouths ?? [])];
   }
@@ -373,7 +378,7 @@ export function replenishStoryTunnel(sim, practice, state, size, activeCount = g
   const needsSupply = (practice.healTarget != null && sim.healed < practice.healTarget) || needsTraversal ||
     Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target);
   if (!practice.pendingMouths?.length && !needsSupply) return null;
-  if (!practice.pendingMouths?.length && activeCount === 0 && sim.tunnelPassages.length) return null;
+  if (!practice.pendingMouths?.length && open === 0 && sim.tunnelPassages.length) return null;
   const map = buildManifoldGridMap(state.cubies, size);
   const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
   occupied.add(tileKey(sim.pos));

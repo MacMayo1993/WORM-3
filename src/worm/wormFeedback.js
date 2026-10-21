@@ -13,6 +13,8 @@ export const WORM_HAPTICS = {
   shieldHit: [35, 35, 22], jump: [12, 22, 8], boost: [18, 30, 12],
   cut: [40, 30, 35], death: [55, 45, 85], rocket: [35, 25, 70, 25, 45],
   rocketLand: [25, 30, 10], magnet: [12, 25, 12, 25, 18],
+  collapse: [30, 40, 20, 60, 45],
+  rumble: [8, 30, 6],
 };
 
 const thump = (freq = 130, gain = 0.24) => tone({ freq, freqTo: 55, dur: 0.10, gain });
@@ -66,13 +68,24 @@ const WORM_SFX = {
     tone({ freq: 990, dur: 0.18, gain: 0.13, when: 0.07 });
   },
   recharge() { tone({ freq: 1100, dur: 0.06, gain: 0.08 }); },
+  // The Rumbler's crest rolling under the head: a low, short swell, felt more than heard.
+  rumble() {
+    noise({ dur: 0.42, type: 'lowpass', freq: 140, gain: 0.16 });
+    tone({ freq: 62, freqTo: 48, dur: 0.4, gain: 0.12 });
+  },
+  // A worn-out tunnel caving in behind the worm: a low crumble and a sinking note.
+  collapse() {
+    noise({ dur: 0.55, type: 'lowpass', freq: 260, gain: 0.26 });
+    tone({ freq: 140, freqTo: 42, dur: 0.6, gain: 0.2 });
+    thump(90, 0.2);
+  },
   shieldHit() {
     noise({ dur: 0.13, freq: 650, gain: 0.27 });
     thump(100, 0.32);
   },
 };
 const vocabulary = { sfx: WORM_SFX, haptics: WORM_HAPTICS };
-const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, elementFusion: 3, dive: 3, exit: 3,
+const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, collapse: 3, elementFusion: 3, dive: 3, exit: 3, rumble: 0,
   enemyDown: 3, shotHit: 2, orb: 2, shot: 1, recharge: 0 };
 
 /** Per-run arbitration. Uses the game clock: no timers or catch-up buzzes. */

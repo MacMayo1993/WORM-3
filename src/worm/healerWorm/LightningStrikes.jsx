@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { prefersReducedMotion } from '../../utils/device.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { GENTLE_STRIKE } from './elementalUniforms.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { wormRaisedAmount } from '../../game/raisedCubie.js';
 import { FACE_NORMALS } from './constants.js';
@@ -15,6 +17,11 @@ import { STORM } from './lightningStorm.js';
 //           inside them. The marker is the warning, so it is readable without any flash.
 //   strike  a column of light down the tile's normal and a white disc, for STORM.flash.
 //   mouth   a crackling ring on each end of a charged tunnel.
+//
+// Settings → Scene → Lightning flashes, "Reduced": the mark never pulses faster
+// than about 1.6 a second, a strike swells and fades at a third of its brightness
+// instead of landing at full white, and a charged mouth glows steadily. Reduced
+// motion keeps its own, stiller treatment (no column, no spin).
 
 const Z = new THREE.Vector3(0, 0, 1);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -58,7 +65,9 @@ export function LightningStrikes({ stormRef, worm, size }) {
         const storm = stormRef.current;
         const mouths = worm.chargedMouths?.();
         if (!storm.spots.length && !storm.flashes.length && !mouths?.length) return;
-        const reduced = prefersReducedMotion();
+        const settings = useGameStore.getState().settings;
+        const reduced = !!settings?.reducedMotion || prefersReducedMotion();
+        const gentle = !reduced && !!settings?.reduceFlashing;
         const time = clock?.elapsedTime ?? 0;
 
         // Put `mesh`'s next instance on `tile`, standing off its surface by `lift`, in the
@@ -91,22 +100,26 @@ export function LightningStrikes({ stormRef, worm, size }) {
 
         for (const spot of storm.spots) {
             const u = Math.min(1, spot.age / spot.delay);
-            // The last fifth of the charge pulses faster so the final beat reads as "now".
-            const pulse = reduced ? 1 : 0.75 + 0.25 * Math.sin(time * (u > 0.8 ? 30 : 10));
+            // The last fifth of the charge pulses faster so the final beat reads as "now"
+            // (the closing ring says it without the fast pulse under reduced flashing).
+            const pulse = reduced ? 1 : 0.75 + 0.25 * Math.sin(time * (u > 0.8 && !gentle ? 30 : 10));
             place(r.ring, spot.tile, MARK_COLOR, 0.55 + 0.45 * u, reduced ? 1 : 2.1 - 1.1 * u, 0.1);
             place(r.diamond, spot.tile, MARK_COLOR, (0.5 + 0.5 * u) * pulse, 1, 0.1, reduced ? 0 : time * (1 + 3 * u));
             place(r.disc, spot.tile, MARK_COLOR, 0.12 + 0.4 * u * u * pulse, 1, 0.09);
         }
         for (const flash of storm.flashes) {
             const fade = 1 - Math.min(1, flash.age / STORM.flash);
-            place(r.disc, flash.tile, BOLT_COLOR, reduced ? 0.35 * fade : fade * fade, 1.5 - 0.5 * fade, 0.12);
-            if (!reduced) place(r.column, flash.tile, BOLT_COLOR, fade * fade, 0.06 + 0.1 * fade, 0, 0, 3.2);
+            // Gentle: rise and fall over the flash, never a full-white onset.
+            const swell = Math.sin(Math.PI * (1 - fade));
+            const disc = reduced ? 0.35 * fade : gentle ? GENTLE_STRIKE.disc * swell : fade * fade;
+            place(r.disc, flash.tile, BOLT_COLOR, disc, 1.5 - 0.5 * fade, 0.12);
+            if (!reduced) place(r.column, flash.tile, BOLT_COLOR, gentle ? GENTLE_STRIKE.column * swell : fade * fade, 0.06 + 0.1 * fade, 0, 0, 3.2);
         }
         if (mouths?.length) {
             const lift = wormRaisedAmount(size) + 0.12;
             for (const hit of mouths) {
                 for (const end of [hit.tunnel.entry, hit.tunnel.exit]) {
-                    const flicker = reduced ? 0.7 : 0.55 + 0.45 * Math.abs(Math.sin(time * 9 + end.x * 2.1 + end.y * 3.7 + end.z * 1.3));
+                    const flicker = reduced ? 0.7 : gentle ? 0.75 : 0.55 + 0.45 * Math.abs(Math.sin(time * 9 + end.x * 2.1 + end.y * 3.7 + end.z * 1.3));
                     place(r.crackle, end, CHARGE_COLOR, flicker, 1.15 + (reduced ? 0 : 0.08 * Math.sin(time * 5)), lift, reduced ? 0 : time * 1.5);
                 }
             }

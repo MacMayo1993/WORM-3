@@ -75,6 +75,10 @@ export const makeWormSessionDefaults = () => ({
   wormViewPower: null,
   // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
   wormSpecialNotice: null,
+  // Grid ids of the stickers whose tunnels collapsed into pits (tunnelPits.js).
+  wormPitGrids: [],
+  // A line Mobi says in play the first time something happens: { id, text, seq }.
+  wormMobiLine: null,
   // { color, combo, seq } for the most recent orb pickup — drives the HUD's
   // screen-edge confirmation flash.
   wormOrbFlash: null,

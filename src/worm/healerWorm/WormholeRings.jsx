@@ -27,6 +27,8 @@ import { BASE_TAIL_LENGTH, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 // Gives players a clear visual cue for all wormhole locations on the cube surface.
 const _ringDummy = new THREE.Object3D();
 const _ringUp = new THREE.Vector3();
+const _mawDummy = new THREE.Object3D();
+const _mawZ = new THREE.Vector3(0, 0, 1);
 const _bubbleDummy = new THREE.Object3D();
 const _sparkDummy = new THREE.Object3D();
 const _cautionDummy = new THREE.Object3D();
@@ -53,6 +55,7 @@ const _sparkBlack = new THREE.Color('#080308');
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
 const VOID_INNER_COLOR = '#121a3b';   // cool inverted core
 const VOID_BUBBLE_COLOR = '#39ff14';  // neon green ooze
+const VOID_MAW_COLOR = '#05010c';     // the pit: nearly black, a hint of violet
 const CRITICAL_ARC_COLOR = '#ff493d';  // electrical warning before full void
 const _criticalArcColor = new THREE.Color(CRITICAL_ARC_COLOR);
 const _tapeYellow = new THREE.Color('#ffe000');
@@ -132,6 +135,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
     const moteRef = useRef();       // affordability sparks on all flipped tiles
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
+    const mawRef = useRef();        // the dark hole of a collapsed tunnel's pit
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
     const sparkRef = useRef();      // warning electricity when tunnel is one trip from void
@@ -238,7 +242,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         const tapes = tapeRef.current;
         const voidFrames = voidFrameRef.current;
         const motes = moteRef.current;
-        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames || !motes) return;
+        const maws = mawRef.current;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames || !motes || !maws) return;
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? _EMPTY_SET;
@@ -279,10 +284,18 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
 
             if (isVoid) {
-                // ── Void swamp portal ───────────────────────────────────────
-                // Outer ring: slow reverse rotation, sluggish dying pulse
-                _ringDummy.rotateOnAxis(n, -t * 0.35 + voidIdx * 1.1);
-                const outerPulse = 0.9 + Math.sin(t * 0.85 + voidIdx * 2.3) * 0.1;
+                // ── A collapsed tunnel: a pit in the floor (tunnelPits.js) ──────
+                // The maw: a dark disc in the slot the pad dropped into, under the
+                // rings. Static, so the pit reads with reduced motion too.
+                _mawDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.02);
+                _mawDummy.quaternion.setFromUnitVectors(_mawZ, n);
+                _mawDummy.updateMatrix();
+                maws.setMatrixAt(voidIdx, _mawDummy.matrix);
+                // Outer ring: slow reverse rotation, sluggish dying pulse (held still
+                // under reduced motion)
+                const vt = reducedMotion ? 0 : t;
+                _ringDummy.rotateOnAxis(n, -vt * 0.35 + voidIdx * 1.1);
+                const outerPulse = 0.9 + Math.sin(vt * 0.85 + voidIdx * 2.3) * 0.1;
                 _ringDummy.scale.setScalar(outerPulse);
                 _ringDummy.updateMatrix();
                 voidOuter.setMatrixAt(voidIdx, _ringDummy.matrix);
@@ -290,14 +303,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 // Inner ring: slightly different counter-rotation phase, smaller
                 _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
                 _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
-                _ringDummy.rotateOnAxis(n, t * 0.2 - voidIdx * 0.9); // counter-phase
-                const innerPulse = 0.7 + Math.sin(t * 1.1 + voidIdx * 1.7) * 0.08;
+                _ringDummy.rotateOnAxis(n, vt * 0.2 - voidIdx * 0.9); // counter-phase
+                const innerPulse = 0.7 + Math.sin(vt * 1.1 + voidIdx * 1.7) * 0.08;
                 _ringDummy.scale.setScalar(innerPulse);
                 _ringDummy.updateMatrix();
                 voidInner.setMatrixAt(voidIdx, _ringDummy.matrix);
 
                 // Void swamp bubbles — rising gas from the dead portal
-                for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < MAX_BUBBLES; b++) {
+                for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < MAX_BUBBLES && !reducedMotion; b++) {
                     const si = (i * BUBBLES_PER_VOID + b) * 3;
                     const phase = (t * 0.55 + bubbleSeeds[si + 2]) % 1;
                     const lift = phase * 0.72;
@@ -533,6 +546,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         liveMesh.count = liveIdx;
         voidOuter.count = voidIdx;
         voidInner.count = voidIdx;
+        maws.count = voidIdx;
         bubbles.count = bubbleIdx;
         sparks.count = sparkIdx;
         poles.count = poleIdx;
@@ -548,6 +562,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         if (voidIdx > 0) {
             voidOuter.instanceMatrix.needsUpdate = true;
             voidInner.instanceMatrix.needsUpdate = true;
+            maws.instanceMatrix.needsUpdate = true;
         }
         if (bubbleIdx > 0) bubbles.instanceMatrix.needsUpdate = true;
         if (sparkIdx > 0) {
@@ -574,6 +589,12 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             <instancedMesh ref={liveRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.42, 0.025, 8, 32]} />
                 <meshBasicMaterial color="#ff44ff" vertexColors transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* A collapsed tunnel's pit: a dark hole in its slot, drawn under the rings */}
+            <instancedMesh name="worm-pit-maw" ref={mawRef} args={[undefined, undefined, MAX_RINGS]} count={0} frustumCulled={false} renderOrder={-0.5}>
+                <circleGeometry args={[0.4, 32]} />
+                <meshBasicMaterial color={VOID_MAW_COLOR} transparent opacity={0.92} depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
             </instancedMesh>
 
             {/* Dead void outer ring — sickly swamp green, slow reverse rotation */}

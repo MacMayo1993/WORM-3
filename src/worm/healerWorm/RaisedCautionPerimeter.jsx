@@ -17,10 +17,11 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
   const lastExpansion = useRef(NaN);
   const motion = useRef({ active: false, txn: -1, layouts: null, perimeter: null });
   const cap = useGameStore(selectEffectiveFlipCap);
+  const pitGrids = useGameStore(s => s.wormPitGrids);
   const layouts = useMemo(() => [
-    buildCautionPerimeter(positions, cubies, size, cap),
-    buildCautionPerimeter(positions, cubies, size, cap, true),
-  ], [positions, cubies, size, cap]);
+    buildCautionPerimeter(positions, cubies, size, cap, false, null, pitGrids),
+    buildCautionPerimeter(positions, cubies, size, cap, true, null, pitGrids),
+  ], [positions, cubies, size, cap, pitGrids]);
   const capacity = Math.max(...layouts.map(p => p.edges.length));
   const poleCapacity = Math.max(1, ...layouts.map(p => p.posts.length));
   const geometry = useMemo(() => {
@@ -55,7 +56,7 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
         if (motion.current.txn !== liveRotation.txnId || motion.current.layouts !== layouts) {
           motion.current.txn = liveRotation.txnId;
           motion.current.layouts = layouts;
-          motion.current.perimeter = buildCautionPerimeter(positions, cubies, size, cap, false, liveRotation);
+          motion.current.perimeter = buildCautionPerimeter(positions, cubies, size, cap, false, liveRotation, pitGrids);
         }
         perimeter = motion.current.perimeter;
       }
