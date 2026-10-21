@@ -5,7 +5,6 @@ import { ordinaryGeometry, flippedGeometry, ordinaryMaterial, flippedMaterial } 
 export default function TileBoundary({ flipped }) {
     return <TileSurfaceInstance
         name={flipped ? 'flipped-tile-border' : 'tile-border'}
-        position={[0, 0, 0.012]}
         geometry={flipped ? flippedGeometry : ordinaryGeometry}
         material={flipped ? flippedMaterial : ordinaryMaterial}
     />;

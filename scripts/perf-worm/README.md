@@ -68,6 +68,15 @@ Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch 
 `--freeze` pauses at the start of active play. `--seed=71` seeds `Math.random`;
 wall-clock-dependent activity can still make separate launches differ. The runner
 checks the actual launched board size, rather than only labelling the requested size.
+`--style=eyeball` wears one tile style on every face, `--style=eyeball,marble,…` one
+per face (1–6, cycled); it is applied after the wizard and before Mobi's skip, so the
+run's own warm-up sees it. The runner starts from the main menu with `?unlockall=1`
+and the mode gate set (as `e2e/helpers.js` does), since a fresh save goes straight
+into Story level 1 and a production build locks the larger boards.
+
+`frames` and `attribute` print the slowest frames with the program links and React
+commits they carried. `attribute` also names every `renderer.compile` call that
+linked programs during the window (warm-ups that ran mid-play), with its caller.
 
 | Mode | Output |
 | --- | --- |
@@ -76,6 +85,8 @@ checks the actual launched board size, rather than only labelling the requested 
 | `react` | commit rates plus render counts per component (DOM root and R3F root) |
 | `ab` | pauses the run so every window renders the same scene, then toggles in-page patches: **A** transparent double-sided materials in one pass, **B** instanced attributes upload only the live range, **C** hidden subtrees skip world-matrix updates, **D** inward-facing antipodal sticker backs hidden |
 | `batching` | alternates individual tile meshes / three cage material groups with the production batches in one frozen scene; pins reduced FX and DPR 1; records draw ownership and optionally captures paired real-draw images |
+| `census` | the scene graph three.js walks every frame: objects, objects under a visible chain, meshes and visible meshes, per owning component |
+| `swaps` | applies each whole-cube view power (`--views=view-glass,…`, default all) and restores it, twice each, and prints the worst frame of every change with its links and R3F commits; use with `--freeze` |
 
 `batching` uses `batching.js` to reconstruct individual tile meshes from the real
 component props and split merged cages back into their three original colour/alpha

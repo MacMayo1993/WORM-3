@@ -55,6 +55,9 @@ function commitCost(frames) {
     meanScriptMs: { noCommit: r1(mean(none)), domCommit: r1(mean(dom)), r3fCommit: r1(mean(r3f)) }
   };
 }
+// The slowest frames, with what they carried: links are compile hitches, commits React work.
+const worst = (frames, n = 8) => [...frames].filter((r) => r.cbs > 0).sort((a, b) => b.script - a.script).slice(0, n)
+  .map((r) => `${r1(r.script).toFixed(1).padStart(7)} ms  links ${r.link}  r3f commits ${r.cR3f}  dom commits ${r.cDom}  draws ${r.draw}  ${r.s ?? ''}`).join('\n');
 const top = (obj, n, fmt) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n).map(fmt).join('\n');
 
 // ── Browser + navigation ─────────────────────────────────────────────────────
@@ -85,23 +88,32 @@ const click = async (re, timeout = 30000) => {
   await b.waitFor({ state: 'visible', timeout });
   await b.click();
 };
-await page.goto(URL, { waitUntil: 'load' });
-await page.getByRole('button', { name: 'Skip intro and enter game' }).click({ timeout: 60000 });
-await click(/^\s*play\s*→?\s*$/i);
+// A brand-new save goes from the intro straight into Story level 1, and a
+// production build locks the board sizes and modes behind progress: start from
+// the menu with everything open, as e2e/helpers.js does.
+await page.addInitScript(() => { if (!localStorage.getItem('worm3_mode_gate')) localStorage.setItem('worm3_mode_gate', 'gated'); });
+await page.goto(`${URL}${URL.includes('?') ? '&' : '?'}unlockall=1`, { waitUntil: 'load' });
+await page.getByRole('button', { name: /skip intro/i }).click({ timeout: 60000 });
+await click(/^\s*play\b/i);
 await click(/play worm/i);
-await page.getByRole('button', { name: 'Free Play', exact: true }).click();
-await click(/continue/i);
-let sized = !args.size;
-for (let i = 0; i < 10; i++) {
-  await page.waitForTimeout(600);
-  if (!sized) {
-    const size = page.getByRole('button', { name: `${args.size} by ${args.size}`, exact: true });
-    if (await size.count()) { await size.first().click(); sized = true; }
+await page.getByRole('combobox', { name: 'Worm mode section', exact: true }).selectOption('free');
+const wizard = page.getByRole('dialog', { name: 'WORM setup', exact: true });
+for (const category of ['Character', 'Scene', 'Colors', 'Style', 'Gameplay']) {
+  const panel = wizard.getByRole('region', { name: category, exact: true });
+  await panel.waitFor({ state: 'visible', timeout: 30000 });
+  if (category === 'Gameplay' && args.size) {
+    await page.getByRole('button', { name: `${args.size} by ${args.size}`, exact: true }).first().click();
   }
-  const play = page.locator('button:visible', { hasText: /^\s*play\s*→?\s*$/i });
-  if (await play.count()) { await play.first().click(); break; }
-  await click(/next/i);
+  await wizard.locator('.mode-wizard-primary').click();
 }
+// --style=eyeball (every face) or --style=eyeball,marble,… (faces 1–6, cycled):
+// the wizard has already applied its own styles, and the scramble's warm-up runs
+// after Mobi's skip, so this lands before anything is compiled for the run.
+if (args.style) await page.evaluate((list) => {
+  const styles = String(list).split(',');
+  const manifoldStyles = Object.fromEntries([1, 2, 3, 4, 5, 6].map((face, i) => [face, styles[i % styles.length]]));
+  window.__store.setState(s => ({ settings: { ...s.settings, manifoldStyles } }));
+}, args.style);
 await click(/^\s*skip\s*$/i); // Mobi's intro
 await page.evaluate(async (base) => {
   if (window.__store) return;
@@ -214,6 +226,7 @@ if (MODE === 'frames' || MODE === 'react') {
   const { frames, renders } = await page.evaluate(() => ({ frames: window.__perf.frames, renders: window.__perf.renders }));
   Object.assign(out, summarize(frames), { reactCommits: commitCost(frames), phases: phases(frames), deaths, heapMB: [r1(heap0.usedSize / 1e6), r1(heap1.usedSize / 1e6)] });
   console.log(JSON.stringify(out, null, 2));
+  console.log(`\nSlowest frames:\n${worst(frames)}`);
   if (MODE === 'react') console.log(`\nComponent renders in ${MS / 1000}s:\n${top(renders, 40, ([k, v]) => `${String(v).padStart(6)}  ${k}`)}`);
   if (args.profile) {
     const { profile } = await cdp.send('Profiler.stop');
@@ -233,8 +246,20 @@ if (MODE === 'attribute') {
   console.log('renderer:', JSON.stringify(await page.evaluate(`(${inpage})()`)));
   await page.evaluate(() => {
     const W = window.__perf;
-    W.frames = []; W.byOwner = {}; W.passes = {}; W.uploads = {}; W.churn = {}; W.linkLog = [];
+    W.frames = []; W.byOwner = {}; W.passes = {}; W.uploads = {}; W.churn = {}; W.linkLog = []; W.compileLog = [];
     W.trackUploads(false);
+    // Links outside a draw come from renderer.compile (warm-ups): name the caller.
+    if (!W.gl.__compileLogged) {
+      const compile = W.gl.compile;
+      W.gl.compile = function (...a) {
+        const links = W.c.link, t0 = performance.now();
+        try { return compile.apply(this, a); } finally {
+          if (W.attrib && W.c.link > links) W.compileLog.push({ links: W.c.link - links, ms: Math.round(performance.now() - t0),
+            s: W.sample?.() ?? null, caller: (new Error().stack || '').split('\n').slice(2, 5).map(l => l.trim().replace(/\(?http[^)]*\/assets\//, '(')).join(' < ') });
+        }
+      };
+      W.gl.__compileLogged = true;
+    }
     W.attrib = true; W.churnOn = true;
     W.ownerTimer = setInterval(() => W.buildOwners(), 1000);
     const loop = () => { if (!W.attrib) return; W.trackUploads(true); requestAnimationFrame(loop); };
@@ -244,11 +269,12 @@ if (MODE === 'attribute') {
   const r = await page.evaluate(() => {
     const W = window.__perf;
     W.attrib = false; W.churnOn = false; clearInterval(W.ownerTimer);
-    return { n: W.frames.length, byOwner: W.byOwner, passes: W.passes, uploads: W.uploads, churn: W.churn, links: W.linkLog, frames: W.frames };
+    return { n: W.frames.length, byOwner: W.byOwner, passes: W.passes, uploads: W.uploads, churn: W.churn, links: W.linkLog, frames: W.frames, compiles: W.compileLog };
   });
   const per = (x) => x / r.n;
   Object.assign(out, summarize(r.frames), { phases: phases(r.frames), deaths });
   console.log(JSON.stringify(out, null, 2));
+  console.log(`\nSlowest frames:\n${worst(r.frames)}`);
   console.log(`\nRender passes per frame:\n${top(r.passes, 10, ([k, v]) => `${per(v).toFixed(2).padStart(7)}  ${k}`)}`);
   const owners = Object.fromEntries(Object.entries(r.byOwner).map(([k, v]) => [k, v.draws]));
   console.log(`\nDraws per frame by owner (triangles/frame):\n${top(owners, 30, ([k, v]) => `${per(v).toFixed(1).padStart(7)} ${String(Math.round(per(r.byOwner[k].tris))).padStart(8)}  ${k}`)}`);
@@ -256,7 +282,56 @@ if (MODE === 'attribute') {
   console.log(`\nUploads, KB per frame:\n${top(uploads, 20, ([k, v]) => `${(per(v) / 1024).toFixed(1).padStart(7)}  ${k}`)}`);
   console.log(`\nProgram re-selection per frame (material state that sends three.js back through getProgram):\n${top(r.churn, 20, ([k, v]) => `${per(v).toFixed(2).padStart(7)}  ${k}`)}`);
   const links = r.links.reduce((acc, l) => ((acc[l.owner] = (acc[l.owner] || 0) + 1), acc), {});
+  if (r.compiles.length) console.log(`\nrenderer.compile calls that linked programs:\n${r.compiles.map(c => `${String(c.links).padStart(5)} links ${String(c.ms).padStart(5)} ms  ${c.s ?? ''}  ${c.caller}`).join('\n')}`);
   console.log(`\nShader program links in ${MS / 1000}s by the draw that triggered them (${r.links.length} total):\n${top(links, 25, ([k, v]) => `${String(v).padStart(5)}  ${k}`)}`);
+}
+
+// The scene graph three.js walks every frame: updateMatrixWorld visits every
+// object, projectObject every object under a visible chain. Per owning component.
+if (MODE === 'census') {
+  await page.evaluate(`(${inpage})()`);
+  const census = await page.evaluate(() => {
+    const W = window.__perf, rows = {};
+    let total = 0, shown = 0, autoUpdate = 0, meshes = 0, shownMeshes = 0;
+    const walk = (o, chainVisible) => {
+      const vis = chainVisible && o.visible;
+      total++; if (vis) shown++; if (o.matrixAutoUpdate) autoUpdate++;
+      const mesh = o.isMesh || o.isLine || o.isPoints || o.isSprite;
+      if (mesh) { meshes++; if (vis) shownMeshes++; }
+      const row = (rows[W.ownerOf(o)] ||= { objects: 0, shown: 0, meshes: 0, shownMeshes: 0 });
+      row.objects++; if (vis) row.shown++; if (mesh) { row.meshes++; if (vis) row.shownMeshes++; }
+      for (const c of o.children) walk(c, vis);
+    };
+    walk(W.scene, true);
+    return { total, shown, autoUpdate, meshes, shownMeshes, rows };
+  });
+  const { rows, ...totals } = census;
+  Object.assign(out, totals);
+  console.log(JSON.stringify(out, null, 2));
+  console.log(`\nObjects by owner (objects / under a visible chain / meshes / visible meshes):\n${top(Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, v.objects])), 40,
+    ([k]) => `${String(rows[k].objects).padStart(7)} ${String(rows[k].shown).padStart(7)} ${String(rows[k].meshes).padStart(7)} ${String(rows[k].shownMeshes).padStart(7)}  ${k}`)}`);
+}
+
+// Whole-cube look changes mid-run: each view power re-renders every sticker and
+// may meet programs the run never drew. The worst frame of each swap and back.
+if (MODE === 'swaps') {
+  await page.evaluate(`(${inpage})()`);
+  await page.evaluate(() => { window.__perf.attrib = true; });
+  out.swaps = [];
+  const views = String(args.views || 'view-classic,view-grid,view-sudokube,view-wireframe,view-glass,view-chrome,view-neon,view-gap,view-lego').split(',');
+  for (const view of [...views.flatMap(v => [v, null]), ...views.flatMap(v => [v, null])]) {
+    await page.evaluate(() => { const W = window.__perf; W.frames = []; W.linkLog = []; });
+    await page.evaluate(v => window.__store.setState({ wormViewPower: v }), view);
+    await page.waitForTimeout(+(args.settle || 1500));
+    const r = await page.evaluate(() => {
+      const f = window.__perf.frames.filter(x => x.cbs > 0), worst = f.reduce((a, b) => (b.script > a.script ? b : a), f[0] || { script: 0 });
+      return { frames: f.length, worstMs: Math.round(worst.script), worstLinks: worst.link, links: f.reduce((n, x) => n + x.link, 0),
+        commitsR3f: f.reduce((n, x) => n + x.cR3f, 0), owners: [...new Set(window.__perf.linkLog.map(l => l.owner))].slice(0, 6) };
+    });
+    out.swaps.push({ view: view ?? 'restore', ...r });
+    console.log(`${String(view ?? '  → restore').padEnd(16)} worst ${String(r.worstMs).padStart(5)} ms  links in worst ${r.worstLinks}  links ${r.links}  r3f commits ${r.commitsR3f}  ${r.owners.join(' | ')}`);
+  }
+  if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
 }
 
 if (MODE === 'ab') {
@@ -340,6 +415,12 @@ if (args.screenshot) {
   // Visual QA is outside the measurement window and always uses real draws.
   await page.evaluate(() => { window.__store.setState({ wormPaused: true }); window.__perf.noDraw = false; });
   await page.waitForTimeout(2500);
-  await page.screenshot({ path: args.screenshot });
+  // Hold the last drawn frame: software WebGL cannot keep a live loop going
+  // while the compositor is read, and the capture timed out on large boards.
+  await page.evaluate(() => {
+    const state = window.__perf.roots.r3f.containerInfo.getState();
+    state.setFrameloop('never'); state.gl.getContext().finish();
+  });
+  await page.screenshot({ path: args.screenshot, timeout: 120000 });
 }
 await browser.close();

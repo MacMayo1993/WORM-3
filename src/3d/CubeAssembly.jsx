@@ -1242,6 +1242,13 @@ const CubeAssembly = React.memo(({
   }, [size, animState]);
   // Mirror into a ref so the priority -1 useFrame can read per-band directions.
   megaChassisRef.current = megaChassis;
+  // One chassis material per look, shared by the resting box and a turn's slabs
+  // and bands, for the cube's life. They were created per mount, so every turn
+  // and every view-power swap and restore rebuilt them, and a look whose program
+  // nothing else held was released and relinked mid-run.
+  const megaMaterials = useMemo(() => new Map(), []);
+  useEffect(() => () => megaMaterials.forEach(material => material.dispose()), [megaMaterials]);
+  const megaMaterial = megaChassis ? megaViewMaterial(megaMaterials, powerView) : null;
 
   return (
     <StickerInstanceProvider exteriorPortals={exteriorPortals}>
@@ -1271,6 +1278,7 @@ const CubeAssembly = React.memo(({
               receiveShadow={false}
               onPointerDown={onMegaChassisPointerDown}
               visible={powerView !== 'gap'}
+              material={megaMaterial}
             >
               {/* The sticker face begins 0.51 units from its cubie centre and its
                   footprint can sink 0.03584 units at maximum spring overshoot. Keep
@@ -1281,7 +1289,6 @@ const CubeAssembly = React.memo(({
                   visible in the grid channels, not another shaded face. Ambient
                   light and background bleed made the previous transparent standard
                   material read gray and erased the black cubie perimeter. */}
-              <MegaViewMaterial view={powerView} />
             </mesh>
           )}
           {megaChassis && !megaChassis.rest && (
@@ -1292,16 +1299,15 @@ const CubeAssembly = React.memo(({
                cube interior, never a hole to the background. */
             <>
               {megaChassis.slabs.map((s, si) => (
-                <mesh key={`slab-${si}`} visible={powerView !== 'gap'} castShadow={false} receiveShadow={false} position={s.pos}>
+                <mesh key={`slab-${si}`} visible={powerView !== 'gap'} castShadow={false} receiveShadow={false} position={s.pos}
+                  material={megaMaterial}>
                   <boxGeometry args={s.args} />
-                  <MegaViewMaterial view={powerView} />
                 </mesh>
               ))}
               {megaChassis.bands.map((b, bi) => (
                 <group key={`band-${bi}`} ref={(el) => { megaBandRefs.current[bi] = el; }} position={b.pos}>
-                  <mesh visible={powerView !== 'gap'} castShadow={false} receiveShadow={false}>
+                  <mesh visible={powerView !== 'gap'} castShadow={false} receiveShadow={false} material={megaMaterial}>
                     <boxGeometry args={b.args} />
-                    <MegaViewMaterial view={powerView} />
                   </mesh>
                 </group>
               ))}
@@ -1391,8 +1397,14 @@ const CubeAssembly = React.memo(({
 
 export default CubeAssembly;
 
-// Preserve the one-draw Mega chassis while letting temporary materials reach it.
-function MegaViewMaterial({ view }) {
-  return view ? <meshStandardMaterial {...bodyMaterialProps(view)} side={THREE.DoubleSide} />
-    : <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />;
+// Preserve the one-draw Mega chassis while letting temporary looks reach it.
+function megaViewMaterial(cache, view) {
+  const key = view ?? '';
+  let material = cache.get(key);
+  if (!material) {
+    material = view ? new THREE.MeshStandardMaterial({ ...bodyMaterialProps(view), side: THREE.DoubleSide })
+      : new THREE.MeshBasicMaterial({ color: '#000000', side: THREE.DoubleSide });
+    cache.set(key, material);
+  }
+  return material;
 }

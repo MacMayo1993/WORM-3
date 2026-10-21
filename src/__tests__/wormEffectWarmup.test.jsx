@@ -82,9 +82,25 @@ it('retains warmed programs across events, warms changed scene variants, and dis
     expect(gl.compile.mock.calls[11][0]).toBe(store.getState().scene);
     useGameStore.setState({ wormStoryStarted: true });
     store.getState().advance(1.4); expect(gl.compile).toHaveBeenCalledTimes(12);
+    // Styled tiles at rest are batched, so the scene holds none of the programs a
+    // flipping tile's own mesh draws: each equipped style, and its portal-bored
+    // copy, compile with the run's scene. The style cache owns the sources.
+    const styled = { ...before.settings, manifoldStyles: { 1: 'eyeball', 2: 'marble', 3: 'eyeball', 4: 'solid', 5: 'marble', 6: 'eyeball' } };
+    useGameStore.setState({ settings: styled, wormRunId: before.wormRunId + 3, wormGamePhase: 'scrambling', wormStoryLevel: null });
+    store.getState().advance(1.5); store.getState().advance(1.6);
+    expect(gl.compile).toHaveBeenCalledTimes(14);
+    const styleScene = gl.compile.mock.calls[13][0];
+    const styleMaterials = styleScene.children.map(mesh => mesh.material);
+    const sources = styleMaterials.filter(m => !m.userData.portalCutout), bored = styleMaterials.filter(m => m.userData.portalCutout);
+    expect(sources).toHaveLength(5);
+    expect(new Set(bored.map(m => m.userData.styleFragmentShader)).size).toBe(2);
+    expect(bored).toHaveLength(2);
+    const boredSpies = bored.map(m => vi.spyOn(m, 'dispose')), sourceSpies = sources.map(m => vi.spyOn(m, 'dispose'));
     await act(async () => root.unmount());
     disposed.forEach(spy => expect(spy).toHaveBeenCalledTimes(1));
     kept.forEach(spy => expect(spy).not.toHaveBeenCalled());
+    boredSpies.forEach(spy => expect(spy).toHaveBeenCalledTimes(1));
+    sourceSpies.forEach(spy => expect(spy).not.toHaveBeenCalled());
   } finally {
     useGameStore.setState(before, true); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

@@ -58,7 +58,18 @@ it.each([
     scene.updateMatrixWorld(true);
     rendered = new Map();
     scene.traverse(mesh => {
-      if (mesh.name !== 'sticker-front') return;
+      // Styled tiles at rest are instances of the tile-surface batches, identity per instance.
+      if (mesh.isInstancedMesh && mesh.name === 'TileSurfaceBatch:sticker-front') {
+        const identity = mesh.geometry.attributes.aInstanceData;
+        for (let i = 0; i < mesh.count; i++) {
+          const matrix = new THREE.Matrix4();
+          mesh.getMatrixAt(i, matrix);
+          const id = `${identity.getX(i)},${identity.getY(i)},${identity.getZ(i)}:${identity.getW(i)}`;
+          rendered.set(id, { matrix: matrix.premultiply(mesh.matrixWorld), material: mesh.material });
+        }
+        return;
+      }
+      if (mesh.name !== 'sticker-front' || !mesh.isMesh) return;
       const material = mesh.material;
       mesh.onBeforeRender(null, scene, null, mesh.geometry, material);
       const id = `${material.uniforms.tileHome.value.toArray()}:${material.uniforms.tileFace.value}`;
