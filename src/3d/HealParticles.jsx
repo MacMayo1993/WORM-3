@@ -3,9 +3,10 @@
 // The parent calls ref.trigger(color), then ref.step(delta) every frame while
 // ref.active() holds. Every tile carries one, so it has no frame callback of its
 // own: 1,350 idle subscriptions a frame on a 15×15 cost more than the bursts.
-import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { skipMatrixWhileHidden } from './hiddenMatrices.js';
+import { bindEffectUniforms } from './sharedEffectMaterials.js';
 
 const _sharedHealGeo = new THREE.PlaneGeometry(1, 1);
 const _healDummy = new THREE.Object3D();
@@ -57,6 +58,18 @@ const FRAGMENT_SHADER = `
   }
 `;
 
+// One material for every tile's sparks; each binds its own colour and fade just
+// before its draw (sharedEffectMaterials.js).
+const healParticleMaterial = new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: new THREE.Color() }, uOpacity: { value: 0 } },
+  vertexShader: VERTEX_SHADER,
+  fragmentShader: FRAGMENT_SHADER,
+  transparent: true,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
 const HealParticles = React.forwardRef((_props, ref) => {
   const meshRef = useRef(null);
   const progressRef = useRef(0);
@@ -67,6 +80,7 @@ const HealParticles = React.forwardRef((_props, ref) => {
     uColor: { value: new THREE.Color() },
     uOpacity: { value: 0.0 },
   });
+  const bindUniforms = useMemo(() => bindEffectUniforms(uniformsRef.current), []);
 
   // Advance a live burst; the parent's tick calls this once a frame.
   const step = useCallback((delta) => {
@@ -187,19 +201,10 @@ const HealParticles = React.forwardRef((_props, ref) => {
   return (
     <instancedMesh
       ref={meshRef}
-      args={[_sharedHealGeo, null, HEAL_PARTICLE_COUNT]}
+      args={[_sharedHealGeo, healParticleMaterial, HEAL_PARTICLE_COUNT]}
       position={[0, 0, 0.07]}
-    >
-      <shaderMaterial
-        uniforms={uniformsRef.current}
-        vertexShader={VERTEX_SHADER}
-        fragmentShader={FRAGMENT_SHADER}
-        transparent
-        side={THREE.DoubleSide}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </instancedMesh>
+      onBeforeRender={bindUniforms}
+    />
   );
 });
 

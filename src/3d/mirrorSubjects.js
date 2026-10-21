@@ -1,4 +1,5 @@
 import { PerspectiveCamera, WebGLRenderTarget } from 'three';
+import { compileDistinct } from './compileDistinct.js';
 
 // What the core's mirror room reflects. Its capture (createCoreMirrorProbe) sees
 // only MIRROR_LAYER: the mirrors themselves, the registered subjects (the worm,
@@ -65,5 +66,5 @@ export function compileOffscreen(renderer, object, camera, scene) {
   warmTarget ||= new WebGLRenderTarget(1, 1);
   const previous = renderer.getRenderTarget?.() ?? null;
   renderer.setRenderTarget?.(warmTarget);
-  try { renderer.compile(object, camera, scene); } finally { renderer.setRenderTarget?.(previous); }
+  try { compileDistinct(renderer, object, camera, scene); } finally { renderer.setRenderTarget?.(previous); }
 }

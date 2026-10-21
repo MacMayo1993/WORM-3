@@ -14,6 +14,8 @@ import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImpera
 import { useFrame } from '@react-three/fiber';
 import { cubieBodyGeometry } from './cubieBodyGeometry.js';
 import { useCubieBodyBatches } from './cubieBodyBatchContext.js';
+import { useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
+import { LEGO_FACE_TRANSFORMS, LEGO_STUD_PARTS } from './legoStud.js';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS } from '../utils/constants.js';
 import { getEdgeFlags } from '../game/cubeUtils.js';
@@ -62,39 +64,26 @@ function getHollowBeamMaterial(visualMode) {
   return mat;
 }
 
-// Lego stud: a single molded stud centered on each face. The face group's +Y axis is
-// rotated to the outward normal, then the stud is built up the local +Y axis.
-const LEGO_STUD_BODY_GEO = [0.2, 0.21, 0.14, 26];   // slightly tapered cylinder (radiusTop < bottom)
-const LEGO_STUD_RING_GEO = [0.14, 0.022, 10, 28];   // torus — embossed ring on the stud top
-const LEGO_STUD_PIP_GEO = [0.055, 0.055, 0.05, 18]; // small raised center pip
-const LEGO_FACE_TRANSFORMS = {
-  PZ: { pos: [0, 0, 0.49], rot: [Math.PI / 2, 0, 0] },
-  NZ: { pos: [0, 0, -0.49], rot: [-Math.PI / 2, 0, 0] },
-  PX: { pos: [0.49, 0, 0], rot: [0, 0, -Math.PI / 2] },
-  NX: { pos: [-0.49, 0, 0], rot: [0, 0, Math.PI / 2] },
-  PY: { pos: [0, 0.49, 0], rot: [0, 0, 0] },
-  NY: { pos: [0, -0.49, 0], rot: [Math.PI, 0, 0] }
-};
-
-// A single detailed Lego stud on a given face, colored to match the face's sticker:
-// a tapered cylinder body, an embossed ring on top, and a small center pip.
+// A single detailed Lego stud on a given face, colored to match the face's sticker.
+// Drawn by the tile-surface batches from its face group (one draw per part for every
+// stud on the cube); without that provider (previews) it keeps its own meshes.
 function LegoStud({ dir, color, enableShadows = true }) {
   const t = LEGO_FACE_TRANSFORMS[dir];
+  const pool = useTileSurfaceInstances(), anchor = useRef(null), colorRef = useRef(color);
+  colorRef.current = color;
+  useLayoutEffect(() => {
+    if (!pool || !anchor.current) return undefined;
+    const release = LEGO_STUD_PARTS.map(part => pool.register(anchor.current, part.geometry, part.material, colorRef, null, null, 'lego-stud'));
+    return () => release.forEach(off => off());
+  }, [pool]);
   if (!t) return null;
   return (
-    <group position={t.pos} rotation={t.rot}>
-      <mesh position={[0, 0.07, 0]} castShadow={enableShadows}>
-        <cylinderGeometry args={LEGO_STUD_BODY_GEO} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
-      </mesh>
-      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow={enableShadows}>
-        <torusGeometry args={LEGO_STUD_RING_GEO} />
-        <meshStandardMaterial color={color} roughness={0.28} metalness={0} envMapIntensity={0.75} />
-      </mesh>
-      <mesh position={[0, 0.155, 0]} castShadow={enableShadows}>
-        <cylinderGeometry args={LEGO_STUD_PIP_GEO} />
-        <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
-      </mesh>
+    <group ref={anchor} position={t.pos} rotation={t.rot} castShadow={enableShadows}>
+      {!pool && LEGO_STUD_PARTS.map(part => (
+        <mesh key={part.name} geometry={part.geometry} castShadow={enableShadows} dispose={null}>
+          <meshStandardMaterial color={color} {...part.finish} />
+        </mesh>
+      ))}
     </group>
   );
 }
