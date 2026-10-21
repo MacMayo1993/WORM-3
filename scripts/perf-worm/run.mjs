@@ -124,6 +124,25 @@ await page.evaluate(() => {
     const s = window.__store.getState();
     return `${s.wormGamePhase}|${s.wormPhase}|${s.animState ? 'turning' : '-'}|${s.wormElementalTheme || '-'}|${s.perfReducedFX ? 'reducedFX' : 'fullFX'}`;
   };
+  // Time every renderer.compile from here on: the run's warm-up happens while the
+  // board scrambles, before any measurement window, and is a frame of its own.
+  const W = window.__perf;
+  W.warmups = [];
+  const install = () => {
+    const gl = W.roots.r3f?.containerInfo?.getState?.().gl;
+    if (!gl) { setTimeout(install, 100); return; }
+    if (gl.__warmupTimed) return;
+    gl.__warmupTimed = true;
+    const compile = gl.compile;
+    gl.compile = function (...a) {
+      const links = W.c.link, t0 = performance.now();
+      try { return compile.apply(this, a); } finally {
+        const ms = performance.now() - t0;
+        if (ms >= 2) W.warmups.push({ ms: Math.round(ms), links: W.c.link - links, s: W.sample?.() ?? null });
+      }
+    };
+  };
+  install();
 });
 const t0 = Date.now();
 while ((await page.evaluate(() => window.__store.getState().wormGamePhase)) !== 'active') {
@@ -154,7 +173,10 @@ const measuredState = await page.evaluate(() => {
   return { size: s.size, orbs: s.wormPowerups?.length, theme: s.wormElementalTheme, reducedFX: s.perfReducedFX };
 });
 if (args.size && +args.size !== measuredState.size) throw Error(`Requested size ${args.size}, launched ${measuredState.size}`);
-const out = { mode: MODE, url: URL, ms: MS, size: measuredState.size, scene: measuredState, freeze: !!args.freeze || MODE === 'batching' || MODE === 'events', seed: args.seed,
+const warmups = await page.evaluate(() => window.__perf.warmups ?? []);
+console.log(`warm-up compiles before play: ${warmups.length} calls, ${warmups.reduce((n, w) => n + w.ms, 0)} ms in all, longest ${Math.max(0, ...warmups.map(w => w.ms))} ms, ${warmups.reduce((n, w) => n + w.links, 0)} links`);
+for (const w of warmups) console.log(`  ${String(w.ms).padStart(5)} ms  ${w.links} links  ${w.s ?? ''}`);
+const out = { mode: MODE, url: URL, ms: MS, size: measuredState.size, scene: measuredState, warmups, freeze: !!args.freeze || MODE === 'batching' || MODE === 'events', seed: args.seed,
   mobile: !!args.mobile, throttle: +(args.throttle || 1), draws: args.draw ? 'real' : 'suppressed' };
 
 if (MODE === 'events') {
@@ -303,7 +325,11 @@ if (MODE === 'census') {
       for (const c of o.children) walk(c, vis);
     };
     walk(W.scene, true);
-    return { total, shown, autoUpdate, meshes, shownMeshes, rows };
+    // How many materials renderer.compile meets, and how few programs they need.
+    const materials = new Set(), sources = new Set();
+    W.scene.traverse(o => { for (const m of [o.material].flat()) if (m) materials.add(m); });
+    for (const m of materials) sources.add(m.isShaderMaterial ? `${m.vertexShader}|${m.fragmentShader}` : m.uuid);
+    return { total, shown, autoUpdate, meshes, shownMeshes, materials: materials.size, shaderSourcesOrBuiltins: sources.size, rows };
   });
   const { rows, ...totals } = census;
   Object.assign(out, totals);
@@ -332,6 +358,100 @@ if (MODE === 'swaps') {
     console.log(`${String(view ?? '  → restore').padEnd(16)} worst ${String(r.worstMs).padStart(5)} ms  links in worst ${r.worstLinks}  links ${r.links}  r3f commits ${r.commitsR3f}  ${r.owners.join(' | ')}`);
   }
   if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
+}
+
+// The run's warm-up again on a board whose programs are all linked: what is left
+// is three.js walking the scene for program keys, the cost a retry pays. Bumps the
+// run id and steps the frozen board back into the scrambling phase for a frame.
+if (MODE === 'rewarm') {
+  out.rewarms = [];
+  if (args.profile) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 100 }); await cdp.send('Profiler.start'); }
+  for (let i = 0; i < +(args.cycles || 5); i++) {
+    await page.evaluate(() => { window.__perf.warmups = []; const s = window.__store.getState();
+      window.__store.setState({ wormRunId: s.wormRunId + 1, wormGamePhase: 'scrambling' }); });
+    await page.waitForTimeout(600);
+    const calls = await page.evaluate(() => { window.__store.setState({ wormGamePhase: 'active' }); return window.__perf.warmups; });
+    out.rewarms.push(calls);
+    console.log(`rewarm ${i}: ${calls.map(c => `${c.ms} ms/${c.links} links`).join(', ')}`);
+  }
+  if (args.profile) {
+    const { profile } = await cdp.send('Profiler.stop');
+    const self = new Map(), byFn = {};
+    profile.samples.forEach((id, i) => self.set(id, (self.get(id) || 0) + (profile.timeDeltas[i] || 0)));
+    for (const n of profile.nodes) {
+      const cf = n.callFrame;
+      const k = `${cf.functionName || '(anonymous)'} ${cf.url.replace(/^.*\/WORM-3\//, '').replace(/\?.*$/, '')}:${cf.lineNumber + 1}`;
+      byFn[k] = (byFn[k] || 0) + (self.get(n.id) || 0) / 1000;
+    }
+    console.log(`\nCPU self time over the rewarms (ms):\n${top(byFn, 30, ([k, v]) => `${v.toFixed(0).padStart(7)}  ${k}`)}`);
+  }
+}
+
+// Visual check of a slice turn: waits for a live turn, pauses GSAP once the layer
+// is part-way round (every turn is a GSAP tween), then films that frozen frame
+// with real draws, from the player's camera and from a fixed overview.
+if (MODE === 'turnshots') {
+  fs.mkdirSync(args.shots || '/tmp/turnshots', { recursive: true });
+  const dir = args.shots || '/tmp/turnshots';
+  await page.evaluate((minAngle) => {
+    window.__turnFrozen = null;
+    const watch = () => {
+      const live = window.__liveRotation;
+      if (live?.active && Math.abs(live.angle) >= minAngle) {
+        window.__gsap.globalTimeline.pause();
+        window.__store.setState({ wormPaused: true });
+        window.__turnFrozen = { axis: live.axis, layers: [...live.sliceIndices], angle: live.angle };
+        return;
+      }
+      requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  }, +(args.angle || 0.5));
+  // --turn=col:0 starts that turn now (layer index; 0 and size-1 are faces)
+  // instead of waiting for a hazard turn.
+  // --turn=face turns the face the worm's head is on; --turn=head:col (or row,
+  // depth) the layer through the head.
+  if (args.turn) await page.evaluate((turn) => {
+    let [axis, layer, dir = '1'] = String(turn).split(':');
+    const pos = window.__wormSimRef?.current?.pos, n = window.__store.getState().size;
+    if (axis === 'face' && pos) {
+      const faces = { PX: ['col', n - 1], NX: ['col', 0], PY: ['row', n - 1], NY: ['row', 0], PZ: ['depth', n - 1], NZ: ['depth', 0] };
+      [axis, layer] = faces[pos.dirKey];
+    } else if (axis === 'head' && pos) {
+      axis = layer; layer = { col: pos.x, row: pos.y, depth: pos.z }[axis];
+    }
+    const move = { axis, dir: +dir, sliceIndex: +layer, sliceIndices: null, sliceDirs: null, t: 0 };
+    window.__store.setState({ animState: move, pendingMove: { ...move } });
+  }, args.turn);
+  const t1 = Date.now();
+  let frozen = null;
+  while (!(frozen = await page.evaluate(() => window.__turnFrozen))) {
+    if (Date.now() - t1 > +(args.ms || 120000)) throw Error('No slice turn within the window');
+    await page.waitForTimeout(250);
+  }
+  out.turn = frozen;
+  console.log('frozen turn:', JSON.stringify(frozen));
+  for (const pose of ['chase', 'overview']) {
+    await page.evaluate((pose) => {
+      const W = window.__perf, state = W.roots.r3f.containerInfo.getState();
+      W.noDraw = false;
+      state.setFrameloop('never');
+      if (pose === 'overview') {
+        // Re-aim after the chase rig (-0.25) and before the batches cull (0), as the
+        // events shots do, so one frame is culled and drawn from this fixed view.
+        const root = W.roots.r3f.containerInfo;
+        const n = window.__store.getState().size, at = window.__turnView ?? [n * 0.9, n * 0.8, n * 1.3];
+        state.internal.subscribe({ current: () => {
+          const camera = state.camera;
+          camera.up.set(0, 1, 0); camera.position.set(...at); camera.lookAt(0, 0, 0);
+          camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+        } }, -0.245, root);
+      }
+      state.advance(performance.now());
+      state.gl.getContext().finish();
+    }, pose);
+    await page.screenshot({ path: path.join(dir, `${args.size || 'n'}-${(args.style || 'default').split(',')[0]}-${pose}.png`), timeout: 180000 });
+  }
 }
 
 if (MODE === 'ab') {

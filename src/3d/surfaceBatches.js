@@ -75,9 +75,11 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         }
         // Built once per entry (and again only if its draw order changes): a key
         // per tile per frame was thousands of string concatenations on Mega.
-        if (entry.keyOrder !== anchor.renderOrder) {
+        // An anchor that casts a shadow (a LEGO stud) draws in a batch that does.
+        if (entry.keyOrder !== anchor.renderOrder || entry.keyShadow !== anchor.castShadow) {
           entry.keyOrder = anchor.renderOrder;
-          entry.key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${!!dataRef}:${anchor.renderOrder}`;
+          entry.keyShadow = anchor.castShadow;
+          entry.key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${!!dataRef}:${anchor.renderOrder}:${anchor.castShadow}`;
         }
         const key = entry.key;
         let batch = batches.get(key);
@@ -88,6 +90,7 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           mesh.frustumCulled = false;
           mesh.renderOrder = anchor.renderOrder;
+          mesh.castShadow = anchor.castShadow;
           mesh.raycast = () => {};
           batch = { mesh, count: 0, owners: [], own: !!own,
             seeds: seedRef ? mesh.geometry.attributes.aInstanceSeed : null, data: dataRef ? mesh.geometry.attributes.aInstanceData : null };

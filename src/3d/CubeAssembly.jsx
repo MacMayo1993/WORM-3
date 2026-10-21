@@ -1,6 +1,7 @@
 import { bumpTileRolls } from './tileStyleIdentity.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { createExteriorPortals } from './exteriorPortals.js';
+import { megaChassisLayout } from './megaChassis.js';
 import { CubieBodyBatchProvider } from './CubieBodyBatches.jsx';
 import { wormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
@@ -1193,53 +1194,10 @@ const CubeAssembly = React.memo(({
     }
   }, [animState, rotationEpoch, items, explosionFactor, size, wormHealerMode]);
 
-  // ── Mega Mode chassis geometry ────────────────────────────────────────────
-  // A single 15×15 shell would cost >1,100 individual rounded bodies, so Mega
-  // backs its sticker grid with one dark box instead. At rest that box is fine,
-  // but a static box CANNOT back a *rotating* slice: its corners reach
-  // √2·(size/2) ≈ 10.5 from centre, so a side-sticker sweeping at radius ~7.5
-  // dips inside the solid box around 45° and is occluded — the "black layers on
-  // rotate" bug. The fix: during a turn, carve the box into the two stationary
-  // slabs on either side of the rotating band plus one band box that spins WITH
-  // the slice (megaBandRef), so the swept tiles always stay in front of it.
-  const megaChassis = useMemo(() => {
-    if (size < 15) return null;
-    const full = size - 0.08;      // outer extent (leaves a hairline gap at edges)
-    const half = full / 2;
-    if (!animState) return { rest: true, full };
-    const axisI = animState.axis === 'col' ? 0 : animState.axis === 'row' ? 1 : 2;
-    const k = (size - 1) / 2;
-    const layers = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
-    const dirs = animState.sliceDirs?.length ? animState.sliceDirs : layers.map(() => animState.dir);
-    // Build an [x,y,z] size + centre pair for a box that is `full` on the two
-    // perpendicular axes and [from..to] along the rotation axis.
-    const boxAlong = (from, to) => {
-      const args = [full, full, full];
-      const pos = [0, 0, 0];
-      args[axisI] = to - from;
-      pos[axisI] = (from + to) / 2;
-      return { args, pos };
-    };
-    // Each rotating plane gets a one-layer-thick band box that spins with it (in its
-    // own direction). The stationary regions between/around the planes are filled by
-    // static slabs so the resting silhouette stays a solid cube and the seams opening
-    // mid-turn read as interior. Works for one plane or several non-adjacent ones.
-    const sorted = layers
-      .map((idx, i) => ({ idx, dir: dirs[i] }))
-      .sort((a, b) => a.idx - b.idx);
-    const bands = [];
-    const slabs = [];
-    let cursor = -half;
-    for (const { idx, dir } of sorted) {
-      const bandLo = idx - k - 0.5;
-      const bandHi = idx - k + 0.5;
-      if (bandLo > cursor) slabs.push(boxAlong(cursor, bandLo)); // stationary gap before this plane
-      bands.push({ dir, ...boxAlong(bandLo, bandHi) });
-      cursor = Math.max(cursor, bandHi);
-    }
-    if (cursor < half) slabs.push(boxAlong(cursor, half));
-    return { rest: false, axisI, bands, slabs };
-  }, [size, animState]);
+  // ── Mega Mode chassis geometry (megaChassis.js) ───────────────────────────
+  // One dark box backs the sticker grid at rest; a turn carves it into static
+  // slabs and a band box per plane that spins with its slice (megaBandRefs).
+  const megaChassis = useMemo(() => megaChassisLayout(size, animState), [size, animState]);
   // Mirror into a ref so the priority -1 useFrame can read per-band directions.
   megaChassisRef.current = megaChassis;
   // One chassis material per look, shared by the resting box and a turn's slabs

@@ -21,16 +21,20 @@ import { elementalOrbMaterials } from './elementalOrbMaterials.js';
 import { warmOrbReveal } from '../orbReveal.js';
 import { warmCautionDissolve } from './cautionDissolve.js';
 import { compileOffscreen } from '../../3d/mirrorSubjects.js';
+import { compileDistinct } from '../../3d/compileDistinct.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
-import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { LEGO_STUD_PARTS } from '../../3d/legoStud.js';
+import { ensureInstanceColor } from '../../3d/instanceUploads.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 
 // Styled tiles at rest are drawn by the tile-surface batches (instancedTileStyle.js),
 // so the live scene holds none of the programs a styled tile's own mesh uses: the
 // style the flip swaps in, and its portal-bored copy once the exterior patches it.
-// A carrier per equipped style, for the run's warm-up; the bored copies are owned
-// here (their sources belong to the style cache) and keep those programs alive.
+// A carrier per equipped style (and per view-power look below), for the run's
+// warm-up; the bored copies are owned here (their sources belong to the style cache
+// and legoStud.js) and keep those programs alive.
 function styleWarmup(settings) {
   const warm = new THREE.Scene(), geometry = new THREE.PlaneGeometry(.1, .1), bored = [];
   const colors = resolveColors(settings, settings?.biomeMode?.faceAssignment) ?? {};
@@ -46,7 +50,23 @@ function styleWarmup(settings) {
     bored.push(material);
     warm.add(new THREE.Mesh(geometry, material));
   }
-  return { warm, dispose: () => { warm.clear(); geometry.dispose(); bored.forEach(material => material.dispose()); } };
+  // The Glass and LEGO view powers swap every tile to looks the run never drew:
+  // each sticker's glass clone (both passes of the double-sided front, and the
+  // back), and the shared LEGO stud batches. Held here, their programs outlive the
+  // swap; the glass clones are freed on restore and used to take them with them.
+  // The glass back draws its bare program as well as the bored one.
+  const glassSource = getGlassMaterial('#888888'), glass = exteriorPortalWarmupMaterial(glassSource);
+  bored.push(glass);
+  warm.add(new THREE.Mesh(geometry, glassSource), new THREE.Mesh(geometry, glass));
+  const studs = LEGO_STUD_PARTS.map(part => {
+    const material = exteriorPortalWarmupMaterial(part.material);
+    bored.push(material);
+    const mesh = new THREE.InstancedMesh(part.geometry, material, 1);
+    ensureInstanceColor(mesh);
+    return mesh;
+  });
+  warm.add(...studs);
+  return { warm, dispose: () => { warm.clear(); geometry.dispose(); studs.forEach(mesh => mesh.dispose()); bored.forEach(material => material.dispose()); } };
 }
 
 // Keep one owner of each transient program for this WORM session. Real portal
@@ -158,13 +178,14 @@ export default function WormEffectWarmup({ body }) {
     const key = `${warmed.current}|${s.wormRunId}|${s.size}`;
     if (sceneWarmed.current === key) return;
     sceneWarmed.current = key;
-    gl.compile(scene, camera, scene);
+    // One stand-in per program variant: the full walk was ~130 ms on a 15×15.
+    compileDistinct(gl, scene, camera, scene);
     const styleKey = JSON.stringify([s.settings?.manifoldStyles, s.settings?.colorScheme, s.settings?.customColors]);
     if (styles.current.key !== styleKey) {
       styles.current.warmup?.dispose();
       styles.current = { key: styleKey, warmup: styleWarmup(s.settings) };
     }
-    if (styles.current.warmup.warm.children.length) gl.compile(styles.current.warmup.warm, camera, scene);
+    gl.compile(styles.current.warmup.warm, camera, scene);
     // Desktop draws the surface through the AO composer's render target, a
     // program variant of its own, so the interior and core revealed at a ride's
     // windup would otherwise link theirs there. The ride itself draws on screen.

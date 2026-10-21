@@ -20,7 +20,7 @@ npx vite build --config scripts/perf-worm/vite.perf.config.mjs     # → dist-pe
 npx vite preview --config scripts/perf-worm/vite.perf.config.mjs --port 4173
 ```
 
-That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed. It also exposes `window.__tunnelState`, the live worm sim and its context (`window.__wormSimRef`, `window.__wormCtxRef`) and `window.__beginTunnelTransition`, so a probe can start a real tunnel ride and film it, plus the live cubie meshes (`window.__liveCubies`) and the flip a tap makes (`window.__flipSticker(pos, dirKey)`), so a probe can find a tile on screen and flip it on a frozen clock. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
+That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed, and GSAP and the live rotation (`window.__gsap`, `window.__liveRotation`) so a probe can freeze a slice turn. It also exposes `window.__tunnelState`, the live worm sim and its context (`window.__wormSimRef`, `window.__wormCtxRef`) and `window.__beginTunnelTransition`, so a probe can start a real tunnel ride and film it, plus the live cubie meshes (`window.__liveCubies`) and the flip a tap makes (`window.__flipSticker(pos, dirKey)`), so a probe can find a tile on screen and flip it on a frozen clock. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
 
 ## Modes
 
@@ -74,7 +74,9 @@ run's own warm-up sees it. The runner starts from the main menu with `?unlockall
 and the mode gate set (as `e2e/helpers.js` does), since a fresh save goes straight
 into Story level 1 and a production build locks the larger boards.
 
-`frames` and `attribute` print the slowest frames with the program links and React
+Every run prints the warm-up's `renderer.compile` calls from the scramble (time
+and links each), which happen before any measurement window. `frames` and
+`attribute` print the slowest frames with the program links and React
 commits they carried. `attribute` also names every `renderer.compile` call that
 linked programs during the window (warm-ups that ran mid-play), with its caller.
 
@@ -85,7 +87,9 @@ linked programs during the window (warm-ups that ran mid-play), with its caller.
 | `react` | commit rates plus render counts per component (DOM root and R3F root) |
 | `ab` | pauses the run so every window renders the same scene, then toggles in-page patches: **A** transparent double-sided materials in one pass, **B** instanced attributes upload only the live range, **C** hidden subtrees skip world-matrix updates, **D** inward-facing antipodal sticker backs hidden |
 | `batching` | alternates individual tile meshes / three cage material groups with the production batches in one frozen scene; pins reduced FX and DPR 1; records draw ownership and optionally captures paired real-draw images |
-| `census` | the scene graph three.js walks every frame: objects, objects under a visible chain, meshes and visible meshes, per owning component |
+| `census` | the scene graph three.js walks every frame: objects, objects under a visible chain, meshes and visible meshes, per owning component; also the scene's materials against its distinct shader sources |
+| `rewarm` | reruns the run's warm-up (`--cycles=5`) on a frozen board whose programs are all linked, the cost a retry pays; `--profile` adds CPU self time; use with `--freeze` |
+| `turnshots` | films a slice turn frozen part-way (`--angle=0.6` rad) with real draws, from the player's camera and a fixed overview, into `--shots=dir`. `--turn=face` turns the face under the worm's head, `--turn=head:col` (`row`, `depth`) the layer through it, `--turn=col:0` (`:dir`) any layer; without it, it waits for a hazard turn |
 | `swaps` | applies each whole-cube view power (`--views=view-glass,…`, default all) and restores it, twice each, and prints the worst frame of every change with its links and R3F commits; use with `--freeze` |
 
 `batching` uses `batching.js` to reconstruct individual tile meshes from the real

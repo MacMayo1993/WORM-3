@@ -19,6 +19,9 @@ export default {
         // Ride probes: the bridge, the live sim and its context, and a way into a tunnel.
         if (id.endsWith('/src/worm/tunnelProgressBridge.js')) return `${code}\nwindow.__tunnelState = tunnelState;\n`;
         if (id.endsWith('/src/worm/liveCubies.js')) return `${code}\nwindow.__liveCubies = liveCubies;\n`;
+        // Turn probes: GSAP drives every slice turn, so pausing its ticker freezes one mid-way.
+        if (id.endsWith('/src/worm/liveRotation.js')) return `${code}\nwindow.__liveRotation = liveRotation;\n`;
+        if (id.endsWith('/src/3d/CubeAssembly.jsx')) return code.replace(/import gsap from ["']gsap["'];?/, m => `${m}\nwindow.__gsap = gsap;`);
         // Flip probes: the same flip a tap makes, without the pointer path.
         if (id.endsWith('/src/hooks/useCubeState.js')) return code.replace(/\n {2}return \{\n/, '\n  if (typeof window !== "undefined") window.__flipSticker = flipSticker;\n  return {\n');
         if (id.endsWith('/src/worm/healerWorm/wormSim.js')) return `${code}\nwindow.__beginTunnelTransition = beginTunnelTransition; window.__startElemental = startElemental; window.__queueWormTurn = queueTurn; window.__stepWormSim = stepWormSim; window.__resetWormSim = resetWormSim;\n`;

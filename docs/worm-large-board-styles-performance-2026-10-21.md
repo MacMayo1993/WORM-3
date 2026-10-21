@@ -191,25 +191,23 @@ builds for the LEGO and glass looks (see Still open).
 
 ## Still open
 
-- **The scramble's warm-up is a 400 ms frame on 15×15.** `WormEffectWarmup`
-  compiles the whole scene, and on desktop the off-screen variant too, in one
-  frame while the board scrambles: 120–180 ms each here, 6–7 links. It is by
-  design: it runs before play, and it is what keeps active play free of links.
-  It still hitches the scramble animation. Splitting it across frames
-  (`KHR_parallel_shader_compile` where available) is the next lever.
+Updated after the follow-up below.
+
 - **Small mid-play links remain.** Each tunnel band links its mirror-capture
   variants when it forms (`warmMirrorPrograms`, 2–6 links, 2–4 ms here), and a
-  severed tail and the first special orb of a kind link one each.
-- **LEGO and glass looks** still build per-cubie materials in `Cubie.jsx` on
-  every swap (1–2 links a swap after the first). The swap itself re-renders
-  every sticker, 50–270 ms on 15×15. Holding those materials per look, as the
-  core and chassis now do, would remove the links; the re-render needs the
-  view mode read in the frame loop rather than through props.
+  severed tail and the first special orb of a kind link one each. The first use of
+  some view looks still links 1–2 programs (the classic chassis, the grid
+  instanced quad, the core's wireframe body); later swaps do not.
+- **A view-power swap re-renders every sticker**, 50–150 ms on 15×15. Reading
+  the view mode in the frame loop instead of through props would remove that.
 - **15×15 is still bound by the scene graph.** About 17,000 objects, 12 per tile.
   The rest are structural groups the flip and pad animations write to, plus
   3,534 cubie objects. `updateMatrixWorld` and `projectObject` remain the
   largest costs, then 1,178 per-cubie frame callbacks (about 1 ms) and the
   surface-batch upkeep.
+- **The first scramble still links ~225 programs** before play, spread over 16
+  compile calls (the longest now ~60 ms here). On real GPUs the link itself
+  happens off the main thread, but the first draw of each program can wait for it.
 - **Volume styles below 6×6.** Lava, ice, water, galaxy, neural, circuit, wood
   and grass add 1–3 meshes per tile in full FX on boards up to 5×5 (up to 450
   draws on 5×5). They are already dropped on 6×6 and up, and under reduced FX.
@@ -239,3 +237,131 @@ builds for the LEGO and glass looks (see Still open).
 - Screenshots of a 6×6 board in the six styles, from both builds, show every
   style drawn with its per-tile variation. The two runs drew different palettes,
   so they are a visual check, not a pixel diff.
+
+## Follow-up: Mega face turns, the warm-up, and view swaps
+
+Same day, measured against `main` at `fb5b888` (this pass's first part merged),
+with the same harness and method. Two new probes:
+
+- `--mode=turnshots` films a slice turn frozen part-way with real draws. It
+  pauses GSAP, which the perf build now exposes, with the live rotation.
+- `--mode=rewarm` reruns the run's warm-up on a board whose programs are
+  already linked, which is what a retry pays.
+
+Every run also prints the warm-up's compile calls from the scramble.
+
+### Black tiles on Mega face turns
+
+During a turn, the 15×15 chassis is split into static slabs and a band box that
+spins with the turning layer. Along the turn axis the band spanned the whole
+layer (`idx − k ± 0.5`). For a face layer, that put the band's outer face at
+±7.5, past the resting chassis face at ±7.46:
+
+- A flat sticker's front (7.51) sat only 0.01 in front of it, in z-fighting
+  range at grazing angles.
+- A sticker the worm presses sinks to about 7.478, behind the band.
+
+So on every face turn under the worm, its tiles drew black. Filmed mid-turn,
+they were black on `main` and on the batching build alike; 10×10, which has
+no chassis, never showed it. The layout is now `megaChassisLayout`
+(`src/3d/megaChassis.js`): every piece is cut to the resting box's extent.
+`megaChassis.test.js` holds that, along with the press margin and exact tiling
+of the box. It fails on the old layout. Filmed again, the worm's tiles on the
+turning face keep their style.
+
+### The warm-up walked ~4,600 materials
+
+The run's warm-up compiles the whole scene, plus the off-screen variant on
+desktop, while the board scrambles. On 15×15 the scene held 4,610 materials,
+but only ~540 distinct programs. The footprint, heal seal and heal sparks each
+built a `ShaderMaterial` per tile. Every one of those is a program-key
+computation for `renderer.compile`, and an entry in three.js's bookkeeping.
+
+Changes:
+
+- **One material per effect** for every tile (`src/3d/sharedEffectMaterials.js`).
+  Each tile keeps its own uniform values and copies them in from its mesh's
+  `onBeforeRender`, just before its own draw. A hidden effect is never drawn,
+  so only the few tiles showing one pay for the copy.
+- **The warm-up compiles one stand-in per material and object variant**
+  (`compileDistinct`, `src/3d/compileDistinct.js`): instancing, instance colour,
+  geometry attributes and the other inputs three.js r159 reads from an object.
+  Each stand-in is a shallow copy of its object, with no children, so the compile
+  never re-walks a subtree. On its own this changed nothing, because nearly
+  every material was per tile. With shared materials it keeps the walk small.
+
+| 15×15 Eyeball | `main` | This change |
+| --- | ---: | ---: |
+| Materials in the scene | 4,610 | **557** |
+| First scramble: warm-up compile time, all calls (two runs) | 504, 716 ms | **232, 264 ms** |
+| First scramble: longest single compile | 212, 402 ms | **64, 65 ms** |
+| Retry: scene pass, programs already linked (8 retries) | 84–156 ms | **13–41 ms** |
+| Retry: off-screen pass | 89–152 ms | **17–59 ms** |
+| Live 40 s: worst frame (a retry's warm-up on `main`) | 358 ms | **118 ms** |
+
+The number of links is unchanged (~225 before play), and mid-play links did not
+rise (8 on `main`, 6 here, in matched 40 s runs).
+
+### View swaps
+
+- **LEGO studs are batched** (`src/3d/legoStud.js`, `LegoStud` in `Cubie.jsx`).
+  Every stud was three meshes with their own geometry and material: on 15×15,
+  ~4,000 of each, built on each swap to LEGO, freed on its restore, and drawn
+  one by one. The studs now draw through three tile-surface batches (shared
+  geometry, shared white material, instance colour per face). The batches carry
+  the anchor's `castShadow`, so studs still cast shadows in full FX.
+  `legoStudBatch.test.jsx` holds this.
+- **The Glass and LEGO programs are held by the run's warm-up.** That covers the
+  sticker's bare and portal-bored glass, and the bored stud batches. Glass
+  clones are freed on every restore, and used to release their programs.
+
+| 15×15 Eyeball, every view applied and restored twice (36 changes) | `main` | This change |
+| --- | ---: | ---: |
+| Links, first / second cycle | 10 / 4 | 6 / 1 |
+| LEGO swap, worst frame | 239–365 ms, 1 link each | **55–79 ms, none** |
+| Worst swap frame | 365 ms | **148 ms** |
+
+### Steady state, and a regression the stand-ins caused
+
+The first steady-state A/B showed 10×10 Eyeball about 3 ms a frame slower than
+`main` (p50 18.6, 18.8 ms against 15.3, 16.1). The two scenes were identical:
+8,628 objects, the same owners, the same visible counts. Only the material count
+had changed (2,839 → 1,042). A profile showed every scene walk about twice as
+slow per frame: `updateMatrixWorld`, `projectObject` and the batch trackers alike.
+
+The cause was the stand-ins. Each was built with `Object.create(liveMesh)`, and
+V8 gives any object that becomes a prototype a map of its own, for good. A few
+hundred meshes with unique maps turned every loop over the scene megamorphic for
+the rest of the run. In isolation, with 300 of 5,800 meshes used as prototypes,
+an `updateMatrixWorld` plus `traverseVisible` walk went from 1.2 to 3.9 ms.
+
+A stand-in is now a shallow copy on its object's class prototype, so no live
+object is ever a prototype. Emptying the live objects' `children` during the
+compile would also avoid the walk, but it is wrong: `compile` collects lights by
+walking the live target scene, and would miss any light under an emptied mesh.
+
+Re-measured in alternating order (new, base, base, new, new, base), frozen,
+seed 71, 8 s each, CPU ms per frame:
+
+| p50 (three runs each) | `main` | This change |
+| --- | ---: | ---: |
+| 10×10 Eyeball | 13.6, 13.1, 13.9 | 13.6, 14.1, 13.3 |
+| 15×15 Eyeball | 23.9, 24.0, 24.8 | 21.6, 22.0, 25.5 |
+
+Steady-state cost is at parity on 10×10 and slightly lower on 15×15. Draws are
+unchanged (79 and 81–82). The earlier, sequential A/B always ran `main` first.
+This one alternates, which is why its absolute numbers differ from the first.
+
+### Verification
+
+- **New tests:**
+  - `megaChassis.test.js` (fails on the old layout).
+  - `sharedEffectMaterials.test.jsx`: one material per effect across tiles, each
+    tile drawing its own values.
+  - `compileDistinct.test.js`: one stand-in per variant, each a copy on its
+    object's class prototype, and the live scene untouched.
+  - `legoStudBatch.test.jsx`.
+- **Updated tests:** `wormEffectWarmup.test.jsx` covers stand-ins, plus held
+  Glass and LEGO programs that are released on exit.
+- **Real draws:** a frozen 15×15 face turn under the worm, filmed with real
+  draws before and after the fix.

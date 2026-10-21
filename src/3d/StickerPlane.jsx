@@ -28,6 +28,7 @@ import { useStickerInstances } from './StickerInstances.jsx';
 import { TileSurfaceInstance, useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { instancedTileStyleMaterial } from './styles/instancedTileStyle.js';
 import { skipMatrixWhileHidden } from './hiddenMatrices.js';
+import { bindEffectUniforms } from './sharedEffectMaterials.js';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getWormPress, getWormContact, wormPress } from '../worm/tilePressBridge.js';
 import { updateTilePressVisual } from '../worm/tilePressVisual.js';
@@ -235,6 +236,19 @@ const wormFootprintFragmentShader = `
   }
 `;
 
+// One material per tile effect for every tile; each tile binds its own uniform
+// values just before its draw (sharedEffectMaterials.js).
+const footprintMaterial = new THREE.ShaderMaterial({
+  vertexShader: neonBorderVertexShader, fragmentShader: wormFootprintFragmentShader,
+  uniforms: { uColor: { value: new THREE.Color('#33ff66') }, uPress: { value: 0 }, uTime: wispyTime },
+  transparent: true, depthWrite: false
+});
+const healSealMaterial = new THREE.ShaderMaterial({
+  vertexShader: healSealVertexShader, fragmentShader: healSealFragmentShader,
+  uniforms: { uColor: { value: new THREE.Color() }, uHealProgress: { value: 0 }, uTime: { value: 0 } },
+  transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending
+});
+
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey, presentation = null }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
@@ -333,12 +347,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // The group carries the lit square down with the tile; the sticker itself sinks on
   // innerGroupRef (see the press block in tickImpl).
   const footprintGroupRef = useRef();
-  const footprintMatRef = useRef();
   const [footprintUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color('#33ff66') },
     uPress: { value: 0 },
     uTime: wispyTime, // shared reference — advanced once per frame externally
   }));
+  const bindFootprint = useMemo(() => bindEffectUniforms(footprintUniforms), [footprintUniforms]);
   // Split so the press and the flip counter-kick can both drive innerGroupRef.position.z
   // without either clobbering the other; applyInnerZ() writes their sum.
   const innerShockZ = useRef(0);
@@ -356,7 +370,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spiderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       eyelidMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       spinRevealMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      footprintMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
 
@@ -436,6 +449,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uHealProgress: { value: 0.0 },
     uTime: { value: 0.0 },
   }));
+  const bindHealSeal = useMemo(() => bindEffectUniforms(healSealUniforms), [healSealUniforms]);
   // Overlay ref for antipodal color bleed during flip transitions.
   // Physical-piece manifold id — written to flipBurstMap during flips, and the key
   // the shared animation manager ticks/activates this sticker under (the worm
@@ -1777,16 +1791,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           tile look pressed rather than merely lit, and additive cannot darken. */}
       {wormHealerMode && !isDead && (
         <group ref={footprintGroupRef} visible={false}>
-          <mesh position={[0, 0, showFlipPortal ? PORTAL_TOP + 0.003 : 0.005]} renderOrder={2}>
+          <mesh position={[0, 0, showFlipPortal ? PORTAL_TOP + 0.003 : 0.005]} renderOrder={2}
+            material={footprintMaterial} onBeforeRender={bindFootprint} dispose={null}>
             <primitive object={_neonBorderGeo} attach="geometry" />
-            <shaderMaterial
-              ref={footprintMatRef}
-              vertexShader={neonBorderVertexShader}
-              fragmentShader={wormFootprintFragmentShader}
-              uniforms={footprintUniforms}
-              transparent
-              depthWrite={false}
-            />
           </mesh>
         </group>
       )}
@@ -1911,17 +1918,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal.
           Kept mounted regardless of flip history: the heal resets flips to 0 before
           this animation is picked up (see note above). */}
-      <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
+      <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}
+        material={healSealMaterial} onBeforeRender={bindHealSeal} dispose={null}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
-        <shaderMaterial
-          vertexShader={healSealVertexShader}
-          fragmentShader={healSealFragmentShader}
-          uniforms={healSealUniforms}
-          transparent
-          depthTest={true}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
       </mesh>
 
       {/* Double-density golden particle burst on heal. Kept mounted for the same
