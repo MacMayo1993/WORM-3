@@ -1,9 +1,11 @@
 // src/3d/HealParticles.jsx
 // Double-density golden burst fired when a wormhole tile is healed.
-// API-compatible with FlipParticles: parent calls ref.trigger(color).
-import React, { useRef, useEffect, useImperativeHandle } from 'react';
-import { useFrame } from '@react-three/fiber';
+// The parent calls ref.trigger(color), then ref.step(delta) every frame while
+// ref.active() holds. Every tile carries one, so it has no frame callback of its
+// own: 1,350 idle subscriptions a frame on a 15×15 cost more than the bursts.
+import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react';
 import * as THREE from 'three';
+import { skipMatrixWhileHidden } from './hiddenMatrices.js';
 
 const _sharedHealGeo = new THREE.PlaneGeometry(1, 1);
 const _healDummy = new THREE.Object3D();
@@ -66,53 +68,8 @@ const HealParticles = React.forwardRef((_props, ref) => {
     uOpacity: { value: 0.0 },
   });
 
-  useImperativeHandle(ref, () => ({
-    trigger(color) {
-      if (isActiveRef.current) return;
-      isActiveRef.current = true;
-      progressRef.current = 0;
-      if (meshRef.current) meshRef.current.visible = true; // draw only while live
-
-      uniformsRef.current.uColor.value.set(color);
-      _baseHealColor.set(color);
-      uniformsRef.current.uOpacity.value = 1.0;
-
-      velocitiesRef.current = Array.from({ length: HEAL_PARTICLE_COUNT }, (_, i) => {
-        const angle = (i / HEAL_PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.35;
-        // Faster launch than FlipParticles — more explosive outward feel
-        const speed = 2.5 + Math.random() * 4.0;
-        return {
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          vz: 0.4 + Math.random() * 1.8,
-          drag: 0.82 + Math.random() * 0.12,
-          rotX: (Math.random() - 0.5) * 24,
-          rotY: (Math.random() - 0.5) * 20,
-          rotZ: (Math.random() - 0.5) * 16,
-          // More large chips for a chunky, satisfying look
-          size: i < 8
-            ? 0.11 + Math.random() * 0.11
-            : 0.03 + Math.random() * 0.07,
-          px: 0, py: 0, pz: 0,
-          ax: 0, ay: 0, az: 0,
-        };
-      });
-    },
-  }), []);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    _healDummy.scale.set(0, 0, 0);
-    _healDummy.updateMatrix();
-    for (let i = 0; i < HEAL_PARTICLE_COUNT; i++) {
-      mesh.setMatrixAt(i, _healDummy.matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.visible = false; // idle: not drawn until trigger()
-  }, []);
-
-  useFrame((_state, delta) => {
+  // Advance a live burst; the parent's tick calls this once a frame.
+  const step = useCallback((delta) => {
     const mesh = meshRef.current;
     if (!mesh || !isActiveRef.current) return;
 
@@ -176,7 +133,56 @@ const HealParticles = React.forwardRef((_props, ref) => {
     }
 
     mesh.instanceMatrix.needsUpdate = true;
-  });
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    step,
+    active: () => isActiveRef.current,
+    trigger(color) {
+      if (isActiveRef.current) return;
+      isActiveRef.current = true;
+      progressRef.current = 0;
+      if (meshRef.current) meshRef.current.visible = true; // draw only while live
+
+      uniformsRef.current.uColor.value.set(color);
+      _baseHealColor.set(color);
+      uniformsRef.current.uOpacity.value = 1.0;
+
+      velocitiesRef.current = Array.from({ length: HEAL_PARTICLE_COUNT }, (_, i) => {
+        const angle = (i / HEAL_PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.35;
+        // Faster launch than FlipParticles — more explosive outward feel
+        const speed = 2.5 + Math.random() * 4.0;
+        return {
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          vz: 0.4 + Math.random() * 1.8,
+          drag: 0.82 + Math.random() * 0.12,
+          rotX: (Math.random() - 0.5) * 24,
+          rotY: (Math.random() - 0.5) * 20,
+          rotZ: (Math.random() - 0.5) * 16,
+          // More large chips for a chunky, satisfying look
+          size: i < 8
+            ? 0.11 + Math.random() * 0.11
+            : 0.03 + Math.random() * 0.07,
+          px: 0, py: 0, pz: 0,
+          ax: 0, ay: 0, az: 0,
+        };
+      });
+    },
+  }), [step]);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    _healDummy.scale.set(0, 0, 0);
+    _healDummy.updateMatrix();
+    for (let i = 0; i < HEAL_PARTICLE_COUNT; i++) {
+      mesh.setMatrixAt(i, _healDummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.visible = false; // idle: not drawn until trigger()
+    skipMatrixWhileHidden(mesh);
+  }, []);
 
   return (
     <instancedMesh

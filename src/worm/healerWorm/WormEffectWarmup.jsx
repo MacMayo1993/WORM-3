@@ -22,6 +22,32 @@ import { warmOrbReveal } from '../orbReveal.js';
 import { warmCautionDissolve } from './cautionDissolve.js';
 import { compileOffscreen } from '../../3d/mirrorSubjects.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
+import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { resolveColors } from '../../utils/colorSchemes.js';
+import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+
+// Styled tiles at rest are drawn by the tile-surface batches (instancedTileStyle.js),
+// so the live scene holds none of the programs a styled tile's own mesh uses: the
+// style the flip swaps in, and its portal-bored copy once the exterior patches it.
+// A carrier per equipped style, for the run's warm-up; the bored copies are owned
+// here (their sources belong to the style cache) and keep those programs alive.
+function styleWarmup(settings) {
+  const warm = new THREE.Scene(), geometry = new THREE.PlaneGeometry(.1, .1), bored = [];
+  const colors = resolveColors(settings, settings?.biomeMode?.faceAssignment) ?? {};
+  const seen = new Set();
+  for (let face = 1; face <= 6; face++) {
+    const style = settings?.manifoldStyles?.[face];
+    if (!style || style === 'solid') continue;
+    const source = getTileStyleMaterial(style, colors[face] ?? '#888888', false, null, colors[ANTIPODAL_COLOR[face]] ?? null);
+    warm.add(new THREE.Mesh(geometry, source));
+    if (seen.has(style)) continue;
+    seen.add(style);
+    const material = exteriorPortalWarmupMaterial(source);
+    bored.push(material);
+    warm.add(new THREE.Mesh(geometry, material));
+  }
+  return { warm, dispose: () => { warm.clear(); geometry.dispose(); bored.forEach(material => material.dispose()); } };
+}
 
 // Keep one owner of each transient program for this WORM session. Real portal
 // materials still have private uniforms and their normal disposal; only the
@@ -31,6 +57,8 @@ export default function WormEffectWarmup({ body }) {
   const pool = usePickupPool(), resources = useRef(null), warmed = useRef(null), sceneWarmed = useRef(null);
   const fall = useRef({ key: null, dispose: null });
   useEffect(() => () => fall.current.dispose?.(), []);
+  const styles = useRef({ key: null, warmup: null });
+  useEffect(() => () => styles.current.warmup?.dispose(), []);
   useEffect(() => {
     const materials = [...createStickerPortalWarmupMaterials(), ...createMobiusWarmupMaterials()];
     const geometry = new THREE.PlaneGeometry(.1, .1), warm = new THREE.Scene();
@@ -131,6 +159,12 @@ export default function WormEffectWarmup({ body }) {
     if (sceneWarmed.current === key) return;
     sceneWarmed.current = key;
     gl.compile(scene, camera, scene);
+    const styleKey = JSON.stringify([s.settings?.manifoldStyles, s.settings?.colorScheme, s.settings?.customColors]);
+    if (styles.current.key !== styleKey) {
+      styles.current.warmup?.dispose();
+      styles.current = { key: styleKey, warmup: styleWarmup(s.settings) };
+    }
+    if (styles.current.warmup.warm.children.length) gl.compile(styles.current.warmup.warm, camera, scene);
     // Desktop draws the surface through the AO composer's render target, a
     // program variant of its own, so the interior and core revealed at a ride's
     // windup would otherwise link theirs there. The ride itself draws on screen.

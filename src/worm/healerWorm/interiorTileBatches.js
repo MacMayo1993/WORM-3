@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 import { resolveCubeViewAppearance } from '../../3d/cubeViewAppearance.js';
 import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { instanceTileStyleShaders } from '../../3d/styles/instancedTileStyle.js';
 import { withPortalCutout } from '../../3d/portalCutout.js';
 import { interiorPortalGLSL } from './interiorPortals.js';
 
@@ -11,21 +12,7 @@ import { interiorPortalGLSL } from './interiorPortals.js';
 function batchMaterial(source, portals) {
   const material = source.clone();
   material.uniforms = { ...source.uniforms };
-  material.vertexShader = `attribute vec4 aTileIdentity;
-    varying vec4 vInteriorIdentity;\n${source.vertexShader
-    .replace(/\bmodelViewMatrix\b/g, 'tileModelView')
-    .replace(/\bmodelMatrix\b/g, 'tileModel')
-    .replace(/\bnormalMatrix\b/g, 'tileNormal')
-    .replace('void main() {', `void main() {
-      mat4 tileModel = modelMatrix * instanceMatrix;
-      mat4 tileModelView = viewMatrix * tileModel;
-      mat3 tileNormal = normalMatrix * mat3(instanceMatrix);
-      vInteriorIdentity = aTileIdentity;`)} `;
-  material.fragmentShader = `varying vec4 vInteriorIdentity;\n${source.fragmentShader
-    .replace(/uniform vec3 tileHome;/g, '')
-    .replace(/uniform float tileFace;/g, '')
-    .replace(/\btileHome\b/g, 'vInteriorIdentity.xyz')
-    .replace(/\btileFace\b/g, 'vInteriorIdentity.w')}`;
+  instanceTileStyleShaders(material, 'aTileIdentity', 'vInteriorIdentity');
   return withPortalCutout(material, portals, interiorPortalGLSL, 'interior');
 }
 

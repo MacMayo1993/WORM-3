@@ -35,7 +35,9 @@ it('keeps tile accessory batches on the raised/rotating tile and restores glass/
   const frame = async () => act(async () => { runActiveStickers({ clock: { elapsedTime: time } }, 1 / 60); store.getState().advance(time += 1 / 60); });
   const batch = name => store.getState().scene.getObjectByName(`TileSurfaceBatch:${name}`);
   const check = name => {
-    const scene = store.getState().scene, source = scene.getObjectByName(name), mesh = batch(name);
+    const scene = store.getState().scene, mesh = batch(name);
+    // The border draws from the tile's own group (the back wrapper's parent).
+    const source = name.endsWith('tile-border') ? scene.getObjectByName('sticker-antipodal-back').parent : scene.getObjectByName(name);
     expect(source.isMesh).not.toBe(true); expect(mesh.count).toBe(1); expect(mesh.visible).toBe(true);
     scene.updateMatrixWorld(true);
     const matrix = new THREE.Matrix4(); mesh.getMatrixAt(0, matrix); matrix.premultiply(mesh.matrixWorld);
@@ -63,21 +65,26 @@ it('keeps tile accessory batches on the raised/rotating tile and restores glass/
     expect(scene.getObjectByName('sticker-antipodal-back').material.transparent).toBe(true);
     await act(async () => useGameStore.setState({ settings: { ...settings, manifoldStyles: Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, 'carbonFiber'])) } }));
     await render(); await frame();
-    expect(scene.getObjectByName('sticker-antipodal-back').material.isShaderMaterial).toBe(true);
+    // A styled back is batched too, through its style's instanced twin, so every
+    // back of one style and colour is a single draw.
+    const styledBack = () => scene.getObjectsByProperty('name', 'TileSurfaceBatch:sticker-antipodal-back')
+      .find(mesh => mesh.material.isShaderMaterial);
+    expect(styledBack().count).toBe(1);
+    expect(styledBack().material.userData.styleFragmentShader).toBeTruthy();
     // A same-color sticker can change orientation without changing its identity.
-    // Both faces bind their own identity even when materials are shared/patched.
+    // Both faces bind their own identity even when materials are shared/patched:
+    // the flipped front through its own mesh, the batched back per instance.
     meta = { ...meta, uvTurns: 1 };
     await render(); await frame();
     const front = scene.getObjectByName('sticker-front');
     expect(front.parent.rotation.z).toBeCloseTo(Math.PI / 2);
-    const patternedBack = scene.getObjectByName('sticker-antipodal-back');
-    for (const mesh of [front, patternedBack]) {
-      mesh.onBeforeRender(null, scene, null, mesh.geometry, mesh.material);
-      expect(mesh.material.uniforms.tileHome.value.toArray()).toEqual([2, 2, 5]);
-      expect(mesh.material.uniforms.tileFace.value).toBe(meta.orig);
-      expect(mesh.material.uniformsNeedUpdate).toBe(true);
-    }
-    // Artwork rotation lives on the shared back wrapper, also used by batches.
+    front.onBeforeRender(null, scene, null, front.geometry, front.material);
+    expect(front.material.uniforms.tileHome.value.toArray()).toEqual([2, 2, 5]);
+    expect(front.material.uniforms.tileFace.value).toBe(meta.orig);
+    expect(front.material.uniformsNeedUpdate).toBe(true);
+    const identity = styledBack().geometry.attributes.aInstanceData;
+    expect([identity.getX(0), identity.getY(0), identity.getZ(0), identity.getW(0)]).toEqual([2, 2, 5, meta.orig]);
+    // Artwork rotation lives on the shared back wrapper, which is the batch's anchor.
     // Check the composed transform so this catches a missing/doubled rotation.
     const expectedBack = new THREE.Matrix4().compose(
       new THREE.Vector3(0, 0, -0.018),
@@ -85,8 +92,11 @@ it('keeps tile accessory batches on the raised/rotating tile and restores glass/
       new THREE.Vector3(0.8, 0.8, 1),
     );
     scene.updateMatrixWorld(true);
-    const actualBack = patternedBack.parent.matrix.clone().multiply(patternedBack.matrix);
-    actualBack.elements.forEach((value, i) => expect(value).toBeCloseTo(expectedBack.elements[i], 8));
+    const backAnchor = scene.getObjectByName('sticker-antipodal-back');
+    expect(backAnchor.isMesh).not.toBe(true);
+    backAnchor.matrix.elements.forEach((value, i) => expect(value).toBeCloseTo(expectedBack.elements[i], 8));
+    const drawn = new THREE.Matrix4(); styledBack().getMatrixAt(0, drawn); drawn.premultiply(styledBack().matrixWorld);
+    drawn.elements.forEach((value, i) => expect(value).toBeCloseTo(backAnchor.matrixWorld.elements[i], 6));
 
     await act(async () => useGameStore.setState({ settings }));
     await render(); await frame(); check('sticker-antipodal-back');

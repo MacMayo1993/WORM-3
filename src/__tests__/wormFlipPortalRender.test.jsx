@@ -66,7 +66,7 @@ it.each([3, 15])('shares Flip Cube portals in size-%s Worm, through burrows, tur
     expect(seed).toBeCloseTo(10 + PORTAL_OPEN_DELAY);
     expect(Array.from(batch.geometry.attributes.aInstanceData.array.slice(0, 4))).toEqual(
       flipPortalData(colors[base.orig], 1, FLIP_CAP).map(Math.fround));
-    expect(scene.getObjectByName('flipped-tile-border')).toBeDefined();
+    expect(scene.getObjectByName('TileSurfaceBatch:flipped-tile-border').count).toBe(1);
     // The exact portal program retains the bore that clears traversal/death mouths.
     const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
     batch.material.onBeforeCompile(shader);

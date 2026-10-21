@@ -40,18 +40,19 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
   const entries = new Set(), batches = new Map();
   const tracker = createWorldTransformTracker();
   const inverse = new THREE.Matrix4(), local = new THREE.Matrix4(), color = new THREE.Color();
-  const frustum = new THREE.Frustum(), projection = new THREE.Matrix4(), sphere = new THREE.Sphere();
+  const frustum = new THREE.Frustum(), projection = new THREE.Matrix4();
   return {
     group,
-    register(anchor, geometry, material, colorRef, seedRef = null, dataRef = null) {
+    // `name` labels the batch; the anchor's own name by default.
+    register(anchor, geometry, material, colorRef, seedRef = null, dataRef = null, name = anchor.name) {
       if (material.transparent) throw Error('Transparent tile surfaces retain individual sorting');
-      const entry = { anchor, geometry, material, colorRef, seedRef, dataRef, data: [NaN, NaN, NaN, NaN] };
+      const entry = { anchor, geometry, material, colorRef, seedRef, dataRef, name, data: [NaN, NaN, NaN, NaN] };
       entries.add(entry);
       return () => entries.delete(entry);
     },
     update(camera = null) {
       tracker.begin();
-      const rootVersion = tracker.update(group);
+      const rootVersion = tracker.track(group, false);
       inverse.copy(group.matrixWorld).invert();
       if (camera) {
         camera.updateWorldMatrix(true, false);
@@ -60,12 +61,17 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
       for (const batch of batches.values()) { batch.count = 0; batch.matrixDirty = batch.colorDirty = batch.seedDirty = batch.dataDirty = false; }
       for (const entry of entries) {
         const { anchor, geometry, material, colorRef, seedRef, dataRef } = entry;
-        if (!anchor.parent || !tracker.visible(anchor)) continue;
-        const version = tracker.update(anchor);
+        if (!anchor.parent) continue;
+        const version = tracker.track(anchor);
+        if (version < 0) continue;
         if (camera) {
-          if (!geometry.boundingSphere) geometry.computeBoundingSphere();
-          sphere.copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
-          if (!frustum.intersectsSphere(sphere)) continue;
+          // The world bounds move only with the anchor; the camera moves every frame.
+          if (entry.sphereVersion !== version) {
+            if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+            (entry.sphere ??= new THREE.Sphere()).copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
+            entry.sphereVersion = version;
+          }
+          if (!frustum.intersectsSphere(entry.sphere)) continue;
         }
         // Built once per entry (and again only if its draw order changes): a key
         // per tile per frame was thousands of string concatenations on Mega.
@@ -78,7 +84,7 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         if (!batch) {
           const own = seedRef || dataRef;
           const mesh = new THREE.InstancedMesh(own ? seededGeometry(geometry, capacity, !!seedRef, !!dataRef) : geometry, materialFor(material), capacity);
-          mesh.name = `TileSurfaceBatch:${anchor.name || geometry.type}`;
+          mesh.name = `TileSurfaceBatch:${entry.name || geometry.type}`;
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           mesh.frustumCulled = false;
           mesh.renderOrder = anchor.renderOrder;
@@ -97,7 +103,13 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
           batch.matrixDirty = true;
         }
         if (colorRef) {
-          color.set(colorRef.current);
+          // Most tiles pass a hex string; parsing it is a regex per tile per frame.
+          const source = colorRef.current;
+          if (typeof source !== 'string' || source !== entry.colorSource) {
+            color.set(source);
+            entry.colorSource = source;
+            entry.cr = color.r; entry.cg = color.g; entry.cb = color.b;
+          } else color.setRGB(entry.cr, entry.cg, entry.cb);
           if (moved || entry.r !== color.r || entry.g !== color.g || entry.b !== color.b) {
             batch.mesh.setColorAt(slot, color);
             batch.colorDirty = true;

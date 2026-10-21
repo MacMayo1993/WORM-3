@@ -105,12 +105,25 @@ function VoidCore({ cubieRefs = null }) {
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    bodyMaterial: withPortalCutout(withCoreLightning(createCoreBodyMaterial(isMobile, mode), lightning),
-      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
     stickerMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile), lightning, { haloOnly: true }),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
-  }), [glow, mode, passage, lightning]);
+  }), [glow, passage, lightning]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
+  // Every look's materials are kept for the core's life. A view power swaps the
+  // cube's look and back within seconds, and a disposed material releases its
+  // program: every swap, and every restore, relinked the core's programs mid-run.
+  // Built for one board size and one set of core uniforms; a new one starts over.
+  const looks = useMemo(() => ({ size, passage, lightning, bodies: new Map(), styles: new Map() }), [size, passage, lightning]);
+  useEffect(() => () => {
+    looks.bodies.forEach(material => material.dispose());
+    looks.styles.forEach(look => { look.geometry.dispose(); look.material.dispose(); });
+  }, [looks]);
+  let bodyMaterial = looks.bodies.get(mode);
+  if (!bodyMaterial) {
+    bodyMaterial = withPortalCutout(withCoreLightning(createCoreBodyMaterial(isMobile, mode), lightning),
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true);
+    looks.bodies.set(mode, bodyMaterial);
+  }
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
   // The mirror room inside the core reflects the room itself, live (coreMirrorRoom.js).
@@ -135,17 +148,19 @@ function VoidCore({ cubieRefs = null }) {
     for (let id = 1; id <= 6; id++) {
       const style = mode === 'glass' ? 'glass' : manifoldStyles?.[id] || 'solid';
       if (style === 'solid') continue;
-      const key = `${id}-${style}`;
-      byColor.set(id, {
-        key, id, style,
-        geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER),
-        material: withPortalCutout(createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size)),
-          passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
-      });
+      const key = `${id}-${style}`, color = faceColors[id], antipode = faceColors[ANTIPODAL_COLOR[id]];
+      const lookKey = `${key}-${color}-${antipode}`;
+      let look = looks.styles.get(lookKey);
+      if (!look) {
+        look = { geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER),
+          material: withPortalCutout(createCoreTileStyle(style, color, antipode, tunnelCoreScale(size)),
+            passage.uniforms, coreRoomCutoutGLSL, 'core-room', true) };
+        looks.styles.set(lookKey, look);
+      }
+      byColor.set(id, { key, id, style, ...look });
     }
     return byColor;
-  }, [manifoldStyles, mode, faceColors, size, passage]);
-  useEffect(() => () => appearances.forEach(b => { b.geometry.dispose(); b.material.dispose(); }), [appearances]);
+  }, [manifoldStyles, mode, faceColors, size, passage, looks]);
   const styled = useMemo(() => {
     const groups = new Map(), slots = new Set();
     colors.ids.forEach((id, i) => {
@@ -396,7 +411,8 @@ function VoidCore({ cubieRefs = null }) {
           name="antipodal-core-body"
           frustumCulled={false}
           ref={bodiesRef}
-          args={[parts.body, parts.bodyMaterial, layout.cells.length]}
+          args={[parts.body, null, layout.cells.length]}
+          material={bodyMaterial}
         />
         <instancedMesh
           key={`stickers-${size}`}

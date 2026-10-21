@@ -19,8 +19,11 @@ function perimeter(outer, inner) {
     return new THREE.ShapeGeometry(shape);
 }
 
-export const ordinaryGeometry = perimeter(0.443, 0.425);
-export const flippedGeometry = perimeter(0.465, 0.397);
+// The border's lift off the tile is part of the geometry, so a tile's border is
+// drawn from the tile's own group with no anchor object of its own.
+export const TILE_BORDER_LIFT = 0.012;
+export const ordinaryGeometry = perimeter(0.443, 0.425).translate(0, 0, TILE_BORDER_LIFT);
+export const flippedGeometry = perimeter(0.465, 0.397).translate(0, 0, TILE_BORDER_LIFT);
 const vertexShader = `
 varying vec2 tilePosition;
 void main() {

@@ -15,7 +15,7 @@ export function createWorldTransformTracker() {
         let state = cache.get(object);
         if (state === undefined) {
             state = { frame: -1, version: 0, values: new Float64Array(16).fill(NaN), auto: null, parent: null, parentVersion: -1,
-                visibleFrame: -1, visible: true };
+                visibleFrame: -1, visible: true, chainVisible: true };
             cache.set(object, state);
         }
         return state;
@@ -25,7 +25,9 @@ export function createWorldTransformTracker() {
         if (state.frame === frame) return state.version;
         state.frame = frame;
         const parent = object.parent;
-        const parentVersion = parent ? update(parent) : 0;
+        return refresh(object, state, parent, parent ? update(parent) : 0);
+    }
+    function refresh(object, state, parent, parentVersion) {
         const auto = object.matrixAutoUpdate;
         const v = state.values;
         // No per-frame allocation. Matrix-driven objects are compared as matrices;
@@ -70,5 +72,22 @@ export function createWorldTransformTracker() {
         state.visible = object.visible && visible(object.parent);
         return state.visible;
     }
-    return { begin: () => { frame++; }, update, visible };
+    // Both questions in one walk: the world version, or -1 when an ancestor is
+    // hidden (or the object itself, unless `ownVisibility` is false). One cache
+    // lookup per object per frame instead of two, and a hidden branch skips its
+    // matrix work. A batch on 15×15 asks this for thousands of tile anchors whose
+    // ancestors are per tile too, so the lookups were most of its frame cost.
+    // Use either track or update/visible on one tracker, not both.
+    function track(object, ownVisibility = true) {
+        const state = stateOf(object);
+        if (state.frame !== frame) {
+            state.frame = frame;
+            const parent = object.parent;
+            const parentVersion = parent ? track(parent) : 0;
+            state.chainVisible = parentVersion >= 0;
+            if (state.chainVisible) refresh(object, state, parent, parentVersion);
+        }
+        return state.chainVisible && (!ownVisibility || object.visible) ? state.version : -1;
+    }
+    return { begin: () => { frame++; }, update, visible, track };
 }

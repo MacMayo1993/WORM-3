@@ -35,7 +35,7 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
   const entries = new Set(), batches = new Map();
   const tracker = createWorldTransformTracker();
   const inverse = new THREE.Matrix4(), local = new THREE.Matrix4();
-  const frustum = new THREE.Frustum(), projection = new THREE.Matrix4(), sphere = new THREE.Sphere();
+  const frustum = new THREE.Frustum(), projection = new THREE.Matrix4();
   const eye = new THREE.Vector3(), forward = new THREE.Vector3();
   let shadows = false;
   function batchFor(geometry, props) {
@@ -74,7 +74,7 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
     },
     update(camera = null) {
       tracker.begin();
-      const rootVersion = tracker.update(group);
+      const rootVersion = tracker.track(group, false);
       inverse.copy(group.matrixWorld).invert();
       if (camera) {
         camera.updateWorldMatrix(true, false);
@@ -87,16 +87,22 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
         const { anchor, geometry } = entry;
         // The anchor itself is invisible by design; what hides a body is a hidden
         // ancestor (the exterior while the lens is inside the cube, a cubie).
-        if (!anchor.parent || !tracker.visible(anchor.parent)) continue;
-        entry.version = tracker.update(anchor);
+        if (!anchor.parent) continue;
+        const version = tracker.track(anchor, false);
+        if (version < 0) continue;
+        entry.version = version;
         const m = anchor.matrixWorld.elements;
         if (camera) {
           // A shadow map needs the casters the lens cannot see, as it had them
           // when each body was its own mesh, culled per camera.
           if (!shadows) {
-            if (!geometry.boundingSphere) geometry.computeBoundingSphere();
-            sphere.copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
-            if (!frustum.intersectsSphere(sphere)) continue;
+            // The world bounds move only with the anchor; the camera moves every frame.
+            if (entry.sphereVersion !== version) {
+              if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+              (entry.sphere ??= new THREE.Sphere()).copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
+              entry.sphereVersion = version;
+            }
+            if (!frustum.intersectsSphere(entry.sphere)) continue;
           }
           entry.depth = (m[12] - eye.x) * forward.x + (m[13] - eye.y) * forward.y + (m[14] - eye.z) * forward.z;
         }

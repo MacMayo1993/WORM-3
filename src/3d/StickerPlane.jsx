@@ -26,6 +26,8 @@ import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, sharedUniforms, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { TileSurfaceInstance, useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
+import { instancedTileStyleMaterial } from './styles/instancedTileStyle.js';
+import { skipMatrixWhileHidden } from './hiddenMatrices.js';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getWormPress, getWormContact, wormPress } from '../worm/tilePressBridge.js';
 import { updateTilePressVisual } from '../worm/tilePressVisual.js';
@@ -49,6 +51,8 @@ import { blinkCountForFlips, blinkFlipRate, blinkPhase, blinkBounce, BLINK_BASE_
 import HealParticles from './HealParticles.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
+import { ordinaryGeometry as borderGeometry, flippedGeometry as flippedBorderGeometry,
+  ordinaryMaterial as borderMaterial, flippedMaterial as flippedBorderMaterial } from './tileBoundaryMaterials.js';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
 import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, forgetFlipPortalOpening, FLIP_PORTAL_OPEN_SEED, PORTAL_TOP } from './flipPortal.js';
 import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
@@ -780,6 +784,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [biomeEnabled]);
 
   tickImplRef.current = (state, delta) => {
+    // Heal sparks run on this tick (HealParticles has no frame callback of its own).
+    healParticlesRef.current?.step(delta);
     // Settle before another rigid turn starts. There is never a second rotation
     // competing with the layer animation, including during a live drag.
     applyArtworkAngle(advanceTileDisplayAngle(meta, state.clock.elapsedTime * 1000,
@@ -852,6 +858,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
       healParticlesRef.current?.trigger(origHealColor);
     }
+    const sparksLive = !!healParticlesRef.current?.active();
 
     // ── Worm footprint: the tile carrying the worm's weight ────────────────────
     // press comes from the shared spring (worm/tilePressBridge) and can overshoot
@@ -881,7 +888,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // A cube-mode portal animates in its shader: unless the legacy tremor runs, a
     // flipped tile sleeps like any other once its flip has played.
     const wormholeFrames = (wormHealerMode || flipPads === 'off') && wormhole && !isSudokube;
-    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
+    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || healTRef.current >= 0 || sparksLive || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1358,9 +1365,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const bindStyleIdentity = useMemo(() => bindTileStyleIdentity({ x: meta?.origPos?.x, y: meta?.origPos?.y, z: meta?.origPos?.z }, meta?.orig),
     [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
+  // The same identity for an instanced style draw (instancedTileStyle.js reads it as aInstanceData).
+  const styleIdentity = useMemo(() => [meta?.origPos?.x ?? 0, meta?.origPos?.y ?? 0, meta?.origPos?.z ?? 0, meta?.orig ?? 0],
+    [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
 
   const backTileStyle = isDead || lightweightNumbers || isChrome ? 'solid' : isNeon ? 'neonSign' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
-  const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
+  // The back is never animated, so in WORM it is always one of the tile-surface
+  // batches: plain backs share one material, styled backs their style's instanced twin.
+  const batchBack = wormHealerMode && !!surfaceCtx && !useGlassStyle;
+  const instanceBack = batchBack && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
     if (instanceBack) return isChrome ? surfaceCtx.chromeMaterial : surfaceCtx.backMaterial;
@@ -1370,9 +1383,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       material.side = THREE.FrontSide;
       return material;
     }
-    if (backTileStyle !== 'solid') return getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
+    if (backTileStyle !== 'solid') {
+      const material = getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
+      return batchBack ? instancedTileStyleMaterial(material) : material;
+    }
     return new THREE.MeshStandardMaterial({ color: isDead ? '#555555' : antipodalHex, roughness: 0.45, metalness: 0.08 });
-  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle, isChrome, instanceBack, surfaceCtx]);
+  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle, isChrome, instanceBack, batchBack, surfaceCtx]);
   useEffect(() => () => {
     // Shader styles belong to the shared tile cache; only the plain back owns
     // its material, along with the glass clone. Never dispose a cached shader.
@@ -1427,6 +1443,29 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !hasPendingFlipAnimation &&
     !keepFlipMeshMounted
   );
+  // A styled tile at rest is drawn the same way in WORM: one instanced draw per
+  // style and colour (identity per instance) instead of a draw per tile, which on
+  // a 10×10 or 15×15 was most of the frame's draws. A tile that has flipped, or is
+  // about to, keeps its own mesh, whose material the flip swaps imperatively.
+  const styleBatched = wormHealerMode && !!surfaceCtx && useShaderStyle && !!styleMaterial && !hollow &&
+    !(meta?.flips > 0) && !hasPendingFlipAnimation && !keepFlipMeshMounted;
+  // Both batch draws take the tile's own groups as their anchors (the front sits
+  // at the inner group's origin, the back at its orientation group's), so a tile
+  // adds no anchor objects to the scene graph three.js walks every frame. These
+  // effects run after the groups' refs attach, which a child's would not.
+  const styleIdentityRef = useRef(styleIdentity);
+  styleIdentityRef.current = styleIdentity;
+  const backColorRef = useRef(null);
+  backColorRef.current = isDead ? '#555555' : antipodalHex;
+  const frontBatchMaterial = styleBatched ? instancedTileStyleMaterial(styleMaterial) : null;
+  useLayoutEffect(() => frontBatchMaterial ? surfaceCtx.register(innerGroupRef.current, _playStickerGeo, frontBatchMaterial,
+    null, null, styleIdentityRef, 'sticker-front') : undefined, [surfaceCtx, frontBatchMaterial]);
+  // The footprint and heal seal wait hidden on every tile (hiddenMatrices.js).
+  useLayoutEffect(() => { skipMatrixWhileHidden(footprintGroupRef.current); skipMatrixWhileHidden(healSealRef.current); });
+  const backBatched = batchBack && !!antipodalHex && !!backMaterial;
+  useLayoutEffect(() => backBatched ? surfaceCtx.register(backOrientationRef.current, _sharedStickerGeo, backMaterial,
+    instanceBack ? backColorRef : null, null, instanceBack ? null : styleIdentityRef, 'sticker-antipodal-back') : undefined,
+  [surfaceCtx, backBatched, backMaterial, instanceBack]);
 
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
@@ -1502,6 +1541,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
+  // The tile border, batched from the tile's own group like the faces above.
+  const showBorder = wormHealerMode && !isDead && !isSudokube;
+  const borderBatched = showBorder && !!surfaceCtx;
+  useLayoutEffect(() => borderBatched ? surfaceCtx.register(groupRef.current, isWormhole ? flippedBorderGeometry : borderGeometry,
+    isWormhole ? flippedBorderMaterial : borderMaterial, null, null, null, isWormhole ? 'flipped-tile-border' : 'tile-border') : undefined,
+  [surfaceCtx, borderBatched, isWormhole]);
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Worm and cube modes share the same batched, animated portal face, in every view:
   // Sudokube draws it too, with the tile's number laid over the lens.
@@ -1533,7 +1578,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     <group position={pos} rotation={rot} ref={groupRef}>
       {/* A static surface marking stays legible when bloom and moving portal
           effects wash out. Raised hazard fences still identify deadly portals. */}
-      {wormHealerMode && !isDead && !isSudokube && <TileBoundary flipped={isWormhole} />}
+      {showBorder && !borderBatched && <TileBoundary flipped={isWormhole} />}
       {/* Ghost spider web on the back of flipped tiles. Mounted only once a tile has
           any flip history — a never-flipped tile can never show it, so on a 15×15
           Mega shell the ~1,300 untouched tiles skip this mesh (and every transient
@@ -1560,16 +1605,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           at 80% scale so the interior reads as distinct from the front face. It sits
           just behind the solid sticker's 0.016 thickness, or the sticker's back would hide it. */}
       {antipodalHex && (
-        <group ref={backOrientationRef} position={[0, 0, -0.018]} rotation={[0, Math.PI, -displayAngle]} scale={[0.8, 0.8, 1]}>
-        {instanceBack ? <TileSurfaceInstance name="sticker-antipodal-back" geometry={_sharedStickerGeo} material={backMaterial}
-          color={isDead ? '#555555' : antipodalHex} />
-        : <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} dispose={null}>
+        <group ref={backOrientationRef} name={batchBack ? 'sticker-antipodal-back' : ''}
+          position={[0, 0, -0.018]} rotation={[0, Math.PI, -displayAngle]} scale={[0.8, 0.8, 1]}>
+        {/* In WORM the back is drawn by the tile-surface batches from this group (see batchBack),
+            which then carries the back's name. */}
+        {!batchBack && <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
         </mesh>}
         </group>
       )}
 
-      <group ref={innerGroupRef} rotation={[0, 0, displayAngle]}>
+      <group ref={innerGroupRef} name={styleBatched ? 'sticker-front' : ''} rotation={[0, 0, displayAngle]}>
         {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
             so the white '#ffffff' texture-tint does not bleed through the transparent disc
             corners on textured tiles.  Only rendered when a texture is active; plain
@@ -1592,7 +1638,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             Replacing a primitive changes its shared R3F parent/previousAttach
             bookkeeping and can overwrite a stationary tile's material when a
             different slot swaps styles during a turn. */}
-        {!isInstanceable && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef}
+        {!isInstanceable && !styleBatched && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef}
           {...(useGlassStyle && glassMaterial ? { material: glassMaterial }
             : useShaderStyle && styleMaterial ? { material: styleMaterial } : {})}
           key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : 'plane'}>
