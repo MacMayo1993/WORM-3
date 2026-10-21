@@ -34,9 +34,11 @@ const fakeCamera = {};
 const SKIN_MATERIALS = { surface: 1, flames: 6, blades: 3 };
 // Ice alone carries a second, low-detail surface program for phones.
 const DETAIL_VARIANTS = { ice: 1 };
+// Water's drips and ice's icicles hang off the shell (elementalAdornments.js).
+const ADORNMENTS = { water: 1, ice: 1 };
 // Every fusion's reaction adds its coat and its particle material.
 const expectedCount = Object.entries(ELEMENTAL_DEFS).reduce(
-  (n, [element, def]) => n + 5 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0),
+  (n, [element, def]) => n + 5 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0) + (ADORNMENTS[element] ?? 0),
   0
 ) + Object.keys(FUSION_LOOKS).length * 2 + 1; // + the sigil emblem (FusionAura)
 

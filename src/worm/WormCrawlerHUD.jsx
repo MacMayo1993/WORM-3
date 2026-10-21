@@ -978,6 +978,29 @@ function SpecialNotice({ suppressed = false }) {
     );
 }
 
+// Mobi speaks up the first time something new happens in play (the Rumbler's
+// first crest, Rumbler.jsx): one short line, then gone. It never blocks the run.
+const MOBI_LINE_MS = 4200;
+
+function MobiLineNotice() {
+    const line = useGameStore(s => s.wormMobiLine);
+    const [shown, setShown] = useState(null);
+    useEffect(() => {
+        if (!line) { setShown(null); return undefined; }
+        setShown(line);
+        const timer = setTimeout(() => setShown(null), MOBI_LINE_MS);
+        return () => clearTimeout(timer);
+    }, [line]);
+    if (!shown) return null;
+    return (
+        <div key={shown.seq} className="worm-mobi-line" role="status" aria-live="polite"
+            style={{ ...SPECIAL_NOTICE_STYLE, color: GAME_HUD.text, letterSpacing: 0.2 }}>
+            <strong>MOBI</strong>
+            <span style={{ fontWeight: 700 }}>{shown.text}</span>
+        </div>
+    );
+}
+
 // ─── Boost button ────────────────────────────────────────────────────────────
 
 function BoostButton({ wormAlive }) {
@@ -1262,6 +1285,7 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
         {healing ? <TunnelNeedsCard compact onInspect={onInspect} /> : surface && hasBuff ? <BuffStrip onInspect={onPowerInspect} /> : null}
         {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
         <SpecialNotice suppressed={healing || hasBuff || !surface} />
+        <MobiLineNotice />
     </div>;
 }
 
@@ -1283,7 +1307,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const combatMode = useGameStore(s => s.wormCombatMode);
     const jumpRescue = useGameStore(s => s.wormJumpRescueActive && !s.wormPaused && s.wormAlive);
     const rescueKind = useGameStore(s => s.wormRescueKind);
-    const cautionRescue = jumpRescue && rescueKind === 'caution';
+    // A collapsed tunnel's pit stops the worm at its rim like the tape does: steer
+    // away or jump clear (tunnelPits.js).
+    const pitRescue = jumpRescue && rescueKind === 'pit';
+    const cautionRescue = jumpRescue && (rescueKind === 'caution' || pitRescue);
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
     const airActive = useGameStore(s => !s.wormRocketActive && (s.wormElementalTheme === 'air' || s.wormElementalPartner === 'air'));
     const runId = useGameStore(s => s.wormRunId);
@@ -1491,7 +1518,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
-                                {jumpRescue && <JumpRescueCue caution={cautionRescue} watching={previewLesson} />}
+                                {jumpRescue && <JumpRescueCue caution={cautionRescue} pit={pitRescue} watching={previewLesson} />}
                                 <button
                                     onPointerDown={e => { e.currentTarget.setPointerCapture?.(e.pointerId); callWormTurn('jump-hold'); handleJumpAction(); }}
                                     onPointerUp={() => callWormTurn('jump-release')}
@@ -1501,7 +1528,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                                     className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
                                     style={isPortalReady ? jumpReadyStyle : airActive ? { ...jumpIdleStyle, background: '#b9f5ed', boxShadow: '0 0 18px #b9f5ed88' } : jumpIdleStyle}
-                                    aria-label={cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : airActive ? 'Hold Jump to fly; release to land' : "Jump over body or vault an edge"}
+                                    aria-label={pitRescue ? 'Jump now to clear the pit' : cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : airActive ? 'Hold Jump to fly; release to land' : "Jump over body or vault an edge"}
                                     title={airActive ? 'Hold Jump or Space to fly. Release to land.' : undefined}
                                     disabled={!controlsEnabled}
                                 >

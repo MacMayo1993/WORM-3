@@ -14,6 +14,7 @@ import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
 import { combatBridge, strikeEnemies, afflictEnemies, nearestEnemy } from './combat/portalCombat.js';
 import { STORM, makeStorm, beginStorm, clearStorm, tickStorm, pickStrikeTile, addStormFlash } from './healerWorm/lightningStorm.js';
+import Rumbler from './healerWorm/Rumbler.jsx';
 import { getAllSurfaceTiles } from './healerWorm/surfaceTiles.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
@@ -979,6 +980,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 : (typeof _pending?.sliceIndex === 'number' ? [_pending.sliceIndex] : []);
             _si.length = _layers.length;
             for (let i = 0; i < _layers.length; i++) _si[i] = _layers[i];
+            const _sd = rotationClock.sliceDirs;
+            _sd.length = _layers.length;
+            for (let i = 0; i < _layers.length; i++) _sd[i] = (_pending?.sliceDirs?.[i] ?? _pending?.dir ?? 1) < 0 ? -1 : 1;
         }
 
         // Fire at the authored interval after the full warning.
@@ -1053,7 +1057,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
-            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><ElementalAbilityEffects worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /></group>
+            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><ElementalAbilityEffects worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /><Rumbler worm={worm} size={size} /></group>
             {/* Keep the equipped body/face and their programs through retries. The
                 hidden scramble frame also prepares their instanced attributes. */}
             <StoryArrival worm={worm} elapsed={spawnTimerRef}>

@@ -1,5 +1,6 @@
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { cubeExpansionScale, cubeExpansionMultiplier } from './cubeWorldGeometry.js';
+import { getManifoldGridId } from './gridIds.js';
 
 // Caution fences sit halfway up to the landing, grounded on the unraised cube.
 // Their visual height is independent of the platform/jump geometry.
@@ -31,6 +32,30 @@ export function isLiveFlippedFace(sticker, cap) {
 // A cubie is one solid piece. Several flipped faces must not multiply its lift.
 export function cubieHasFlippedFace(cubie, cap) {
   return DIRECTIONS.some(dir => isLiveFlippedFace(cubie.stickers?.[dir], cap));
+}
+
+// WORM: a collapsed tunnel's mouths are pits (worm/healerWorm/tunnelPits.js),
+// listed by sticker grid id. A pit's pad has dropped into its slot, so it neither
+// raises its piece nor stands up off it.
+export function isPitFace(sticker, size, pitGrids) {
+  return !!pitGrids?.length && !!sticker?.origPos && pitGrids.includes(getManifoldGridId(sticker, size));
+}
+
+// The live flipped faces of this piece that are pits, as their direction keys
+// joined ('' for none): a stable value a store selector can return per cubie.
+export function cubiePitFaces(cubie, cap, size, pitGrids) {
+  if (!pitGrids?.length || !cubie) return '';
+  let faces = '';
+  for (const dir of DIRECTIONS) {
+    const sticker = cubie.stickers?.[dir];
+    if (isLiveFlippedFace(sticker, cap) && isPitFace(sticker, size, pitGrids)) faces += dir;
+  }
+  return faces;
+}
+
+// A WORM piece is held up by a live flipped face that has not collapsed into a pit.
+export function wormPieceRaised(cubie, cap, pitFaces = '') {
+  return !!cubie && DIRECTIONS.some(dir => isLiveFlippedFace(cubie.stickers?.[dir], cap) && !pitFaces.includes(dir));
 }
 
 export function cubieFaceRole(cubie, dir, cap) {

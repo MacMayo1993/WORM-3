@@ -157,6 +157,7 @@ import {
 } from './constants.js';
 
 import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
+import { voidTunnel, mendTunnel, isPitTile, rideExhausted, mouthOccupied, remapTunnelKeys } from './tunnelPits.js';
 import { ageDroppedOrbs, takeDroppedOrbsAt, scatterDroppedOrbs } from './droppedOrbs.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -330,6 +331,8 @@ export function makeWormSim(size) {
         burrows: makeBurrows(),
         tunnelUseCounts: new Map(),
         voidTunnelKeys: new Set(),
+        pitTiles: new Set(),          // the collapsed tunnels' mouths (tunnelPits.js)
+        pitVersion: 0,                // bumped whenever pitTiles changes, for the renderers
         chargedTunnels: new Set(),    // tunnels a lightning strike opened: each pays part of its own heal toll
         pendingVoidKill: null,
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
@@ -517,6 +520,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healed = 0;
     sim.tunnelUseCounts = new Map();
     sim.voidTunnelKeys = new Set();
+    sim.pitTiles = new Set();
+    sim.pitVersion++;
     sim.chargedTunnels = new Set();
     sim.pendingVoidKill = null;
     sim.currentTunnelStableKey = null;
@@ -870,17 +875,7 @@ function tickCautionRescue(sim, delta, size, ctx) {
         return true;
     }
     sim.jumpRescueT = Math.max(0, sim.jumpRescueT - Math.max(0, delta));
-    if (sim.jumpRescueT <= 1e-9) {
-        clearJumpRescue(sim, ctx);
-        sim.cautionFall = makeCautionFall(sim, rescue.tile, size);
-        sim.headInterpPos.copy(sim.cautionFall.start);
-        sim.phase = 'falling';
-        sim.pendingTurns.length = 0;
-        sim.pendingSelfCollision = null;
-        sim.pendingTunnelTrigger = null;
-        sim.signatureRequested = false;
-        ctx.onPhase('falling');
-    }
+    if (sim.jumpRescueT <= 1e-9) beginCautionFall(sim, rescue.tile, size, ctx, !!rescue.pit);
     return true;
 }
 
@@ -956,6 +951,32 @@ export function queueTurn(sim, dir) {
     if (q[q.length - 1] !== dir) q.push(dir);
 }
 
+// The worn-out tunnel caves in behind the worm (tunnelPits.js). A charge it held
+// goes with it, and the ride that armed a mid-ride collapse is already over.
+function collapseBehind(sim, ctx, passage) {
+    const { tunnelKey, tunnel } = passage;
+    voidTunnel(sim, tunnelKey);
+    sim.chargedTunnels.delete(tunnelKey);
+    if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+    ctx.feel('collapse');
+    ctx.onTunnelCollapse?.(tunnel, tunnelKey);
+}
+
+// Over the edge and down the hole: a caution fall, into a raised piece's opening
+// or a collapsed tunnel's pit. The fall is presentation; its end is the death.
+function beginCautionFall(sim, tile, size, ctx, pit = false) {
+    clearJumpRescue(sim, ctx);
+    sim.cautionFall = makeCautionFall(sim, tile, size);
+    sim.cautionFall.pit = pit;
+    sim.headInterpPos.copy(sim.cautionFall.start);
+    sim.phase = 'falling';
+    sim.pendingTurns.length = 0;
+    sim.pendingSelfCollision = null;
+    sim.pendingTunnelTrigger = null;
+    sim.signatureRequested = false;
+    ctx.onPhase('falling');
+}
+
 export function killWormSim(sim, ctx, details = null) {
     if (!sim.alive) return;
     if ((details?.reason === 'self' || details?.reason === 'self-collision') && spendIceShield(sim)) {
@@ -1029,11 +1050,12 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     // for the "void on the 4th traversal" rule.
     const traversalVerdict = classifyTraversal(nextTraversals);
     if (traversalVerdict === 'void-arm') {
-        // The fourth trip collapses at the interior midpoint, never after escape.
+        // The third ride caves the tunnel in behind the worm (tunnelPits.js). A fourth,
+        // re-entered before that could land, collapses at the interior midpoint.
         sim.pendingVoidKill = { tunnelKey, traversals: nextTraversals };
     } else if (traversalVerdict === 'collapse') {
         // Past the void traversal the tunnel is fully collapsed and kills on contact.
-        sim.voidTunnelKeys.add(tunnelKey);
+        voidTunnel(sim, tunnelKey);
         sim.pendingVoidKill = null;
         killWormSim(sim, ctx, {
             reason: 'voided',
@@ -1450,7 +1472,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
         if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, hit.mouth);
         if (tunnelKey) {
             sim.tunnelUseCounts.delete(tunnelKey);
-            sim.voidTunnelKeys.delete(tunnelKey);
+            mendTunnel(sim, tunnelKey);
             sim.chargedTunnels.delete(tunnelKey);
             if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
         }
@@ -2163,7 +2185,7 @@ const PHASE_HANDLERS = {
                     sim.pendingTurns.length = 0;
                     sim.signatureRequested = false;
                     sim.stepAcc = STEP_SEC;
-                    ctx.onJumpRescue?.(true, 'caution');
+                    ctx.onJumpRescue?.(true, caution.pit ? 'pit' : 'caution');
                     return true;
                 }
                 sim.stepAcc -= STEP_SEC;
@@ -2361,7 +2383,7 @@ const PHASE_HANDLERS = {
             if (collapsing && nextProgress >= 0.5) {
                 const { tunnelKey, traversals } = sim.pendingVoidKill;
                 sim.pendingVoidKill = null;
-                sim.voidTunnelKeys.add(tunnelKey);
+                voidTunnel(sim, tunnelKey);
                 killWormSim(sim, ctx, { reason: 'void-tunnel-exhausted', tunnelKey, traversals, progress: 0.5 });
                 return true;
             }
@@ -2494,7 +2516,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'falling') {
         sim.jumpRescueHeld = true;
         if (tickCautionFall(sim, delta)) killWormSim(sim, ctx, {
-            reason: 'caution-fall', headTile: tileKey(sim.cautionFall.tile),
+            reason: sim.cautionFall.pit ? 'pit' : 'caution-fall', headTile: tileKey(sim.cautionFall.tile),
             impactPosition: sim.cautionFall.mouth.toArray(),
         });
         return;
@@ -2848,8 +2870,16 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.jumpBase = 0;
             sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
             sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+            // Coming down in a collapsed tunnel's pit: straight in, no rim to stop on.
+            if (settled && sim.alive && sim.phase === 'crawling' && isPitTile(sim, sim.pos)) {
+                beginCautionFall(sim, { ...sim.pos }, size, ctx, true);
+            }
         }
     }
+
+    // A landing in a pit started the fall (beginCautionFall); 'falling' is run at the
+    // top of the next step, not by a phase handler.
+    if (sim.phase === 'falling') return;
 
     // ── Dispatch: detect phase transitions, then run the active handler ──────
     const currentPhase = sim.phase;
@@ -2903,11 +2933,18 @@ export function stepWormSim(sim, delta, size, ctx) {
             if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);
             if (tunnelKey) {
                 sim.tunnelUseCounts.delete(tunnelKey);
-                sim.voidTunnelKeys.delete(tunnelKey);
+                mendTunnel(sim, tunnelKey);
                 sim.chargedTunnels.delete(tunnelKey);
                 if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
             }
             ctx.feel('heal');
+        } else if (rideExhausted(sim, passage.tunnelKey) && !sim.voidTunnelKeys.has(passage.tunnelKey)) {
+            // That was its last ride: the tunnel collapses behind the worm, and both
+            // pads drop into their slots as pits. Never onto the worm: a body still
+            // lying on (or under) either mouth holds the collapse until it moves off.
+            const reach = Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1;
+            if (mouthOccupied(sim, passage.tunnel, reach)) { passage.clearFrame = false; continue; }
+            collapseBehind(sim, ctx, passage);
         }
         sim.tunnelPassages.splice(i, 1);
     }
@@ -3165,7 +3202,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
-        sim.onFlippedTile = landedFlipped && !isParityLocked(sim, sim.pos, ctx);
+        sim.onFlippedTile = landedFlipped && !isParityLocked(sim, sim.pos, ctx) && !isPitTile(sim, sim.pos);
         if (sim.onFlippedTile !== sim.lastFlipped) {
             sim.lastFlipped = sim.onFlippedTile;
             ctx.onFlippedTile(sim.onFlippedTile);
@@ -3255,6 +3292,8 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         passage.tunnel = rotateTunnel(passage.tunnel);
         if (passage.heal) passage.heal = { ...passage.heal, tunnel: passage.tunnel };
     }
+    // Wear, collapse and charge are keyed by the mouths' cells: carry them too.
+    remapTunnelKeys(sim, _remapTileKey);
 
     // A turn that carried any of the visible body earns a few steps of self-collision
     // immunity on the small boards. The turn itself never kills — but it can drop the

@@ -61,7 +61,7 @@ export function wormdKindForDeath(reason) {
   if (reason === 'bomb') return 'blasted';
   if (reason === 'lightning') return 'struck';
   if (reason === 'self' || reason === 'self-collision') return 'bite';
-  if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'void';
+  if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted' || reason === 'pit') return 'void';
   if (reason === 'portal-crawler') return 'overrun';
   return null;
 }

@@ -21,10 +21,11 @@ describe('rotation clock bridge', () => {
       armed: true, secondsLeft: 4.2, total: 10, warning: 0.6, held: true, axis: 'row', sliceIndex: 2
     });
     rotationClock.sliceIndices.push(2, 5);
+    rotationClock.sliceDirs.push(1, -1);
     resetRotationClock();
     expect(rotationClock).toEqual({
       armed: false, secondsLeft: 0, total: 0, warning: 0, held: false,
-      axis: null, sliceIndex: null, sliceIndices: []
+      axis: null, sliceIndex: null, sliceIndices: [], sliceDirs: []
     });
   });
 

@@ -131,6 +131,28 @@ function publishTilePress(sim, size, ctx, delta) {
     tickWormPress(delta);
 }
 
+// Collapsed tunnels' mouths for the renderers, as their stickers' grid ids
+// (tunnelPits.js). A grid id travels with its sticker, so a slice turn carrying a
+// pit republishes nothing; only a collapse or a heal changes the list, and only
+// the cubies under it re-render.
+const NO_PITS = Object.freeze([]);
+function publishPits(sim, size, ctx, published) {
+    if (sim.pitVersion === published.version) return;
+    published.version = sim.pitVersion;
+    const cubies = ctx.getCubies();
+    const ids = [];
+    for (const key of sim.pitTiles) {
+        parseTileKey(key, _parseTile);
+        const sticker = cubies?.[_parseTile.x]?.[_parseTile.y]?.[_parseTile.z]?.stickers?.[_parseTile.dirKey];
+        if (sticker) ids.push(getManifoldGridId(sticker, size));
+    }
+    ids.sort();
+    const list = ids.join('|');
+    if (list === published.list) return;
+    published.list = list;
+    useGameStore.setState({ wormPitGrids: ids.length ? ids : NO_PITS });
+}
+
 export function useWormCrawler(size, cubies) {
     // Only the values that must RESET the run are subscribed reactively; everything
     // the sim reads per-frame (speed, control mode, pause, interval) goes through
@@ -151,6 +173,8 @@ export function useWormCrawler(size, cubies) {
 
     // ── The simulation state — one plain object, created once per mount ─────────
     const simRef = useRef(null);
+    // What publishPits last wrote; reset with the run so a fresh sim republishes.
+    const pitsPublishedRef = useRef({ version: -1, list: '' });
     if (simRef.current === null) simRef.current = makeWormSim(size);
 
     const feedbackRef = useRef(null);
@@ -203,6 +227,8 @@ export function useWormCrawler(size, cubies) {
             getCubies: () => useGameStore.getState().cubies,
             getRotationEpoch: () => useGameStore.getState().rotationEpoch,
             isBurrowFaceOpen: sticker => burrowEntryOpen(simRef.current.burrows.pairs.get(flipPadPair(sticker, sizeRef.current))),
+            // A collapsed tunnel's mouth (tunnelPits.js): its pad has dropped into the slot.
+            isPitFace: (x, y, z, dirKey) => simRef.current.pitTiles.size > 0 && simRef.current.pitTiles.has(`${x},${y},${z},${dirKey}`),
             getFlipCap: () => selectEffectiveFlipCap(useGameStore.getState()),
             getTunnelEntry: () => tunnelEntryRule(useGameStore.getState()),
             getGamePhase: () => useGameStore.getState().wormGamePhase,
@@ -694,6 +720,7 @@ export function useWormCrawler(size, cubies) {
         // claim without allocating anything per frame.
         wormBuffs.elementalOrigin = sim.elementalOrigin;
         publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
+        publishPits(sim, sizeRef.current, ctxRef.current, pitsPublishedRef.current);
     }, []);
 
     const queueTurn = useCallback((dir) => {
@@ -768,7 +795,10 @@ export function useWormCrawler(size, cubies) {
                 wormStoryTarget: practice.target, wormStoryReady: true, wormPaused: true };
         }
         useGameStore.getState().setWormBoostState('ready');
+        pitsPublishedRef.current = { version: -1, list: '' };
         useGameStore.setState({
+            wormPitGrids: NO_PITS,
+            wormMobiLine: null,
             wormPowerups: sim.powerups,
             wormSpecials: [],
             wormExplodeActive: false, wormRocketActive: false,
@@ -812,7 +842,7 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false, wormRescueKind: null });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false, wormRescueKind: null, wormPitGrids: NO_PITS });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,

@@ -14,7 +14,10 @@ export const rotationClock = {
   // Every plane the armed move will turn. A hazard turn spins two at once, and the
   // safe-lane pick has to exclude both — the anchor alone would advertise a lane
   // that is about to rotate. Mutated in place like the rest of this bridge.
-  sliceIndices: []
+  sliceIndices: [],
+  // The turn direction of each of those planes (±1), in the same order. The
+  // Rumbler circles each threatened belt the way its layer is about to turn.
+  sliceDirs: []
 };
 
 export function resetRotationClock() {
@@ -26,4 +29,5 @@ export function resetRotationClock() {
   rotationClock.axis = null;
   rotationClock.sliceIndex = null;
   rotationClock.sliceIndices.length = 0;
+  rotationClock.sliceDirs.length = 0;
 }
