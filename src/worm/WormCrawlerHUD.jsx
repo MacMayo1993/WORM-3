@@ -593,6 +593,7 @@ const PODIUM_LABEL_STYLE = {
 const MAX_WORM_DISPLAY = 28;
 
 function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAlive, wormHealedCount, wormColor, formatTime, onRetry, onNewGame }) {
+    const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
     const ppEarned = wormBodyTiles * 10;
     const displayCount = Math.min(wormBodyTiles, MAX_WORM_DISPLAY);
     const overflow = wormBodyTiles > MAX_WORM_DISPLAY ? wormBodyTiles - MAX_WORM_DISPLAY : 0;
@@ -641,6 +642,7 @@ function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityP
                     ['Time', formatTime(wormTimeAlive)],
                     ['Collected', wormSessionOrbs],
                     ['Healed', wormHealedCount],
+                    ...(bestCombo >= 2 ? [['Best orb chain', `×${bestCombo}`]] : []),
                     ['Total PP', parityPoints],
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
