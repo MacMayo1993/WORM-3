@@ -39,6 +39,8 @@ import { useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
+import { queueHealSeal } from './healSeal.js';
+import { comboWindowLeft } from './healerWorm/orbCombo.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
 import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
 import { flipPadPair } from '../game/flipPad.js';
@@ -414,6 +416,7 @@ export function useWormCrawler(size, cubies) {
                     ...(recovered ? {} : wormEventChanges(state, 'orbs', (state.wormSessionOrbs ?? 0) + 1, faceId, state.wormRunId)),
                     wormBodyTiles: orbCount,
                     wormSessionOrbs: (state.wormSessionOrbs ?? 0) + (recovered ? 0 : 1),
+                    wormRunBestCombo: Math.max(state.wormRunBestCombo ?? 0, (combo ?? 0) + 1),
                     // Drives the HUD's screen-edge confirmation flash. `seq` is what the
                     // HUD keys its animation off, so two pickups of the same colour still
                     // replay it. A magnet sweep collects several orbs inside one tick and
@@ -496,6 +499,8 @@ export function useWormCrawler(size, cubies) {
                 const st = useGameStore.getState();
                 let healed = healSticker(st.cubies, sz, entry.x, entry.y, entry.z, entry.dirKey);
                 healed = healSticker(healed, sz, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                // The pair goes home together, so both mouths play the seal.
+                queueHealSeal(healed, sz, [entry, exitTile]);
                 // Match a manual cube-mode flip: both antipodal endpoint cubies hop
                 // outward while their stickers animate back to the restored color.
                 const now = performance.now();
@@ -555,7 +560,7 @@ export function useWormCrawler(size, cubies) {
             useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,
                 exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
-                wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
+                wormSessionOrbs: 0, wormRunBestCombo: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 // A retry can interrupt a rescue or a tunnel ride. Reset the
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false, wormRescueKind: null,
@@ -711,6 +716,8 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.orbShowerT = sim.orbShowerT;
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
+        wormBuffs.orbCombo = sim.orbCombo;
+        wormBuffs.orbComboLeft = sim.alive ? comboWindowLeft(sim) : 0;
         wormBuffs.rocketActive = sim.rocketActive;
         wormBuffs.viewPowerT = sim.viewPowerT;
         wormBuffs.elementalT = sim.elementalT;
@@ -975,6 +982,8 @@ export function useWormCrawler(size, cubies) {
             pendingHealBurstRef: f('pendingHealBurst'),
             healPauseT: f('healPauseT'),
             healFocusTile: f('healFocusTile'),
+            healBeatSeq: f('healBeatSeq'),
+            healBeatTier: f('healBeatTier'),
             cutFocusT: f('cutFocusT'),
             jumpRescueHeld: f('jumpRescueHeld'),
             cautionFall: f('cautionFall'),

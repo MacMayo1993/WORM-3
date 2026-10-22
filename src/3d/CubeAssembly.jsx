@@ -902,7 +902,9 @@ const CubeAssembly = React.memo(({
       const finalAngle = Math.PI / 2 * (animState.numTurns ?? 1);
       setLiveRotation(animState.axis, layers, dirs.map(d => d * finalAngle), animState.sliceIndex, animState.dir * finalAngle);
       resetLiveRotation();
-      vibrate(isFast ? 8 : 14);
+      // A scramble turns silently under the hand (see cubeShuffleTurn); only a
+      // player's own turn ticks the motor.
+      if (!isFast) vibrate(14);
       onAnimCompleteRef.current();
     };
     if (isShuffle && isWormScramble) {

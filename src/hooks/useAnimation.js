@@ -14,6 +14,25 @@ import { feel } from '../utils/feel.js';
 import { cancelLiveRotation } from '../worm/liveRotation.js';
 
 /**
+ * Commit a whole shuffle at once, with no animation: a retry's quick start
+ * (worm/healerWorm/runStart.js). Each move is its own store write, exactly as the
+ * animated shuffle commits them, so everything that follows a committed turn (the
+ * worm sim's rotation transaction subscribes to rotationEpoch) follows every move;
+ * React batches the writes into one render.
+ */
+export function commitShuffleNow(moves, size) {
+  clearHomeAlignments();
+  for (const move of moves ?? []) {
+    const { axis, dir, sliceIndex, sliceIndices, sliceDirs } = move;
+    useGameStore.setState((state) => ({
+      cubies: recordHomeAlignments(applyTileMove(state.cubies, size, move)).cubies,
+      rotationEpoch: state.rotationEpoch + 1,
+      lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir, numTurns: move.numTurns ?? 1 },
+    }));
+  }
+}
+
+/**
  * Hook for animation management
  */
 export function useAnimation() {

@@ -121,15 +121,10 @@ export const flipBurstMap = new Map();
 // deleted when it completes; readers treat a missing entry as "at rest".
 export const stickerFlipMotion = new Map();
 
-// ─── Heal burst map ───────────────────────────────────────────────────────────
-// Written by HealerWormMode when a tunnel heals (key = sticker gridId, value = 1).
-// StickerPlane consumes + deletes the entry to trigger the heal seal animation.
-export const healBurstMap = new Map();
-
-// ─── Heal particle map ────────────────────────────────────────────────────────
-// Written by disparity tap-heal (key = sticker gridId, value = 1).
-// StickerPlane fires only the golden particle burst — no white seal overlay.
-export const healParticleMap = new Map();
+// ─── Heal cue maps ────────────────────────────────────────────────────────────
+// Live in healBurstBridge.js (no dependencies, so the worm's hook can write them);
+// re-exported here for the stickers and the animation driver.
+export { healBurstMap, healParticleMap } from '../healBurstBridge.js';
 
 
 /**

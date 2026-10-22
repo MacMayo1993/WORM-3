@@ -220,4 +220,12 @@ describe('Air: Gale', () => {
         expect(sim.powerups).toHaveLength(2); // the far orb and the unripe bud stay
         expect(sim.droppedOrbs).toHaveLength(0);
     });
+    it('sounds a gust, not an orb chime, when there is nothing to take', () => {
+        const { sim, ctx } = fixture();
+        wash(sim, 'air');
+        expect(airGale(sim, size, ctx)).toBe(0);
+        const events = ctx.feel.mock.calls.map(([event]) => event);
+        expect(events).toContain('gust');
+        expect(events).not.toContain('orb');
+    });
 });

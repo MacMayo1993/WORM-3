@@ -116,7 +116,7 @@ const _hollowStickerGeo = createPlayStickerGeometry(0.85, 0.68);
 // ─── Heal seal shader ─────────────────────────────────────────────────────────
 // Plays when the worm heals a wormhole tile.
 // Phase 1 (uHealProgress 0→0.5): golden ring converges rim→center (wound closing).
-// Phase 2 (uHealProgress 0.5→1): healed color blooms outward from center (life restored).
+// Phase 2 (uHealProgress 0.5→1): the home colour rings back out from the centre.
 const healSealVertexShader = `
   varying vec2 vUv;
   void main() {
@@ -154,16 +154,20 @@ const healSealFragmentShader = `
       float wakeAlpha = wake * inDisc * 0.25 * (1.0 - t);
       col = vec4(ringCol * 1.8, max(ringAlpha, wakeAlpha));
     } else {
-      // Phase 2: healed color blooms outward from center, fading as it expands
+      // Phase 2: the tile's home colour rings out from the centre. Two thin rings and
+      // a small glint, never a disc: a heal is a flip home, and a flip never washes
+      // the tile (the sticker itself has already turned back to its home colour).
       float t = (uHealProgress - 0.5) * 2.0;
-      float bloomR = t * 0.50;
-      float bloom = 1.0 - smoothstep(bloomR - 0.05, bloomR + 0.01, dist);
-      // White-hot center glow that fades with t
-      float centerGlow = (1.0 - smoothstep(0.0, 0.15 + t * 0.08, dist)) * (1.0 - t);
-      float whiteFade = (1.0 - t) * (1.0 - t);
-      vec3 bloomCol = mix(uColor, vec3(1.0, 1.0, 1.0), whiteFade * 0.70 + centerGlow * 0.45);
-      float bloomAlpha = (bloom + centerGlow * 0.80) * inDisc * (0.60 + 0.40 * (1.0 - t));
-      col = vec4(bloomCol * (1.0 + whiteFade * 0.80), bloomAlpha);
+      float e = 1.0 - (1.0 - t) * (1.0 - t);
+      float r1 = 0.04 + e * 0.42;
+      float r2 = 0.04 + max(0.0, e - 0.25) / 0.75 * 0.34;
+      float ring1 = 1.0 - smoothstep(0.0, 0.03, abs(dist - r1));
+      float ring2 = (1.0 - smoothstep(0.0, 0.02, abs(dist - r2))) * step(0.25, e);
+      float fade = 1.0 - t;
+      float glint = (1.0 - smoothstep(0.0, 0.1, dist)) * fade * fade;
+      float ringAlpha = (ring1 * 0.95 + ring2 * 0.6) * fade * inDisc;
+      vec3 ringCol = mix(uColor, vec3(1.0), 0.25) * 1.6;
+      col = vec4(mix(ringCol, vec3(1.8), glint), max(ringAlpha, glint * 0.9));
     }
 
     if (col.a < 0.001) discard;
@@ -1921,7 +1925,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal.
+      {/* Heal seal overlay — golden convergence ring, then home-colour rings, on a wormhole heal.
           Kept mounted regardless of flip history: the heal resets flips to 0 before
           this animation is picked up (see note above). */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}

@@ -1,5 +1,6 @@
 import { STORE_ITEMS, getStoreItem } from '../utils/storeCatalog.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
 
 // Ascending rarity. The die faces are weighted, not a physics simulation.
 export const CHEST_TIERS = [
@@ -18,6 +19,11 @@ export const GEM_EXCHANGE = { points: 100, gems: 10 };
 export const WELCOME_GEMS = 20;
 export const GEM_LEVEL_REWARD = 5;
 export const GEM_STORY_REWARD = 10;
+// Every WORM Story level pays its first-clear gems once. The claim list must keep
+// every id the payout counts: capping it below the campaign's length dropped the
+// claims past level 10 on each load and paid them out again.
+const STORY_REWARD_IDS = new Set(WORM_STORY_LEVELS.map(level => level.id));
+export const isStoryRewardId = id => STORY_REWARD_IDS.has(id);
 const safeCount = n => Number.isSafeInteger(n) && n >= 0 ? Math.min(n, 1e9) : 0;
 export const newChestWallet = () => ({ version: 1, gems: WELCOME_GEMS, rolls: 0, claimedLevel: 1, claimedStory: [], history: [] });
 const validTier = n => Number.isInteger(n) && n >= 0 && n < CHEST_TIERS.length;
@@ -96,7 +102,7 @@ export function sanitizeChestWallet(raw) {
   if (raw == null) return newChestWallet(); // one-time migration; the next snapshot includes the wallet
   const wallet = { version: 1, gems: safeCount(raw.gems), rolls: safeCount(raw.rolls),
     claimedLevel: Math.max(1, Math.min(50, safeCount(raw.claimedLevel))),
-    claimedStory: [...new Set((Array.isArray(raw.claimedStory) ? raw.claimedStory : []).filter(id => Number.isInteger(id) && id >= 1 && id <= 10))], history: [] };
+    claimedStory: [...new Set((Array.isArray(raw.claimedStory) ? raw.claimedStory : []).filter(isStoryRewardId))], history: [] };
   for (const r of (Array.isArray(raw.history) ? raw.history : []).slice(-20)) {
     if (!r || !CHEST_MODES[r.mode] || !Array.isArray(r.faces) || r.faces.length !== CHEST_MODES[r.mode].dice ||
         !r.faces.every(validTier) || r.tier !== resolveChestFaces(r.faces) || !Number.isSafeInteger(r.id) || r.id <= 0 || r.id > wallet.rolls) continue;

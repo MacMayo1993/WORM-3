@@ -144,6 +144,8 @@ describe('double heals', () => {
     settle(sim, ctx);
     expect(sim.healed).toBe(1);
     expect(mechanics(ctx, 'multiHeals')).toHaveLength(0);
+    // The seal's hitstop holds the game clock; the window counts crawl time from here.
+    sim.healPauseT = 0;
     for (let i = 0; i < Math.round(seconds * 10); i++) stepWormSim(sim, 0.1, SIZE, ctx);
     sim.tunnelPassages.push(passage(tunnelB, 'B', clear()));
     settle(sim, ctx);
@@ -157,6 +159,7 @@ describe('double heals', () => {
     sim.tunnelPassages.push(passage(tunnelA, 'A', cleared), passage(tunnelB, 'B', sim.stepHistory.distance));
     settle(sim, ctx);
     expect(mechanics(ctx, 'multiHeals')).toHaveLength(1);
+    sim.healPauseT = 0; // these steps take no time, so let the seal's hitstop go
     sim.stepHistory.distance += tunnelTailReach(sim.tailLength) + 1;
     settle(sim, ctx);
     expect(sim.healed).toBe(2);

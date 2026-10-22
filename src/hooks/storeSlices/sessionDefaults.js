@@ -97,6 +97,7 @@ export const makeWormSessionDefaults = () => ({
   wormGamePhase: 'scrambling',
   wormCountdownStep: null,
   wormSessionOrbs: 0,
+  wormRunBestCombo: 0,
   wormMission: null,
   wormMissionCounters: { orbs: 0, tunnels: 0, healed: 0 },
   wormRunAchievements: [],

@@ -4,6 +4,12 @@ import { shAt } from '../circularBuffers.js';
 // One shared clock for portal, camera, ready beats and control handoff.
 export const STORY_ARRIVAL_SECONDS = COUNTDOWN_STEP_DURATION * 4;
 export const STORY_ARRIVAL_REDUCED_SECONDS = 0.35;
+// A retry's arrival (runStart.js): the same beats on a short clock, with only GO.
+export const STORY_ARRIVAL_QUICK_SECONDS = 1.2;
+
+/** This arrival's length: reduced motion's beat, a retry's quick one, or the full show. */
+export const arrivalSeconds = (reduced = false, quick = false) =>
+  reduced ? STORY_ARRIVAL_REDUCED_SECONDS : quick ? STORY_ARRIVAL_QUICK_SECONDS : STORY_ARRIVAL_SECONDS;
 
 // The worm surfaces through a portal opened under its start tile: the head
 // rises out first, already facing the way it will crawl, and the body uncoils
@@ -37,10 +43,11 @@ const crawl = x => {
  * head out of it, `emerge` is how much of the body has uncoiled (0: all still
  * in the hole, 1: resting on its authored body), `close` collapses the portal,
  * `shock` is the ring it throws off as it shuts, and `settle` hands the camera
- * to the chase.
+ * to the chase. `quick` is a retry's arrival (runStart.js): the same beats on
+ * the short clock, with only GO.
  */
-export function storyArrivalPose(elapsed, reduced = false) {
-  const t = clamp((elapsed > 0 ? elapsed + 1e-10 : 0) / (reduced ? STORY_ARRIVAL_REDUCED_SECONDS : STORY_ARRIVAL_SECONDS));
+export function storyArrivalPose(elapsed, reduced = false, quick = false) {
+  const t = clamp((elapsed > 0 ? elapsed + 1e-10 : 0) / arrivalSeconds(reduced, quick));
   if (reduced) {
     return { t, open: 0, ring: 0, rise: 1, emerge: 1, close: 1, shock: 0, settle: 1, step: null };
   }
@@ -54,7 +61,8 @@ export function storyArrivalPose(elapsed, reduced = false) {
     close,
     shock: pulse(t, 0.8, 0.05, 0.15),
     settle: smooth((t - 0.74) / 0.26),
-    step: t < 0.25 ? 3 : t < 0.5 ? 2 : t < 0.75 ? 1 : 'go',
+    // A retry's player is already set: no 3-2-1, just GO as the body lands.
+    step: quick ? (t < 0.75 ? null : 'go') : t < 0.25 ? 3 : t < 0.5 ? 2 : t < 0.75 ? 1 : 'go',
   };
 }
 

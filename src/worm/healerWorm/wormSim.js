@@ -115,6 +115,8 @@ import {
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
     HEAL_PAUSE_DURATION,
+    TUNNEL_HEAL_HOLD,
+    DOUBLE_HEAL_HOLD,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     JUMP_RESCUE_SECONDS,
@@ -159,6 +161,7 @@ import {
 import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
 import { voidTunnel, mendTunnel, isPitTile, rideExhausted, mouthOccupied, remapTunnelKeys } from './tunnelPits.js';
 import { ageDroppedOrbs, takeDroppedOrbsAt, scatterDroppedOrbs } from './droppedOrbs.js';
+import { chainOrb } from './orbCombo.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
@@ -371,6 +374,7 @@ export function makeWormSim(size) {
         // Orb-pickup combo: consecutive pickups within 2 s escalate pitch + haptic.
         orbCombo: 0,
         lastOrbTime: -999,
+        bestCombo: 0,             // the run's longest orb chain (orbCombo.js)
 
         // ── One-shot flags consumed by renderers ──────────────────────────────
         willHeal: false,
@@ -381,6 +385,8 @@ export function makeWormSim(size) {
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
+        healBeatSeq: 0,           // counts tunnel heals this run; the camera kicks when it moves
+        healBeatTier: 0,          // 1 for a heal, 2 for a double heal
         droppedOrbs: [],          // a cut tail's orbs, scattered to be taken back (droppedOrbs.js)
         pendingDropDissolves: [], // expired dropped orbs, for the renderer to crumble
         cutFocusT: 0,             // seconds remaining of the "WORM'D" body-cut camera beat
@@ -535,6 +541,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
     sim.healFocusTile = null;
+    sim.healBeatSeq = 0;
+    sim.healBeatTier = 0;
     sim.cutFocusT = 0;
     sim.cutFocusPos = null;
     sim.cutFocusSlice = null;
@@ -545,6 +553,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingDropDissolves = [];
     sim.orbCombo = 0;
     sim.lastOrbTime = -999;
+    sim.bestCombo = 0;
 
     sim.powerups = initial;
     sim.alive = true;
@@ -1164,8 +1173,7 @@ function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey, reachOverride = 0) 
     if (!taken) return;
     if (riptideReach(sim) && !reachOverride) abilityEvent(sim, 'water', [sim.pos, ...taken]);
     for (const drop of taken) {
-        sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
-        sim.lastOrbTime = sim.timeAlive;
+        chainOrb(sim, ctx);
         // Each orb restores exactly the segments its cut removed (cutWormTail).
         for (const orb of drop.payload) {
             const segments = orb.segments ?? ORB_SEGMENT_GROWTH;
@@ -1244,7 +1252,9 @@ export function airGale(sim, size, ctx) {
     abilityEvent(sim, 'air', [sim.pos]);
     if (targets.size) tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, false, targets);
     tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey, ELEMENT_ABILITIES.galeReach);
-    ctx.feel?.('orb', { combo: sim.orbCombo });
+    // The gust itself. Each orb it takes chimes on its own; an empty gale used to
+    // play the orb chime and promise a pickup that never came.
+    ctx.feel?.('gust');
     return targets.size;
 }
 
@@ -1298,12 +1308,11 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         const refracted = refractPickup(sim, ctx, pickedSticker ? orbCreditFace(pickedSticker.curr) : 0);
         const pickedFaceId = refracted.faceId;
         const pickedColor = ctx.getOrbColor(pickedFaceId);
-        // Combo climbs when pickups come in quick succession (≤2s apart). A magnet
+        // Combo climbs when pickups come in quick succession (orbCombo.js). A magnet
         // sweep collecting several orbs in one step escalates the same way. Updated
         // BEFORE the growth call so the pickup's sound, haptic and screen flash all
         // read the same (new) combo level.
-        sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
-        sim.lastOrbTime = sim.timeAlive;
+        chainOrb(sim, ctx);
         applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId, ORB_SEGMENT_GROWTH + refracted.bonus + fireOrbBonus(sim, pickedUp));
         if (sim.magnetT > 0 && puKey !== headKey) ctx.onStoryMechanic?.('magnetOrbs');
         sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray(), combo: sim.orbCombo };
@@ -2929,7 +2938,8 @@ export function stepWormSim(sim, delta, size, ctx) {
             ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
             recordCompletedHeal(sim, ctx, identity, doubled, doubled);
             releaseMobiTunnel(sim, tunnel);
-            sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
+            const tier = doubled ? 2 : 1;
+            sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry, tier };
             if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);
             if (tunnelKey) {
                 sim.tunnelUseCounts.delete(tunnelKey);
@@ -2937,7 +2947,16 @@ export function stepWormSim(sim, delta, size, ctx) {
                 sim.chargedTunnels.delete(tunnelKey);
                 if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
             }
-            ctx.feel('heal');
+            // The payoff beat: hold the crawl while both mouths seal (never mid-ride,
+            // and never cutting short a ring heal's longer pause), kick the camera,
+            // and climb the heal ladder: each heal this run sounds a step higher.
+            if (sim.phase === 'crawling') {
+                if (sim.healPauseT <= 0) sim.healFocusTile = null;
+                sim.healPauseT = Math.max(sim.healPauseT, doubled ? DOUBLE_HEAL_HOLD : TUNNEL_HEAL_HOLD);
+            }
+            sim.healBeatSeq += 1;
+            sim.healBeatTier = tier;
+            ctx.feel('seal', { combo: sim.healed - 1, tier });
         } else if (rideExhausted(sim, passage.tunnelKey) && !sim.voidTunnelKeys.has(passage.tunnelKey)) {
             // That was its last ride: the tunnel collapses behind the worm, and both
             // pads drop into their slots as pits. Never onto the worm: a body still

@@ -2,6 +2,8 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { CHEST_MODES, CHEST_TIERS, chestOdds, chestItemTier, chestPool, drawChestFace, resolveChestFaces, rollChest, newChestWallet, sanitizeChestWallet } from '../economy/chests.js';
 import { STORE_ITEMS, DEFAULT_OWNED } from '../utils/storeCatalog.js';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { pendingGemRewards } from '../hooks/storeSlices/chestSlice.js';
+import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
 import { newProgress, xpForLevel, savePlayerState, readPlayerSave, PLAYER_SAVE_KEY } from '../progression/model.js';
 const state = () => useGameStore.getState();
 beforeEach(() => { localStorage.clear(); useGameStore.setState({ playerProgress: newProgress(), chestWallet: newChestWallet(), chestRolling: false, parityPoints: 200, ownedItems: [...DEFAULT_OWNED], demoMode: false }); });
@@ -81,8 +83,22 @@ it('migrates old saves once, sanitizes malformed records, and retains spent welc
   const old = readPlayerSave(); expect(old.legacyCharacters).toBe(true); expect(old.chestWallet.gems).toBe(20);
   savePlayerState({ playerProgress: old.progress, parityPoints: old.points, ownedItems: old.ownedItems, chestWallet: { ...old.chestWallet, gems: 0 } });
   expect(readPlayerSave()).toMatchObject({ legacyCharacters: false, chestWallet: { gems: 0 } });
-  const bad = sanitizeChestWallet({ gems: -10, rolls: Infinity, claimedLevel: NaN, claimedStory: [1,1,11,'2'], history: [{ faces: [6] }] });
-  expect(bad).toMatchObject({ gems: 0, rolls: 0, claimedLevel: 1, claimedStory: [1], history: [] });
+  const last = WORM_STORY_LEVELS.at(-1).id;
+  const bad = sanitizeChestWallet({ gems: -10, rolls: Infinity, claimedLevel: NaN, claimedStory: [1,1,11,'2',0,last,last + 1,2.5], history: [{ faces: [6] }] });
+  expect(bad).toMatchObject({ gems: 0, rolls: 0, claimedLevel: 1, claimedStory: [1, 11, last], history: [] });
+});
+it('pays each Story level\'s first-clear gems once, past level 10 and across reloads', () => {
+  // Clearing levels 1-12 in order (sanitizeStoryProgress drops a gapped run).
+  const stars = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 1]));
+  useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars, claimed: {} } }, chestWallet: { ...newChestWallet(), gems: 0 } });
+  expect(pendingGemRewards(state()).amount).toBe(120);
+  expect(state().claimChestGems().ok).toBe(true); expect(state().chestWallet.gems).toBe(120);
+  // A reload sanitizes the wallet; the claims for 11 and 12 must survive it.
+  const reloaded = readPlayerSave();
+  expect(reloaded.chestWallet.claimedStory).toHaveLength(12);
+  useGameStore.setState({ playerProgress: reloaded.progress, chestWallet: reloaded.chestWallet });
+  expect(pendingGemRewards(state()).amount).toBe(0);
+  expect(state().claimChestGems().error).toBeTruthy(); expect(state().chestWallet.gems).toBe(120);
 });
 it('uses catalog prices, rejects negative/non-finite money, and equips only owned characters outside demos', () => {
   for (const n of [-100, NaN, Infinity, .5]) expect(state().spendCoins(n)).toBe(false);

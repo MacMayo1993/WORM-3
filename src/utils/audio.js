@@ -12,8 +12,17 @@
 // vibrate() stays because a handful of pure-UI call sites want a bare tap with
 // no sound attached to it (menu presses, the cutscene, the nav bar).
 
-/** A single haptic tap, or a [buzz, gap, buzz…] pattern. No-op where unsupported. */
+// The player's haptics setting, synced by setFeelEnabled (feel.js). Every buzz in
+// the game ends here, so this is the one gate: the menu, the cutscene and the cube's
+// turn ticks used to call vibrate() straight and buzzed with haptics switched off.
+let _hapticsAllowed = true;
+export const setHapticsAllowed = allowed => { _hapticsAllowed = !!allowed; };
+const isCancel = ms => ms === 0 || (Array.isArray(ms) && ms.length === 0);
+
+/** A single haptic tap, or a [buzz, gap, buzz…] pattern. No-op where unsupported or switched off. */
 export const vibrate = (ms = 18) => {
+  // A cancel always goes through, so switching haptics off can stop a buzz in flight.
+  if (!_hapticsAllowed && !isCancel(ms)) return;
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
       navigator.vibrate(ms);

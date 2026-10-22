@@ -6,7 +6,7 @@
 // filtered noise, so this ships with zero binaries. Recorded samples can be swapped
 // in later behind the same feel() API without touching any call site.
 
-import { vibrate } from './audio.js';
+import { vibrate, setHapticsAllowed } from './audio.js';
 
 let _ctx = null;
 let _master = null;
@@ -70,7 +70,7 @@ export function setFeelEnabled({ sfx, haptics } = {}) {
   if (sfx === false) stopFeel({ haptics: false });
   if (typeof sfx === 'boolean') _enabledSfx = sfx;
   if (haptics === false) stopFeel({ audio: false });
-  if (typeof haptics === 'boolean') _enabledHaptics = haptics;
+  if (typeof haptics === 'boolean') { _enabledHaptics = haptics; setHapticsAllowed(haptics); }
 }
 
 /** Manually resume audio (e.g. from a known user gesture). Safe to call anytime. */
