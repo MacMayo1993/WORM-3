@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.mocked(feel).mockClear(); vi.mocked(prefersReducedMotion).mockReturnValue(false);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useGameStore.setState({ wormGamePhase: 'solved', wormStoryLevel: 1, wormRunId: 91,
-    wormStoryResult: { levelId: 1, stars: 3 }, wormPaused: true, demoMode: false, wormCombatMode: false });
+    wormStoryResult: { levelId: 1, stars: 3 }, wormRunBestCombo: 0, wormPaused: true, demoMode: false, wormCombatMode: false });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(() => {
@@ -96,4 +96,23 @@ it('shows the finished worm size and best length alongside the earned rating', (
   expect(host.querySelector('.story-completion-size').textContent).toContain('Best length 4.14 tiles');
   expect(host.querySelector('.story-completion-stars').getAttribute('aria-label')).toBe('2 out of 3 stars');
   expect(host.querySelector('[role="status"]').textContent).toBe('2 stars earned');
+});
+
+it.each([null, 1])('shows the recorded best chain on the successful HUD route (story level %s)', storyLevel => {
+  useGameStore.setState({ wormStoryLevel: storyLevel, wormRunBestCombo: 8,
+    wormOrbFlash: null, wormSessionOrbs: 20 });
+  act(() => root.render(<WormCrawlerHUD phase="crawling" wormAlive />));
+  const result = host.querySelector(storyLevel ? '.story-completion-size' : '.worm-freeplay-completion');
+  expect(result.textContent).toContain('Best orb chain');
+  expect(result.textContent).toContain('×8');
+  expect(host.querySelector('.worm-death')).toBeNull();
+
+  // A new run without a chain must not retain the previous result's value.
+  for (const combo of [undefined, 0, 1]) {
+    act(() => useGameStore.setState({ wormRunBestCombo: combo }));
+    expect(result.textContent).not.toContain('Best orb chain');
+  }
+  act(() => useGameStore.setState({ wormRunBestCombo: 2 }));
+  expect(result.textContent).toContain('Best orb chain');
+  expect(result.textContent).toContain('×2');
 });

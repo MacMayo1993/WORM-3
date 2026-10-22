@@ -260,6 +260,7 @@ export function StoryResult(props) {
 }
 
 function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
+  const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
   const [reducedMotion] = useState(prefersReducedMotion);
   const [ready, setReady] = useState(reducedMotion);
   const [leaving, setLeaving] = useState(false);
@@ -323,6 +324,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
       <div className="story-completion-size">
         {Number.isFinite(result.finalLength) && <span>Worm length <strong>{segmentsToTiles(result.finalLength)}</strong> tiles</span>}
         {Number.isFinite(result.peakLength) && <span>Best length <strong>{segmentsToTiles(result.peakLength)}</strong> tiles</span>}
+        {bestCombo >= 2 && <span>Best orb chain <strong>×{bestCombo}</strong></span>}
       </div>
       <div className="story-completion-award">
         <div className="story-completion-sparks" aria-hidden="true">{Array.from({ length: 16 }, (_, i) =>
