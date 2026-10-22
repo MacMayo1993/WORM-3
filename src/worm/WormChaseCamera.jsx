@@ -2,6 +2,8 @@ import { storyArrivalPose } from './healerWorm/storyArrival.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
 import { victoryViewport, victoryView, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
 import { OPENING_FOV, openingCameraDistance } from './healerWorm/openingRotation.js';
+import { makeHealBeat, stepHealBeat } from './healBeat.js';
+import { runStart } from './healerWorm/runStart.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
 import { clampWormCameraZoom, wheelCameraZoom, desktopHeadFraming } from './wormCameraZoom.js';
@@ -239,6 +241,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
     const revealActiveRef = useRef(false);
     const cameraRunRef = useRef(null);
+    const healBeatRef = useRef(makeHealBeat()); // the tunnel heal's lens punch (healBeat.js)
     const surfaceNearRef = useRef(camera.near);
     const rocketShakeTime = useRef(0);          // clock for the rocket's camera rumble
     const fallCamera = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), direction: new THREE.Vector3() });
@@ -575,7 +578,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             ? crossingCloseUpInto(_closeUp, worm.activeTunnel.current, tunnelTraversalT(phase, _enterP), size,
                 tunnelState.coreZoom ?? 1).weight : 0;
         const closeFov = closeUp > 0 ? crossingFov(_closeUp, camera.aspect, rideFov) : rideFov;
-        const targetFov = THREE.MathUtils.lerp(rideFov, closeFov, closeUp) + rocketFov;
+        // A tunnel heal punches the lens in a touch as both mouths seal.
+        const healKick = stepHealBeat(healBeatRef.current, worm.healBeatSeq?.current ?? 0, worm.healBeatTier?.current ?? 1, delta,
+            { crawling: phase === 'crawling', live: !gameState.wormPaused, calm: rocketCalm || !!gameState.settings?.reducedMotion });
+        const targetFov = THREE.MathUtils.lerp(rideFov, closeFov, closeUp) + rocketFov - healKick;
         const fovAlpha = enteredReveal ? 1 : 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -626,7 +632,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             // there until Start, then continue the same dolly into 3-2-1.
             const arriving = gamePhase === 'spawning' && arrivalElapsed;
             const reduced = gameState.settings?.reducedMotion || prefersReducedMotion();
-            const arrival = arriving ? storyArrivalPose(arrivalElapsed.current, reduced) : null;
+            const arrival = arriving ? storyArrivalPose(arrivalElapsed.current, reduced, runStart.quick) : null;
             if (arriving) revealTRef.current = reduced ? 1 : arrival.t;
             else if (!storyBriefing) revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
             const rt = revealTRef.current;
@@ -827,7 +833,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             // the chase framing as the pause ends — so the pop reads even on a mega board.
             const healPauseT = worm.healPauseT?.current ?? 0;
             const focusTile = worm.healFocusTile?.current;
-            if (healPauseT > 0 && focusTile) {
+            // Only a ring heal's pause takes the lens; a tunnel heal's short hitstop
+            // (no focus tile) leaves the chase framing alone.
+            const healFocusActive = healPauseT > 0 && !!focusTile;
+            if (healFocusActive) {
                 const elapsed = HEAL_PAUSE_DURATION - healPauseT;
                 const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.22);
                 const rampOut = THREE.MathUtils.smoothstep(healPauseT, 0, 0.28);
@@ -890,7 +899,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             if (mobile) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
-            } else if (!mobile && !rocketLift && !(worm.healPauseT?.current > 0)) {
+            } else if (!mobile && !rocketLift && !healFocusActive) {
                 const headWeight = desktopHeadFraming(size);
                 if (headWeight > 0) {
                     bodyPathHeadInto(_desktopAim, worm, false);
@@ -899,7 +908,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                         THREE.MathUtils.lerp(0.06, 0.12, portraitFactor) * (1 - headWeight));
                 } else frameSurfaceCamera(camera, portraitFactor);
             }
-            if (!(worm.healPauseT?.current > 0)) {
+            if (!healFocusActive) {
                 bodyPathHeadInto(_mobileHeadWorld, worm, false);
                 framePlatform(camera, platformFrame.current, nearbyPlatform(worm, size, gameState),
                     _mobileHeadWorld, _camNormal, _camForward, delta, !!worm.padFlight?.current);

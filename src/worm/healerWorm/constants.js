@@ -139,6 +139,12 @@ export const HEAL_COST = 4; // worm segments (balls) required to fully heal one 
 // short settle. Purely a crawl freeze; the pop FX are store-driven and play through it.
 export const HEAL_PAUSE_DURATION = 0.85;
 
+// A tunnel heal is the main way a pair goes home, so it gets a hitstop of its own: the
+// crawl holds this long (a double heal, longer) while both mouths seal. Short enough to
+// read as impact, not a stall; only taken while crawling, never mid-ride.
+export const TUNNEL_HEAL_HOLD = 0.14;
+export const DOUBLE_HEAL_HOLD = 0.24;
+
 // When a rotating layer severs part of the worm's body (a cut, not a kill), the
 // game freezes for this beat: the worm sim and the rotation hazard clock both
 // stop while the chase camera swings out to the impact and the severing slice

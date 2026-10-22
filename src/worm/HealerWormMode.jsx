@@ -1,6 +1,8 @@
 import { ElementalAbilityEffects } from './healerWorm/ElementalAbilityEffects.jsx';
 import { StoryArrival } from './healerWorm/StoryArrival.jsx';
-import { STORY_ARRIVAL_SECONDS, STORY_ARRIVAL_REDUCED_SECONDS, storyArrivalPose } from './healerWorm/storyArrival.js';
+import { arrivalSeconds, storyArrivalPose } from './healerWorm/storyArrival.js';
+import { runStart, beginRun } from './healerWorm/runStart.js';
+import { commitShuffleNow } from '../hooks/useAnimation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import CautionFallFX from './healerWorm/CautionFallFX.jsx';
 import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
@@ -125,6 +127,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
     const spawnTimerRef     = useRef(0);    // seconds elapsed in spawning entrance animation
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
+    const quickScrambleRef  = useRef(null); // a retry's committed scramble: { frames, done } (runStart.js)
+    const quickStoryRef     = useRef(0);    // frames a retried Story level has sat ready before it starts itself
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
 
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
@@ -499,6 +503,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const story = storyLevel(state.wormStoryLevel);
             const practice = wormDemoActive(state);
             const seq = story || practice ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
+            // A retry asks for the quick start (runStart.js); anything else gets the full show.
+            const quick = beginRun();
+            quickScrambleRef.current = null;
+            quickStoryRef.current = 0;
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
             inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size, story) : []) : invertWormScramble(seq);
@@ -556,6 +564,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 gameModePhaseRef.current = 'active';
                 useGameStore.setState({ wormGamePhase: 'active', wormPaused: true, wormCountdownStep: null });
             }
+            else if (quick) {
+                // The whole scramble in one go. Hold the scrambling phase two frames
+                // first: the run's warm-up compiles while it is up (WormEffectWarmup).
+                commitShuffleNow(seq, size);
+                quickScrambleRef.current = { frames: 2, done: afterShuffle };
+            }
             else onAnimatedShuffle(seq, afterShuffle);
         };
 
@@ -581,6 +595,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useFrame((_, delta) => {
         const startState = useGameStore.getState();
         const story = storyLevel(startState.wormStoryLevel);
+        // A retried Story level starts itself once staged: its briefing was read at
+        // launch. Two frames ready first, so the run's warm-up compiles behind it.
+        if (story && runStart.quick && startState.wormStoryReady && !startState.wormStoryStarted && startState.wormAlive &&
+            !startState.wormStoryResult && startState.wormGamePhase === 'active' && ++quickStoryRef.current > 2) {
+            quickStoryRef.current = 0;
+            startState.startWormStory();
+            return;
+        }
         // Reveal the staged body only after Start. Never reseed the authored trail.
         if (story && startState.wormGamePhase === 'spawning' && gameModePhaseRef.current === 'active') {
             gameModePhaseRef.current = 'spawning';
@@ -628,6 +650,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // Here we only track the worm's visual position so it rides along with each
         // rotating slice instead of staying frozen in world space.
         if (gameModePhaseRef.current === 'scrambling') {
+            const quickScramble = quickScrambleRef.current;
+            if (quickScramble && --quickScramble.frames <= 0) {
+                quickScrambleRef.current = null;
+                quickScramble.done();
+                return;
+            }
             if (liveRotation.active) {
                 // The worm is frozen during the scramble, so tick() didn't refresh
                 // headInterpPos — seed it from the flat tile position before riding the slice.
@@ -644,8 +672,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // A resumed tab must not skip the whole reveal in one frame.
             spawnTimerRef.current += Math.min(0.05, Math.max(0, delta));
             const reduced = startState.settings?.reducedMotion || prefersReducedMotion();
-            const duration = reduced ? STORY_ARRIVAL_REDUCED_SECONDS : STORY_ARRIVAL_SECONDS;
-            const pose = storyArrivalPose(spawnTimerRef.current, reduced);
+            const duration = arrivalSeconds(reduced, runStart.quick);
+            const pose = storyArrivalPose(spawnTimerRef.current, reduced, runStart.quick);
             if (pose.step !== countdownStepRef.current) {
                 countdownStepRef.current = pose.step;
                 useGameStore.setState({ wormCountdownStep: pose.step });

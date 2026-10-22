@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { feel, setFeelEnabled, stopFeel, resumeFeel } from '../utils/feel.js';
 import { createWormFeedback } from '../worm/wormFeedback.js';
+import { vibrate } from '../utils/audio.js';
 
 const sources = [];
 const param = () => ({ value: 0, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() });
@@ -118,6 +119,14 @@ describe('audio and motor lifecycle', () => {
     feedback.emit('shot'); expect(sources).toHaveLength(0); expect(navigator.vibrate).not.toHaveBeenCalled();
     setFeelEnabled({ sfx: true }); feedback.emit('enemyDown');
     expect(sources.length).toBeGreaterThan(0); expect(navigator.vibrate).not.toHaveBeenCalled();
+  });
+  it('holds bare UI taps (menus, cube turn ticks) to the haptics setting too', () => {
+    vibrate(14); expect(navigator.vibrate).toHaveBeenLastCalledWith(14);
+    setFeelEnabled({ haptics: false }); navigator.vibrate.mockClear();
+    vibrate(14); vibrate([50, 30, 100]); expect(navigator.vibrate).not.toHaveBeenCalled();
+    // A cancel still reaches the motor.
+    vibrate(0); expect(navigator.vibrate).toHaveBeenLastCalledWith(0);
+    setFeelEnabled({ haptics: true }); vibrate(8); expect(navigator.vibrate).toHaveBeenLastCalledWith(8);
   });
   it('keeps a quiet UI tap from truncating a stronger impact', () => {
     createWormFeedback().emit('heal');

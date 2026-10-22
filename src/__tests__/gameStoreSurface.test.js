@@ -106,7 +106,7 @@ const EXPECTED_KEYS = [
   'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive', 'wormRescueKind',
   'wormOrbShowerActive', 'wormMagnetActive', 'wormMagnetSeq', 'wormOnFlippedTile', 'wormOrbCount',
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
-  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
+  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs', 'wormRunBestCombo',
   'wormShowTrail', 'wormSkin', 'wormSpecialNotice', 'wormSpecials',
   // Collapsed tunnels' pits (tunnelPits.js) and Mobi's in-play first-time lines.
   'wormPitGrids', 'wormMobiLine',

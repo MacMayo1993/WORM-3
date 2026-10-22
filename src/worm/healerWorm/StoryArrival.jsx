@@ -9,6 +9,7 @@ import {
   ARRIVAL_PORTAL_RADIUS as R,
   arrivalHeadInto, arrivalPathPointInto, arrivalTuck, storyArrivalPose,
 } from './storyArrival.js';
+import { runStart } from './runStart.js';
 
 const Z = new Vector3(0, 0, 1);
 const SPARKS = 32;
@@ -93,7 +94,7 @@ export function StoryArrival({ worm, elapsed, children }) {
     }
 
     const now = elapsed.current;
-    const pose = storyArrivalPose(now);
+    const pose = storyArrivalPose(now, false, runStart.quick);
     const mouth = bodyDistanceAt(worm, Math.max(0, worm.tailLength.current - 1));
     const tuck = arrivalTuck(pose.emerge, mouth);
     arrival.tuck = tuck;

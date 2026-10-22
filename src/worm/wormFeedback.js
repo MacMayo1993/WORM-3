@@ -9,15 +9,25 @@ export const WORM_HAPTICS = {
   dive: [24, 32, 12, 38, 22],
   tunnelRush: [8, 38, 12], tunnelFold: [10, 32, 10], tunnelRelease: [12, 25, 18],
   exit: [28, 35, 12], heal: [20, 50, 32, 65, 48],
+  // A tunnel heal: one firm knock per mouth; a double heal knocks twice per mouth.
+  seal: (_rung, opts) => opts?.tier === 2 ? [26, 40, 26, 55, 34, 40, 60] : [26, 45, 40],
   shot: 12, shotHit: [18, 20, 8], enemyDown: [24, 32, 12], recharge: 6,
   shieldHit: [35, 35, 22], jump: [12, 22, 8], boost: [18, 30, 12],
   cut: [40, 30, 35], death: [55, 45, 85], rocket: [35, 25, 70, 25, 45],
   rocketLand: [25, 30, 10], magnet: [12, 25, 12, 25, 18],
   collapse: [30, 40, 20, 60, 45],
   rumble: [8, 30, 6],
+  combo: [10, 18, 10, 18, 26],
+  gust: [10, 30, 8],
 };
 
 const thump = (freq = 130, gain = 0.24) => tone({ freq, freqTo: 55, dur: 0.10, gain });
+// The heal ladder: a pentatonic scale from C4, so any run of heals stays in key. Each
+// tunnel heal this run roots its arpeggio one step higher (capped, so a long run
+// tops out bright rather than shrill); the next run starts back at the bottom.
+const PENTATONIC = [261.63, 293.66, 329.63, 392, 440];
+const ladder = step => PENTATONIC[step % 5] * 2 ** Math.floor(step / 5);
+export const SEAL_LADDER_TOP = 7;
 const WORM_SFX = {
   elementFusion() {
     // Two voices converge, then resolve into a chord: a combination, not another
@@ -31,6 +41,18 @@ const WORM_SFX = {
     thump(170, 0.22);
     tone({ freq: f * 0.75, freqTo: f, dur: 0.09, type: 'triangle', gain: 0.35 });
     tone({ freq: f * 2, dur: 0.22, gain: 0.12, when: 0.045 });
+  },
+  // A tunnel heal: both mouths sealing. A knock, a rising arpeggio from this run's rung
+  // and a bright shimmer; a double heal answers with the same figure an octave up.
+  seal(rung = 0, opts = {}) {
+    const root = Math.min(SEAL_LADDER_TOP, Math.max(0, Math.floor(Number.isFinite(rung) ? rung : 0)));
+    thump(120, 0.26);
+    [0, 2, 4].forEach((step, i) => tone({ freq: ladder(root + step), dur: 0.2 + i * 0.06, type: 'triangle', gain: 0.24, when: i * 0.07 }));
+    tone({ freq: ladder(root + 4) * 2, dur: 0.5, gain: 0.07, when: 0.21 });
+    if (opts.tier === 2) {
+      [0, 2, 4].forEach((step, i) => tone({ freq: ladder(root + step + 5), dur: 0.24, type: 'triangle', gain: 0.17, when: 0.3 + i * 0.06 }));
+      noise({ dur: 0.35, type: 'highpass', freq: 5200, gain: 0.06, when: 0.3 });
+    }
   },
   dive() {
     thump(190);
@@ -68,6 +90,17 @@ const WORM_SFX = {
     tone({ freq: 990, dur: 0.18, gain: 0.13, when: 0.07 });
   },
   recharge() { tone({ freq: 1100, dur: 0.06, gain: 0.08 }); },
+  // An orb chain reaching ×3, ×5, ×8 (orbCombo.js): a quick sparkle run on top of
+  // the pickup's own chime, a step higher at each milestone.
+  combo(combo = 0) {
+    const lift = level(Math.floor((combo + 1) / 3));
+    for (let i = 0; i < 3; i++) tone({ freq: notes[Math.min(6, lift + i * 2)] * 2, dur: 0.12, gain: 0.1, when: 0.08 + i * 0.05 });
+  },
+  // Air's gale on landing: a breath of wind, nothing that sounds like a pickup.
+  gust() {
+    noise({ dur: 0.38, type: 'bandpass', freq: 900, q: 0.6, gain: 0.14 });
+    tone({ freq: 240, freqTo: 420, dur: 0.3, gain: 0.05 });
+  },
   // The Rumbler's crest rolling under the head: a low, short swell, felt more than heard.
   rumble() {
     noise({ dur: 0.42, type: 'lowpass', freq: 140, gain: 0.16 });
@@ -85,8 +118,8 @@ const WORM_SFX = {
   },
 };
 const vocabulary = { sfx: WORM_SFX, haptics: WORM_HAPTICS };
-const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, collapse: 3, elementFusion: 3, dive: 3, exit: 3, rumble: 0,
-  enemyDown: 3, shotHit: 2, orb: 2, shot: 1, recharge: 0 };
+const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, seal: 4, collapse: 3, elementFusion: 3, dive: 3, exit: 3, rumble: 0,
+  enemyDown: 3, shotHit: 2, orb: 2, combo: 2, gust: 1, shot: 1, recharge: 0 };
 
 /** Per-run arbitration. Uses the game clock: no timers or catch-up buzzes. */
 export function createWormFeedback(dispatch = feel, stop = stopFeel) {
@@ -101,7 +134,7 @@ export function createWormFeedback(dispatch = feel, stop = stopFeel) {
     const haptics = time >= motorUntil || rank > priority;
     const pattern = WORM_HAPTICS[event];
     if (haptics && pattern != null) {
-      const value = typeof pattern === 'function' ? pattern(opts.combo) : pattern;
+      const value = typeof pattern === 'function' ? pattern(opts.combo, opts) : pattern;
       motorUntil = time + (Array.isArray(value) ? value.reduce((a, b) => a + b, 0) : value) / 1000;
       priority = rank;
     }

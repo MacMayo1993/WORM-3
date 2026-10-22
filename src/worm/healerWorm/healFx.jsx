@@ -1,128 +1,83 @@
 import { tunnelDanger } from './tunnelReadout.js';
 import { wormBuffs } from '../wormBuffs.js';
 // src/worm/healerWorm/healFx.jsx
-// Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { useRef, useState, useMemo } from 'react';
+// Extracted from HealerWormMode.jsx (2026-07 monolith split).
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
-import { readLiveTile } from '../wormHelpers.js';
-import { liveCubies } from '../liveCubies.js';
+import { readLiveTile, getOrbColor } from '../wormHelpers.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { resolveColors } from '../../utils/colorSchemes.js';
 import { FACE_NORMALS } from './constants.js';
+import { makeBurstRig, poseBurstRig, tintBurstRig } from './healBurstRig.js';
 
-// 3D heal burst — an expanding shockwave + flash on the tile the worm emerges from, so the
-// wormhole exit reads as a pop of healing energy instead of the worm just sliding through a
-// plain tile. The ring meshes live in the local XY plane (ringGeometry faces +Z), and the
-// group is rotated so local +Z aligns with the tile's surface normal — the rings lie flat on
-// the face and expand outward across it.
+// 3D heal burst: an expanding shockwave and a flash on BOTH mouths of a healed pair,
+// each in the colour that tile goes home to. A pair heals together (α² = id), so the
+// beat lands on the two antipodal tiles at once, mirrored. A double heal rings
+// bigger and sends a second wave. The rings lie in the tile's plane (ringGeometry
+// faces +Z; each rig's +Z is turned onto the live tile normal) and follow the live
+// cubie, so a piece still settling from its pop or a turning layer carries them.
+//
+// Pooled rigs (healBurstRig.js): no mount, no setState, on the frame a heal lands.
 const _healNormalScratch = new THREE.Vector3();
 const _healRingZ = new THREE.Vector3(0, 0, 1);
+const BURST_RIGS = 4;
 
-function HealBurst3D({ wp, normal, color = '#3affb0', onDone }) {
-    const ringRef = useRef();
-    const coreRingRef = useRef();
-    const flashRef = useRef();
-    const tRef = useRef(0);
-    const doneRef = useRef(false);
+// Watches for heal events from the worm hook and plays the pooled bursts (tile
+// recolour, seal and cubie pop are driven by applyHeal).
+export function HealBurstSystem({ worm, size }) {
+    const rigs = useMemo(() => Array.from({ length: BURST_RIGS }, makeBurstRig), []);
+    const colorCache = useRef({ settings: null, colors: null });
+    useEffect(() => () => {
+        for (const rig of rigs) for (const mesh of [rig.outer, rig.wave, rig.core, rig.flash]) mesh.material.dispose();
+    }, [rigs]);
 
-    const quat = useMemo(() => {
-        const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
-        return new THREE.Quaternion().setFromUnitVectors(_healRingZ, n);
-    }, [normal]);
+    const place = (rig) => {
+        const tile = rig.tile;
+        if (!readLiveTile(tile, rig.group.position, _healNormalScratch)) {
+            const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0);
+            if (!wp) return false;
+            rig.group.position.set(wp[0], wp[1], wp[2]);
+            _healNormalScratch.copy(FACE_NORMALS[tile.dirKey] ?? FACE_NORMALS.PZ);
+        }
+        rig.group.quaternion.setFromUnitVectors(_healRingZ, _healNormalScratch);
+        return true;
+    };
 
     useFrame((_s, dt) => {
-        tRef.current += dt;
-        const t = tRef.current;
-        const DUR = 0.95;
-        const p = Math.min(1, t / DUR);
-        const ease = 1 - Math.pow(1 - p, 3); // easeOutCubic
-
-        if (ringRef.current) {
-            const s = 0.15 + ease * 1.75;
-            ringRef.current.scale.set(s, s, 1);
-            ringRef.current.material.opacity = (1 - p) * 0.9;
+        const pending = worm.pendingHealBurstRef.current;
+        if (pending) {
+            worm.pendingHealBurstRef.current = null;
+            const store = useGameStore.getState();
+            const cache = colorCache.current;
+            if (cache.settings !== store.settings) { cache.settings = store.settings; cache.colors = resolveColors(store.settings); }
+            for (const tile of [pending.exitTile, pending.entryTile]) {
+                if (!tile) continue;
+                // A free rig, or the one furthest through its burst.
+                let rig = rigs.find(r => !r.active);
+                if (!rig) rig = rigs.reduce((a, b) => (b.t > a.t ? b : a));
+                const home = store.cubies?.[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey]?.orig;
+                // Lifted toward white, so a ring still reads over its own colour (it
+                // lands on the tile that has just turned back to that colour).
+                tintBurstRig(rig, getOrbColor(home, cache.colors, '#3affb0'));
+                rig.tile = tile; rig.t = 0; rig.tier = pending.tier ?? 1; rig.active = true;
+                rig.group.visible = place(rig);
+                if (!rig.group.visible) rig.active = false;
+            }
         }
-        if (coreRingRef.current) {
-            const p2 = Math.min(1, t / (DUR * 0.65));
-            const e2 = 1 - Math.pow(1 - p2, 3);
-            const s = 0.1 + e2 * 1.05;
-            coreRingRef.current.scale.set(s, s, 1);
-            coreRingRef.current.material.opacity = (1 - p2) * 0.75;
+        const held = useGameStore.getState().wormPaused;
+        for (const rig of rigs) {
+            // An idle rig stays hidden: a Suspense resume unhides every instance that
+            // has no visible={false} prop, which drew four empty rigs every frame.
+            if (!rig.active) { if (rig.group.visible) rig.group.visible = false; continue; }
+            if (!held) rig.t += dt;
+            place(rig);
+            if (!poseBurstRig(rig, rig.t)) { rig.active = false; rig.group.visible = false; }
         }
-        if (flashRef.current) {
-            const fp = Math.min(1, t / 0.28);
-            flashRef.current.scale.setScalar(0.2 + fp * 0.95);
-            flashRef.current.material.opacity = (1 - fp) * 0.85;
-        }
-        if (p >= 1 && !doneRef.current) { doneRef.current = true; onDone?.(); }
     });
 
-    return (
-        <group position={wp} quaternion={quat}>
-            {/* Outer healing shockwave ring */}
-            <mesh ref={ringRef}>
-                <ringGeometry args={[0.34, 0.5, 48]} />
-                <meshBasicMaterial color={color} transparent opacity={0.9} side={THREE.DoubleSide}
-                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </mesh>
-            {/* Inner bright ring */}
-            <mesh ref={coreRingRef}>
-                <ringGeometry args={[0.16, 0.28, 40]} />
-                <meshBasicMaterial color="#ffffff" transparent opacity={0.75} side={THREE.DoubleSide}
-                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </mesh>
-            {/* Emergence flash just above the tile */}
-            <mesh ref={flashRef} position={[0, 0, 0.06]}>
-                <sphereGeometry args={[0.3, 16, 16]} />
-                <meshBasicMaterial color={color} transparent opacity={0.85}
-                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </mesh>
-        </group>
-    );
-}
-
-// Watches for heal events from the worm hook and manages active burst instances (the 3D
-// emergence shockwave; tile flip and cubie-pop feedback is driven by applyHeal.
-export function HealBurstSystem({ worm, size }) {
-    const [bursts, setBursts] = useState([]);
-
-    useFrame(() => {
-        if (!worm.pendingHealBurstRef.current) return;
-        const { exitTile } = worm.pendingHealBurstRef.current;
-        worm.pendingHealBurstRef.current = null;
-        const wp = getStickerWorldPos(exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey, size, 0);
-        if (!wp) return;
-        // World-space surface normal of the exit tile (from the live cubie transform) so the
-        // shockwave lies flat on whichever face the worm emerges from, even after rotations.
-        const lSize = liveCubies.size;
-        const cubie = (lSize > 0 && liveCubies.refs)
-            ? liveCubies.refs[exitTile.x * lSize * lSize + exitTile.y * lSize + exitTile.z]
-            : null;
-        const localN = FACE_NORMALS[exitTile.dirKey];
-        let normal = [0, 1, 0];
-        if (cubie && localN) {
-            _healNormalScratch.copy(localN).applyQuaternion(cubie.quaternion);
-            normal = [_healNormalScratch.x, _healNormalScratch.y, _healNormalScratch.z];
-        } else if (localN) {
-            normal = [localN.x, localN.y, localN.z];
-        }
-        const id = Date.now();
-        setBursts(prev => [...prev, { id, wp: [wp[0], wp[1], wp[2]], normal }]);
-    });
-
-    if (bursts.length === 0) return null;
-    return (
-        <>
-            {bursts.map(burst => (
-                <HealBurst3D
-                    key={burst.id}
-                    wp={burst.wp}
-                    normal={burst.normal}
-                    onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
-                />
-            ))}
-        </>
-    );
+    return <>{rigs.map((rig, i) => <primitive key={i} object={rig.group} />)}</>;
 }
 
 // One surface ring links the contextual HUD card to its entrance.

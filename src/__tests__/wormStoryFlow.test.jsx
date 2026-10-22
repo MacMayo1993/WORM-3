@@ -365,7 +365,9 @@ it.each([2, 5, 6])('can reach the healing target for level %i through real movem
   // Replenishment now stops; the remaining physical pair can be cleared.
   expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(1);
   if (id === 2) {
-    // Healing can spend food before the peak-length target. Claim the clear.
+    // Healing can spend food before the peak-length target. Claim the clear once
+    // the last heal's beat (its short hitstop) has landed.
+    for (let i = 0; i < 30 && !state().wormStoryResult && !state().wormStoryChecklist?.canFinish; i++) frame();
     if (!state().wormStoryResult) {
       expect(state().wormStoryChecklist.canFinish).toBe(true);
       act(() => state().finishWormStory());

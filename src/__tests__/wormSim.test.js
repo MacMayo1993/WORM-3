@@ -919,7 +919,7 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.healFired).toBe(true);
     expect(sim.orbCascades).toHaveLength(0);
     expect(sim.powerups.some(p => p.cascade)).toBe(false);
-    expect(sim.pendingHealBurst).toEqual({ exitTile: tunnel.exit, entryTile: tunnel.entry });
+    expect(sim.pendingHealBurst).toEqual({ exitTile: tunnel.exit, entryTile: tunnel.entry, tier: 1 });
     // Healed tunnel's traversal bookkeeping is dropped
     expect(sim.tunnelUseCounts.has(tunnelKey)).toBe(false);
   });

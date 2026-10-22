@@ -1,11 +1,11 @@
 import { persistedState } from './persistedState.js';
 import { addXp, levelProgress, savePlayerState } from '../../progression/model.js';
-import { CHEST_TIERS, CHEST_MODES, GEM_EXCHANGE, GEM_LEVEL_REWARD, GEM_STORY_REWARD, newChestWallet, rollChest } from '../../economy/chests.js';
+import { CHEST_TIERS, CHEST_MODES, GEM_EXCHANGE, GEM_LEVEL_REWARD, GEM_STORY_REWARD, isStoryRewardId, newChestWallet, rollChest } from '../../economy/chests.js';
 
 export function pendingGemRewards(state) {
   const wallet = state.chestWallet ?? newChestWallet();
   const level = levelProgress(state.playerProgress.xp).level;
-  const story = Object.entries(state.playerProgress.wormStory?.stars ?? {}).filter(([, stars]) => stars > 0).map(([id]) => Number(id));
+  const story = Object.entries(state.playerProgress.wormStory?.stars ?? {}).filter(([, stars]) => stars > 0).map(([id]) => Number(id)).filter(isStoryRewardId);
   return { level, story, amount: Math.max(0, level - wallet.claimedLevel) * GEM_LEVEL_REWARD + story.filter(id => !wallet.claimedStory.includes(id)).length * GEM_STORY_REWARD };
 }
 export const createChestSlice = (set, get) => {

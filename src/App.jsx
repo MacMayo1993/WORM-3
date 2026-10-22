@@ -31,6 +31,7 @@ import { recordLevelCompletion, recordFreeplaySolve } from './levels/completion.
 import { EARN_DAILY_CHALLENGE } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { setFeelEnabled } from './utils/feel.js';
+import { requestQuickStart } from './worm/healerWorm/runStart.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateAlignedSlice } from './game/tileOrientation.js';
 import { flipStickerPair } from './game/manifoldLogic.js';
@@ -979,6 +980,8 @@ export default function WORM3() {
     // Clear the old board before run subscribers start the new scramble.
     // reset() also clears XP, so it must precede the new run's initialization.
     reset();
+    // The player has just watched the full scramble and arrival: get them back in.
+    requestQuickStart();
     wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled, wormState.wormStoryLevel);
   }, [reset, cancelShuffle]);
 

@@ -196,6 +196,7 @@ export default function DeathScreen({
     // Examine hides the overlay to show the board behind it, which is only worth
     // offering when there is a spot on the board to go and look at.
     const canExamine = !!onExamine && kind === 'tail-bite' && !!location;
+    const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
     const orbs = wormSessionOrbs ?? 0;
     const shownOrbs = useCountUp(orbs, still);
     const stats = [
@@ -251,6 +252,7 @@ export default function DeathScreen({
                     <details className="screen-disclosure"><summary>Run details</summary>
                       <WormMissionCard summary /><XpRunSummary mode="worm" />
                       {location && <OverlayChip accent={config.color} label={location.label} value={location.value} />}
+                      {bestCombo >= 2 && <OverlayChip accent={config.color} label="Best orb chain" value={`×${bestCombo}`} />}
                     </details>
                     </div>
                 </div>

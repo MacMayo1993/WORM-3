@@ -36,6 +36,7 @@ import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
 import { wormBuffs } from './wormBuffs.js';
+import { comboMilestone, ORB_COMBO_WINDOW } from './healerWorm/orbCombo.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { getFusion, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
@@ -716,6 +717,59 @@ function OrbPickupFlash() {
                 }}
             />
         </>
+    );
+}
+
+// ─── Orb chain ───────────────────────────────────────────────────────────────
+// Quick pickups chain (orbCombo.js). From the second orb the chain shows as ×N with
+// a ring that drains as its window closes, and ×3, ×5 and ×8 call out. The chip
+// pops on the pickup's own store write (wormOrbFlash); the drain and the hide are
+// one rAF loop writing the DOM from the wormBuffs bridge, so it freezes with the
+// sim and costs no React render per frame.
+const COMBO_RING_R = 19;
+const COMBO_RING_CIRC = 2 * Math.PI * COMBO_RING_R;
+
+export function ComboMeter() {
+    const flash = useGameStore(s => s.wormOrbFlash);
+    const rootRef = useRef(null);
+    const countRef = useRef(null);
+    const ringRef = useRef(null);
+    const labelRef = useRef(null);
+    useEffect(() => {
+        const el = rootRef.current;
+        if (!el) return undefined;
+        const chain = (flash?.combo ?? 0) + 1;
+        if (!flash?.color || chain < 2 || wormBuffs.orbComboLeft <= 0) { el.hidden = true; return undefined; }
+        const milestone = comboMilestone(chain);
+        countRef.current.textContent = `×${chain}`;
+        labelRef.current.textContent = milestone ?? '';
+        el.dataset.milestone = milestone ? 'true' : 'false';
+        el.style.setProperty('--combo-color', flash.color);
+        el.hidden = false;
+        // Restart the pop: drop the class, force a style flush, put it back.
+        el.classList.remove('is-popping');
+        void el.offsetWidth;
+        el.classList.add('is-popping');
+        let raf = 0;
+        const paint = () => {
+            const left = wormBuffs.orbComboLeft;
+            ringRef.current.style.strokeDashoffset = `${COMBO_RING_CIRC * (1 - Math.max(0, Math.min(1, left / ORB_COMBO_WINDOW)))}`;
+            if (left <= 0) { el.hidden = true; return; }
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [flash]);
+    return (
+        <div ref={rootRef} className="worm-combo" hidden aria-hidden="true">
+            <svg className="worm-combo-ring" viewBox="0 0 44 44" width="44" height="44">
+                <circle cx="22" cy="22" r={COMBO_RING_R} fill="none" strokeWidth="4" className="worm-combo-track" />
+                <circle ref={ringRef} cx="22" cy="22" r={COMBO_RING_R} fill="none" strokeWidth="4" strokeLinecap="round"
+                    className="worm-combo-fill" strokeDasharray={COMBO_RING_CIRC} transform="rotate(-90 22 22)" />
+            </svg>
+            <strong ref={countRef} className="worm-combo-count" />
+            <span ref={labelRef} className="worm-combo-label" />
+        </div>
     );
 }
 
@@ -1462,6 +1516,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
+                {/* Hangs just under the dock (absolute), so showing it never moves the bar. */}
+                {wormAlive && phase === 'crawling' && <ComboMeter />}
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'rotation'].includes(lesson.id)) && (

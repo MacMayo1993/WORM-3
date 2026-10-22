@@ -334,3 +334,45 @@
 .worm-pause-loading { margin:16px 0; color:var(--arcade-muted,#6a705e); }
 /* The Cube page's lists are long: its tabs (cubeLookSettings.css) stay at the top of the card as it scrolls. */
 .worm-pause-card { --cube-look-pad-top:14px; --cube-look-pad-x:16px; --cube-look-card:var(--arcade-card,#fffcf1); }
+
+/* The orb chain (ComboMeter): hangs centred just under the top dock, out of the flow
+   so it never moves the bar. A pop on each link; a bigger one, and a callout, at
+   ×3, ×5 and ×8. The ring drains with the chain's window. */
+.worm-combo {
+  position: absolute; top: 100%; left: 50%; margin-top: 8px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 12px 3px 3px; border-radius: 26px;
+  background: var(--hud-surface, #fff9e9); color: var(--hud-text, #17201b);
+  border: 2px solid #17201b; box-shadow: 0 3px 0 #17201b;
+  font-family: var(--heading-font); pointer-events: none;
+  transform: translateX(-50%); transform-origin: 50% 0;
+}
+.worm-combo[hidden] { display: none; }
+.worm-combo-ring { flex-shrink: 0; display: block; }
+.worm-combo-track { stroke: #17201b22; }
+.worm-combo-fill { stroke: var(--combo-color, #009b48); filter: drop-shadow(0 0 2px var(--combo-color, #009b48)); }
+.worm-combo-count {
+  position: absolute; left: 3px; width: 44px; text-align: center;
+  font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+}
+.worm-combo-label { font-size: 12px; font-weight: 900; letter-spacing: 1.4px; text-transform: uppercase; }
+.worm-combo-label:empty { display: none; }
+.worm-combo:has(.worm-combo-label:empty) { padding-right: 3px; }
+.worm-combo.is-popping { animation: worm-combo-pop 260ms cubic-bezier(.2, 1.6, .4, 1); }
+.worm-combo.is-popping[data-milestone=true] { animation: worm-combo-milestone 520ms cubic-bezier(.2, 1.6, .4, 1); }
+.worm-combo[data-milestone=true] { background: var(--combo-color, #009b48); color: #17201b; }
+.worm-combo[data-milestone=true] .worm-combo-track { stroke: #17201b33; }
+.worm-combo[data-milestone=true] .worm-combo-fill { stroke: #17201b; filter: none; }
+@keyframes worm-combo-pop {
+  0% { transform: translateX(-50%) scale(0.86); }
+  60% { transform: translateX(-50%) scale(1.12); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+@keyframes worm-combo-milestone {
+  0% { transform: translateX(-50%) scale(0.7) rotate(-6deg); }
+  45% { transform: translateX(-50%) scale(1.28) rotate(3deg); }
+  100% { transform: translateX(-50%) scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .worm-combo.is-popping, .worm-combo.is-popping[data-milestone=true] { animation: none; }
+}

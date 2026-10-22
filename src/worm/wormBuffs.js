@@ -37,6 +37,8 @@ export const wormBuffs = {
   // would re-run every subscriber's selector across the whole app for a value only
   // one component looks at.
   elementalOrigin: null,
+  orbCombo: 0,       // links in the current orb chain (the chain is orbCombo + 1 orbs)
+  orbComboLeft: 0,   // seconds left to extend it, on the sim's clock (orbCombo.js)
 };
 
 /**
@@ -78,4 +80,6 @@ export function resetWormBuffs() {
   wormBuffs.elementalT = 0;
   wormBuffs.elementalMaxT = 0;
   wormBuffs.elementalOrigin = null;
+  wormBuffs.orbCombo = 0;
+  wormBuffs.orbComboLeft = 0;
 }
