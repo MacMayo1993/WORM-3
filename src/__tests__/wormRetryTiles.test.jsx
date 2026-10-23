@@ -13,8 +13,8 @@ vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 vi.mock('@react-three/drei', async original => ({ ...await original(), Text: () => null }));
 extend(THREE);
 
-it.each([[8, false], [8, true], [90, false], [90, true]])(
-  'restores a previously flipped mobile Sudoku tile on retry (frames=%i, moved=%s)', async (flipFrames, moved) => {
+it.each([[8, false, 1], [8, true, 1], [90, false, 1], [90, true, 1], [8, false, 2], [8, true, 2]])(
+  'restores a previously flipped mobile Sudoku tile on retry (frames=%i, moved=%s, flips=%i)', async (flipFrames, moved, flips) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -64,12 +64,26 @@ it.each([[8, false], [8, true], [90, false], [90, true]])(
     }
     return items;
   };
+  const portalCount = () => {
+    let count = 0;
+    store.getState().scene.traverse(object => {
+      if (object.isInstancedMesh && object.name === 'TileSurfaceBatch:FlipPortal') count += object.count;
+    });
+    return count;
+  };
   try {
     await render(); await frame(90);
     const clean = snapshot();
     expect(clean).toHaveLength(1);
     cubie = { ...base, stickers: { PZ: { ...base.stickers.PZ, flips: 1, curr: ANTIPODAL_COLOR[base.stickers.PZ.orig] } } };
-    await render(); await frame(flipFrames);
+    await render();
+    if (flips === 2) {
+      await frame(90);
+      cubie = { ...base, stickers: { PZ: { ...base.stickers.PZ, flips, curr: base.stickers.PZ.orig } } };
+      await render();
+    }
+    await frame(flipFrames);
+    if (flips === 2) expect(portalCount()).toBe(1);
     await act(async () => useGameStore.setState({ wormAlive: false, wormPaused: true }));
     cubie = moved ? { ...base, stickers: makeCubies(size)[2][3][6].stickers } : base;
     await act(async () => {
@@ -77,8 +91,10 @@ it.each([[8, false], [8, true], [90, false], [90, true]])(
     });
     await frame();
     expect(snapshot()).toEqual(clean);
+    expect(portalCount()).toBe(0);
     await frame(120);
     expect(snapshot()).toEqual(clean);
+    expect(portalCount()).toBe(0);
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true); context.mockRestore(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;

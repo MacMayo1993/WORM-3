@@ -619,7 +619,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevFlips.current = meta?.flips ?? 0;
     isFlipping.current = false;
     setKeepFlipMeshMounted(false);
-    portalClosingRef.current = false;
+    // Stopping the flip skips its midpoint cleanup. Re-render before paint so
+    // JSX computed with the outgoing closing-portal ref is retired as well.
+    endPortalClosing();
     spinT.current = 0;
     shakeT.current = 0;
     shockT.current = 1;
