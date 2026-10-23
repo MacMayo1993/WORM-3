@@ -259,7 +259,7 @@ export function useWormCrawler(size, cubies) {
             onSkill: (kind) => {
                 if (!SKILL_CALLOUTS[kind]) return;
                 feedbackRef.current.emit('clutch');
-                useGameStore.setState(state => ({ wormSkillCallout: { kind, seq: (state.wormSkillCallout?.seq ?? 0) + 1 } }));
+                useGameStore.setState({ wormSkillCallout: { kind } });
             },
             onStoryMechanic: (key, id) => {
                 const s = useGameStore.getState(), p = storyPracticeRef.current;

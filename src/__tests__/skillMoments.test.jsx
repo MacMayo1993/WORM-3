@@ -61,12 +61,28 @@ describe('the callout', () => {
 
   it('shows the moment once and is gone in about a second', () => {
     act(() => root.render(<SkillCallout />));
-    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'double', seq: 1 } }));
+    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'double' } }));
     expect(host.querySelector('.worm-skill-callout').textContent).toBe('Double heal!');
     expect(useGameStore.getState().wormSkillCallout).toBeNull();
     act(() => vi.advanceTimersByTime(1200));
     expect(host.querySelector('.worm-skill-callout')).toBeNull();
-    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'nonsense', seq: 2 } }));
+    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'nonsense' } }));
     expect(host.querySelector('.worm-skill-callout')).toBeNull();
+  });
+
+  it('a moment landing while one is on screen gets a fresh element and a full second', () => {
+    act(() => root.render(<SkillCallout />));
+    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'hop' } }));
+    const first = host.querySelector('.worm-skill-callout');
+    act(() => vi.advanceTimersByTime(900));
+    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'hop' } }));
+    const second = host.querySelector('.worm-skill-callout');
+    expect(second).not.toBe(first);
+    expect(first.isConnected).toBe(false);
+    act(() => vi.advanceTimersByTime(900));
+    expect(host.querySelector('.worm-skill-callout')).toBe(second);
+    act(() => useGameStore.setState({ wormSkillCallout: { kind: 'pass' } }));
+    expect(host.querySelector('.worm-skill-callout')).not.toBe(second);
+    expect(host.querySelector('.worm-skill-callout').textContent).toBe('Self-pass!');
   });
 });
