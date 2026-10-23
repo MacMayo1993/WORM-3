@@ -1,5 +1,6 @@
 import { segmentsToTiles, goalDisplayValue } from '../healerWorm/tileUnits.js';
 import StoryStarRequirements from './StoryStarRequirements.jsx';
+import { nextStarHint } from './starGoals.js';
 import React, { Suspense, useEffect, useId, useRef, useState } from 'react';
 import VictoryCubeStage from './VictoryCubeStage.jsx';
 import { useShallow } from 'zustand/react/shallow';
@@ -251,6 +252,26 @@ function StoryRewardBurst({ points, xp, start, still }) {
     </div>}
   </>;
 }
+// What this clear changed: a first clear or better stars, the time against the
+// level's best, a level-up (its toast would sit under this card), and, short of
+// three stars, what the next one needs.
+function StoryRecords({ result, level, stars }) {
+  const improved = !result.first && result.previousStars > 0 && stars > result.previousStars;
+  const hint = nextStarHint(level, stars, result.starGoals);
+  return <div className="story-completion-records">
+    <div className="story-completion-chips">
+      {result.first && <span className="story-record is-first">First clear</span>}
+      {improved && <span className="story-record is-up" aria-label={`Improved from ${result.previousStars} to ${stars} stars`}>
+        {'★'.repeat(result.previousStars)} → {'★'.repeat(stars)}</span>}
+      {Number.isFinite(result.seconds) && <span className={`story-record${result.newBestTime ? ' is-best' : ''}`}>
+        {result.seconds}s{result.newBestTime ? <> · new best <small>(was {result.previousTime}s)</small></>
+          : result.previousTime ? <small> · best {result.previousTime}s</small> : null}</span>}
+      {result.levelUp && <span className="story-record is-level">Level {result.levelUp.level} · +{result.levelUp.points} PP</span>}
+    </div>
+    {hint && <p className="story-completion-next-star"><b>{'★'.repeat(stars + 1)}</b> {hint}</p>}
+  </div>;
+}
+
 export function StoryResult(props) {
   const result = useGameStore(s => s.wormStoryResult);
   const runId = useGameStore(s => s.wormRunId);
@@ -271,7 +292,9 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
   const stars = Math.max(1, Math.min(3, result.stars));
   const readyAt = STAR_FIRST_MS + (stars - 1) * STAR_STEP_MS + 450;
   const narrative = storyNarrative(level.id);
-  const hasRewards = !!level.reward || !!result.unlockedCharacter || !!result.unlockedModes?.length;
+  const hasUnlocks = !!result.unlockedCharacter || !!result.unlockedModes?.length;
+  // A reward still to pick opens its panel, so it is not left behind unseen.
+  const [pickOpen] = useState(() => !!level.reward && !useGameStore.getState().playerProgress.wormStory?.claimed?.[level.id]);
 
   useEffect(() => {
     if (reducedMotion) { feel('storyComplete'); return; }
@@ -313,7 +336,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     else exitTimer.current = setTimeout(action, 180);
   };
 
-  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || !!result.unlockedCharacter || !!result.unlockedModes}
+  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || hasUnlocks}
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
@@ -337,10 +360,10 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
         </div>
         <p className="story-completion-verdict" role="status">{ready ? `${stars} ${stars === 1 ? 'star' : 'stars'} earned` : '\u00a0'}</p>
         <StoryRewardBurst points={result.points ?? 0} xp={result.xp ?? 0} start={STAR_FIRST_MS + stars * STAR_STEP_MS} still={reducedMotion} />
+        <StoryRecords result={result} level={level} stars={stars} />
       </div>
-      <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
-        {hasRewards && <details className="story-completion-bonus">
-          <summary>Level rewards</summary>
+      {/* What the clear opened is the headline, not a fold: it reveals as the card settles. */}
+      {hasUnlocks && <div className="story-completion-unlocks" role="status">
         {result.unlockedCharacter && <div className="story-completion-unlock story-reward-character">
           <RewardArt item={getStoreItem(`character_${result.unlockedCharacter}`) ?? { type: 'character', characterId: result.unlockedCharacter, label: getWormCharacter(result.unlockedCharacter).label }} ready={ready} />
           <p><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>
@@ -348,7 +371,11 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
         {result.unlockedModes?.map(id => <p key={id} className="story-completion-unlock story-mode-unlock">
           <span>New mode unlocked</span><strong>{MODE_UNLOCK_LABELS[id]}</strong>
         </p>)}
-        <StoryRewardChoices level={level} previewsReady={ready} />
+      </div>}
+      <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
+        {level.reward && <details className="story-completion-bonus" open={pickOpen || undefined}>
+          <summary>Level rewards</summary>
+          <StoryRewardChoices level={level} previewsReady={ready} />
         </details>}
         {narrative && <details className="story-completion-notes"><summary tabIndex={0}>Mobi’s field notes</summary><StoryMobiNote levelId={level.id} complete /></details>}
       </div>

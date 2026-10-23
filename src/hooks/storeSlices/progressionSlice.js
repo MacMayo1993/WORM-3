@@ -5,6 +5,7 @@ import { xpChanges, wormXpChanges, puzzleXpChanges, achievementChanges } from '.
 import { availableRewards, rewardChoices } from '../../progression/rewards.js';
 import { getLevelPar } from '../../levels/scoring.js';
 import { getWinnerFaces } from '../../utils/disparityBetting.js';
+import { recordFreeBests } from '../../progression/wormBests.js';
 
 export const createProgressionSlice = (set, get) => ({
   playerProgress: persistedState.playerProgress,
@@ -30,6 +31,26 @@ export const createProgressionSlice = (set, get) => ({
     ? { xpRun: { ...state.xpRun, assisted: true } } : {}),
   completePuzzleXp: () => set(state => puzzleXpChanges(state)),
   recordWormXp: (kind, total, pair, runId) => set(state => wormXpChanges(state, kind, total, pair, runId)),
+  // The first time a player makes an elemental recipe (by its id, e.g. 'steam'):
+  // a milestone that persists, and a one-shot notice the HUD turns into NEW RECIPE.
+  discoverWormFusion: id => set(state => {
+    if (state.demoMode || typeof id !== 'string' || !/^[a-z]{2,24}$/.test(id)) return {};
+    const mark = `first:fusion:${id}`;
+    if (state.playerProgress.milestones[mark]) return {};
+    return { playerProgress: { ...state.playerProgress, milestones: { ...state.playerProgress.milestones, [mark]: 1 } },
+      wormFusionDiscovery: { id, seq: (state.wormFusionDiscovery?.seq ?? 0) + 1 } };
+  }),
+  // A free-play run's personal bests (progression/wormBests.js), once per run, at
+  // its end (death or a healed cube). wormRunBests tells the result cards which
+  // numbers beat an earlier record.
+  recordWormRunBests: runId => set(state => {
+    if (state.demoMode || !state.wormHealerMode || state.wormStoryLevel || state.wormCombatMode ||
+        runId !== state.wormRunId || state.wormRunBests?.runId === runId) return {};
+    const { bests, beaten, previous } = recordFreeBests(state.playerProgress.bests, state.size, {
+      orbs: state.wormSessionOrbs, heals: state.wormHealedCount, chain: state.wormRunBestCombo, time: state.wormTimeAlive,
+    });
+    return { playerProgress: { ...state.playerProgress, bests }, wormRunBests: { runId, beaten, previous } };
+  }),
   finishWormXp: (won, runId) => set(state => {
     const run = state.xpRun;
     if (state.demoMode || !state.wormHealerMode || !run || run.mode !== 'worm' || run.id !== runId || runId !== state.wormRunId || run.completed) return {};

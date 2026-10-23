@@ -46,6 +46,17 @@ export function ScenePanel({ settings, onSettingsChange }) {
           </label>
         ))}
       </div>
+      <h3 className="settings-section-title">Motion</h3>
+      <p>Reduced holds the camera steady and drops shakes, lens punches, sweeps and particle motion in play. Your device's reduce-motion setting does the same.</p>
+      <div className="settings-radio-group">
+        {[[false, 'Full'], [true, 'Reduced']].map(([value, label]) => (
+          <label key={label} className={`settings-radio${(settings.reducedMotion === true) === value ? ' active' : ''}`}>
+            <input type="radio" name="reducedMotion" checked={(settings.reducedMotion === true) === value}
+              onChange={() => update('reducedMotion', value)} />
+            <span className="settings-radio-label">{label}</span>
+          </label>
+        ))}
+      </div>
       <h3 className="settings-section-title">Lightning flashes</h3>
       <p>Lightning orbs and storm fusions. Reduced keeps every strike and its warning readable, but nothing flashes bright or fast.</p>
       <div className="settings-radio-group">

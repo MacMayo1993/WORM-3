@@ -59,6 +59,16 @@ export const storyLevel = id => WORM_STORY_LEVELS.find(level => level.id === id)
 export const storyStars = (progress, id) => progress?.wormStory?.stars?.[id] || 0;
 export const storyUnlocked = (progress, id) => !!storyLevel(id) && (id === 1 || storyStars(progress, id - 1) > 0);
 export const nextStoryLevel = progress => WORM_STORY_LEVELS.find(level => !storyStars(progress, level.id)) ?? WORM_STORY_LEVELS.at(-1);
+/**
+ * The level the main menu's Continue key starts: the next unplayed level, for a
+ * player who has cleared at least one. Null for a new save (the intro already
+ * hands them level 1) and once every level has stars (the map is the way back).
+ */
+export function continueStoryLevel(progress) {
+  if (!storyStars(progress, WORM_STORY_LEVELS[0].id)) return null;
+  const level = WORM_STORY_LEVELS.find(item => !storyStars(progress, item.id));
+  return level && storyUnlocked(progress, level.id) ? level : null;
+}
 export function sanitizeStoryProgress(raw) {
   const result = { stars: {}, claimed: {} };
   for (const level of WORM_STORY_LEVELS) {

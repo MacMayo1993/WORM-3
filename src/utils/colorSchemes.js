@@ -356,6 +356,7 @@ export const DEFAULT_SETTINGS = {
   flipPads: 'full',
   // Lightning strikes and storm coats swell and fade instead of flashing.
   reduceFlashing: false,
+  reducedMotion: false,
   colorScheme: 'standard',
   customColors: null,
   backgroundTheme: 'blackhole',

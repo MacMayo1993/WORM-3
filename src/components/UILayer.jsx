@@ -118,7 +118,7 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet, onMenuContinue,
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped, speedThresholdSec, chaosPreview, onBetBack, onChaosReplay,
@@ -482,6 +482,7 @@ export default function UILayer({
           onComingSoon={onMenuComingSoon}
           onMobiusCubelet={onMenuMobiusCubelet}
           onDemo={onDemo}
+          onContinue={onMenuContinue}
         />
       )}
 

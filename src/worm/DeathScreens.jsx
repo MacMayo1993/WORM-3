@@ -48,6 +48,8 @@ import {
     primaryBtnStyle, SECONDARY_BTN_STYLE, TERTIARY_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
 import './deathScreen.css';
+import NewBestTag from './NewBestTag.jsx';
+import { useRunBestsBeaten, useNewBestChime } from './runBests.js';
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
@@ -197,12 +199,15 @@ export default function DeathScreen({
     // offering when there is a spot on the board to go and look at.
     const canExamine = !!onExamine && kind === 'tail-bite' && !!location;
     const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
+    // Personal bests (progression/wormBests.js): death is still progress.
+    const beaten = useRunBestsBeaten();
+    useNewBestChime(beaten);
     const orbs = wormSessionOrbs ?? 0;
     const shownOrbs = useCountUp(orbs, still);
     const stats = [
-        ['Time', formatTime(wormTimeAlive)],
-        ['Healed', wormHealedCount],
-        ['Tunnels', wormTunnelCount],
+        ['Time', formatTime(wormTimeAlive), 'time'],
+        ['Healed', wormHealedCount, 'heals'],
+        ['Tunnels', wormTunnelCount, null],
     ];
 
     return (
@@ -229,15 +234,17 @@ export default function DeathScreen({
                     {/* One strip: the orbs collected lead, then the run's other numbers. */}
                     <div className="worm-death-stats">
                         <div className="worm-death-stat is-hero" style={{ '--i': 0 }}>
+                            {beaten.includes('orbs') && <NewBestTag />}
                             {STAT_ICONS.Orbs}
                             <strong aria-hidden="true">{shownOrbs}</strong>
-                            <span>Orbs<span className="worm-death-sr">: {orbs}</span></span>
+                            <span>Orbs<span className="worm-death-sr">: {orbs}{beaten.includes('orbs') ? ', a new best' : ''}</span></span>
                         </div>
-                        {stats.map(([label, value], i) => (
+                        {stats.map(([label, value, metric], i) => (
                             <div key={label} className="worm-death-stat" style={{ '--i': i + 1 }}>
+                                {metric && beaten.includes(metric) && <NewBestTag />}
                                 {STAT_ICONS[label]}
                                 <strong>{value}</strong>
-                                <span>{label}</span>
+                                <span>{label}{metric && beaten.includes(metric) && <span className="worm-death-sr">, a new best</span>}</span>
                             </div>
                         ))}
                     </div>
@@ -252,7 +259,8 @@ export default function DeathScreen({
                     <details className="screen-disclosure"><summary>Run details</summary>
                       <WormMissionCard summary /><XpRunSummary mode="worm" />
                       {location && <OverlayChip accent={config.color} label={location.label} value={location.value} />}
-                      {bestCombo >= 2 && <OverlayChip accent={config.color} label="Best orb chain" value={`×${bestCombo}`} />}
+                      {bestCombo >= 2 && <OverlayChip accent={config.color} label="Best orb chain"
+                        value={`×${bestCombo}${beaten.includes('chain') ? ' · new best' : ''}`} />}
                     </details>
                     </div>
                 </div>

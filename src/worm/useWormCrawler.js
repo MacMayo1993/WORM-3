@@ -41,6 +41,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { queueHealSeal } from './healSeal.js';
 import { comboWindowLeft } from './healerWorm/orbCombo.js';
+import { ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
 import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
 import { flipPadPair } from '../game/flipPad.js';
@@ -314,6 +315,7 @@ export function useWormCrawler(size, cubies) {
                     wormDeathDetails: details,
                     wormTimeAlive: timeAlive,
                 });
+                ending.recordWormRunBests(ending.wormRunId);
                 // Let death state land first, then reveal menu for clearer sequencing.
                 deathMenuTimer.current = setTimeout(() => {
                     const current = useGameStore.getState();
@@ -485,9 +487,14 @@ export function useWormCrawler(size, cubies) {
                     useGameStore.setState({ wormElementalTheme: type ?? null, wormElementalPartner: pair });
                 }
             },
-            onFusion: (key) => useGameStore.setState((state) => ({
-                wormFusionNotice: { key, seq: (state.wormFusionNotice?.seq ?? 0) + 1 },
-            })),
+            onFusion: (key) => {
+                useGameStore.setState((state) => ({
+                    wormFusionNotice: { key, seq: (state.wormFusionNotice?.seq ?? 0) + 1 },
+                }));
+                // A recipe made for the first time is a discovery (NEW RECIPE in the HUD).
+                const recipe = ORDERED_FUSIONS[key];
+                if (recipe) useGameStore.getState().discoverWormFusion(recipe.id);
+            },
             onSpecialSpawned: (type) => useGameStore.setState((state) => ({
                 wormSpecialNotice: { kind: 'spawn', type, seq: (state.wormSpecialNotice?.seq ?? 0) + 1 },
             })),
@@ -560,7 +567,7 @@ export function useWormCrawler(size, cubies) {
             useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,
                 exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
-                wormSessionOrbs: 0, wormRunBestCombo: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
+                wormSessionOrbs: 0, wormRunBestCombo: 0, wormRunBests: null, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 // A retry can interrupt a rescue or a tunnel ride. Reset the
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false, wormRescueKind: null,

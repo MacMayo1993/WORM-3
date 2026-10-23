@@ -721,6 +721,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (!liveState.demoMode && bodyOrbs > 0) liveState.earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
                     // Freeze the worm — game is over; publish final time for WinnerScreen
                     useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true, wormTimeAlive: Math.floor(worm.timeAliveRef.current) });
+                    liveState.recordWormRunBests(liveState.wormRunId);
                 }
             }
             return;

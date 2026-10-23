@@ -37,6 +37,8 @@ import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 import { isModeUnlocked, modeLockText, levelsUntilModeUnlock, modeUnlockLevels } from '../../progression/modeUnlocks.js';
+import { continueStoryLevel, storyChapterId, storyChapterIndex } from '../../worm/story/levels.js';
+import { stageCode } from '../../worm/story/levelMapLayout.js';
 
 // ─── The opening's cube ────────────────────────────────────────────────────────
 // The menu cube is the one that lands in the opening (IntroScene): black plastic
@@ -1427,7 +1429,22 @@ const MENU_KEY_COLORS = {
 };
 const PLAY_FLIP_MS = 520;
 
-const MenuStartButton = ({ visible, onClick, onDemo }) => {
+// A returning player's next WORM Story level, one tap from the menu (the map is
+// still behind PLAY). Hidden for a new save and once every level has stars.
+export const MenuContinueKey = ({ onContinue }) => {
+  const level = useGameStore(s => continueStoryLevel(s.playerProgress));
+  if (!level || !onContinue) return null;
+  const code = stageCode(storyChapterId(level.id), storyChapterIndex(level.id));
+  return <button type="button" className="menu-key menu-key--continue" onClick={() => onContinue(level.id)}
+    aria-label={`Continue: stage ${code}, ${level.title}`}>
+    <span className="menu-key-face">
+      <span className="menu-continue-text"><b>Continue</b><small>Stage {code} · {level.title}</small></span>
+      <span className="menu-continue-arrow" aria-hidden="true">→</span>
+    </span>
+  </button>;
+};
+
+const MenuStartButton = ({ visible, onClick, onDemo, onContinue }) => {
   // Lift the action cluster while retaining portrait/desktop and safe-area spacing.
   const [portrait, setPortrait] = React.useState(
     typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
@@ -1478,6 +1495,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         <span className="menu-key-arrow" aria-hidden="true">→</span>
       </span>
     </button>
+    <MenuContinueKey onContinue={onContinue} />
     <div className="worm-menu-links">
       {onDemo && <button type="button" onClick={onDemo} onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}>
         <span aria-hidden="true">▷</span> Demo
@@ -1570,7 +1588,7 @@ const MainMenu = ({
   onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
   onWormHealer: _onWormHealer,
   onStore: _onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
-  onDemo,
+  onDemo, onContinue,
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [bottomVisible, setBottomVisible] = useState(false);
@@ -1591,7 +1609,7 @@ const MainMenu = ({
       <MenuBackdrop visible={titleVisible} />
       <MenuTopBar visible={titleVisible} onSettings={_onSettings} />
       <MenuTitleCard visible={titleVisible} />
-      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
+      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} onContinue={onContinue} />
     </div>
   );
 };

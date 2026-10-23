@@ -98,7 +98,7 @@ const ModeCarousel = React.lazy(() =>
   import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.ModeCarousel }))
 );
 import { useTeachMode } from './teach/useTeachMode.js';
-import { isMobile } from './utils/device.js';
+import { isMobile, setReducedMotionSetting } from './utils/device.js';
 import { preloadAppAssets } from './utils/preloadAssets.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
@@ -374,6 +374,8 @@ export default function WORM3() {
   useEffect(() => {
     setFeelEnabled({ sfx: settings?.sfx ?? true, haptics: settings?.haptics ?? true });
   }, [settings?.sfx, settings?.haptics]);
+  // Settings → Scene → Motion reaches every prefersReducedMotion() caller and CSS.
+  useEffect(() => { setReducedMotionSetting(settings?.reducedMotion === true); }, [settings?.reducedMotion]);
 
 
   const { moveHistory, undo, canUndo } = useUndo(startAnimation);
@@ -998,6 +1000,15 @@ export default function WORM3() {
     handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(1)) });
   };
 
+  // The main menu's Continue key: straight into the next unplayed Story level.
+  const handleMenuContinue = useCallback(id => {
+    const s = useGameStore.getState();
+    if (!storyUnlocked(s.playerProgress, id)) return;
+    setWormEntryPage('story');
+    s.setShowMainMenu(false);
+    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(id)) });
+  }, [handleWormSetupComplete]);
+
   const handleWormStoryNext = useCallback(() => {
     const s = useGameStore.getState();
     const id = (s.wormStoryResult?.levelId ?? 0) + 1;
@@ -1567,6 +1578,7 @@ export default function WORM3() {
               onMenuBiome: handleMenuBiome,
               onMenuDisparity: handleMenuDisparity,
               onMenuWormHealer: handleMenuWormHealer,
+              onMenuContinue: handleMenuContinue,
               onMenuStore: handleOpenStore,
               onMenuComingSoon: handleMenuComingSoon,
               onMenuMobiusCubelet: handleMenuMobiusCubelet,

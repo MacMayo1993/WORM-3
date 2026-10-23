@@ -29,3 +29,25 @@ it('defaults to full flashes and switches to reduced from the Scene panel', () =
   act(() => [...host.querySelectorAll('input[name="reduceFlashing"]')][0].click());
   expect(settings.reduceFlashing).toBe(false);
 });
+
+it('has a Motion toggle that every prefersReducedMotion() caller honours', async () => {
+  const { prefersReducedMotion, setReducedMotionSetting } = await import('../utils/device.js');
+  expect(DEFAULT_SETTINGS.reducedMotion).toBe(false);
+  let settings;
+  function Harness() {
+    const [value, setValue] = useState({ ...DEFAULT_SETTINGS });
+    useEffect(() => { settings = value; }, [value]);
+    return <ScenePanel settings={value} onSettingsChange={setValue} />;
+  }
+  act(() => root.render(<Harness />));
+  const radios = [...host.querySelectorAll('input[name="reducedMotion"]')];
+  expect(radios.map(r => r.closest('label').textContent)).toEqual(['Full', 'Reduced']);
+  act(() => radios[1].click());
+  expect(settings.reducedMotion).toBe(true);
+  // App syncs the setting into the shared query (jsdom has no system preference).
+  expect(prefersReducedMotion()).toBe(false);
+  setReducedMotionSetting(true);
+  expect(prefersReducedMotion()).toBe(true);
+  setReducedMotionSetting(false);
+  expect(prefersReducedMotion()).toBe(false);
+});
