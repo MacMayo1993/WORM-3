@@ -145,7 +145,8 @@ function ActiveInspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
             const stickers = scene.getObjectByName('StickerInstanceMesh');
             const chromeStickers = scene.getObjectByName('ChromeStickerInstanceMesh');
             const tileSurfaces = scene.getObjectByName('TileSurfaceBatches');
-            renderInspectionPass(gl, scene, lensCamera, lensTarget, [root, exteriorRef.current, stickers, chromeStickers, tileSurfaces], [guide]);
+            const tileDecals = scene.getObjectByName('TileSurfaceDecals');
+            renderInspectionPass(gl, scene, lensCamera, lensTarget, [root, exteriorRef.current, stickers, chromeStickers, tileSurfaces, tileDecals], [guide]);
             lastCapture = now;
           }
           lensMesh.visible = true;

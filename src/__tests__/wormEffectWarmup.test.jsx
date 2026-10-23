@@ -8,6 +8,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { ordinaryMaterial, flippedMaterial } from '../3d/tileBoundaryMaterials.js';
 import { stickerWormBodyMaterial, stickerWormGlowMaterial } from '../3d/stickerWormMaterials.js';
 import { healthBarMaterial } from '../3d/disparityHealthBarMaterial.js';
+import { healSealMaterial, healParticleMaterial } from '../3d/healEffectMaterials.js';
 import { elementalWarmupObjects } from '../worm/healerWorm/elementalWarmup.js';
 import { distinctProgramObjects } from '../3d/compileDistinct.js';
 import { LEGO_STUD_PARTS } from '../3d/legoStud.js';
@@ -50,6 +51,7 @@ it('retains warmed programs across events, warms changed scene variants, and dis
     expect(gl.compile).toHaveBeenCalledTimes(3);
     // Module-owned materials ride in the warm scene but belong to their modules.
     const shared = new Set([ordinaryMaterial, flippedMaterial, stickerWormBodyMaterial, stickerWormGlowMaterial, healthBarMaterial,
+      healSealMaterial, healParticleMaterial,
       ...elementalWarmupObjects(new THREE.PlaneGeometry()).map(o => o.material)]);
     const disposed = [...warmMaterials].filter(m => !shared.has(m)).map(m => vi.spyOn(m, 'dispose'));
     const kept = [...shared].map(m => vi.spyOn(m, 'dispose'));

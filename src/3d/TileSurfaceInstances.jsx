@@ -11,20 +11,25 @@ export const useTileSurfaceInstances = () => useContext(Context);
 export function TileSurfaceProvider({ children, exteriorPortals }) {
   const pool = useMemo(() => ({
     ...createSurfaceBatches(2048, exteriorPortals?.materialFor),
+    // Flat transparent marks laid on tiles (the worm's footprint), one draw per look.
+    decals: createSurfaceBatches(2048, exteriorPortals?.materialFor, { transparent: true }),
     chromeMaterial: new MeshStandardMaterial(CHROME_TILE_FINISH),
     backMaterial: new MeshStandardMaterial({ color: '#ffffff', roughness: 0.45, metalness: 0.08 })
   }), [exteriorPortals]);
-  useLayoutEffect(() => () => { pool.dispose(); pool.backMaterial.dispose(); pool.chromeMaterial.dispose(); }, [pool]);
+  useLayoutEffect(() => () => { pool.dispose(); pool.decals.dispose(); pool.backMaterial.dispose(); pool.chromeMaterial.dispose(); }, [pool]);
   // Child transform writers register before this provider at priority zero;
   // cubie rotation, raised pads and live expansion already ran at negative priorities.
   // PiP and live portal views render other cameras; keep their tiles available.
   useFrame(({ camera }) => {
     const state = useGameStore.getState();
-    pool.update(state.showAntipodalPiP || state.settings?.livePortalViews === true ? null : camera);
+    const view = state.showAntipodalPiP || state.settings?.livePortalViews === true ? null : camera;
+    pool.update(view);
+    pool.decals.update(view);
   });
   return <Context.Provider value={pool}>
     {children}
     <primitive object={pool.group} />
+    <primitive object={pool.decals.group} />
   </Context.Provider>;
 }
 
