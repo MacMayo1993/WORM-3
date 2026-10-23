@@ -98,8 +98,9 @@ describe('a retried free-play run', () => {
   };
 
   it('skips the animated scramble, holds the warm-up frames, and arrives on the short clock', () => {
-    // The first run plays the full show.
+    // The first run plays the full show, and free play counts the turns it will undo.
     expect(shuffle).toHaveBeenCalledTimes(1);
+    expect(useGameStore.getState().wormTurnsLeft).toBe(shuffle.mock.calls[0][0].length);
     const fullFrames = framesToActive();
     expect(fullFrames * 0.05).toBeGreaterThanOrEqual(STORY_ARRIVAL_SECONDS - 0.05);
 
@@ -136,6 +137,7 @@ describe('a retried free-play run', () => {
     requestQuickStart();
     act(() => useGameStore.setState(s => ({ wormRunId: (s.wormRunId ?? 0) + 1 })));
     expect(useGameStore.getState().wormGamePhase).toBe('active'); // staged, waiting on its card
+    expect(useGameStore.getState().wormTurnsLeft).toBeNull(); // Story has its own objectives
     tick(5);
     expect(useGameStore.getState().wormStoryStarted).toBe(false); // not before the board is ready
     act(() => useGameStore.setState({ wormStoryReady: true }));

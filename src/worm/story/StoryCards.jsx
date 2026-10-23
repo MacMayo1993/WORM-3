@@ -284,6 +284,9 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
   const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
   const [reducedMotion] = useState(prefersReducedMotion);
   const [ready, setReady] = useState(reducedMotion);
+  // A tap during the reveal finishes it: stars, counts and buttons at once.
+  const [skipped, setSkipped] = useState(false);
+  const revealTimers = useRef([]);
   const [leaving, setLeaving] = useState(false);
   const ref = useRef(null), exitTimer = useRef(null), navigating = useRef(false);
   const last = level.id === WORM_STORY_LEVELS.at(-1).id, finale = isChapterFinale(level.id);
@@ -303,8 +306,15 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
       timers.push(setTimeout(() => feel('storyStar', { combo: i }), STAR_FIRST_MS + i * STAR_STEP_MS));
     }
     timers.push(setTimeout(() => setReady(true), readyAt));
+    revealTimers.current = timers;
     return () => timers.forEach(clearTimeout);
   }, [reducedMotion, stars, readyAt]);
+  const skipReveal = () => {
+    if (ready) return;
+    revealTimers.current.forEach(clearTimeout);
+    setSkipped(true);
+    setReady(true);
+  };
 
   useEffect(() => {
     const prior = document.activeElement;
@@ -336,7 +346,8 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     else exitTimer.current = setTimeout(action, 180);
   };
 
-  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || hasUnlocks}
+  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-skipped={skipped || undefined} data-leaving={leaving}
+    onPointerDown={skipReveal} data-rewards={!!level.reward || hasUnlocks}
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
@@ -359,7 +370,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
           </div>)}
         </div>
         <p className="story-completion-verdict" role="status">{ready ? `${stars} ${stars === 1 ? 'star' : 'stars'} earned` : '\u00a0'}</p>
-        <StoryRewardBurst points={result.points ?? 0} xp={result.xp ?? 0} start={STAR_FIRST_MS + stars * STAR_STEP_MS} still={reducedMotion} />
+        <StoryRewardBurst points={result.points ?? 0} xp={result.xp ?? 0} start={STAR_FIRST_MS + stars * STAR_STEP_MS} still={reducedMotion || skipped} />
         <StoryRecords result={result} level={level} stars={stars} />
       </div>
       {/* What the clear opened is the headline, not a fold: it reveals as the card settles. */}

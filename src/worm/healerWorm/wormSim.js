@@ -381,6 +381,7 @@ export function makeWormSim(size) {
         // The head dived while part of the body was still riding another tunnel:
         // the worm passes itself in the Core. Credited once it is safely crawling.
         selfPassPending: false,
+        assistedJump: false,      // this jump answered a rescue prompt: not a skill moment
         healFired: false,
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
@@ -537,6 +538,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
     sim.selfPassPending = false;
+    sim.assistedJump = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
@@ -575,6 +577,7 @@ export const jumpLiftOf = (sim) => sim.isJumping && !sim.padFlight
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (sim.signature.sweep || sim.padFlight) return;
     if (sim.phase !== 'crawling') return;
+    sim.assistedJump = false; // a rescue sets it after this call (skillMoments.js)
     sim.springBouncePending = false; // manual input owns the follow-up, including platform flights
     // A jump press while the Spring is coiling lets it go now. If the landing is no longer
     // clear the coil is spent and this becomes the ordinary hop it would have been (a jump
@@ -868,7 +871,7 @@ function tickCautionRescue(sim, delta, size, ctx) {
     const input = sim.jumpRescueRequested;
     if (input) {
         clearJumpRescue(sim, ctx);
-        if (input === 'jump') startJump(sim, ctx, size);
+        if (input === 'jump') { startJump(sim, ctx, size); sim.assistedJump = true; }
         else {
             sim.moveDir = turnWorm(sim.moveDir, input);
             sim.lastTurnDir = input;
@@ -907,6 +910,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
             clearJumpRescue(sim, ctx);
             // A rescue always hops; a changed sticker must not turn this into a dive.
             startJump(sim, ctx, size, { allowDive: false });
+            sim.assistedJump = true;
             // The prompt fires at the step's beginning. Carry the assisted hop
             // beyond that occupied tile so it cannot land back on the same body.
             sim.jumpSpan = Math.max(sim.jumpSpan, 1.25);
@@ -1891,6 +1895,7 @@ const PHASE_HANDLERS = {
             if (sim.selfPassPending) {
                 sim.selfPassPending = false;
                 ctx.onStoryMechanic?.('selfPasses');
+                ctx.onSkill?.('pass');
             }
             sim.onFlippedTile = false;
             sim.lastFlipped = false;
@@ -2956,6 +2961,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             }
             sim.healBeatSeq += 1;
             sim.healBeatTier = tier;
+            if (doubled) ctx.onSkill?.('double');
             ctx.feel('seal', { combo: sim.healed - 1, tier });
         } else if (rideExhausted(sim, passage.tunnelKey) && !sim.voidTunnelKeys.has(passage.tunnelKey)) {
             // That was its last ride: the tunnel collapses behind the worm, and both

@@ -1,5 +1,5 @@
 import AntipodalCameraPanel from './components/overlays/AntipodalCameraPanel.jsx';
-import { storyLevel, storyUnlocked, storyLaunchSettings } from './worm/story/levels.js';
+import { storyLevel, storyUnlocked, storyLaunchSettings, storyStars } from './worm/story/levels.js';
 import { storyLaunchLines } from './worm/story/narrative.js';
 import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
@@ -931,7 +931,8 @@ export default function WORM3() {
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
-    launchWithMobi(chapterLevel ? storyLaunchLines(chapterLevel) : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
+    const replay = !!chapterLevel && storyStars(useGameStore.getState().playerProgress, chapterLevel.id) > 0;
+    launchWithMobi(chapterLevel ? storyLaunchLines(chapterLevel, { replay }) : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
       vibrate([50, 30, 100]);
       cancelDisparityRun();
       useGameStore.getState().clearLevel();

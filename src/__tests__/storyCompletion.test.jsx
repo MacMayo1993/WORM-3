@@ -116,3 +116,19 @@ it.each([null, 1])('shows the recorded best chain on the successful HUD route (s
   expect(result.textContent).toContain('Best orb chain');
   expect(result.textContent).toContain('×2');
 });
+
+it('finishes the reveal at a tap: buttons, stars and the payout at once, and no more stings', () => {
+  useGameStore.setState({ wormStoryResult: { levelId: 1, stars: 3, points: 40, xp: 60 } });
+  act(() => root.render(<StoryResult onNext={vi.fn()} />));
+  const dialog = host.querySelector('[role="dialog"]');
+  const button = host.querySelector('.worm-story-primary');
+  advance(200);
+  expect(button.disabled).toBe(true);
+  vi.mocked(feel).mockClear();
+  act(() => dialog.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(dialog.dataset.skipped).toBe('true');
+  expect(button.disabled).toBe(false);
+  expect(host.querySelector('.story-reward-points').textContent).toContain('+40');
+  advance(3000);
+  expect(vi.mocked(feel).mock.calls.filter(([name]) => name === 'storyStar')).toHaveLength(0);
+});
