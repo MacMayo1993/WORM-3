@@ -266,6 +266,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipPads: effectiveFlipPads(s),
       faceTextures: s.faceTextures,
       wormHealerMode: s.wormHealerMode ?? false,
+      wormRunId: !presentation && s.wormHealerMode ? s.wormRunId : 0,
       wormViewPower: s.wormViewPower,
       perfReducedFX: s.perfReducedFX ?? false,
     }))
@@ -600,8 +601,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // other mode the physical-identity key forces a remount, so stickerGridId never
   // changes under a mounted component and this effect is inert after mount.
   const prevGridIdRef = useRef(stickerGridId);
+  const prevRunIdRef = useRef(gameConfig.wormRunId);
   useLayoutEffect(() => {
-    if (prevGridIdRef.current === stickerGridId) return; // mount, or no identity change
+    if (prevGridIdRef.current === stickerGridId && prevRunIdRef.current === gameConfig.wormRunId) return;
+    // A retry also reuses these slots. Reset before paint, even if the same
+    // physical tile returns: restoring the board is not a healing animation.
     // The outgoing piece's in-flight flip motion is cut short here, so drop what it
     // published (as an unmount would): tunnels must not keep shaking its anchor.
     if (prevGridIdRef.current) {
@@ -609,17 +613,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       stickerFlipMotion.delete(prevGridIdRef.current);
     }
     prevGridIdRef.current = stickerGridId;
+    prevRunIdRef.current = gameConfig.wormRunId;
     prevCurr.current = meta?.curr ?? 0;
     displayedFaceRef.current = meta?.curr ?? 0;
     prevFlips.current = meta?.flips ?? 0;
     isFlipping.current = false;
     setKeepFlipMeshMounted(false);
-    portalClosingRef.current = false;
+    // Stopping the flip skips its midpoint cleanup. Re-render before paint so
+    // JSX computed with the outgoing closing-portal ref is retired as well.
+    endPortalClosing();
     spinT.current = 0;
     shakeT.current = 0;
     shockT.current = 1;
     glowT.current = 1;
     flashT.current = 1;
+    flipShockwaveRef.current?.setProgress(1);
+    glowFillRef.current?.setProgress(1);
+    flipFlashRef.current?.setProgress(1);
     hitstopT.current = 0;
     healTRef.current = -1;
     ringFlashRef.current = 0;
@@ -643,9 +653,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     tombRiseT.current = -1;
     if (tombRef.current) tombRef.current.scale.set(1, 1, 1);
     setDeathAnimDone(isDead);
-    if (groupRef.current) groupRef.current.scale.set(1, 1, 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only on identity change
-  }, [stickerGridId]);
+    if (groupRef.current) {
+      groupRef.current.scale.set(1, 1, 1);
+      groupRef.current.position.set(...pos);
+      groupRef.current.rotation.set(...rot);
+    }
+    activateSticker(stickerGridId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot the incoming tile only on identity/run changes
+  }, [stickerGridId, gameConfig.wormRunId]);
 
   useEffect(() => {
     const curr = meta?.curr ?? 0;
@@ -1451,6 +1466,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const nextCurr = meta?.curr ?? 0;
   const nextFlips = meta?.flips ?? 0;
   const hasPendingFlipAnimation = stickerGridId === prevGridIdRef.current
+    && gameConfig.wormRunId === prevRunIdRef.current
     && nextFlips !== prevFlips.current
     && nextCurr !== prevCurr.current
     && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
@@ -1563,7 +1579,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon, gameConfig.wormRunId]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   // The tile border, batched from the tile's own group like the faces above.
   const showBorder = wormHealerMode && !isDead && !isSudokube;
