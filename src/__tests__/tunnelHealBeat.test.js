@@ -26,6 +26,7 @@ function makeCtx() {
     onFlippedTile: log('flipped'), applyDeposit: log('deposit'), onOrbPickup: log('pickup'), onPowerupsChanged: log('powerups'),
     applyHeal: log('heal'), onSpecialsChanged: log('specials'), onRocketState: log('rocketState'), onMagnetState: log('magnetState'),
     onSpecialSpawned: log('specialSpawned'), onSpecialExpired: log('specialExpired'), onStoryMechanic: log('mechanic'),
+    onSkill: log('skill'),
   };
 }
 const tunnelA = { entry: { x: 1, y: 2, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 0, z: 0, dirKey: 'NZ' } };
@@ -76,6 +77,8 @@ describe('the tunnel heal beat in the sim', () => {
     expect(sim.healed).toBe(2);
     expect(sim.healBeatSeq).toBe(2);
     expect(seals(ctx)).toEqual([{ combo: 0, tier: 2 }, { combo: 1, tier: 1 }]);
+    // The double heal is called out; the single one after it is not.
+    expect(ctx.events.filter(e => e.type === 'skill').map(e => e.args[0])).toEqual(['double']);
   });
 
   it('never cuts short a ring heal\'s longer pause or its camera focus', () => {

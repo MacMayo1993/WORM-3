@@ -45,9 +45,13 @@ import FusionSigilIcon from './FusionSigilIcon.jsx';
 import { wormClock } from './wormClock.js';
 import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
-import { isMobile } from '../utils/device.js';
+import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import NewBestTag from './NewBestTag.jsx';
+import FreePlayProgress from './FreePlayProgress.jsx';
+import SkillCallout from './SkillCallout.jsx';
+import ChallengeToast from './ChallengeToast.jsx';
+import { useCountUp } from './useCountUp.js';
 import { useRunBestsBeaten, useNewBestChime } from './runBests.js';
 import WormCameraZoomControl from './WormCameraZoomControl.jsx';
 import {
@@ -599,6 +603,13 @@ function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityP
     const beaten = useRunBestsBeaten();
     useNewBestChime(beaten, 900);
     const ppEarned = wormBodyTiles * 10;
+    // The whole board healed is the run's finale: a fanfare and a payout that climbs.
+    const [still] = useState(() => !!useGameStore.getState().settings?.reducedMotion || prefersReducedMotion());
+    const shownPP = useCountUp(ppEarned, still);
+    useEffect(() => {
+        const timer = setTimeout(() => feel('storyComplete'), 150);
+        return () => clearTimeout(timer);
+    }, []);
     const displayCount = Math.min(wormBodyTiles, MAX_WORM_DISPLAY);
     const overflow = wormBodyTiles > MAX_WORM_DISPLAY ? wormBodyTiles - MAX_WORM_DISPLAY : 0;
 
@@ -639,7 +650,7 @@ function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityP
                     <span style={PODIUM_LABEL_STYLE}>Final length: {wormLengthTiles} tiles</span>
                 </div>
             </div>
-            <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
+            <div style={WINNER_PP_STYLE} aria-label={`${ppEarned} Parity Points earned`}>+{shownPP} Parity Points</div>
             <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} {wormBodyTiles === 1 ? 'orb' : 'orbs'} × 5 PP × 2 win bonus</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
@@ -1392,6 +1403,7 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
         <SpecialNotice suppressed={healing || hasBuff || !surface} />
         <MobiLineNotice />
         <FusionDiscoveryNotice />
+        {!demo && <ChallengeToast />}
     </div>;
 }
 
@@ -1565,11 +1577,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
+            {wormAlive && <SkillCallout />}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
                 {/* Hangs just under the dock (absolute), so showing it never moves the bar. */}
                 {wormAlive && phase === 'crawling' && <ComboMeter />}
+                {phase === 'crawling' && <FreePlayProgress />}
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'rotation'].includes(lesson.id)) && (

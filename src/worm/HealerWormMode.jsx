@@ -510,6 +510,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
             inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size, story) : []) : invertWormScramble(seq);
+            // Free play's live progress: the turns still to come before the final heal.
+            useGameStore.setState({ wormTurnsLeft: story || practice ? null : inverseQueueRef.current.length });
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -1025,6 +1027,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const { axis, dir, sliceIndex, sliceIndices, sliceDirs } = pendingRotRef.current;
             const dispatched = inverseQueueRef.current.shift();
             if (story?.rotateEvery) inverseQueueRef.current.push(dispatched); // repeat until the objective clears
+            else if (!story) useGameStore.setState({ wormTurnsLeft: inverseQueueRef.current.length });
 
             // Hit detection — the worm can be caught by EITHER spinning plane, so both
             // are resolved before anything is applied. Taking the first plane that

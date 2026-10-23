@@ -147,3 +147,9 @@ describe('every level can be supplied', () => {
     expect(level.par).toBeLessThan(level.limit);
   });
 });
+
+it('gives a replay of a cleared level the mission card alone', () => {
+  const level = WORM_STORY_LEVELS.find(item => storyNarrative(item.id)?.briefing?.length);
+  expect(storyLaunchLines(level).length).toBeGreaterThan(1);
+  expect(storyLaunchLines(level, { replay: true })).toEqual([level.goal]);
+});

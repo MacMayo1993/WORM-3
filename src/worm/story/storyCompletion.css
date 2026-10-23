@@ -120,3 +120,10 @@
   100% { opacity:0; transform:translateY(105vh) rotate(calc(var(--r) + 540deg)) scale(var(--s)); }
 }
 @media (prefers-reduced-motion: reduce) { .story-reward-burst { animation:none; opacity:1; } .story-confetti, .story-coin-flight { display:none; } }
+
+/* A tap during the reveal finishes it (StoryCompletion's skipReveal): the card shows
+   its final state at once, as it does under reduced motion. */
+.story-completion[data-skipped="true"] { animation:none; background-color:#122a361a; }
+.story-completion[data-skipped="true"] :is(.story-completion-card, .story-completion-star svg, .story-completion-extras, .story-completion-records, .story-completion-unlocks, .story-reward-burst) { animation:none !important; opacity:1; }
+.story-completion[data-skipped="true"] :is(.story-completion-wave, .story-completion-sparks, .story-confetti, .story-coin-flight) { display:none; }
+.story-completion[data-skipped="true"] .story-completion-actions { transition:none; }

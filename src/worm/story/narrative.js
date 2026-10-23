@@ -877,5 +877,8 @@ export const WORM_STORY_NARRATIVE = {
 export const storyNarrative = id => WORM_STORY_NARRATIVE[id] ?? null;
 // The briefing as one paragraph, for the map and pause card.
 export const storyBriefingText = id => storyNarrative(id)?.briefing.join(' ') ?? '';
-// Mobi's launch dialogue: the story first, then the literal mission card.
-export const storyLaunchLines = level => [...(storyNarrative(level.id)?.briefing ?? [level.subtitle].filter(Boolean)), level.goal];
+// Mobi's launch dialogue: the story first, then the literal mission card. A level
+// already cleared has heard its story: a replay gets the mission card alone (the
+// story stays in the map and in the clear card's field notes).
+export const storyLaunchLines = (level, { replay = false } = {}) => replay ? [level.goal]
+  : [...(storyNarrative(level.id)?.briefing ?? [level.subtitle].filter(Boolean)), level.goal];

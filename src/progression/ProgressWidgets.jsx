@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { levelProgress, playerRank } from './model.js';
+import { feel } from '../utils/feel.js';
 import './progression.css';
 
 export function XpMeter({ xp, animate = false }) {
@@ -60,6 +61,7 @@ export function AchievementCue() {
     if (!id || hidden || old.id !== id || count <= old.count) return;
     const added = earned.slice(old.count);
     setMessage(added.length > 1 ? `${added.length} feats earned · ${added.at(-1).title}` : added[0].title);
+    feel('storyTask'); // a feat used to land in silence
     const timer = setTimeout(() => setMessage(null), 2200);
     return () => clearTimeout(timer);
   }, [id, earned, hidden]);
@@ -84,6 +86,7 @@ export function LevelUpCue() {
     setShow(null);
     if (gained <= 0 || hidden) return;
     setShow({ level, points: gained * 25 });
+    feel('storyStar', { combo: 2 });
     const timer = setTimeout(() => setShow(null), 1600);
     return () => clearTimeout(timer);
   }, [level, hidden]);

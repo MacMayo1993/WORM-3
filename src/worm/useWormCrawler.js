@@ -42,6 +42,7 @@ import { getManifoldGridId } from '../game/coordinates.js';
 import { queueHealSeal } from './healSeal.js';
 import { comboWindowLeft } from './healerWorm/orbCombo.js';
 import { ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
+import { SKILL_CALLOUTS, makeHopTracker, trackBodyHop } from './healerWorm/skillMoments.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
 import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
 import { flipPadPair } from '../game/flipPad.js';
@@ -205,6 +206,7 @@ export function useWormCrawler(size, cubies) {
     const deathMenuTimer = useRef(null);
     const demoPracticeRef = useRef(null);
     const storyPracticeRef = useRef(null);
+    const skillHopRef = useRef(makeHopTracker());
     const combatRunRef = useRef(null);
     useEffect(() => () => { combatBridge.current = null; }, []);
 
@@ -216,6 +218,8 @@ export function useWormCrawler(size, cubies) {
         const snapshot = getWormTunnelSnapshot(cubies, size, rotationEpoch);
         tunnelLookupRef.current = snapshot.lookup;
         activeTunnelsRef.current = snapshot.tunnels;
+        // The HUD's live progress (pairs still open): written only when it changes.
+        if (useGameStore.getState().wormOpenPairs !== snapshot.tunnels.length) useGameStore.setState({ wormOpenPairs: snapshot.tunnels.length });
     }, [cubies, size, rotationEpoch]);
 
     // ── The ctx port: everything the sim needs from React-land / the store ──────
@@ -250,6 +254,12 @@ export function useWormCrawler(size, cubies) {
                 const m = storyLevel(useGameStore.getState().wormStoryLevel)?.mechanics;
                 const counts = storyPracticeRef.current?.mechanics;
                 return (counts?.ringHeals ?? 0) >= (m?.ringHeals ?? 0) && (counts?.signatures ?? 0) >= (m?.signatures ?? 0);
+            },
+            // A skill moment (skillMoments.js): a callout in the HUD and a bright sting.
+            onSkill: (kind) => {
+                if (!SKILL_CALLOUTS[kind]) return;
+                feedbackRef.current.emit('clutch');
+                useGameStore.setState(state => ({ wormSkillCallout: { kind, seq: (state.wormSkillCallout?.seq ?? 0) + 1 } }));
             },
             onStoryMechanic: (key, id) => {
                 const s = useGameStore.getState(), p = storyPracticeRef.current;
@@ -603,6 +613,8 @@ export function useWormCrawler(size, cubies) {
         const elementalRevealHeld = sim.elementalFocusT > 0;
         sim.orbCascadeBombTiles = hazards.bombTiles ?? [];
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
+        // A jump that carried the head over its own body and landed it alive.
+        if (trackBodyHop(sim, skillHopRef.current, sizeRef.current)) ctxRef.current.onSkill('hop');
         const lengthTiles = segmentsToTiles(sim.tailLength);
         if (useGameStore.getState().wormLengthTiles !== lengthTiles) {
             useGameStore.setState({ wormLengthTiles: lengthTiles });
@@ -795,6 +807,7 @@ export function useWormCrawler(size, cubies) {
         wormExpansion.amount = 0;
         useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
+        skillHopRef.current = makeHopTracker();
         burrowBridge.current = sim.burrows;
         resetWormBuffs();
         resetWormSegments();

@@ -37,7 +37,7 @@ import WormMissionCard from './WormMissionCard.jsx';
 // hit / Impact progress: 0.55" — the two tile values name the same square so
 // they were usually identical, and a 0-to-1 interpolation factor means nothing
 // to anyone who has not read the collision code. One location chip replaces it.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { prefersReducedMotion } from '../utils/device.js';
@@ -49,6 +49,7 @@ import {
 } from './wormOverlayUI.jsx';
 import './deathScreen.css';
 import NewBestTag from './NewBestTag.jsx';
+import { useCountUp } from './useCountUp.js';
 import { useRunBestsBeaten, useNewBestChime } from './runBests.js';
 
 // ─── Death-cause classification ───────────────────────────────────────────────
@@ -140,26 +141,6 @@ function locationFor(kind, deathDetails) {
 }
 
 // ─── Pieces ─────────────────────────────────────────────────────────────────────
-/** Count a number up from zero as the card lands; the final value at once without motion. */
-function useCountUp(target, still, ms = 900) {
-    const animate = !still && target > 0 && typeof requestAnimationFrame === 'function';
-    const [shown, setShown] = useState(animate ? 0 : target);
-    useEffect(() => {
-        if (!animate) { setShown(target); return undefined; }
-        let raf = 0, start = null;
-        const step = (now) => {
-            start ??= now;
-            const t = Math.min(1, (now - start) / ms);
-            setShown(Math.round(target * (1 - (1 - t) ** 3)));
-            if (t < 1) raf = requestAnimationFrame(step);
-        };
-        // Let the card land before the number starts to climb.
-        const delay = setTimeout(() => { raf = requestAnimationFrame(step); }, 350);
-        return () => { clearTimeout(delay); cancelAnimationFrame(raf); };
-    }, [animate, target, ms]);
-    return shown;
-}
-
 const STAT_ICONS = {
     Orbs: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><circle cx="12" cy="12" r="8.5" /><circle cx="9" cy="9" r="2.4" fill="currentColor" stroke="none" /></svg>,
     Time: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l3 2M10 3h4" /></svg>,
