@@ -1,7 +1,8 @@
-import React, { useLayoutEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePickupMaterials } from './usePickupMaterials.js';
+import { resetPickupMaterials } from './pickupMaterials.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
   PICKUP_BURST_SECONDS, PICKUP_MAX_SPARKS, PICKUP_MOTES,
@@ -49,61 +50,16 @@ export default function OrbPickupBurst({ position, normal: surfaceNormal, color 
     }
   }, [materials]);
 
+  // Built once: the frame loop allocates nothing.
+  const parts = useMemo(() => ({ core, coreHalo, rings, sparks, motes }), []);
+  const look = useRef({});
+  look.current.combo = combo; look.current.reducedMotion = reducedMotion; look.current.sparkCount = sparkCount; look.current.base = base;
+
   useFrame((_state, delta) => {
     if (!materials) return;
     if (pickup && useGameStore.getState().wormPaused) return;
     age.current += delta;
-    const t = age.current;
-
-    const c = pickupCore(t);
-    core.current.visible = coreHalo.current.visible = !!c;
-    if (c) {
-      const s = reducedMotion ? c.scale * 0.6 : c.scale;
-      core.current.scale.setScalar(s * 0.55);
-      core.current.material.opacity = c.opacity;
-      coreHalo.current.scale.setScalar(s);
-      coreHalo.current.material.opacity = c.opacity * 0.7;
-    }
-
-    rings.current.forEach((ring, i) => {
-      // Reduced motion keeps one quiet, stationary ring: the cue without the travel.
-      const r = reducedMotion ? (i === 0 ? pickupRing(0, t) : null) : pickupRing(i, t, combo);
-      ring.visible = !!r;
-      if (!r) return;
-      ring.scale.setScalar(reducedMotion ? 0.45 : r.radius);
-      ring.material.opacity = reducedMotion ? r.opacity * 0.5 : r.opacity;
-    });
-
-    if (sparkCount) {
-      for (let i = 0; i < PICKUP_MAX_SPARKS; i++) {
-        const s = i < sparkCount ? pickupSpark(i, t, sparkCount) : null;
-        if (s) {
-          dummy.position.fromArray(s.position);
-          dummy.quaternion.setFromUnitVectors(Y_UP, dir.fromArray(s.direction));
-          const fade = 0.3 + 0.7 * s.opacity;
-          dummy.scale.set(0.035 * fade, s.length * fade, 0.035 * fade);
-          sparks.current.setColorAt(i, s.white ? WHITE : base);
-        } else dummy.scale.setScalar(0);
-        dummy.updateMatrix();
-        sparks.current.setMatrixAt(i, dummy.matrix);
-      }
-      sparks.current.instanceMatrix.needsUpdate = true;
-      if (sparks.current.instanceColor) sparks.current.instanceColor.needsUpdate = true;
-
-      for (let i = 0; i < PICKUP_MOTES; i++) {
-        const m = pickupMote(i, t);
-        dummy.quaternion.identity();
-        if (m) {
-          dummy.position.fromArray(m.position);
-          dummy.scale.setScalar(m.scale);
-        } else dummy.scale.setScalar(0);
-        dummy.updateMatrix();
-        motes.current.setMatrixAt(i, dummy.matrix);
-      }
-      motes.current.instanceMatrix.needsUpdate = true;
-    }
-
-    if (t >= PICKUP_BURST_SECONDS && !done.current) {
+    if (poseBurst(parts, age.current, look.current) && !done.current) {
       done.current = true;
       root.current.visible = false;
       onDone?.();
@@ -113,27 +69,146 @@ export default function OrbPickupBurst({ position, normal: surfaceNormal, color 
   if (!materials) return null;
   return (
     <group ref={root} position={position} quaternion={quaternion}>
-      <mesh ref={core} geometry={CORE} visible={false}>
-        <primitive object={materials.core} attach="material" />
-      </mesh>
-      <mesh ref={coreHalo} geometry={CORE} visible={false}>
-        <primitive object={materials.halo} attach="material" />
-      </mesh>
-      {[materials.ring, materials.ringWhite].map((material, i) => (
-        <mesh key={i} ref={el => { rings.current[i] = el; }} geometry={RING} visible={false}>
-          <primitive object={material} attach="material" />
-        </mesh>
-      ))}
-      {!reducedMotion && (
-        <>
-          <instancedMesh ref={sparks} args={[SHARD, null, PICKUP_MAX_SPARKS]} frustumCulled={false}>
-            <primitive object={materials.sparks} attach="material" />
-          </instancedMesh>
-          <instancedMesh ref={motes} args={[MOTE, null, PICKUP_MOTES]} frustumCulled={false}>
-            <primitive object={materials.motes} attach="material" />
-          </instancedMesh>
-        </>
-      )}
+      <BurstParts materials={materials} reducedMotion={reducedMotion} core={core} coreHalo={coreHalo} rings={rings} sparks={sparks} motes={motes} />
     </group>
   );
 }
+
+// One frame of a burst at time t (seconds since the pickup), from the parts' refs.
+// True once it is over. Allocates nothing.
+function poseBurst(parts, t, { combo, reducedMotion, sparkCount, base }) {
+  const core = parts.core.current, coreHalo = parts.coreHalo.current, rings = parts.rings.current;
+  const sparks = parts.sparks.current, motes = parts.motes.current;
+  const c = pickupCore(t);
+  core.visible = coreHalo.visible = !!c;
+  if (c) {
+    const s = reducedMotion ? c.scale * 0.6 : c.scale;
+    core.scale.setScalar(s * 0.55);
+    core.material.opacity = c.opacity;
+    coreHalo.scale.setScalar(s);
+    coreHalo.material.opacity = c.opacity * 0.7;
+  }
+
+  for (let i = 0; i < rings.length; i++) {
+    const ring = rings[i];
+    // Reduced motion keeps one quiet, stationary ring: the cue without the travel.
+    const r = reducedMotion ? (i === 0 ? pickupRing(0, t) : null) : pickupRing(i, t, combo);
+    ring.visible = !!r;
+    if (!r) continue;
+    ring.scale.setScalar(reducedMotion ? 0.45 : r.radius);
+    ring.material.opacity = reducedMotion ? r.opacity * 0.5 : r.opacity;
+  }
+
+  if (sparkCount && sparks && motes) {
+    for (let i = 0; i < PICKUP_MAX_SPARKS; i++) {
+      const s = i < sparkCount ? pickupSpark(i, t, sparkCount) : null;
+      if (s) {
+        dummy.position.fromArray(s.position);
+        dummy.quaternion.setFromUnitVectors(Y_UP, dir.fromArray(s.direction));
+        const fade = 0.3 + 0.7 * s.opacity;
+        dummy.scale.set(0.035 * fade, s.length * fade, 0.035 * fade);
+        sparks.setColorAt(i, s.white ? WHITE : base);
+      } else dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      sparks.setMatrixAt(i, dummy.matrix);
+    }
+    sparks.instanceMatrix.needsUpdate = true;
+    if (sparks.instanceColor) sparks.instanceColor.needsUpdate = true;
+
+    for (let i = 0; i < PICKUP_MOTES; i++) {
+      const m = pickupMote(i, t);
+      dummy.quaternion.identity();
+      if (m) {
+        dummy.position.fromArray(m.position);
+        dummy.scale.setScalar(m.scale);
+      } else dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      motes.setMatrixAt(i, dummy.matrix);
+    }
+    motes.instanceMatrix.needsUpdate = true;
+  }
+  return t >= PICKUP_BURST_SECONDS;
+}
+
+// Hide every spark and mote instance (they start at identity).
+function hideInstances(...meshes) {
+  dummy.position.set(0, 0, 0); dummy.quaternion.identity(); dummy.scale.setScalar(0); dummy.updateMatrix();
+  for (const mesh of meshes) {
+    if (!mesh) continue;
+    for (let i = 0; i < mesh.count; i++) mesh.setMatrixAt(i, dummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+function BurstParts({ materials, reducedMotion, core, coreHalo, rings, sparks, motes }) {
+  return <>
+    <mesh ref={core} geometry={CORE} visible={false}>
+      <primitive object={materials.core} attach="material" />
+    </mesh>
+    <mesh ref={coreHalo} geometry={CORE} visible={false}>
+      <primitive object={materials.halo} attach="material" />
+    </mesh>
+    {[materials.ring, materials.ringWhite].map((material, i) => (
+      <mesh key={i} ref={el => { rings.current[i] = el; }} geometry={RING} visible={false}>
+        <primitive object={material} attach="material" />
+      </mesh>
+    ))}
+    {!reducedMotion && (
+      <>
+        <instancedMesh ref={sparks} args={[SHARD, null, PICKUP_MAX_SPARKS]} frustumCulled={false}>
+          <primitive object={materials.sparks} attach="material" />
+        </instancedMesh>
+        <instancedMesh ref={motes} args={[MOTE, null, PICKUP_MOTES]} frustumCulled={false}>
+          <primitive object={materials.motes} attach="material" />
+        </instancedMesh>
+      </>
+    )}
+  </>;
+}
+
+/**
+ * A burst that stays mounted and is restarted from a frame loop: OrbFlashSystem
+ * keeps four and hands each pickup to the next (start), so eating an orb costs no
+ * React render and no mount. Holds one material set from the pool for its life.
+ */
+export const PickupBurstSlot = forwardRef(function PickupBurstSlot({ pickup = true, reducedMotion = false }, ref) {
+  const materials = usePickupMaterials('#ffd700');
+  const root = useRef(), core = useRef(), coreHalo = useRef(), rings = useRef([]), sparks = useRef(), motes = useRef();
+  const run = useRef({ active: false, age: 0, combo: 0, sparkCount: 0, reducedMotion, base: new THREE.Color() });
+  const parts = useMemo(() => ({ core, coreHalo, rings, sparks, motes }), []);
+  run.current.reducedMotion = reducedMotion;
+  useImperativeHandle(ref, () => ({
+    /** Play a burst at a world position on a surface; false until the materials are ready. */
+    start(position, surfaceNormal, color, combo = 0) {
+      if (!materials || !root.current) return false;
+      const r = run.current;
+      resetPickupMaterials(materials, color);
+      r.base.set(color);
+      r.combo = combo; r.sparkCount = reducedMotion ? 0 : pickupSparkCount(combo); r.age = 0; r.active = true;
+      root.current.position.fromArray(position);
+      root.current.quaternion.setFromUnitVectors(Z_UP, normal.fromArray(surfaceNormal ?? [0, 0, 1]).normalize());
+      hideInstances(sparks.current, motes.current);
+      root.current.visible = true;
+      return true;
+    },
+    stop() { run.current.active = false; if (root.current) root.current.visible = false; },
+    get active() { return run.current.active; },
+    get age() { return run.current.age; },
+  }), [materials, reducedMotion]);
+
+  useFrame((_state, delta) => {
+    const r = run.current, group = root.current;
+    // Idle slots stay hidden (a Suspense resume unhides instances).
+    if (!r.active || !materials) { if (group?.visible) group.visible = false; return; }
+    if (pickup && useGameStore.getState().wormPaused) return;
+    r.age += delta;
+    if (poseBurst(parts, r.age, r)) { r.active = false; group.visible = false; }
+  });
+
+  if (!materials) return null;
+  return (
+    <group ref={root} visible={false}>
+      <BurstParts materials={materials} reducedMotion={reducedMotion} core={core} coreHalo={coreHalo} rings={rings} sparks={sparks} motes={motes} />
+    </group>
+  );
+});

@@ -72,6 +72,7 @@ export const makeWormSessionDefaults = () => ({
   wormElementalPartner: null,
   // The fusion just made, for the HUD's FUSION banner: { key: 'water>fire', seq }, or null.
   wormFusionNotice: null,
+  wormFusionDiscovery: null,
   wormViewPower: null,
   // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
   wormSpecialNotice: null,
@@ -98,6 +99,7 @@ export const makeWormSessionDefaults = () => ({
   wormCountdownStep: null,
   wormSessionOrbs: 0,
   wormRunBestCombo: 0,
+  wormRunBests: null,
   wormMission: null,
   wormMissionCounters: { orbs: 0, tunnels: 0, healed: 0 },
   wormRunAchievements: [],

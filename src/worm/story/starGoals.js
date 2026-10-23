@@ -26,6 +26,20 @@ export function storyStarGoals(level, metrics = {}) {
   };
 }
 
+/**
+ * What the next star needs, from a clear's own star goals: the clear card's one
+ * line of advice. Null at three stars.
+ */
+export function nextStarHint(level, stars, goals = {}) {
+  if (stars >= 3) return null;
+  if (stars <= 1) return `finish within ${level.par}s or avoid tail cuts`;
+  const missing = [];
+  if (!goals.fast) missing.push(`finish within ${level.par}s`);
+  if (!goals.clean) missing.push('no tail cuts');
+  if (!goals.grown) missing.push(`reach ${segmentsToTiles(storyGrowthTarget(level))} tiles`);
+  return missing.join(', ') || null;
+}
+
 export function storyStarRules(level) {
   const target = storyGrowthTarget(level);
   return [

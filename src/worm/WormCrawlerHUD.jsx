@@ -47,6 +47,8 @@ import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
+import NewBestTag from './NewBestTag.jsx';
+import { useRunBestsBeaten, useNewBestChime } from './runBests.js';
 import WormCameraZoomControl from './WormCameraZoomControl.jsx';
 import {
     overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS, StatTiles,
@@ -594,6 +596,8 @@ const MAX_WORM_DISPLAY = 28;
 
 function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAlive, wormHealedCount, wormColor, formatTime, onRetry, onNewGame }) {
     const bestCombo = useGameStore(s => s.wormRunBestCombo ?? 0);
+    const beaten = useRunBestsBeaten();
+    useNewBestChime(beaten, 900);
     const ppEarned = wormBodyTiles * 10;
     const displayCount = Math.min(wormBodyTiles, MAX_WORM_DISPLAY);
     const overflow = wormBodyTiles > MAX_WORM_DISPLAY ? wormBodyTiles - MAX_WORM_DISPLAY : 0;
@@ -639,13 +643,14 @@ function WinnerScreen({ wormLengthTiles, wormBodyTiles, wormSessionOrbs, parityP
             <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} {wormBodyTiles === 1 ? 'orb' : 'orbs'} × 5 PP × 2 win bonus</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
-                    ['Time', formatTime(wormTimeAlive)],
-                    ['Collected', wormSessionOrbs],
-                    ['Healed', wormHealedCount],
-                    ...(bestCombo >= 2 ? [['Best orb chain', `×${bestCombo}`]] : []),
-                    ['Total PP', parityPoints],
-                ].map(([label, value]) => (
-                    <div key={label} style={WINNER_STAT_BOX_STYLE}>
+                    ['Time', formatTime(wormTimeAlive), 'time'],
+                    ['Collected', wormSessionOrbs, 'orbs'],
+                    ['Healed', wormHealedCount, 'heals'],
+                    ...(bestCombo >= 2 ? [['Best orb chain', `×${bestCombo}`, 'chain']] : []),
+                    ['Total PP', parityPoints, null],
+                ].map(([label, value, metric]) => (
+                    <div key={label} style={{ ...WINNER_STAT_BOX_STYLE, position: 'relative' }}>
+                        {metric && beaten.includes(metric) && <NewBestTag />}
                         <div style={WINNER_STAT_LABEL_STYLE}>{label}</div>
                         <div style={WINNER_STAT_VALUE_STYLE}>{value}</div>
                     </div>
@@ -981,15 +986,59 @@ function BuffStrip({ detailed = false, onInspect }) {
 }
 
 // Kept in Pause so recipe discovery does not expand the live checklist.
+const RECIPES = Object.values(ORDERED_FUSIONS);
+const foundRecipe = (milestones, id) => !!milestones?.[`first:fusion:${id}`];
+
 export function FusionGuide() {
+    // Every recipe stays readable (the guide teaches the rules); the ones this
+    // player has made carry a mark, and the summary counts them.
+    const milestones = useGameStore(s => s.playerProgress.milestones);
+    const found = RECIPES.filter(recipe => foundRecipe(milestones, recipe.id)).length;
     return <details className="worm-fusion-guide">
-        <summary>Elemental recipes · pickup order matters</summary>
+        <summary>Elemental recipes · {found}/{RECIPES.length} found · pickup order matters</summary>
         <p>Collect a second element before the timer ends. Both last 10 seconds from that pickup. Collecting the older element reverses the recipe; repeating the newest only refreshes it.</p>
-        <ul>{Object.values(ORDERED_FUSIONS).map(recipe => <li key={recipe.id}>
-            <strong><FusionSigilIcon recipe={recipe.id} size={18} className="worm-fusion-guide-sigil" /> {fusionRecipeLabel(recipe)}</strong>
+        <ul>{RECIPES.map(recipe => <li key={recipe.id} data-found={foundRecipe(milestones, recipe.id) || undefined}>
+            <strong><FusionSigilIcon recipe={recipe.id} size={18} className="worm-fusion-guide-sigil" /> {fusionRecipeLabel(recipe)}
+                {foundRecipe(milestones, recipe.id) && <em className="worm-fusion-found"> ✓ found</em>}</strong>
             <span>{recipe.description}</span>
         </li>)}</ul>
     </details>;
+}
+
+// ─── New recipe ──────────────────────────────────────────────────────────────
+// The first time a player makes a recipe (discoverWormFusion): its sigil, name and
+// rule, and how many of the set they have found. The notice is taken out of the
+// store as it shows, so a tunnel ride or a remount never replays it.
+const DISCOVERY_MS = 3600;
+
+export function FusionDiscoveryNotice() {
+    const discovery = useGameStore(s => s.wormFusionDiscovery);
+    const milestones = useGameStore(s => s.playerProgress.milestones);
+    const [shown, setShown] = useState(null);
+    useEffect(() => {
+        if (!discovery) return undefined;
+        setShown(discovery);
+        useGameStore.setState({ wormFusionDiscovery: null });
+        return undefined;
+    }, [discovery]);
+    useEffect(() => {
+        if (!shown) return undefined;
+        const timer = setTimeout(() => setShown(null), DISCOVERY_MS);
+        return () => clearTimeout(timer);
+    }, [shown]);
+    const recipe = shown && RECIPES.find(item => item.id === shown.id);
+    if (!recipe) return null;
+    const found = RECIPES.filter(item => foundRecipe(milestones, item.id)).length;
+    return (
+        <div key={shown.seq} className="worm-fusion-discovery" role="status" aria-live="polite">
+            <FusionSigilIcon recipe={recipe.id} size={30} className="worm-fusion-discovery-sigil" />
+            <div>
+                <small>New recipe · {found}/{RECIPES.length}</small>
+                <strong>{fusionRecipeLabel(recipe)}</strong>
+                <span>{recipe.rule ?? recipe.description}</span>
+            </div>
+        </div>
+    );
 }
 
 // ─── Special spawn / expiry notice ───────────────────────────────────────────
@@ -1342,6 +1391,7 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
         {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
         <SpecialNotice suppressed={healing || hasBuff || !surface} />
         <MobiLineNotice />
+        <FusionDiscoveryNotice />
     </div>;
 }
 

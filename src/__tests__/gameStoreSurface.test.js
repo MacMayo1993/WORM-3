@@ -21,7 +21,7 @@ const EXPECTED_KEYS = [
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',
   'xpActivityRuns', 'beginAchievementActivity',
   'playerProgress', 'xpRun', 'xpNotice', 'showPlayerProgress', 'setShowPlayerProgress',
-  'beginPuzzleXp', 'markXpAssisted', 'completePuzzleXp', 'recordWormXp', 'finishWormXp',
+  'beginPuzzleXp', 'markXpAssisted', 'completePuzzleXp', 'recordWormXp', 'recordWormRunBests', 'discoverWormFusion', 'finishWormXp',
   'beginChaosXp', 'finishChaosXp', 'recordLessonXp', 'recordDiscoveryXp', 'claimLevelReward',
   'wormMission', 'wormMissionsCompleted', 'recordWormMission', 'wormMissionCounters', 'wormRunAchievements',
   'chestWallet', 'chestRolling', 'rollCubieChest', 'finishChestRoll', 'chooseChestReward', 'exchangeChestGems', 'claimChestGems',
@@ -106,7 +106,7 @@ const EXPECTED_KEYS = [
   'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive', 'wormRescueKind',
   'wormOrbShowerActive', 'wormMagnetActive', 'wormMagnetSeq', 'wormOnFlippedTile', 'wormOrbCount',
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
-  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs', 'wormRunBestCombo',
+  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs', 'wormRunBestCombo', 'wormRunBests', 'wormFusionDiscovery',
   'wormShowTrail', 'wormSkin', 'wormSpecialNotice', 'wormSpecials',
   // Collapsed tunnels' pits (tunnelPits.js) and Mobi's in-play first-time lines.
   'wormPitGrids', 'wormMobiLine',

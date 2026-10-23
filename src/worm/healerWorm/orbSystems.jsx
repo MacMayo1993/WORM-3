@@ -18,7 +18,7 @@ import { isViewPower } from './viewPowerups.js';
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs from '../ParityOrb.jsx';
-import OrbPickupBurst from './OrbPickupBurst.jsx';
+import OrbPickupBurst, { PickupBurstSlot } from './OrbPickupBurst.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 import ViewPickupCube from './ViewPickupCube.jsx';
 import SpringPickup from './SpringPickup.jsx';
@@ -513,45 +513,38 @@ export function SpecialFlashSystem({ worm }) {
 }
 
 // Every worm gets a color burst at its rendered head, including during rocket flight.
-// Follows the same pendingRef + useFrame polling pattern as HealBurstSystem.
+// Four bursts stay mounted and the frame loop restarts the next one on each pickup
+// (PickupBurstSlot), so eating an orb costs no React render: this used to set state
+// from inside useFrame and mount a burst per pickup, on every link of a chain.
+const ORB_FLASH_SLOTS = 4;
+const _flashHead = new THREE.Vector3();
+const _flashPos = [0, 0, 0];
+const _flashNormal = [0, 0, 0];
+
 export function OrbFlashSystem({ worm }) {
-    const [flashes, setFlashes] = useState([]);
-    const seq = useRef(0);
+    const slots = useRef([]);
+    const next = useRef(0);
     const reduced = useRef(prefersReducedMotion());
 
     useFrame(() => {
-        if (!useGameStore.getState().wormAlive) {
+        const store = useGameStore.getState();
+        if (!store.wormAlive) {
             worm.pendingOrbFlashRef.current = null;
-            if (flashes.length) setFlashes([]);
+            for (const slot of slots.current) slot?.stop();
             return;
         }
-        if (useGameStore.getState().wormPaused || !worm.pendingOrbFlashRef.current) return;
-        const { color, pos: fallback, combo = 0 } = worm.pendingOrbFlashRef.current;
+        const pending = worm.pendingOrbFlashRef.current;
+        if (store.wormPaused || !pending) return;
         worm.pendingOrbFlashRef.current = null;
-        const pos = wormSegments.count
-            ? Array.from(wormSegments.positions.subarray(0, 3)) : fallback;
-        const id = ++seq.current;
-        // Magnet sweeps coalesce per frame; bound overlapping bursts as well.
+        const pos = wormSegments.count ? _flashHead.fromArray(wormSegments.positions, 0).toArray(_flashPos) : pending.pos;
         // Laid out on the face the head is on, so the rings run along the tile.
-        const normal = worm.currentNormal.current.toArray();
-        setFlashes(prev => [...prev.slice(-3), { id, pos, color, combo, normal }]);
+        const normal = worm.currentNormal.current.toArray(_flashNormal);
+        // Magnet sweeps coalesce per frame; the oldest burst gives way to the newest.
+        const slot = slots.current[next.current];
+        next.current = (next.current + 1) % ORB_FLASH_SLOTS;
+        slot?.start(pos, normal, pending.color, pending.combo ?? 0);
     });
 
-    if (flashes.length === 0) return null;
-    return (
-        <>
-            {flashes.map(f => (
-                <OrbPickupBurst
-                    key={f.id}
-                    position={f.pos}
-                    normal={f.normal}
-                    color={f.color}
-                    combo={f.combo}
-                    pickup
-                    reducedMotion={reduced.current}
-                    onDone={() => setFlashes(prev => prev.filter(x => x.id !== f.id))}
-                />
-            ))}
-        </>
-    );
+    return <>{Array.from({ length: ORB_FLASH_SLOTS }, (_, i) =>
+        <PickupBurstSlot key={i} ref={el => { slots.current[i] = el; }} pickup reducedMotion={reduced.current} />)}</>;
 }

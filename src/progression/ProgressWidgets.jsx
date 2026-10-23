@@ -72,7 +72,9 @@ export function LevelUpCue() {
     // the recap, including the interval before showDisparityWinner turns on.
     hidden: s.demoMode || s.showMainMenu || s.showPlayerProgress || !!s.victory
       || s.showDisparityWinner || !!s.disparityWinner || s.chaosLevel > 0
-      || s.xpRun?.mode === 'chaos',
+      || s.xpRun?.mode === 'chaos'
+      // A Story clear's card covers the screen and announces its own level-up.
+      || !!s.wormStoryResult,
   })));
   const previous = useRef(level);
   const [show, setShow] = useState(null);

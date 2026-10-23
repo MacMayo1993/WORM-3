@@ -1,5 +1,6 @@
 import { characterXpMultiplier } from '../characterAbilities.js';
-import { addXp } from '../../progression/model.js';
+import { addXp, levelProgress } from '../../progression/model.js';
+import { recordStoryTime } from '../../progression/wormBests.js';
 import { storyLevel, storyStars, storyUnlocked, storyOutcome } from './levels.js';
 import { grantCharacterUnlocks } from '../wormUnlocks.js';
 import { modesUnlockedBetween } from '../../progression/modeUnlocks.js';
@@ -15,7 +16,9 @@ export function completeStoryChanges(state, runId, metrics) {
   const improved = Math.max(0, result.stars - Math.max(1, old));
   const points = (old ? 0 : level.points || 0) + improved * 10;
   const xp = Math.round(((old ? 0 : 50) + improved * 10) * characterXpMultiplier(state.wormCharacter));
-  const progress = { ...state.playerProgress, wormStory: {
+  // The level's fastest clear (progression/wormBests.js), for the card's "new best time".
+  const time = recordStoryTime(state.playerProgress.bests, level.id, result.seconds);
+  const progress = { ...state.playerProgress, bests: time.bests, wormStory: {
     ...state.playerProgress.wormStory,
     stars: { ...state.playerProgress.wormStory?.stars, [level.id]: Math.max(old, result.stars) },
   } };
@@ -28,6 +31,9 @@ export function completeStoryChanges(state, runId, metrics) {
   return {
     playerProgress: grant.progress, parityPoints: state.parityPoints + points + grant.points, ownedItems,
     wormStoryResult: { ...result, levelId: level.id, xp, points: points + grant.points, first: !old,
+      previousStars: old, previousTime: time.previous, newBestTime: time.improved,
+      // Shown on the card itself: a level-up toast would sit under it.
+      ...(grant.points ? { levelUp: { level: levelProgress(grant.progress.xp).level, points: grant.points } } : {}),
       ...(unlocked ? { unlockedCharacter: unlocked.slice('character_'.length) } : {}),
       ...(unlockedModes.length ? { unlockedModes } : {}) },
     wormPaused: true, wormGamePhase: 'solved', wormTimeAlive: result.seconds,

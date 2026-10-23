@@ -19,7 +19,14 @@ export const isMobile =
 // if window.matchMedia is replaced (tests stub it).
 let reducedMotionQuery = null;
 let reducedMotionSource = null;
+// The player's own Settings → Scene → Motion choice, synced by App. It is OR'ed in
+// here so every caller honours it, not only the ones that also read
+// settings.reducedMotion. CSS @media (prefers-reduced-motion) rules still follow
+// the system setting only.
+let reducedMotionSetting = false;
+export const setReducedMotionSetting = on => { reducedMotionSetting = !!on; };
 export const prefersReducedMotion = () => {
+  if (reducedMotionSetting) return true;
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   if (reducedMotionSource !== window.matchMedia) {
     reducedMotionSource = window.matchMedia;

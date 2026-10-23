@@ -184,6 +184,9 @@ it('crosses all three mini-cube tunnel pairs and clears the tail with the sparse
     seek(tunnel.entry, () => state().wormTunnelCount > before);
     until(() => worm.phase.current === 'crawling');
     travelUntil(() => worm.tunnelPassages.current.length === 0); frame();
+    // Let the heal's beat (its hitstop) land before choosing the next pair: Story
+    // opens its next pair only once it has, and choosing earlier raced that refill.
+    until(() => worm.healPauseT.current <= 0); frame();
   }
   travelUntil(() => !!state().wormStoryResult);
   expect(state().wormStoryResult).toMatchObject({ levelId: 12 });

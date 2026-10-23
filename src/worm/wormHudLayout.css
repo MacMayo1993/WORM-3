@@ -376,3 +376,37 @@
 @media (prefers-reduced-motion: reduce) {
   .worm-combo.is-popping, .worm-combo.is-popping[data-milestone=true] { animation: none; }
 }
+
+/* A result number that beat the player's earlier record (NewBestTag): a yellow
+   stamp over the stat box, popping in after the card settles. */
+.worm-new-best {
+  position: absolute; top: -9px; left: 50%; z-index: 1;
+  padding: 1px 6px; border: 2px solid #26372d; border-radius: 6px;
+  background: #ffd500; color: #26372d; box-shadow: 0 2px 0 #26372d;
+  font: 900 9px/1.25 var(--heading-font); font-style: normal; letter-spacing: 0.06em;
+  text-transform: uppercase; white-space: nowrap; pointer-events: none;
+  transform: translateX(-50%) rotate(-4deg);
+  animation: worm-new-best-pop 460ms cubic-bezier(0.2, 1.6, 0.4, 1) 520ms both;
+}
+@keyframes worm-new-best-pop {
+  0% { opacity: 0; transform: translateX(-50%) rotate(-4deg) scale(0.4); }
+  100% { opacity: 1; transform: translateX(-50%) rotate(-4deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .worm-new-best { animation: none; } }
+
+/* NEW RECIPE (FusionDiscoveryNotice): the first time a player makes a recipe. */
+.worm-fusion-discovery {
+  display: flex; align-items: center; gap: 10px; box-sizing: border-box; max-width: 100%;
+  padding: 8px 12px; border: 2px solid #26372d; border-radius: 14px;
+  background: var(--hud-surface, #fff9e9); color: var(--hud-text, #26372d); box-shadow: 0 3px 0 #26372d;
+  font-family: var(--heading-font); pointer-events: none;
+  animation: worm-discovery-in 420ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.worm-fusion-discovery > div { display: grid; min-width: 0; }
+.worm-fusion-discovery small { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #79530b; }
+.worm-fusion-discovery strong { font-size: 15px; font-weight: 900; }
+.worm-fusion-discovery span { overflow: hidden; font-size: 11px; font-weight: 700; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.worm-fusion-discovery-sigil { flex: none; }
+.worm-fusion-found { font-style: normal; font-size: 11px; color: #009b48; }
+@keyframes worm-discovery-in { 0% { opacity: 0; transform: translateY(-6px) scale(0.9); } 100% { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .worm-fusion-discovery { animation: none; } }
