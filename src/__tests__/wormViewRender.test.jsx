@@ -12,6 +12,7 @@ vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 vi.mock('../3d/MergedLedEdges.jsx', () => ({ default: () => null }));
 // No body batch here: each cubie keeps its own body mesh, which these checks read.
 vi.mock('../3d/cubieBodyBatchContext.js', () => ({ useCubieBodyBatches: () => null }));
+vi.mock('../3d/cubieTicks.js', () => ({ useCubieTicks: () => null, anyCubiePops: () => false }));
 import Cubie from '../3d/Cubie.jsx';
 import StickerPlane from '../3d/StickerPlane.jsx';
 import MergedLedEdges from '../3d/MergedLedEdges.jsx';

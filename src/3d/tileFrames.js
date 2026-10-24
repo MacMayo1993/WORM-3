@@ -1,5 +1,7 @@
-import { Object3D } from 'three';
-import { FOOTPRINT_RENDER_ORDER } from './tileFootprint.js';
+import { Object3D, Sphere } from 'three';
+
+// The lit footprint square draws after the tile's own transparent layers.
+export const FOOTPRINT_RENDER_ORDER = 2;
 
 // A WORM tile at rest is drawn entirely by batches (the plain sticker by
 // StickerInstances, a styled one, the antipodal back, the border and the footprint
@@ -26,7 +28,10 @@ export function createTileFrames() {
   front.parent = back.parent = foot.parent = tile;
   foot.visible = false;
   foot.renderOrder = FOOTPRINT_RENDER_ORDER;
-  return { tile, front, back, foot };
+  // Bumped by every writer of the frames (StickerPlane's tick, its layout effects,
+  // poseTileFrames), so a batch can tell a still frame from a moved one without
+  // comparing its transforms (frameWorldVersion).
+  return { tile, front, back, foot, version: 0, sphere: new Sphere(), cullStamp: 0, inView: true };
 }
 
 /** Put the frames where StickerPlane's groups would be for a tile at rest. */
@@ -42,6 +47,41 @@ export function poseTileFrames(frames, pos, rot, angle) {
   back.position.set(0, 0, -0.018);
   back.rotation.set(0, Math.PI, -angle);
   back.scale.set(0.8, 0.8, 1);
+  frames.version++;
+}
+
+// Frame world versions, far above any tracker's own count so the two never meet
+// on an entry that moves between them.
+let frameWorlds = 2 ** 40;
+
+/** Whether `anchor` hangs straight off its resting tile frame (or is that frame). */
+export function isRestingFrameAnchor(frames, anchor) {
+  return !!frames && !!frames.tile.parent && (anchor === frames.tile || anchor.parent === frames.tile);
+}
+
+/**
+ * The world version of a resting anchor for one batch entry. A resting board's
+ * thousands of anchors are almost all still; the batch's tracker would compare each
+ * one's transform every frame to find that out. Here the entry keeps the versions
+ * it last saw, its cubie's (`hostVersion`, from the caller's tracker) and its
+ * frames' own, and recomposes the anchor's world matrix only when one moved.
+ */
+export function frameWorldVersion(entry, frames, anchor, hostVersion) {
+  if (entry.hostVersion !== hostVersion || entry.framesVersion !== frames.version) {
+    const { tile } = frames;
+    tile.updateMatrix();
+    tile.matrixWorld.multiplyMatrices(tile.parent.matrixWorld, tile.matrix);
+    frames.sphere.center.setFromMatrixPosition(tile.matrixWorld);
+    frames.sphere.radius = TILE_CULL_RADIUS * tile.matrixWorld.getMaxScaleOnAxis();
+    if (anchor !== tile) {
+      anchor.updateMatrix();
+      anchor.matrixWorld.multiplyMatrices(tile.matrixWorld, anchor.matrix);
+    }
+    entry.hostVersion = hostVersion;
+    entry.framesVersion = frames.version;
+    entry.frameWorld = ++frameWorlds;
+  }
+  return entry.frameWorld;
 }
 
 // The cubie's content group is the frames' parent, but a child's layout effects
@@ -63,4 +103,20 @@ export function adoptTileFrames(host, node) {
   if (!node) return;
   for (const frame of host.pending) frame.parent = node;
   host.pending.clear();
+}
+
+// Everything a tile draws (sticker, back, border, footprint, a press or a rumble
+// heave) lies within this of its centre, at any scale a cubie takes.
+export const TILE_CULL_RADIUS = 0.8;
+let cullStamps = 0;
+/** A stamp per frustum pass, so tiles test once per pass whatever number of entries they own. */
+export const nextCullStamp = () => ++cullStamps;
+
+/** Whether a resting tile is in view, tested once per pass for all its entries. */
+export function tileInView(frames, frustum, stamp) {
+  if (frames.cullStamp !== stamp) {
+    frames.cullStamp = stamp;
+    frames.inView = frustum.intersectsSphere(frames.sphere);
+  }
+  return frames.inView;
 }

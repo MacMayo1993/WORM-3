@@ -384,6 +384,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   };
   useLayoutEffect(() => {
     applyArtworkAngle(tileDisplayAngle(meta, reduceHomeMotion));
+    frames.version++;
     if (hasHomeAlignment(meta)) activateSticker(stickerGridId);
   }, [meta, stickerGridId, reduceHomeMotion]);
 
@@ -453,7 +454,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // added the InstancedMesh to the scene.
   useLayoutEffect(() => {
     if (!instanceCtx) return;
-    const id = instanceCtx.register(innerGroupRef, instanceColorRef, isInstancedRef);
+    const id = instanceCtx.register(innerGroupRef, instanceColorRef, isInstancedRef, frames);
     instanceIdRef.current = id;
     // Only suppress the per-sticker mesh when a slot was actually allocated.
     // If the pool is exhausted (id === -1) we must fall back to individual rendering.
@@ -566,6 +567,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.set(...pos);
       groupRef.current.rotation.set(...rot);
     }
+    frames.version++;
     activateSticker(stickerGridId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot the incoming tile only on identity/run changes
   }, [stickerGridId, gameConfig.wormRunId]);
@@ -728,6 +730,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [biomeEnabled]);
 
   tickImplRef.current = (state, delta) => {
+    // Whatever this tick writes, a resting tile's batches recompose its frames.
+    frames.version++;
     // Heal sparks run on this tick (HealParticles has no frame callback of its own).
     healParticlesRef.current?.step(delta);
     // Settle before another rigid turn starts. There is never a second rotation
@@ -1460,6 +1464,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     poseTileFrames(frames, pos, rot, tileDisplayAngle(meta, reduceHomeMotion));
     innerShockZ.current = 0;
     applyInnerZ();
+    frames.version++;
     // One tick re-applies any press under the worm onto the frames.
     activateSticker(stickerGridIdRef.current);
     return attachTileFrame(frameHost, frames.tile);
@@ -1468,18 +1473,18 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation, resting]);
   useLayoutEffect(() => frontBatchMaterial ? surfaceCtx.register(innerGroupRef.current, _playStickerGeo, frontBatchMaterial,
-    null, null, styleIdentityRef, 'sticker-front') : undefined, [surfaceCtx, frontBatchMaterial, resting]);
+    null, null, styleIdentityRef, 'sticker-front', frames) : undefined, [surfaceCtx, frontBatchMaterial, resting, frames]);
   // The footprint and heal seal wait hidden on every tile (hiddenMatrices.js).
   useLayoutEffect(() => { if (!decalFootprint) skipMatrixWhileHidden(footprintGroupRef.current); skipMatrixWhileHidden(healSealRef.current); });
   useLayoutEffect(() => backBatched ? surfaceCtx.register(backOrientationRef.current, _sharedStickerGeo, backMaterial,
-    instanceBack ? backColorRef : null, null, instanceBack ? null : styleIdentityRef, 'sticker-antipodal-back') : undefined,
-  [surfaceCtx, backBatched, backMaterial, instanceBack, resting]);
+    instanceBack ? backColorRef : null, null, instanceBack ? null : styleIdentityRef, 'sticker-antipodal-back', frames) : undefined,
+  [surfaceCtx, backBatched, backMaterial, instanceBack, resting, frames]);
   useLayoutEffect(() => borderBatched ? surfaceCtx.register(groupRef.current, isWormhole ? flippedBorderGeometry : borderGeometry,
-    isWormhole ? flippedBorderMaterial : borderMaterial, null, null, null, isWormhole ? 'flipped-tile-border' : 'tile-border') : undefined,
-  [surfaceCtx, borderBatched, isWormhole, resting]);
+    isWormhole ? flippedBorderMaterial : borderMaterial, null, null, null, isWormhole ? 'flipped-tile-border' : 'tile-border', frames) : undefined,
+  [surfaceCtx, borderBatched, isWormhole, resting, frames]);
   // One decal draw for every lit square on the cube; a dead tile is never stood on.
   useLayoutEffect(() => decalFootprint && !isDead ? surfaceCtx.decals.register(frames.foot, footprintGeometry, footprintDecalMaterial,
-    null, null, footprintDataRef, 'tile-footprint') : undefined, [surfaceCtx, decalFootprint, isDead, frames]);
+    null, null, footprintDataRef, 'tile-footprint', frames) : undefined, [surfaceCtx, decalFootprint, isDead, frames]);
 
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
