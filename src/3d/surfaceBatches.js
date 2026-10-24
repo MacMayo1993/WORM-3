@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
-import { setInstanceCount, uploadInstancePrefix } from './instanceUploads.js';
+import { ensureInstanceColor, setInstanceCount, uploadInstancePrefix } from './instanceUploads.js';
 
 // Opaque tile accessories share geometry/material draws but retain their own
 // live anchors. Dense slots also remove hidden tiles from the submitted count.
@@ -34,20 +34,61 @@ function seededGeometry(geometry, capacity, seeded, withData) {
   return view;
 }
 
-export function createSurfaceBatches(capacity = 2048, materialFor = material => material) {
+// `transparent` batches are decals laid flat on tiles that never overlap one another
+// (the worm's footprint): one sorted draw for all of them is the same picture as one
+// per tile. Opaque batches refuse transparent materials, which need their own sorting.
+export function createSurfaceBatches(capacity = 2048, materialFor = material => material, { transparent = false } = {}) {
   const group = new THREE.Group();
-  group.name = 'TileSurfaceBatches';
+  group.name = transparent ? 'TileSurfaceDecals' : 'TileSurfaceBatches';
   const entries = new Set(), batches = new Map();
   const tracker = createWorldTransformTracker();
   const inverse = new THREE.Matrix4(), local = new THREE.Matrix4(), color = new THREE.Color();
   const frustum = new THREE.Frustum(), projection = new THREE.Matrix4();
+  // Built once per entry (and again only if its draw order changes): a key per
+  // tile per frame was thousands of string concatenations on Mega.
+  // An anchor that casts a shadow (a LEGO stud) draws in a batch that does.
+  const keyOf = entry => {
+    const { anchor, geometry, material, colorRef, seedRef, dataRef } = entry;
+    if (entry.keyOrder !== anchor.renderOrder || entry.keyShadow !== anchor.castShadow) {
+      entry.keyOrder = anchor.renderOrder;
+      entry.keyShadow = anchor.castShadow;
+      entry.key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${!!dataRef}:${anchor.renderOrder}:${anchor.castShadow}`;
+    }
+    return entry.key;
+  };
+  const batchOf = entry => {
+    const key = keyOf(entry);
+    let batch = batches.get(key);
+    if (batch) return batch;
+    const { anchor, geometry, material, colorRef, seedRef, dataRef } = entry;
+    const own = seedRef || dataRef;
+    const mesh = new THREE.InstancedMesh(own ? seededGeometry(geometry, capacity, !!seedRef, !!dataRef) : geometry, materialFor(material), capacity);
+    mesh.name = `TileSurfaceBatch:${entry.name || geometry.type}`;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = anchor.renderOrder;
+    mesh.castShadow = anchor.castShadow;
+    mesh.raycast = () => {};
+    // The colour buffer's arrival switches programs: allocate it with the mesh.
+    if (colorRef) ensureInstanceColor(mesh);
+    setInstanceCount(mesh, 0);
+    batch = { mesh, count: 0, owners: [], own: !!own,
+      seeds: seedRef ? mesh.geometry.attributes.aInstanceSeed : null, data: dataRef ? mesh.geometry.attributes.aInstanceData : null };
+    batches.set(key, batch);
+    group.add(mesh);
+    return batch;
+  };
   return {
     group,
-    // `name` labels the batch; the anchor's own name by default.
+    // `name` labels the batch; the anchor's own name by default. The batch's mesh is
+    // made here, not on the entry's first visible frame, so a run's warm-up (which
+    // compiles hidden objects too) links its program: an effect that waits hidden on
+    // every tile, like the footprint, would otherwise link in the frame it first shows.
     register(anchor, geometry, material, colorRef, seedRef = null, dataRef = null, name = anchor.name) {
-      if (material.transparent) throw Error('Transparent tile surfaces retain individual sorting');
+      if (material.transparent && !transparent) throw Error('Transparent tile surfaces retain individual sorting');
       const entry = { anchor, geometry, material, colorRef, seedRef, dataRef, name, data: [NaN, NaN, NaN, NaN] };
       entries.add(entry);
+      batchOf(entry);
       return () => entries.delete(entry);
     },
     update(camera = null) {
@@ -60,8 +101,10 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
       }
       for (const batch of batches.values()) { batch.count = 0; batch.matrixDirty = batch.colorDirty = batch.seedDirty = batch.dataDirty = false; }
       for (const entry of entries) {
-        const { anchor, geometry, material, colorRef, seedRef, dataRef } = entry;
-        if (!anchor.parent) continue;
+        const { anchor, geometry, colorRef, seedRef, dataRef } = entry;
+        // A hidden anchor draws nothing whatever its ancestors are doing: decide that
+        // before any cache lookup (most footprints are hidden on most frames).
+        if (!anchor.parent || !anchor.visible) continue;
         const version = tracker.track(anchor);
         if (version < 0) continue;
         if (camera) {
@@ -73,30 +116,7 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
           }
           if (!frustum.intersectsSphere(entry.sphere)) continue;
         }
-        // Built once per entry (and again only if its draw order changes): a key
-        // per tile per frame was thousands of string concatenations on Mega.
-        // An anchor that casts a shadow (a LEGO stud) draws in a batch that does.
-        if (entry.keyOrder !== anchor.renderOrder || entry.keyShadow !== anchor.castShadow) {
-          entry.keyOrder = anchor.renderOrder;
-          entry.keyShadow = anchor.castShadow;
-          entry.key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${!!dataRef}:${anchor.renderOrder}:${anchor.castShadow}`;
-        }
-        const key = entry.key;
-        let batch = batches.get(key);
-        if (!batch) {
-          const own = seedRef || dataRef;
-          const mesh = new THREE.InstancedMesh(own ? seededGeometry(geometry, capacity, !!seedRef, !!dataRef) : geometry, materialFor(material), capacity);
-          mesh.name = `TileSurfaceBatch:${entry.name || geometry.type}`;
-          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-          mesh.frustumCulled = false;
-          mesh.renderOrder = anchor.renderOrder;
-          mesh.castShadow = anchor.castShadow;
-          mesh.raycast = () => {};
-          batch = { mesh, count: 0, owners: [], own: !!own,
-            seeds: seedRef ? mesh.geometry.attributes.aInstanceSeed : null, data: dataRef ? mesh.geometry.attributes.aInstanceData : null };
-          batches.set(key, batch);
-          group.add(mesh);
-        }
+        const batch = batchOf(entry);
         const slot = batch.count++;
         if (slot >= capacity) throw Error('Tile surface batch capacity exceeded');
         const moved = batch.owners[slot] !== entry;

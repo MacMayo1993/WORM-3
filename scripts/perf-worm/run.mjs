@@ -338,6 +338,52 @@ if (MODE === 'census') {
     ([k]) => `${String(rows[k].objects).padStart(7)} ${String(rows[k].shown).padStart(7)} ${String(rows[k].meshes).padStart(7)} ${String(rows[k].shownMeshes).padStart(7)}  ${k}`)}`);
 }
 
+// A flipped tile mounts its subtree and a cleared (healed) one goes back to rest:
+// counts the objects StickerPlane owns after each step of the events fixture.
+if (MODE === 'restcheck') {
+  await page.evaluate(`(${inpage})()`);
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const setup = fs.readFileSync(path.join(here, 'events.js'), 'utf8').replace(/^(\/\/.*\n)+/, '');
+  await page.evaluate(`(${setup})()`);
+  const count = () => page.evaluate(() => {
+    const W = window.__perf; W.buildOwners();
+    let tiles = 0;
+    W.scene.traverse(o => { if (W.ownerOf(o).includes('StickerPlane')) tiles++; });
+    return tiles;
+  });
+  out.steps = [];
+  for (let cycle = 0; cycle < +(args.cycles || 3); cycle++) {
+    for (const event of ['wormhole', 'clear']) {
+      await page.evaluate(event => window.__perf.effectEvent(event), event);
+      await page.waitForTimeout(250);
+      const soon = await count();
+      await page.waitForTimeout(+(args.settle || 3000));
+      const settled = await count();
+      out.steps.push({ cycle, event, soon, settled });
+      console.log(`cycle ${cycle} ${event.padEnd(8)} StickerPlane objects after 0.25 s: ${soon}, settled: ${settled}`);
+    }
+  }
+  console.log(`page errors: ${errors.length}${errors.length ? '\n' + errors.join('\n') : ''}`);
+}
+
+// One resting tile's subtree, so the per-tile object count can be read part by part.
+if (MODE === 'tiletree') {
+  await page.evaluate(`(${inpage})()`);
+  const dump = await page.evaluate((n) => {
+    const W = window.__perf, roots = [];
+    W.scene.traverse(o => { if (W.ownerOf(o).includes('StickerPlane') && !W.ownerOf(o.parent || {}).includes('StickerPlane')) roots.push(o); });
+    const lines = [`${roots.length} StickerPlane roots`];
+    const walk = (o, d) => {
+      lines.push(`${'  '.repeat(d)}${o.type}${o.name ? ' "' + o.name + '"' : ''}${o.visible ? '' : ' (hidden)'}${o.matrixAutoUpdate ? '' : ' [noAuto]'}  <${W.ownerOf(o)}>`);
+      for (const c of o.children) walk(c, d + 1);
+    };
+    for (const r of roots.slice(0, n)) { lines.push('---'); walk(r.parent, 0); }
+    return lines.join('\n');
+  }, +(args.tiles || 2));
+  console.log(dump);
+}
+
 // Whole-cube look changes mid-run: each view power re-renders every sticker and
 // may meet programs the run never drew. The worst frame of each swap and back.
 if (MODE === 'swaps') {

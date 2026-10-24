@@ -12,6 +12,7 @@ import { exteriorPortalWarmupMaterial } from '../../3d/exteriorPortals.js';
 import { createTileBoundaryWarmupMeshes } from '../../3d/tileBoundaryMaterials.js';
 import { stickerWormBodyMaterial, stickerWormGlowMaterial } from '../../3d/stickerWormMaterials.js';
 import { healthBarMaterial } from '../../3d/disparityHealthBarMaterial.js';
+import { healSealMaterial, healParticleMaterial } from '../../3d/healEffectMaterials.js';
 import { rubiksFinish } from '../../3d/rubiksPiece.js';
 import { bodyMaterialProps } from '../../3d/cubeViewStyles.js';
 import { rimFragmentShader, rimVertexShader } from '../../teach/LayerHighlight.jsx';
@@ -106,9 +107,11 @@ export default function WormEffectWarmup({ body }) {
         depthWrite: false, side: THREE.DoubleSide })),
     ];
     // Module-level materials, never disposed here: borders, a flipped tile's ghost
-    // worms and its flip-life bar.
+    // worms and its flip-life bar, and the heal's seal and sparks, which a resting
+    // tile no longer carries hidden (tileFrames.js), so the live scene lacks them.
     const sharedRaised = [...createTileBoundaryWarmupMeshes(), new THREE.Mesh(geometry, stickerWormBodyMaterial),
-      new THREE.Mesh(rgba, stickerWormGlowMaterial), new THREE.Mesh(geometry, healthBarMaterial)];
+      new THREE.Mesh(rgba, stickerWormGlowMaterial), new THREE.Mesh(geometry, healthBarMaterial),
+      new THREE.Mesh(geometry, healSealMaterial), new THREE.InstancedMesh(geometry, healParticleMaterial, 1)];
     const raised = [...ownedRaised, ...sharedRaised];
     const bored = [...shaderMeshes, ...flips, ...raised].map(source => {
       const mesh = source.clone();

@@ -1,5 +1,5 @@
 import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
-import { spiderVertexShader, spiderFragmentShader, neonBorderVertexShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader } from './stickerPortalShaders.js';
+import { spiderVertexShader, spiderFragmentShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader } from './stickerPortalShaders.js';
 import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { burrowSticker } from '../worm/burrowBridge.js';
 import { FlipPadOffset } from './PadSprings.jsx';
@@ -58,6 +58,9 @@ import { ordinaryGeometry as borderGeometry, flippedGeometry as flippedBorderGeo
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
 import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, forgetFlipPortalOpening, FLIP_PORTAL_OPEN_SEED, PORTAL_TOP } from './flipPortal.js';
 import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
+import { footprintGeometry, footprintMaterial, footprintDecalMaterial, FOOTPRINT_Z } from './tileFootprint.js';
+import { healSealMaterial } from './healEffectMaterials.js';
+import { createTileFrames, poseTileFrames, attachTileFrame } from './tileFrames.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -65,8 +68,6 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 // outline and glossy coat (rubiksPiece.js), thin enough to keep every overlay in front.
 const _playStickerGeo = createPlayStickerGeometry();
 const _playFinish = rubiksFinish(isMobile).sticker;
-// Shared footprint plane reaches the grid channel just outside the sticker.
-const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -113,148 +114,35 @@ const _flipWorldN = new THREE.Vector3();
 // Hollow cube mode's frame: the play sticker with a rounded window through it.
 const _hollowStickerGeo = createPlayStickerGeometry(0.85, 0.68);
 
-// ─── Heal seal shader ─────────────────────────────────────────────────────────
-// Plays when the worm heals a wormhole tile.
-// Phase 1 (uHealProgress 0→0.5): golden ring converges rim→center (wound closing).
-// Phase 2 (uHealProgress 0.5→1): the home colour rings back out from the centre.
-const healSealVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const healSealFragmentShader = `
-  uniform vec3  uColor;        // original (healed) face color
-  uniform float uHealProgress; // 0→1
-  uniform float uTime;
-  varying vec2 vUv;
-
-  void main() {
-    vec2 uv = vUv - 0.5;
-    float dist = length(uv);
-    float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
-
-    vec4 col = vec4(0.0);
-
-    if (uHealProgress < 0.5) {
-      // Phase 1: golden convergence ring rushes from rim to center
-      float t = uHealProgress * 2.0;
-      // Quadratic contraction — fast start, slows to a stop at the center
-      float ringR = 0.44 * (1.0 - t * t);
-      float ringWidth = 0.036 + 0.018 * (1.0 - t);
-      float ring = 1.0 - smoothstep(0.0, ringWidth, abs(dist - ringR));
-      // Color sweeps gold → pure white as the ring closes
-      vec3 goldColor = vec3(1.0, 0.87, 0.20);
-      vec3 ringCol = mix(goldColor, vec3(1.0, 1.0, 1.0), t * 0.70);
-      float ringAlpha = ring * inDisc * (0.80 + 0.20 * t);
-      // Soft trailing wake just behind the ring (slightly wider, dimmer)
-      float wake = 1.0 - smoothstep(0.0, 0.04, abs(dist - (ringR + 0.07)));
-      float wakeAlpha = wake * inDisc * 0.25 * (1.0 - t);
-      col = vec4(ringCol * 1.8, max(ringAlpha, wakeAlpha));
-    } else {
-      // Phase 2: the tile's home colour rings out from the centre. Two thin rings and
-      // a small glint, never a disc: a heal is a flip home, and a flip never washes
-      // the tile (the sticker itself has already turned back to its home colour).
-      float t = (uHealProgress - 0.5) * 2.0;
-      float e = 1.0 - (1.0 - t) * (1.0 - t);
-      float r1 = 0.04 + e * 0.42;
-      float r2 = 0.04 + max(0.0, e - 0.25) / 0.75 * 0.34;
-      float ring1 = 1.0 - smoothstep(0.0, 0.03, abs(dist - r1));
-      float ring2 = (1.0 - smoothstep(0.0, 0.02, abs(dist - r2))) * step(0.25, e);
-      float fade = 1.0 - t;
-      float glint = (1.0 - smoothstep(0.0, 0.1, dist)) * fade * fade;
-      float ringAlpha = (ring1 * 0.95 + ring2 * 0.6) * fade * inDisc;
-      vec3 ringCol = mix(uColor, vec3(1.0), 0.25) * 1.6;
-      col = vec4(mix(ringCol, vec3(1.8), glint), max(ringAlpha, glint * 0.9));
-    }
-
-    if (col.a < 0.001) discard;
-    gl_FragColor = col;
-  }
-`;
-
 // Module-level frame counter for tremor sub-sampling.
 // Tremor is a slow organic vibration (~10–40 Hz signal content); computing it at
 // 30 Hz instead of 60 Hz is imperceptible and halves the trig cost per wormhole tile.
 let _tremorFrame = 0;
 
-// ─── Worm footprint shader ────────────────────────────────────────────────────
-// The tile's own grid square, lit up under the worm's weight.
-//
-// Same square-outline vocabulary the neon view mode uses for cubie edges (a bright
-// rail traced right on the perimeter), but driven by contact rather than by view
-// style, and in the worm's own skin colour so the glow reads as coming from the
-// creature rather than from the cube.
-//
-// Two things this deliberately does NOT do, both learned the hard way:
-//
-// The rail's colour and brightness do not vary with how hard the tile is pressed.
-// They did, and the result was that a tile under the head and a tile under the
-// body lit in visibly different colours — one washing toward white, the other
-// staying saturated — so a line of touched tiles read as a mess of mismatched
-// squares rather than as one lit path. Depth is still allowed to vary; light is
-// not. `lit` crosses to full as soon as there is any real contact.
-//
-// And the inner shadow is slight. A recess wants some shading against the rim
-// that is now above it, but at any strength the eye notices it stops being shade
-// and becomes the tile's colour — a dark square where a coloured one used to be,
-// which is exactly what a dead tile looks like in this game. It stays a thin
-// gradient hugging the rim and never reaches the middle of the tile.
-const wormFootprintFragmentShader = `
-  uniform vec3  uColor;   // worm's skin colour
-  uniform float uPress;   // 0 = flat, 1 = fully under the worm
-  uniform float uTime;
-  varying vec2  vUv;
+// The worm's footprint (shader, geometry, and the batched decal) is tileFootprint.js;
+// the heal seal's material is healEffectMaterials.js.
 
-  void main() {
-    vec2  p = vUv - 0.5;
-    vec2  a = abs(p);
-    float edge = 0.5 - max(a.x, a.y);   // 0 at the tile's rim, grows inward
-    float press = clamp(uPress, 0.0, 1.0);
 
-    // The lit rail, hugging the perimeter. It fattens as the tile sinks.
-    float bw   = 0.038 + press * 0.034;
-    float rail = 1.0 - smoothstep(bw * 0.55, bw, edge);
+// The 3D style volumes a tile mounts over its sticker (each a mesh of its own).
+const VOLUME_STYLES = new Set(['grass', 'water', 'lava', 'ice', 'galaxy', 'neural', 'circuit', 'wood']);
 
-    // Light spilling inward from the rail, over the tile's shoulder.
-    float spill = (1.0 - smoothstep(bw, 0.22 + press * 0.12, edge)) * 0.42;
+// A tile asks to re-render from its frame loop only on discrete beats (it has gone
+// idle and can rest, or it must mount its meshes for a heal): queued here and run
+// together outside the frame, never as a state write inside it.
+const _renderQueue = new Set();
+let _renderTimer = 0;
+function flushTileRenders() {
+  _renderTimer = 0;
+  const queued = [..._renderQueue];
+  _renderQueue.clear();
+  for (const render of queued) render();
+}
+function queueTileRender(render) {
+  _renderQueue.add(render);
+  if (!_renderTimer) _renderTimer = setTimeout(flushTileRenders, 0);
+}
 
-    // Inner shadow: the recess the worm is standing in. Strongest right against
-    // the rim (where the wall is highest) and gone by the middle of the tile.
-    float wall = 1.0 - smoothstep(0.015, 0.19, edge);
-    float shade = wall * press * 0.88;
-
-    // A slow breath so a tile held under a resting worm is not perfectly static.
-    float breath = 0.94 + 0.06 * sin(uTime * 2.6);
-
-    float glow  = (rail * (1.05 + press * 0.95) + spill * press) * breath;
-    float alpha = clamp(max(glow, shade), 0.0, 1.0) * smoothstep(0.0, 0.09, press);
-
-    // Rail runs hot toward white at the centre of the stroke; the shadow band is
-    // the same hue taken almost to black, so the whole square stays one colour.
-    vec3 socket = uColor * 0.025;
-    vec3 hotRail = mix(uColor, vec3(1.0), rail * 0.62 * press);
-    vec3 col = mix(socket, hotRail, clamp(glow, 0.0, 1.0));
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
-
-// One material per tile effect for every tile; each tile binds its own uniform
-// values just before its draw (sharedEffectMaterials.js).
-const footprintMaterial = new THREE.ShaderMaterial({
-  vertexShader: neonBorderVertexShader, fragmentShader: wormFootprintFragmentShader,
-  uniforms: { uColor: { value: new THREE.Color('#33ff66') }, uPress: { value: 0 }, uTime: wispyTime },
-  transparent: true, depthWrite: false
-});
-const healSealMaterial = new THREE.ShaderMaterial({
-  vertexShader: healSealVertexShader, fragmentShader: healSealFragmentShader,
-  uniforms: { uColor: { value: new THREE.Color() }, uHealProgress: { value: 0 }, uTime: { value: 0 } },
-  transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending
-});
-
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey, presentation = null }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey, presentation = null, frameHost = null }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
   const gameConfig = useGameStore(
@@ -310,6 +198,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const groupRef = useRef();
   const backOrientationRef = useRef();
   const innerGroupRef = useRef(); // inner UV-rotation group — used for InstancedMesh world matrix
+  // While the tile rests (see `resting` below) those three refs hold these detached
+  // frames instead of mounted groups, and the batches draw the tile from them.
+  const [frames] = useState(createTileFrames);
+  const restingRef = useRef(false);
+  const restCandidateRef = useRef(false);
+  // Set from the frame loop when a resting tile must mount its meshes (a heal seal).
+  const promoteRef = useRef(false);
+  const [, rerenderTile] = useReducer(n => n + 1, 0);
   const meshRef = useRef();
   const cityGroupRef = useRef();
   const geoRef = useRef();
@@ -359,6 +255,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: wispyTime, // shared reference — advanced once per frame externally
   }));
   const bindFootprint = useMemo(() => bindEffectUniforms(footprintUniforms), [footprintUniforms]);
+  // In WORM the footprint is a tile-surface decal (tileFootprint.js): its press goes
+  // per instance, its colour (the worm's) on the one shared material.
+  const [decalUniforms] = useState(() => ({ uPress: { value: 0 }, uColor: footprintDecalMaterial.uniforms.uColor }));
+  const footprintDataRef = useRef([0, 0, 0, 0]);
+  const footprintBaseRef = useRef(FOOTPRINT_Z);
   // Split so the press, the flip counter-kick and the Rumbler's heave can all drive
   // innerGroupRef.position.z without clobbering each other; applyInnerZ() writes their sum.
   const innerShockZ = useRef(0);
@@ -394,6 +295,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Prevents suppressing the per-sticker <mesh> when the pool is exhausted and
   // no slot was allocated — those stickers must fall back to individual draw calls.
   const [instancedSlotValid, setInstancedSlotValid] = useState(false);
+  // A resting tile counts on its slot before the registration has run (it always
+  // succeeds below the pool's 2,048), so its first commit mounts nothing.
+  const slotFailedRef = useRef(false);
   const ringRef = useRef();
   const spinT = useRef(0);
   const shakeT = useRef(0);
@@ -469,7 +373,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const stickerGridId = meta ? `${presentation ? 'intro:' : ''}${getManifoldGridId(meta, faceSize)}` : null;
   const stickerGridIdRef = useRef(stickerGridId);
   stickerGridIdRef.current = stickerGridId;
-  useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation]);
   // Front, antipodal back and attached decorations share one presentation angle.
   // This is independent of the outer flip/squish and the cubelet's rigid turn.
   const reduceHomeMotion = prefersReducedMotion();
@@ -554,7 +457,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     instanceIdRef.current = id;
     // Only suppress the per-sticker mesh when a slot was actually allocated.
     // If the pool is exhausted (id === -1) we must fall back to individual rendering.
+    slotFailedRef.current = id < 0;
     setInstancedSlotValid(id >= 0);
+    if (id < 0) rerenderTile();
     return () => {
       if (instanceIdRef.current >= 0) {
         instanceCtx.unregister(instanceIdRef.current);
@@ -637,9 +542,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     blinkBounceRef.current = 0;
     innerShockZ.current = 0;
     innerRumbleZ.current = 0;
+    const resetDecal = footprintGroupRef.current === frames.foot;
     innerPressZ.current = updateTilePressVisual(
-      innerGroupRef.current, footprintGroupRef.current, footprintUniforms, 0, 0, wormPress.color
+      innerGroupRef.current, footprintGroupRef.current, resetDecal ? decalUniforms : footprintUniforms, 0, 0, wormPress.color,
+      resetDecal ? footprintBaseRef.current : 0
     );
+    footprintDataRef.current[0] = 0;
     applyInnerZ();
     if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
     if (spinRevealRef.current) spinRevealRef.current.visible = false;
@@ -878,7 +786,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Heal seal trigger — MUST be before the anyActive gate.
     // After a tile heals, flips=0 so anyActive would be false and the gate would
     // return early before we could pick up the one-shot healBurstMap entry.
-    if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current)) {
+    // A resting tile has no seal to play it on: mount first, then take the cue.
+    if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current) && !healSealRef.current) {
+      if (!promoteRef.current) { promoteRef.current = true; queueTileRender(rerenderTile); }
+    } else if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current)) {
+      promoteRef.current = false;
       healBurstMap.delete(stickerGridIdRef.current);
       healTRef.current = 0;
       const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
@@ -889,7 +801,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
 
     // Disparity tap-heal: particles only, no white seal overlay.
-    if (stickerGridIdRef.current && healParticleMap.get(stickerGridIdRef.current)) {
+    if (stickerGridIdRef.current && healParticleMap.get(stickerGridIdRef.current) && !healParticlesRef.current) {
+      if (!promoteRef.current) { promoteRef.current = true; queueTileRender(rerenderTile); }
+    } else if (stickerGridIdRef.current && healParticleMap.get(stickerGridIdRef.current)) {
+      promoteRef.current = false;
       healParticleMap.delete(stickerGridIdRef.current);
       const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
       healParticlesRef.current?.trigger(origHealColor);
@@ -914,10 +829,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     innerRumbleZ.current = rumble;
     // Always clear presentation before the idle gate, including after identity
     // changes, restart, mode exit and spring remapping through a slice turn.
+    const decal = footprintGroupRef.current === frames.foot;
     innerPressZ.current = updateTilePressVisual(
-      innerGroupRef.current, footprintGroupRef.current, footprintUniforms,
-      press, wormHealerMode ? getWormContact(surfaceTileKey) : 0, wormPress.color
+      innerGroupRef.current, footprintGroupRef.current, decal ? decalUniforms : footprintUniforms,
+      press, wormHealerMode ? getWormContact(surfaceTileKey) : 0, wormPress.color, decal ? footprintBaseRef.current : 0
     );
+    footprintDataRef.current[0] = decalUniforms.uPress.value;
     applyInnerZ();
 
     // Single-boolean gate: skip the entire body on idle frames.
@@ -927,10 +844,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // A cube-mode portal animates in its shader: unless the legacy tremor runs, a
     // flipped tile sleeps like any other once its flip has played.
     const wormholeFrames = (wormHealerMode || flipPads === 'off') && wormhole && !isSudokube;
-    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || healTRef.current >= 0 || sparksLive || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
+    const anyActive = promoteRef.current || tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || healTRef.current >= 0 || sparksLive || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
+      // Its flip, heal and shake have all played out: a tile that can rest now
+      // unmounts its meshes and goes back to the batches.
+      if (!restingRef.current && restCandidateRef.current) queueTileRender(rerenderTile);
       return;
     }
     isActiveRef.current = true;
@@ -1470,9 +1390,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     && nextFlips !== prevFlips.current
     && nextCurr !== prevCurr.current
     && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
-  const isInstanceable = (
+  // Everything but the slot: a resting tile counts on it before registration runs.
+  const instanceEligible = (
     !!instanceCtx &&
-    instancedSlotValid &&
     !hollow &&
     !isGlass &&
     (!isSudokube || lightweightNumbers) &&
@@ -1483,29 +1403,83 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !hasPendingFlipAnimation &&
     !keepFlipMeshMounted
   );
+  const isInstanceable = instanceEligible && instancedSlotValid;
   // A styled tile at rest is drawn the same way in WORM: one instanced draw per
   // style and colour (identity per instance) instead of a draw per tile, which on
   // a 10×10 or 15×15 was most of the frame's draws. A tile that has flipped, or is
   // about to, keeps its own mesh, whose material the flip swaps imperatively.
   const styleBatched = wormHealerMode && !!surfaceCtx && useShaderStyle && !!styleMaterial && !hollow &&
     !(meta?.flips > 0) && !hasPendingFlipAnimation && !keepFlipMeshMounted;
-  // Both batch draws take the tile's own groups as their anchors (the front sits
-  // at the inner group's origin, the back at its orientation group's), so a tile
-  // adds no anchor objects to the scene graph three.js walks every frame. These
-  // effects run after the groups' refs attach, which a child's would not.
+  // Every batch takes the tile's own groups as its anchors (the front sits at the
+  // inner group's origin, the back at its orientation group's, the border at the
+  // tile group's), so a tile adds no anchor objects to the scene graph three.js
+  // walks every frame. These effects run after the groups' refs attach, which a
+  // child's would not, and after the resting frames below are put in their place.
   const styleIdentityRef = useRef(styleIdentity);
   styleIdentityRef.current = styleIdentity;
   const backColorRef = useRef(null);
   backColorRef.current = isDead ? '#555555' : antipodalHex;
   const frontBatchMaterial = styleBatched ? instancedTileStyleMaterial(styleMaterial) : null;
-  useLayoutEffect(() => frontBatchMaterial ? surfaceCtx.register(innerGroupRef.current, _playStickerGeo, frontBatchMaterial,
-    null, null, styleIdentityRef, 'sticker-front') : undefined, [surfaceCtx, frontBatchMaterial]);
-  // The footprint and heal seal wait hidden on every tile (hiddenMatrices.js).
-  useLayoutEffect(() => { skipMatrixWhileHidden(footprintGroupRef.current); skipMatrixWhileHidden(healSealRef.current); });
   const backBatched = batchBack && !!antipodalHex && !!backMaterial;
+  const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
+  // The tile border, batched from the tile's own group like the faces.
+  const showBorder = wormHealerMode && !isDead && !isSudokube;
+  const borderBatched = showBorder && !!surfaceCtx;
+  const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
+  // Mid-play, the worm's footprint is a decal batch (tileFootprint.js), never a mesh.
+  const decalFootprint = wormHealerMode && !presentation && !!surfaceCtx?.decals;
+  footprintBaseRef.current = !isDead && isWormhole ? PORTAL_TOP + 0.003 : FOOTPRINT_Z;
+
+  // ── Resting ──────────────────────────────────────────────────────────────────
+  // A WORM tile whose every part is batched (front, back, border, footprint) and
+  // that shows nothing else mounts no scene objects: the batches draw it from the
+  // detached frames in tileFrames.js. It mounts its real subtree only while it needs
+  // one: a flip or its history, a death, a heal seal or sparks still playing, a
+  // shake, a volume style, a label, a texture. On a 15×15 almost every tile rests.
+  const drawsVolume = !glbFullFace && !suppressVolumeFX && VOLUME_STYLES.has(tileStyle) && !isGlass && !isSudokube && !currTexture;
+  const frontBatched = styleBatched || (instanceEligible && !slotFailedRef.current);
+  const restCandidate = wormHealerMode && !presentation && !!surfaceCtx && !!frameHost && decalFootprint
+    && frontBatched && (!antipodalHex || backBatched) && (!showBorder || borderBatched)
+    && !hollow && !overlay && !drawsVolume && !renderTexture && !biomeEnabled
+    && !isDead && !hasFlipHistory && !isWinnerTile && !portalClosingRef.current;
+  restCandidateRef.current = restCandidate;
+  // Effects still playing on the mounted meshes keep them until the tick goes idle.
+  const resting = restCandidate && !promoteRef.current && !isFlipping.current && spinT.current <= 0
+    && shakeT.current <= 0 && healTRef.current < 0 && !healParticlesRef.current?.active();
+  useLayoutEffect(() => {
+    restingRef.current = resting;
+    if (decalFootprint) {
+      footprintGroupRef.current = frames.foot;
+      // The lit square rides the tile's own group, mounted or resting.
+      frames.foot.parent = resting ? frames.tile : groupRef.current;
+    }
+    if (!resting) return undefined;
+    groupRef.current = frames.tile;
+    innerGroupRef.current = frames.front;
+    backOrientationRef.current = frames.back;
+    poseTileFrames(frames, pos, rot, tileDisplayAngle(meta, reduceHomeMotion));
+    innerShockZ.current = 0;
+    applyInnerZ();
+    // One tick re-applies any press under the worm onto the frames.
+    activateSticker(stickerGridIdRef.current);
+    return attachTileFrame(frameHost, frames.tile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pose only on entering rest; the tick moves the frames after
+  }, [resting, decalFootprint, frames, frameHost]);
+
+  useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation, resting]);
+  useLayoutEffect(() => frontBatchMaterial ? surfaceCtx.register(innerGroupRef.current, _playStickerGeo, frontBatchMaterial,
+    null, null, styleIdentityRef, 'sticker-front') : undefined, [surfaceCtx, frontBatchMaterial, resting]);
+  // The footprint and heal seal wait hidden on every tile (hiddenMatrices.js).
+  useLayoutEffect(() => { if (!decalFootprint) skipMatrixWhileHidden(footprintGroupRef.current); skipMatrixWhileHidden(healSealRef.current); });
   useLayoutEffect(() => backBatched ? surfaceCtx.register(backOrientationRef.current, _sharedStickerGeo, backMaterial,
     instanceBack ? backColorRef : null, null, instanceBack ? null : styleIdentityRef, 'sticker-antipodal-back') : undefined,
-  [surfaceCtx, backBatched, backMaterial, instanceBack]);
+  [surfaceCtx, backBatched, backMaterial, instanceBack, resting]);
+  useLayoutEffect(() => borderBatched ? surfaceCtx.register(groupRef.current, isWormhole ? flippedBorderGeometry : borderGeometry,
+    isWormhole ? flippedBorderMaterial : borderMaterial, null, null, null, isWormhole ? 'flipped-tile-border' : 'tile-border') : undefined,
+  [surfaceCtx, borderBatched, isWormhole, resting]);
+  // One decal draw for every lit square on the cube; a dead tile is never stood on.
+  useLayoutEffect(() => decalFootprint && !isDead ? surfaceCtx.decals.register(frames.foot, footprintGeometry, footprintDecalMaterial,
+    null, null, footprintDataRef, 'tile-footprint') : undefined, [surfaceCtx, decalFootprint, isDead, frames]);
 
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
@@ -1580,14 +1554,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor, isChrome, isNeon, gameConfig.wormRunId]);
-  const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
-  // The tile border, batched from the tile's own group like the faces above.
-  const showBorder = wormHealerMode && !isDead && !isSudokube;
-  const borderBatched = showBorder && !!surfaceCtx;
-  useLayoutEffect(() => borderBatched ? surfaceCtx.register(groupRef.current, isWormhole ? flippedBorderGeometry : borderGeometry,
-    isWormhole ? flippedBorderMaterial : borderMaterial, null, null, null, isWormhole ? 'flipped-tile-border' : 'tile-border') : undefined,
-  [surfaceCtx, borderBatched, isWormhole]);
-  const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Worm and cube modes share the same batched, animated portal face, in every view:
   // Sudokube draws it too, with the tile's number laid over the lens.
   // The surface batch applies the traversal/death bore to this face as well.
@@ -1612,6 +1578,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const currIsWhite = meta?.curr === 3;
   const origIsWhite = meta?.orig === 3;
   const _antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
+
+  // The batches draw a resting tile from its frames; it mounts nothing.
+  if (resting) return null;
 
   return (
     <FlipPadOffset meta={meta} size={faceSize} pos={pos} rot={rot}>
@@ -1815,11 +1784,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           so its contact cue remains visible.
           Normal blending, not additive: the inner shadow is the half of this that makes a
           tile look pressed rather than merely lit, and additive cannot darken. */}
-      {wormHealerMode && !isDead && (
+      {wormHealerMode && !isDead && !decalFootprint && (
         <group ref={footprintGroupRef} visible={false}>
-          <mesh position={[0, 0, showFlipPortal ? PORTAL_TOP + 0.003 : 0.005]} renderOrder={2}
+          <mesh position={[0, 0, showFlipPortal ? PORTAL_TOP + 0.003 : FOOTPRINT_Z]} renderOrder={2}
             material={footprintMaterial} onBeforeRender={bindFootprint} dispose={null}>
-            <primitive object={_neonBorderGeo} attach="geometry" />
+            <primitive object={footprintGeometry} attach="geometry" />
           </mesh>
         </group>
       )}

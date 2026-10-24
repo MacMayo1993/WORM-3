@@ -26,7 +26,7 @@ describe('shared tile effect materials', () => {
     expect(shared.uniformsNeedUpdate).toBe(true);
   });
 
-  it('gives every WORM tile the same footprint, heal-seal and spark material', async () => {
+  it('gives every WORM tile the same heal-seal and spark material, and one footprint decal', async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     const before = useGameStore.getState(), canvas = document.createElement('canvas');
     const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -50,7 +50,6 @@ describe('shared tile effect materials', () => {
       const meshes = [];
       store.getState().scene.traverse(o => { if (o.isMesh && o.material?.uniforms) meshes.push(o); });
       const kinds = {
-        footprint: meshes.filter(m => 'uPress' in m.material.uniforms),
         seal: meshes.filter(m => 'uHealProgress' in m.material.uniforms),
         sparks: meshes.filter(m => m.isInstancedMesh && 'uOpacity' in m.material.uniforms)
       };
@@ -60,14 +59,21 @@ describe('shared tile effect materials', () => {
         // Each tile still draws its own values.
         expect(list[0].onBeforeRender, kind).not.toBe(list[1].onBeforeRender);
       }
-      // A tile's footprint draws in its own colour and press, whatever drew last.
-      const [a] = kinds.footprint;
+      // Under the tile-surface batches the footprint is no per-tile mesh at all: one
+      // decal batch draws every lit square, its press per instance (tileFootprint.js).
+      expect(meshes.filter(m => 'uPress' in m.material.uniforms)).toHaveLength(0);
+      const decals = meshes.filter(m => m.name === 'TileSurfaceBatch:tile-footprint');
+      expect(decals).toHaveLength(1);
+      expect(decals[0].isInstancedMesh).toBe(true);
+      expect(decals[0].geometry.attributes.aInstanceData).toBeDefined();
+      // A seal draws in its own colour and progress, whatever drew last.
+      const [a] = kinds.seal;
       a.material.uniforms.uColor.value.set('#123456');
-      a.material.uniforms.uPress.value = 0.9;
+      a.material.uniforms.uHealProgress.value = 0.9;
       a.material.uniformsNeedUpdate = false;
       a.onBeforeRender(null, null, null, a.geometry, a.material);
-      expect(a.material.uniforms.uColor.value.getHex()).toBe(0x33ff66);
-      expect(a.material.uniforms.uPress.value).toBe(0);
+      expect(a.material.uniforms.uColor.value.getHex()).toBe(0xffffff);
+      expect(a.material.uniforms.uHealProgress.value).toBe(0);
       expect(a.material.uniformsNeedUpdate).toBe(true);
     } finally {
       await act(async () => root.unmount()); useGameStore.setState(before, true);
