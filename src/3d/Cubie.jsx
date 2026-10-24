@@ -22,6 +22,7 @@ import { getEdgeFlags } from '../game/cubeUtils.js';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import StickerPlane from './StickerPlane.jsx';
+import { anyCubiePops, useCubieTicks } from './cubieTicks.js';
 import { createTileFrameHost, adoptTileFrames } from './tileFrames.js';
 import MergedLedEdges from './MergedLedEdges.jsx';
 import { hollowFrameGeometry } from './hollowFrameGeometry.js';
@@ -34,18 +35,12 @@ import {
 // Canonical Sudokube number (matches win detection in winDetection.js).
 import { faceValue as sudokuValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 
-// Cube-pop bursts (the little outward hops on a disparity heal tap) touch only a
-// handful of cubies and never fire in Worm/Mega mode at all. Rather than have
-// every one of Mega's ~1,350 cubies read the store and index cubiePops on every
-// frame, a single module-level subscription flips this flag whenever the pop map
-// gains or loses entries. Idle cubies then leave the pop useFrame on one cheap
-// boolean check. subscribeWithSelector (used by the store) fires the listener
-// only when the cubiePops reference actually changes, so Object.keys runs rarely.
-let _anyCubiePops = false;
-useGameStore.subscribe(
-  (s) => s.cubiePops,
-  (pops) => { _anyCubiePops = !!pops && Object.keys(pops).length > 0; }
-);
+// Run from CubeAssembly's one CubieTickDriver (cubieTicks.js); a cubie mounted
+// without it (a preview or a test) keeps a frame callback of its own.
+function CubieFrameFallback({ tick, priority }) {
+  useFrame((_state, delta) => { tick(delta); }, priority);
+  return null;
+}
 
 // Shared hollow beam materials — one per visualMode string.
 // Each cubie uses one merged frame mesh and a shared material.
@@ -458,22 +453,25 @@ const Cubie = React.forwardRef(function Cubie({
   }, [batchBody, bodyBatches, bodyGeometry, bodyLook]);
 
 
-  useFrame((_state, delta) => {
+  // The lift, kick, pop and burrow offsets. Returns whether the piece is still
+  // moving; reassigned every render so it reads this render's props.
+  const tickRef = useRef(null);
+  tickRef.current = (delta) => {
     const spring = liftSpring.current;
     // Chaos lightning jolts: an empty map costs one size check per idle cubie.
     const kick = cubieKicks.size ? cubieKicks.get(popKey) : undefined;
     const burrows = wormPads ? burrowBridge.current : null;
     const burrowingHere = burrows?.wakeCubies.has(burrowHomeKey);
-    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0 && !burrowingHere) {
+    if (!kick && !anyCubiePops() && !poppedRef.current && !raised && spring.lift === 0 && !burrowingHere) {
       // A piece that is not raised has no offset. Whatever left one behind (a
       // loss mid-turn, a retry that remapped slots before poppedRef caught up),
       // drop it here so a fresh run never shows pieces floating where they
       // were popped out last run.
       const pop = popGroupRef.current;
       if (pop && (pop.position.x || pop.position.y || pop.position.z)) pop.position.set(0, 0, 0);
-      return;
+      return false;
     }
-    if (!popGroupRef.current || !pieceRef.current) return;
+    if (!popGroupRef.current || !pieceRef.current) return true;
     const state = useGameStore.getState();
     const reduced = settings?.reducedMotion || prefersReducedMotion();
     const managedBurrow = burrows && Object.values(cubie.stickers).some(sticker =>
@@ -531,10 +529,23 @@ const Cubie = React.forwardRef(function Cubie({
     }
     poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick || burrowOffset.lengthSq() > 0;
     if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
-  }, wormMode ? -0.4 : -0.75); // WORM: after live expansion, before pad stalks and tunnel anchors
+    return true;
+  };
+  const ticks = useCubieTicks();
+  const tick = useMemo(() => delta => tickRef.current(delta), []);
+  useLayoutEffect(() => ticks?.register(tick), [ticks, tick]);
+  // Raised by its own render: tick until the formation settles.
+  useLayoutEffect(() => { if (raised) ticks?.wake(tick); }, [ticks, tick, raised]);
+  // A turn hands this slot another piece, and with it that piece's spring
+  // (useRaisedCubieSpring follows the physical piece), which may still be easing
+  // home: tick until it has settled, whether or not this piece is raised now.
+  const springIdentity = `${size}:${origHomeX},${origHomeY},${origHomeZ}`;
+  useLayoutEffect(() => { ticks?.wake(tick); }, [ticks, tick, springIdentity, wormRunId]);
 
   return (
     <group ref={popGroupRef}>
+    {/* WORM: after live expansion, before pad stalks and tunnel anchors */}
+    {!ticks && <CubieFrameFallback tick={tick} priority={wormMode ? -0.4 : -0.75} />}
     <group position={explodedPos} ref={pieceRef}>
     <group scale={contentScale} ref={contentRef}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}

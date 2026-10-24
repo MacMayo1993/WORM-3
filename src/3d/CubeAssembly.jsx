@@ -15,6 +15,7 @@ import { MAX_DISTANCE_BY_SIZE } from './cameraLimits.js';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import Cubie from './Cubie.jsx';
+import { createCubieTicks, CubieTicksProvider } from './cubieTicks.js';
 import VoidCore from './VoidCore.jsx';
 // DragGuide removed - real-time rotation provides visual feedback
 import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
@@ -731,6 +732,11 @@ const CubeAssembly = React.memo(({
     rescaleExpandedCubies(cubieRefs.current, size, appliedExpansionRef.current, amount);
     appliedExpansionRef.current = explosionFactorRef.current = amount;
   }, -0.45);
+  // Every cubie's lift, kick and pop offsets in one callback over the moving ones
+  // (cubieTicks.js). WORM: after live expansion, before tunnel anchors (-0.4) and
+  // pad stalks (-0.35); elsewhere where each cubie's own callback ran.
+  const cubieTicks = useMemo(() => createCubieTicks(), []);
+  useFrame((_state, delta) => cubieTicks.run(delta), wormHealerMode ? -0.41 : -0.75);
 
   // Pre-compile default tile style shaders on mount to prevent first-use stalls.
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
@@ -1290,6 +1296,7 @@ const CubeAssembly = React.memo(({
             />
           )}
           <CubieBodyBatchProvider enabled={wormHealerMode} materialFor={exteriorPortals.materialFor}>
+          <CubieTicksProvider value={cubieTicks}>
           <group>
             {items.map((it, idx) => {
               // Skip the center cubie on odd-sized cubes — the antipodal core (VoidCore) occupies that space
@@ -1324,6 +1331,7 @@ const CubeAssembly = React.memo(({
               );
             })}
           </group>
+          </CubieTicksProvider>
           </CubieBodyBatchProvider>
           {showCursor && cursor && (
             <CursorHighlight />

@@ -67,7 +67,6 @@ export const wormFootprintFragmentShader = `
 export const footprintGeometry = new THREE.PlaneGeometry(0.94, 0.94);
 // Where the lit square sits above the tile, and above a flipped tile's portal lip.
 export const FOOTPRINT_Z = 0.005;
-export const FOOTPRINT_RENDER_ORDER = 2;
 
 // One material per tile effect for every tile; each tile binds its own uniform
 // values just before its draw (sharedEffectMaterials.js). Used where there are no

@@ -261,6 +261,19 @@ if (MODE === 'frames' || MODE === 'react') {
       byFn[k] = (byFn[k] || 0) + (self.get(n.id) || 0) / 1000;
     }
     console.log(`\nCPU self time (ms over ${MS / 1000}s):\n${top(byFn, 40, ([k, v]) => `${v.toFixed(0).padStart(7)}  ${k}`)}`);
+    // --lines=<url part>: the same samples by source line, for functions in matching files.
+    if (args.lines) {
+      const byLine = {}, tickMs = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
+      for (const n of profile.nodes) {
+        if (!n.callFrame.url.includes(args.lines)) continue;
+        const file = n.callFrame.url.replace(/^.*\//, '').replace(/\?.*$/, '');
+        for (const { line, ticks } of n.positionTicks || []) {
+          const k = `${file}:${line} ${n.callFrame.functionName || '(anonymous)'}`;
+          byLine[k] = (byLine[k] || 0) + ticks * tickMs;
+        }
+      }
+      console.log(`\nBy line in *${args.lines}* (ms over ${MS / 1000}s):\n${top(byLine, 40, ([k, v]) => `${v.toFixed(0).padStart(7)}  ${k}`)}`);
+    }
   }
 }
 
