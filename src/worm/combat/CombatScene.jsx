@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { BackSide, Color, DoubleSide, Matrix4, Object3D, PlaneGeometry, Quaternion, Vector3 } from 'three';
 import { combatBridge, COMBAT, surfacePose } from './portalCombat.js';
 import { addFrameDissolve } from '../../components/intro/introDissolve.js';
+import { skipMatrixWhileHidden } from '../../3d/hiddenMatrices.js';
 import { allocateEnemySlots, dissolveProgress, enemyFleck, ENEMY_FLECKS, ENEMY_FIELD_SCALE, ENEMY_FIELD_MID } from './enemyDissolve.js';
 
 const up = new Vector3(0,0,1), normal = new Vector3(), tangent = new Vector3(), inverse = new Quaternion();
@@ -323,6 +324,11 @@ const DISSOLVE_SLOTS = 3;
 // re-render of the WORM scene above (a pickup, a turn) has nothing to give them,
 // and re-rendering ~40 idle rigs on each was most of that commit's cost.
 export default React.memo(CombatScene);
+// Every rig waits hidden until a fight puts something in its slot: ~600 objects on
+// a board with no enemies, which three.js would otherwise recompose every frame.
+// The rigs mount before this group's ref attaches, so they are all there to mark.
+const skipHiddenRigs = node => { node?.children.forEach(skipMatrixWhileHidden); };
+
 function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
   const pool = maxEnemies + DISSOLVE_SLOTS;
   const slots = useRef(null), assigned = useRef(new Map());
@@ -330,7 +336,7 @@ function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
   // Before the rigs read their slots this frame (lower priority runs first; a
   // negative priority never takes over rendering).
   useFrame(() => { allocateEnemySlots(combatBridge.current, assigned.current, slots.current); }, -1);
-  return <group><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:pool},(_,i)=><Crawler key={i} slot={i} slots={slots} />)}
+  return <group ref={skipHiddenRigs}><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:pool},(_,i)=><Crawler key={i} slot={i} slots={slots} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}

@@ -3,6 +3,7 @@ import { uploadInstancePrefix } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
 import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
+import { frameWorldVersion, isRestingFrameAnchor } from './tileFrames.js';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile } from '../utils/device.js';
 // StickerInstances.jsx
@@ -148,16 +149,19 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
    * @param {React.RefObject<boolean>} isInstancedRef
    *   Ref set to true when this sticker should be batched, false to fall back to
    *   its own mesh.  Checked every frame by the manager.
+   * @param {object} [frames]
+   *   The tile's resting frames (tileFrames.js): while groupRef holds one, a still
+   *   anchor is not compared every frame (frameWorldVersion).
    * @returns {number} instanceId  (pass to unregister on unmount)
    */
-  const register = useCallback((groupRef, colorRef, isInstancedRef) => {
+  const register = useCallback((groupRef, colorRef, isInstancedRef, frames = null) => {
     const slot = freeSlotsRef.current.pop();
     if (slot === undefined) {
       console.warn('[StickerInstances] slot pool exhausted — sticker will not be batched');
       return -1;
     }
     const id = nextIdRef.current++;
-    registryRef.current.set(id, { groupRef, colorRef, isInstancedRef, slot });
+    registryRef.current.set(id, { groupRef, colorRef, isInstancedRef, slot, frames });
     // Only submit slots that can contain a live sticker. Keeping mesh.count at
     // the 2,048-slot capacity made the GPU process hundreds of empty instances
     // every frame on ordinary cubes and almost 700 empty instances in Mega Mode.
@@ -254,7 +258,10 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
       // non-instanced transition will write _zeroMatrix exactly once again.
       zeroedSlotsRef.current.delete(slot);
 
-      const worldVersion = transformTracker.update(groupRef.current);
+      const anchor = groupRef.current;
+      const worldVersion = isRestingFrameAnchor(entry.frames, anchor)
+        ? frameWorldVersion(entry, entry.frames, anchor, transformTracker.update(entry.frames.tile.parent))
+        : transformTracker.update(anchor);
       const mbase = slot * 16;
       const lm = lastMatricesRef.current;
       if (entry.worldVersion !== worldVersion || Number.isNaN(lm[mbase])) {

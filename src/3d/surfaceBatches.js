@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 import { ensureInstanceColor, setInstanceCount, uploadInstancePrefix } from './instanceUploads.js';
+import { frameWorldVersion, isRestingFrameAnchor, nextCullStamp, tileInView } from './tileFrames.js';
 
 // Opaque tile accessories share geometry/material draws but retain their own
 // live anchors. Dense slots also remove hidden tiles from the submitted count.
@@ -44,6 +45,9 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
   const tracker = createWorldTransformTracker();
   const inverse = new THREE.Matrix4(), local = new THREE.Matrix4(), color = new THREE.Color();
   const frustum = new THREE.Frustum(), projection = new THREE.Matrix4();
+  // An entry keeps its batch until its draw order changes or the pool is disposed
+  // (React's StrictMode replay reuses a disposed pool): no key lookup per frame.
+  let generation = 0;
   // Built once per entry (and again only if its draw order changes): a key per
   // tile per frame was thousands of string concatenations on Mega.
   // An anchor that casts a shadow (a LEGO stud) draws in a batch that does.
@@ -57,10 +61,13 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
     return entry.key;
   };
   const batchOf = entry => {
+    const { anchor } = entry;
+    if (entry.batchGeneration === generation && entry.keyOrder === anchor.renderOrder && entry.keyShadow === anchor.castShadow) return entry.batch;
     const key = keyOf(entry);
     let batch = batches.get(key);
-    if (batch) return batch;
-    const { anchor, geometry, material, colorRef, seedRef, dataRef } = entry;
+    entry.batchGeneration = generation;
+    if (batch) return (entry.batch = batch);
+    const { geometry, material, colorRef, seedRef, dataRef } = entry;
     const own = seedRef || dataRef;
     const mesh = new THREE.InstancedMesh(own ? seededGeometry(geometry, capacity, !!seedRef, !!dataRef) : geometry, materialFor(material), capacity);
     mesh.name = `TileSurfaceBatch:${entry.name || geometry.type}`;
@@ -76,7 +83,7 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
       seeds: seedRef ? mesh.geometry.attributes.aInstanceSeed : null, data: dataRef ? mesh.geometry.attributes.aInstanceData : null };
     batches.set(key, batch);
     group.add(mesh);
-    return batch;
+    return (entry.batch = batch);
   };
   return {
     group,
@@ -84,9 +91,11 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
     // made here, not on the entry's first visible frame, so a run's warm-up (which
     // compiles hidden objects too) links its program: an effect that waits hidden on
     // every tile, like the footprint, would otherwise link in the frame it first shows.
-    register(anchor, geometry, material, colorRef, seedRef = null, dataRef = null, name = anchor.name) {
+    // A resting tile passes its `frames` (tileFrames.js), so a still anchor is not
+    // compared every frame (frameWorldVersion).
+    register(anchor, geometry, material, colorRef, seedRef = null, dataRef = null, name = anchor.name, frames = null) {
       if (material.transparent && !transparent) throw Error('Transparent tile surfaces retain individual sorting');
-      const entry = { anchor, geometry, material, colorRef, seedRef, dataRef, name, data: [NaN, NaN, NaN, NaN] };
+      const entry = { anchor, geometry, material, colorRef, seedRef, dataRef, name, frames, data: [NaN, NaN, NaN, NaN] };
       entries.add(entry);
       batchOf(entry);
       return () => entries.delete(entry);
@@ -95,19 +104,30 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
       tracker.begin();
       const rootVersion = tracker.track(group, false);
       inverse.copy(group.matrixWorld).invert();
+      const stamp = nextCullStamp();
       if (camera) {
         camera.updateWorldMatrix(true, false);
         frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       }
       for (const batch of batches.values()) { batch.count = 0; batch.matrixDirty = batch.colorDirty = batch.seedDirty = batch.dataDirty = false; }
       for (const entry of entries) {
-        const { anchor, geometry, colorRef, seedRef, dataRef } = entry;
+        const { anchor, geometry, colorRef, seedRef, dataRef, frames } = entry;
         // A hidden anchor draws nothing whatever its ancestors are doing: decide that
         // before any cache lookup (most footprints are hidden on most frames).
         if (!anchor.parent || !anchor.visible) continue;
-        const version = tracker.track(anchor);
-        if (version < 0) continue;
-        if (camera) {
+        let version;
+        const resting = isRestingFrameAnchor(frames, anchor);
+        if (resting) {
+          const hostVersion = tracker.track(frames.tile.parent);
+          if (hostVersion < 0) continue;
+          version = frameWorldVersion(entry, frames, anchor, hostVersion);
+          // A resting tile's entries share one test of the tile's own bounds.
+          if (camera && !tileInView(frames, frustum, stamp)) continue;
+        } else {
+          version = tracker.track(anchor);
+          if (version < 0) continue;
+        }
+        if (camera && !resting) {
           // The world bounds move only with the anchor; the camera moves every frame.
           if (entry.sphereVersion !== version) {
             if (!geometry.boundingSphere) geometry.computeBoundingSphere();
@@ -176,7 +196,7 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         view.setIndex(null);
         view.dispose();
       }
-      group.clear(); batches.clear();
+      group.clear(); batches.clear(); generation++;
     }
   };
 }
