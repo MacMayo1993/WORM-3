@@ -2,7 +2,8 @@
 //
 // Moments of skill the run calls out: a jump that carries the head over its own
 // body and lands it alive, a dive while the body still rides an earlier tunnel
-// (a self-pass), and a double heal. The sim reports the last two (ctx.onSkill);
+// (a self-pass), a double heal, and a jump that carries the head over a turning
+// layer's moving seam (sliceCrossing.js). The sim reports the last three (ctx.onSkill);
 // the hop is tracked here from the same rule Story's body-jump goal uses
 // (bodyJumpPractice.js), on a tracker of its own so Story's count is untouched.
 // Each reaches the HUD as wormSkillCallout and plays the 'clutch' sting.
@@ -13,6 +14,7 @@ export const SKILL_CALLOUTS = {
   hop: 'Body hop!',
   pass: 'Self-pass!',
   double: 'Double heal!',
+  seam: 'Seam jump!',
 };
 
 export const makeHopTracker = () => ({ airborne: false, crossedThisJump: false, bodyJumps: 0, assisted: false });

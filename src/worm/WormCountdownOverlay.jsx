@@ -31,6 +31,8 @@ export default function WormCountdownOverlay({ step, arrival = false }) {
         <div className="worm-countdown-ripple" />
         <span className="worm-countdown-digit">{step}</span>
         <span className="worm-countdown-ready">GET READY</span>
+        {/* A first run's full arrival skips to GO on a tap or key (HealerWormMode). */}
+        {arrival && <span className="worm-countdown-skip">Tap to skip</span>}
         <div className="worm-countdown-pips">{[3, 2, 1].map(value =>
           <i key={value} data-lit={value >= step} style={{ '--pip-color': BEAT_COLORS[value] }} />
         )}</div>

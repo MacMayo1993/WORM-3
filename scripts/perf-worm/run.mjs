@@ -145,9 +145,26 @@ await page.evaluate(() => {
   install();
 });
 const t0 = Date.now();
+// --probe-arrival: during the portal arrival, check its skip hint, tap once and
+// time how long the arrival takes to hand over control (or let it run, with =off).
+const arrival = { tapped: false, hint: false, spawnAt: 0, activeAt: 0 };
 while ((await page.evaluate(() => window.__store.getState().wormGamePhase)) !== 'active') {
   if (Date.now() - t0 > 240000) throw new Error('WORM run never reached the active phase');
-  await page.waitForTimeout(1000);
+  if (args['probe-arrival']) {
+    const s = await page.evaluate(() => { const st = window.__store.getState();
+      return { phase: st.wormGamePhase, step: st.wormCountdownStep, hint: document.body.innerText.includes('Tap to skip') }; });
+    if (s.phase === 'spawning' && !arrival.spawnAt) arrival.spawnAt = Date.now();
+    if (s.phase === 'spawning' && s.step !== arrival.lastStep) { (arrival.steps ||= []).push(`${s.step}@${Date.now() - arrival.spawnAt}`); arrival.lastStep = s.step; }
+    if (s.phase === 'spawning' && typeof s.step === 'number') {
+      arrival.hint ||= s.hint;
+      if (!arrival.tapped && args['probe-arrival'] !== 'off') { arrival.tapped = true; await page.mouse.click(640, 400); }
+    }
+    await page.waitForTimeout(50);
+  } else await page.waitForTimeout(1000);
+}
+if (args['probe-arrival']) {
+  arrival.activeAt = Date.now();
+  console.log(`arrival: hint shown ${arrival.hint}, tapped ${arrival.tapped}, spawning to active ${arrival.spawnAt ? arrival.activeAt - arrival.spawnAt : '?'} ms, steps ${(arrival.steps || []).join(' ')}`);
 }
 if (args.freeze || MODE === 'batching' || MODE === 'events') await page.evaluate(() => window.__store.setState({ wormPaused: true }));
 const cdp = await context.newCDPSession(page);
@@ -395,6 +412,31 @@ if (MODE === 'restcheck') {
     }
   }
   console.log(`page errors: ${errors.length}${errors.length ? '\n' + errors.join('\n') : ''}`);
+}
+
+// Batch-4 checks on a live run: Mobi's first flip-pad line, and the Motion
+// setting's CSS rule (an animated probe outside and inside the loading cover).
+if (MODE === 'firsts') {
+  await page.waitForTimeout(+(args.settle || 4000));
+  const r = await page.evaluate(() => {
+    const st = window.__store.getState();
+    const probe = (inCover) => {
+      const host = document.createElement('div');
+      if (inCover) host.className = 'wl-root';
+      const el = document.createElement('div');
+      el.style.animation = 'spin 2s linear infinite';
+      el.style.transition = 'opacity 1s';
+      host.append(el); document.body.append(host);
+      const cs = getComputedStyle(el), out = [cs.animationDuration, cs.animationIterationCount, cs.transitionDuration].join(' ');
+      host.remove(); return out;
+    };
+    const plain = probe(false);
+    document.documentElement.setAttribute('data-reduced-motion', '');
+    const reduced = probe(false), cover = probe(true);
+    document.documentElement.removeAttribute('data-reduced-motion');
+    return { pairs: st.wormOpenPairs, line: st.wormMobiLine, milestones: Object.keys(st.playerProgress.milestones).filter(k => k.startsWith('first:mobi')), plain, reduced, cover };
+  });
+  console.log(JSON.stringify(r, null, 2));
 }
 
 // One resting tile's subtree, so the per-tile object count can be read part by part.

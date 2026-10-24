@@ -6,7 +6,7 @@ import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
-import { movingSliceCrossing } from './sliceCrossing.js';
+import { movingSliceCrossing, seamJumped } from './sliceCrossing.js';
 import { tickExpansion } from './expansion.js';
 import { makeBurrows, startBurrow, tickBurrows } from './burrows.js';
 import { burrowEntryOpen } from '../burrowBridge.js';
@@ -2034,7 +2034,8 @@ const PHASE_HANDLERS = {
                 sim.interpT = sim.stepAcc + delta >= STEP_SEC
                     ? 1 : Math.min(1, sim.interpT + delta / STEP_SEC);
                 sim.crawlDistance += crawlProgressDistance(sim, before, sim.interpT);
-                const sliceHit = ctx.getGamePhase() === 'active' && movingSliceCrossing(sim, before, jumpLiftOf(sim));
+                const live = ctx.getGamePhase() === 'active', lift = live ? jumpLiftOf(sim) : 0;
+                const sliceHit = live && movingSliceCrossing(sim, before, lift);
                 if (sliceHit) {
                     sim.interpT = 0.5;
                     sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
@@ -2042,6 +2043,8 @@ const PHASE_HANDLERS = {
                         liveCrossing: true, impactPosition: sim.headInterpPos.toArray() });
                     return true;
                 }
+                // Jumped clear of a moving seam: a skill moment (skillMoments.js).
+                if (live && seamJumped(sim, before, lift)) ctx.onSkill?.('seam');
             }
 
             // Contact must use this tick's contraction, just as rendering does.

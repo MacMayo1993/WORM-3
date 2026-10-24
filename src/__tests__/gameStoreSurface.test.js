@@ -21,7 +21,7 @@ const EXPECTED_KEYS = [
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',
   'xpActivityRuns', 'beginAchievementActivity',
   'playerProgress', 'xpRun', 'xpNotice', 'showPlayerProgress', 'setShowPlayerProgress',
-  'beginPuzzleXp', 'markXpAssisted', 'completePuzzleXp', 'recordWormXp', 'recordWormRunBests', 'discoverWormFusion', 'finishWormXp',
+  'beginPuzzleXp', 'markXpAssisted', 'completePuzzleXp', 'recordWormXp', 'recordWormRunBests', 'discoverWormFusion', 'sayMobiFirst', 'finishWormXp',
   'beginChaosXp', 'finishChaosXp', 'recordLessonXp', 'recordDiscoveryXp', 'claimLevelReward',
   'wormMission', 'wormMissionsCompleted', 'recordWormMission', 'wormMissionCounters', 'wormRunAchievements',
   'chestWallet', 'chestRolling', 'rollCubieChest', 'finishChestRoll', 'chooseChestReward', 'exchangeChestGems', 'claimChestGems',

@@ -2,9 +2,9 @@ import { liveRotation, liveLayerAngleAt } from '../liveRotation.js';
 
 // Resolve once at the visible tile boundary, including entering and leaving a
 // moving slab. Equal-angle adjacent layers move together and have no shear seam.
-export function movingSliceCrossing(sim, before, lift) {
-  if (!liveRotation.active || !sim.prevTile || before >= 0.5 || sim.interpT < 0.5 ||
-      sim.rocketActive || sim.landingGraceT > 0 || (sim.isJumping && lift > 0.45)) return null;
+// The moving seam the head's step crosses this frame, whatever carries it over.
+function seamCrossing(sim, before) {
+  if (!liveRotation.active || !sim.prevTile || before >= 0.5 || sim.interpT < 0.5) return null;
   const axis = liveRotation.axis;
   const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
   const from = sim.prevTile[coord], to = sim.pos[coord];
@@ -14,6 +14,17 @@ export function movingSliceCrossing(sim, before, lift) {
   // Aligned faces at the beginning/end of the quarter-turn are traversable.
   if (Math.max(Math.abs(Math.sin(2 * a)), Math.abs(Math.sin(2 * b))) < 0.12) return null;
   return { axis, sliceIndex: liveLayerAngleAt(to) != null ? to : from };
+}
+
+// A rocket is untouchable, and a head high in a jump (or still landing) clears the seam.
+export function movingSliceCrossing(sim, before, lift) {
+  if (sim.rocketActive || sim.landingGraceT > 0 || (sim.isJumping && lift > 0.45)) return null;
+  return seamCrossing(sim, before);
+}
+
+/** A moving seam crossed high in a jump the player chose (skillMoments.js): the jump is what saved the worm. */
+export function seamJumped(sim, before, lift) {
+  return !sim.rocketActive && !!sim.isJumping && lift > 0.45 && !sim.assistedJump && !!seamCrossing(sim, before);
 }
 
 // ── Early-turn watch ─────────────────────────────────────────────────────────

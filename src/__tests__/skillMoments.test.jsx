@@ -46,7 +46,7 @@ describe('the body hop', () => {
 
   it('has a sting of its own', () => {
     expect(WORM_HAPTICS.clutch).toBeTruthy();
-    expect(Object.keys(SKILL_CALLOUTS).sort()).toEqual(['double', 'hop', 'pass']);
+    expect(Object.keys(SKILL_CALLOUTS).sort()).toEqual(['double', 'hop', 'pass', 'seam']);
   });
 });
 

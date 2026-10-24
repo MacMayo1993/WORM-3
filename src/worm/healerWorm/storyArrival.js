@@ -11,6 +11,14 @@ export const STORY_ARRIVAL_QUICK_SECONDS = 1.2;
 export const arrivalSeconds = (reduced = false, quick = false) =>
   reduced ? STORY_ARRIVAL_REDUCED_SECONDS : quick ? STORY_ARRIVAL_QUICK_SECONDS : STORY_ARRIVAL_SECONDS;
 
+/**
+ * Where a tap during the arrival moves its clock: the full show jumps to its GO
+ * beat, so the player still sees when control starts; the short arrivals (a
+ * retry's, reduced motion's) have nothing to skip.
+ */
+export const skipArrivalTo = (elapsed, reduced = false, quick = false) =>
+  reduced || quick ? elapsed : Math.max(elapsed, STORY_ARRIVAL_SECONDS - COUNTDOWN_STEP_DURATION);
+
 // The worm surfaces through a portal opened under its start tile: the head
 // rises out first, already facing the way it will crawl, and the body uncoils
 // out of the hole behind it onto the path it rests on. Lengths are along that

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, it, expect } from 'vitest';
-import { movingSliceCrossing, armTurnWatch, stepTurnWatch } from '../worm/healerWorm/sliceCrossing.js';
+import { movingSliceCrossing, seamJumped, armTurnWatch, stepTurnWatch } from '../worm/healerWorm/sliceCrossing.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 let sim;
 beforeEach(() => {
@@ -30,6 +30,21 @@ it('allows sufficiently high jumps, rockets, landing grace and co-rotating layer
   sim.rocketActive=false; sim.landingGraceT=0.1; expect(movingSliceCrossing(sim,0.49,0)).toBeNull();
   sim.landingGraceT=0; setLiveRotation('col',[0,1],[0.6,0.6],1,0.6);
   expect(movingSliceCrossing(sim,0.49,0)).toBeNull();
+});
+
+// The crossing a high jump made safe is a skill moment (skillMoments.js), once,
+// at the boundary, and only for a jump the player chose.
+it('calls out a moving seam cleared by a jump, and nothing else', () => {
+  expect(seamJumped(sim, 0.49, 0.7)).toBe(false);
+  sim.isJumping = true;
+  expect(seamJumped(sim, 0.49, 0.7)).toBe(true);
+  expect(seamJumped(sim, 0.49, 0.1)).toBe(false);
+  expect(seamJumped(sim, 0.6, 0.7)).toBe(false);
+  sim.assistedJump = true; expect(seamJumped(sim, 0.49, 0.7)).toBe(false);
+  sim.assistedJump = false; sim.rocketActive = true; expect(seamJumped(sim, 0.49, 0.7)).toBe(false);
+  sim.rocketActive = false;
+  setLiveRotation('col', [1], [0], 1, 0);
+  expect(seamJumped(sim, 0.49, 0.7)).toBe(false);
 });
 
 // A head mid-step when the hazard fires crosses in the turn's first frames,

@@ -177,6 +177,13 @@
 .worm-countdown--arrival .worm-countdown-digit { font-size: 56px; -webkit-text-stroke-width: 2px; }
 .worm-countdown--arrival .worm-countdown-ready { margin-top: 7px; }
 .worm-countdown--arrival .worm-countdown-pips { margin-top: 6px; }
+.worm-countdown-skip {
+  margin-top: 8px;
+  color: var(--countdown-ink);
+  font: 800 11px/1 var(--countdown-ui);
+  letter-spacing: .08em;
+  opacity: .72;
+}
 .worm-countdown--arrival .worm-countdown-word { font-size: 48px; }
 @media (max-height: 500px) {
   .worm-countdown--arrival { padding-bottom: 20px; }
