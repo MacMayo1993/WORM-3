@@ -12,7 +12,8 @@ import { createOrbVisibility } from './orbVisibility.js';
 // Collectible parity orbs — crystal-core visual design with inner plasma,
 // dual-layer aura, electron halos, and type-system foundation for power-ups.
 
-import React, { useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useCallback } from 'react';
+import { skipMatrixWhileHidden } from '../3d/hiddenMatrices.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
@@ -84,6 +85,9 @@ function SingleOrbImpl({
   );
   const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget, elevated, isGlowWorm), [gemColor, bandColor, isTarget, elevated, isGlowWorm]);
   const orbGroupRef    = useRef();
+  // A hidden orb (culled, or waiting to arrive) costs three.js nothing a frame:
+  // the orb loop updates the matrices it reads itself (updateWorldMatrix).
+  useLayoutEffect(() => { skipMatrixWhileHidden(orbGroupRef.current); });
   const coreRef        = useRef();
   const innerCoreRef   = useRef();
   const shellRef       = useRef();

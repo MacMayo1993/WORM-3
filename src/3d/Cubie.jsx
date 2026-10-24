@@ -415,6 +415,8 @@ const Cubie = React.forwardRef(function Cubie({
   // parent is this piece's content group (tileFrames.js), adopted as the ref attaches.
   const frameHost = useMemo(() => createTileFrameHost(), []);
   const contentRef = useMemo(() => node => adoptTileFrames(frameHost, node), [frameHost]);
+  // The content group's matrix is composed here, not every frame (matrixAutoUpdate off).
+  useLayoutEffect(() => { frameHost.parent?.updateMatrix(); }, [frameHost, contentScale]);
   useImperativeHandle(ref, () => pieceRef.current, []);
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
   const burrowHomeKey = `${origHomeX},${origHomeY},${origHomeZ}`;
@@ -423,7 +425,7 @@ const Cubie = React.forwardRef(function Cubie({
   useLayoutEffect(() => {
     // Replay starts paused: clear the old transform before paint, rather than
     // asking the frozen formation animation to retract during the countdown.
-    popGroupRef.current?.position.set(0, 0, 0);
+    if (popGroupRef.current) { popGroupRef.current.position.set(0, 0, 0); popGroupRef.current.updateMatrix(); }
     poppedRef.current = false;
     if (pieceRef.current) delete pieceRef.current.userData.wormPlatformFormation;
   }, [wormRunId]);
@@ -468,7 +470,7 @@ const Cubie = React.forwardRef(function Cubie({
       // drop it here so a fresh run never shows pieces floating where they
       // were popped out last run.
       const pop = popGroupRef.current;
-      if (pop && (pop.position.x || pop.position.y || pop.position.z)) pop.position.set(0, 0, 0);
+      if (pop && (pop.position.x || pop.position.y || pop.position.z)) { pop.position.set(0, 0, 0); pop.updateMatrix(); }
       return false;
     }
     if (!popGroupRef.current || !pieceRef.current) return true;
@@ -527,6 +529,7 @@ const Cubie = React.forwardRef(function Cubie({
       burrowOffset.applyQuaternion(pieceRef.current.quaternion);
       popGroupRef.current.position.add(burrowOffset);
     }
+    popGroupRef.current.updateMatrix();
     poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick || burrowOffset.lengthSq() > 0;
     if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
     return true;
@@ -542,12 +545,15 @@ const Cubie = React.forwardRef(function Cubie({
   const springIdentity = `${size}:${origHomeX},${origHomeY},${origHomeZ}`;
   useLayoutEffect(() => { ticks?.wake(tick); }, [ticks, tick, springIdentity, wormRunId]);
 
+  // Only this component moves the pop and content groups, and it recomposes them
+  // when it does (updateMatrix): three.js need not recompose 2,356 of them a frame
+  // on a 15×15.
   return (
-    <group ref={popGroupRef}>
+    <group ref={popGroupRef} matrixAutoUpdate={false}>
     {/* WORM: after live expansion, before pad stalks and tunnel anchors */}
     {!ticks && <CubieFrameFallback tick={tick} priority={wormMode ? -0.4 : -0.75} />}
     <group position={explodedPos} ref={pieceRef}>
-    <group scale={contentScale} ref={contentRef}>
+    <group scale={contentScale} ref={contentRef} matrixAutoUpdate={false}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
         <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>

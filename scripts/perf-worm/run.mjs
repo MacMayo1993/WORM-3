@@ -261,6 +261,23 @@ if (MODE === 'frames' || MODE === 'react') {
       byFn[k] = (byFn[k] || 0) + (self.get(n.id) || 0) / 1000;
     }
     console.log(`\nCPU self time (ms over ${MS / 1000}s):\n${top(byFn, 40, ([k, v]) => `${v.toFixed(0).padStart(7)}  ${k}`)}`);
+    // --callers=<function>: that function's time (its own and below it), by the
+    // nearest caller that is not itself, to find who drives a hot routine.
+    if (args.callers) {
+      const parent = new Map(), byId = new Map(profile.nodes.map(n => [n.id, n]));
+      for (const n of profile.nodes) for (const c of n.children || []) parent.set(c, n.id);
+      const total = new Map();
+      const sum = id => { if (total.has(id)) return total.get(id); const n = byId.get(id);
+        const t = (self.get(id) || 0) + (n.children || []).reduce((a, c) => a + sum(c), 0); total.set(id, t); return t; };
+      const byCaller = {}, name = n => `${n.callFrame.functionName || '(anonymous)'} ${n.callFrame.url.replace(/^.*\//, '').replace(/\?.*$/, '')}:${n.callFrame.lineNumber + 1}`;
+      for (const n of profile.nodes) {
+        if (n.callFrame.functionName !== args.callers) continue;
+        const up = byId.get(parent.get(n.id));
+        if (!up || up.callFrame.functionName === args.callers) continue;
+        byCaller[name(up)] = (byCaller[name(up)] || 0) + sum(n.id) / 1000;
+      }
+      console.log(`\n${args.callers} by caller (ms over ${MS / 1000}s, inclusive):\n${top(byCaller, 25, ([k, v]) => `${v.toFixed(0).padStart(7)}  ${k}`)}`);
+    }
     // --lines=<url part>: the same samples by source line, for functions in matching files.
     if (args.lines) {
       const byLine = {}, tickMs = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
