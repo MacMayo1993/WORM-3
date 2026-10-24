@@ -1,6 +1,6 @@
 import { ElementalAbilityEffects } from './healerWorm/ElementalAbilityEffects.jsx';
 import { StoryArrival } from './healerWorm/StoryArrival.jsx';
-import { arrivalSeconds, storyArrivalPose } from './healerWorm/storyArrival.js';
+import { arrivalSeconds, skipArrivalTo, storyArrivalPose } from './healerWorm/storyArrival.js';
 import { runStart, beginRun } from './healerWorm/runStart.js';
 import { commitShuffleNow } from '../hooks/useAnimation.js';
 import { prefersReducedMotion } from '../utils/device.js';
@@ -126,6 +126,20 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
     const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
     const spawnTimerRef     = useRef(0);    // seconds elapsed in spawning entrance animation
+    // A tap or key during a first run's full arrival skips to its GO beat. The
+    // run is still flagged paused through the arrival, so the guard is the pause
+    // menu, and a press on a HUD control (the pause key) is not a skip.
+    const skipArrivalRef    = useRef(false);
+    useEffect(() => {
+        const skip = e => {
+            if (gameModePhaseRef.current !== 'spawning' || useGameStore.getState().wormPauseMenuOpen) return;
+            if (e.target?.closest?.('button, a, input, select, textarea, [role="dialog"]')) return;
+            skipArrivalRef.current = true;
+        };
+        window.addEventListener('pointerdown', skip);
+        window.addEventListener('keydown', skip);
+        return () => { window.removeEventListener('pointerdown', skip); window.removeEventListener('keydown', skip); };
+    }, []);
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
     const quickScrambleRef  = useRef(null); // a retry's committed scramble: { frames, done } (runStart.js)
     const quickStoryRef     = useRef(0);    // frames a retried Story level has sat ready before it starts itself
@@ -558,6 +572,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
                 gameModePhaseRef.current = 'spawning';
                 spawnTimerRef.current    = 0;
+                skipArrivalRef.current   = false;
                 useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
             };
             if (story || practice) {
@@ -609,6 +624,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         if (story && startState.wormGamePhase === 'spawning' && gameModePhaseRef.current === 'active') {
             gameModePhaseRef.current = 'spawning';
             spawnTimerRef.current = 0;
+            skipArrivalRef.current = false;
             return;
         }
         if (startState.wormPauseMenuOpen &&
@@ -675,6 +691,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             spawnTimerRef.current += Math.min(0.05, Math.max(0, delta));
             const reduced = startState.settings?.reducedMotion || prefersReducedMotion();
             const duration = arrivalSeconds(reduced, runStart.quick);
+            if (skipArrivalRef.current) {
+                skipArrivalRef.current = false;
+                spawnTimerRef.current = skipArrivalTo(spawnTimerRef.current, reduced, runStart.quick);
+            }
             const pose = storyArrivalPose(spawnTimerRef.current, reduced, runStart.quick);
             if (pose.step !== countdownStepRef.current) {
                 countdownStepRef.current = pose.step;

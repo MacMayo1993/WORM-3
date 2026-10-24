@@ -3806,3 +3806,18 @@ textarea:focus-visible {
 
 .demo-retry-dialog { font-family: var(--ui-font, sans-serif); }
 .demo-beat-root--hold { padding: 24px; box-sizing: border-box; overflow-y: auto; justify-content: safe center; }
+
+/* Settings → Scene → Motion (device.js marks the root): the player's own switch,
+   beside the system query the rules in every stylesheet follow. Under it every
+   CSS animation lands on its last frame and transitions jump. The loading cover
+   keeps its clock: its canvases read the fall animation's currentTime. */
+:root[data-reduced-motion] :not(.wl-root, .wl-root *),
+:root[data-reduced-motion] :not(.wl-root, .wl-root *)::before,
+:root[data-reduced-motion] :not(.wl-root, .wl-root *)::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}

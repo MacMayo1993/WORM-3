@@ -359,6 +359,7 @@ export function useWormCrawler(size, cubies) {
                 if (resumed.wormPhase === 'windout') {
                     resumed.recordWormXp('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
                     resumed.recordWormMission('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
+                    if (resumed.wormAlive) resumed.sayMobiFirst('ride');
                 }
                 useGameStore.setState({
                     wormPhase: 'crawling',

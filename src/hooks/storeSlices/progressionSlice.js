@@ -1,3 +1,4 @@
+import { MOBI_FIRSTS } from '../../worm/mobiFirsts.js';
 import { checkRubiksWin } from '../../game/winDetection.js';
 import { persistedState } from './persistedState.js';
 import { createXpRun, difficultyMultiplier, puzzleFingerprint, puzzleMode, count } from '../../progression/model.js';
@@ -39,6 +40,16 @@ export const createProgressionSlice = (set, get) => ({
     if (state.playerProgress.milestones[mark]) return {};
     return { playerProgress: { ...state.playerProgress, milestones: { ...state.playerProgress.milestones, [mark]: 1 } },
       wormFusionDiscovery: { id, seq: (state.wormFusionDiscovery?.seq ?? 0) + 1 } };
+  }),
+  // Mobi's line the first time a player meets one of WORM's moving parts
+  // (worm/mobiFirsts.js), once per save; shown by the HUD's MobiLineNotice.
+  sayMobiFirst: id => set(state => {
+    const text = MOBI_FIRSTS[id];
+    if (state.demoMode || !text) return {};
+    const mark = `first:mobi:${id}`;
+    if (state.playerProgress.milestones[mark]) return {};
+    return { playerProgress: { ...state.playerProgress, milestones: { ...state.playerProgress.milestones, [mark]: 1 } },
+      wormMobiLine: { id, text, seq: (state.wormMobiLine?.seq ?? 0) + 1 } };
   }),
   // A free-play run's personal bests (progression/wormBests.js), once per run, at
   // its end (death or a healed cube). wormRunBests tells the result cards which

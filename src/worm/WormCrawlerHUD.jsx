@@ -1117,6 +1117,15 @@ function MobiLineNotice() {
     );
 }
 
+// Mobi's first-pad line (mobiFirsts.js), once a pair of flip pads is open while
+// the worm is crawling in active play, never during the scramble or the arrival.
+export function MobiFirstPad() {
+    const ready = useGameStore(s => s.wormOpenPairs > 0 && s.wormAlive && !s.wormPaused && s.wormPhase === 'crawling'
+        && (s.wormGamePhase === 'active' || s.wormGamePhase === 'finalHealing'));
+    useEffect(() => { if (ready) useGameStore.getState().sayMobiFirst('pad'); }, [ready]);
+    return null;
+}
+
 // ─── Boost button ────────────────────────────────────────────────────────────
 
 function BoostButton({ wormAlive }) {
@@ -1402,6 +1411,7 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
         {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
         <SpecialNotice suppressed={healing || hasBuff || !surface} />
         <MobiLineNotice />
+        {!demo && <MobiFirstPad />}
         <FusionDiscoveryNotice />
         {!demo && <ChallengeToast />}
     </div>;

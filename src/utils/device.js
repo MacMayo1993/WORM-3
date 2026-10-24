@@ -24,7 +24,11 @@ let reducedMotionSource = null;
 // settings.reducedMotion. CSS @media (prefers-reduced-motion) rules still follow
 // the system setting only.
 let reducedMotionSetting = false;
-export const setReducedMotionSetting = on => { reducedMotionSetting = !!on; };
+export const setReducedMotionSetting = on => {
+  reducedMotionSetting = !!on;
+  // CSS follows the switch too: App.css stills animations under this attribute.
+  if (typeof document !== 'undefined') document.documentElement?.toggleAttribute('data-reduced-motion', reducedMotionSetting);
+};
 export const prefersReducedMotion = () => {
   if (reducedMotionSetting) return true;
   if (typeof window === 'undefined' || !window.matchMedia) return false;
