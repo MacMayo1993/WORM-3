@@ -138,13 +138,64 @@ GC time in the throttled profile was lower in the new build: 202 ms against
 - **Heal seal and spark programs** are no longer in the live scene at the
   scramble. They are warmed explicitly instead.
 
+## Step 2: batch upkeep (2026-10-24)
+
+After step 1 the largest cost on a resting 15×15 was keeping the batches
+current: both trackers compared every anchor's transform every frame, and
+1,178 cubies each ran a frame callback that almost always returned at once.
+
+- **Frame versions** (`frameWorldVersion` in `tileFrames.js`). A tile's frames
+  carry a `version` that every writer bumps: its tick, its layout effects and
+  `poseTileFrames`. The tile-surface batches and `StickerInstances` recompose a
+  resting anchor only when that version or its cubie's tracker version changed.
+  Mounted tiles still go through the tracker.
+- **One frustum test per resting tile.** The test runs against a 0.8-radius
+  sphere that holds all of the tile's parts (`tileInView`), instead of one per
+  entry. An entry also keeps its batch until its draw order changes or the pool
+  is disposed (React StrictMode reuses disposed pools).
+- **One cubie callback** (`src/3d/cubieTicks.js`). `CubeAssembly` runs every
+  cubie's lift, kick and pop offsets from one frame callback at -0.41 (WORM)
+  or -0.75. That is after live expansion, and before tunnel anchors and pad
+  stalks. The callback visits only the cubies that are moving. A raised piece
+  wakes itself from its own render. Any kick, pop or burrow on the board ticks
+  every cubie that frame, as before. A `Cubie` mounted without the provider
+  (previews, tests) keeps a callback of its own.
+- **Hidden combat rigs.** `CombatScene`'s pooled rigs, about 600 objects, skip
+  matrix updates while hidden (`skipMatrixWhileHidden`).
+
+Same session, same machine. Base is `main` with step 1 (91eca879). CPU ms per
+frame:
+
+| Run | Base p50 / p95 / over 16.7 ms | New p50 / p95 / over 16.7 ms |
+| --- | --- | --- |
+| 15×15 Eyeball frozen | 11.9 / 17.9 / 10% | **7.9 / 11.7 / 2%** |
+| 15×15 Eyeball live 40 s | 12.0 / 18.2 / 8% | **11.4 / 16.7 / 5%** |
+| 15×15 Eyeball frozen, CPU ×4 | 64.2 / 100.5 | **55.5 / 87.3** |
+| 10×10 Solid frozen | 7.1 / 12.3 / 2% | 7.0 / 12.0 / 1% |
+
+Frozen 15×15 profile, CPU self time over 12 s:
+
+| | Base | New |
+| --- | ---: | ---: |
+| Tracker `refresh` | 1,157 | 388 |
+| `track` | 475 | out of the top |
+| `updateMatrixWorld` | 1,551 | 933 |
+| Cubie frame callbacks | 393 | gone |
+
+The live run gains less: turns, the worm and its effects dominate it. The
+following all match step 1:
+- the flip lifecycle (`restcheck`): 20 objects for a flipped pair, 0 after
+  the heal;
+- shader links per event;
+- a mid-turn 15×15 shot;
+- live 3×3 and 5×5 play with no page errors.
+
 ## Still open
 
-- **Batch upkeep is now the largest cost** on a resting 15×15: about 3.7 ms a
-  frame on this machine. Both trackers (`StickerInstances` and the tile-surface
-  batches) still visit each tile's anchors every frame and compare their
-  transforms. Step 2 is one tile system that skips a resting tile's anchors
-  unless its cubie or the tile itself changed.
-- **`Cubie` keeps three groups per surface cubie** (3,534 objects on a 15×15)
-  and 1,178 per-cubie frame callbacks.
+- **The batch loop still visits every entry each frame**, about 1.5 ms on a
+  resting 15×15. It rebuilds each batch densely so culled tiles leave no gaps.
+  Stable slots with zero-scale culled instances would let still frames skip
+  the loop body.
+- **`Cubie` keeps three groups per surface cubie**: 3,534 objects on a 15×15
+  that three.js composes every frame.
 - **The GPU is still unmeasured.**
