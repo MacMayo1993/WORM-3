@@ -9,6 +9,7 @@ import { cubieKicks } from '../3d/cubieKick.js';
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { CUBE_PIECE_POP } from '../game/raisedCubie.js';
+import { RaisedCubieContext } from '../3d/raisedCubieContext.js';
 
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 extend(THREE);
@@ -79,6 +80,54 @@ describe('cubies under one driver', () => {
       await act(async () => { root.render(draw(2)); });
       frame(); frame();
       expect(raised.current.parent.position.length()).toBe(0);
+      expect(ticks.activeCount()).toBe(0);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+  // A slice turn can carry a piece that is still easing home into a slot whose
+  // cubie was idle: the spring follows the physical piece (useRaisedCubieSpring),
+  // so its new slot must tick it down rather than leave it suspended mid-air.
+  it('keep a returning piece moving when a turn hands its spring to an idle slot', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    useGameStore.setState({ size: 3, explosionT: 0, mirrorMode: false, hollowMode: false, visualMode: 'solid', chaosLevel: 0,
+      randomMode: false, wormHealerMode: false, demoMode: false, cubiePops: {}, settings: { ...before.settings, flipPads: 'full', reducedMotion: false } });
+    const canvas = document.createElement('canvas');
+    const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+      xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+    const root = createRoot(canvas);
+    root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+    const ticks = createCubieTicks(), springs = new Map(), first = createRef(), second = createRef();
+    const source = makeCubies(3);
+    const moving = flips => ({ ...source[2][2][2], stickers: { ...source[2][2][2].stickers,
+      PZ: { ...source[2][2][2].stickers.PZ, flips, curr: flips % 2 ? 4 : 1 } } });
+    const idle = source[0][2][2];
+    function Driver() { useFrame((_s, delta) => ticks.run(delta), -0.75); return null; }
+    // Slot one sits at (2,2,2) and slot two at (0,2,2); `turned` swaps the pieces.
+    const draw = (flips, turned) => <RaisedCubieContext.Provider value={springs}><CubieTicksProvider value={ticks}>
+      <Driver />
+      <Cubie key="one" ref={first} cubie={turned ? { ...idle, x: 2, y: 2, z: 2 } : moving(flips)} position={[1, 1, 1]} size={3} />
+      <Cubie key="two" ref={second} cubie={turned ? { ...moving(flips), x: 0, y: 2, z: 2 } : idle} position={[-1, 1, 1]} size={3} />
+    </CubieTicksProvider></RaisedCubieContext.Provider>;
+    let store, time = 0;
+    const frame = () => store.getState().advance(time += 1 / 60);
+    const spring = () => [...springs.values()].find(s => s.lift !== 0) ?? { lift: 0 };
+    try {
+      await act(async () => { store = root.render(draw(1, false)); });
+      for (let i = 0; i < 90; i++) frame();
+      expect(spring().lift).toBeGreaterThan(0.9);
+      // Healed: it starts home, then the turn moves it into the idle slot mid-way.
+      await act(async () => { root.render(draw(2, false)); });
+      frame(); frame();
+      const midway = spring().lift;
+      expect(midway).toBeGreaterThan(0.2);
+      await act(async () => { root.render(draw(2, true)); });
+      frame();
+      // The new slot carries the offset on and brings it home.
+      expect(second.current.parent.position.length()).toBeGreaterThan(0);
+      for (let i = 0; i < 120; i++) frame();
+      expect(spring().lift).toBe(0);
+      expect(second.current.parent.position.length()).toBe(0);
       expect(ticks.activeCount()).toBe(0);
     } finally {
       await act(async () => root.unmount());

@@ -536,6 +536,11 @@ const Cubie = React.forwardRef(function Cubie({
   useLayoutEffect(() => ticks?.register(tick), [ticks, tick]);
   // Raised by its own render: tick until the formation settles.
   useLayoutEffect(() => { if (raised) ticks?.wake(tick); }, [ticks, tick, raised]);
+  // A turn hands this slot another piece, and with it that piece's spring
+  // (useRaisedCubieSpring follows the physical piece), which may still be easing
+  // home: tick until it has settled, whether or not this piece is raised now.
+  const springIdentity = `${size}:${origHomeX},${origHomeY},${origHomeZ}`;
+  useLayoutEffect(() => { ticks?.wake(tick); }, [ticks, tick, springIdentity, wormRunId]);
 
   return (
     <group ref={popGroupRef}>
