@@ -1,14 +1,15 @@
 // Browser check: jump onto the raised piece straight ahead and crawl on over the cube
 // edge onto its pad. The worm must stay on top of the piece. See README.md.
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { preview } from 'vite';
-const root = '/home/user/WORM-3';
-const { getNextSurfacePosition } = await import(`${root}/src/worm/wormLogic.js`);
-const { cubieCenterInto } = await import(`${root}/src/game/cubeWorldGeometry.js`);
-const { raisedWormExpansion } = await import(`${root}/src/game/raisedCubie.js`);
+import { getNextSurfacePosition } from '../../src/worm/wormLogic.js';
+import { cubieCenterInto } from '../../src/game/cubeWorldGeometry.js';
+import { raisedWormExpansion } from '../../src/game/raisedCubie.js';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, ...v] = a.replace(/^--/, '').split('='); return [k, v.join('=') || true]; }));
 const size = +(args.size || 3), shots = args.shots;
-const { chromium } = await import(process.env.PLAYWRIGHT);
+const { chromium } = await import(process.env.PLAYWRIGHT || 'playwright-core');
 const server = await preview({ root, configFile: path.join(root, 'scripts/perf-worm/vite.perf.config.mjs'), preview: { host: '127.0.0.1', port: 4181 + size } });
 let browser;
 try {
