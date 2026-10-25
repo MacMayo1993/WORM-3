@@ -8,6 +8,8 @@ import { makeWormSim, resetWormSim, startJump, jumpLiftOf, queueTurn, stepWormSi
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
+import { cautionFallPoint } from '../worm/healerWorm/cautionRescue.js';
+import { CAUTION_OPENING_RADIUS } from '../worm/healerWorm/cautionOpening.js';
 
 // A raised WORM piece is solid: the worm goes over it or onto it, never through it.
 // On small cubes almost every piece is an edge or a corner, so the step off its top
@@ -138,5 +140,43 @@ describe('hops and steps near raised pieces', () => {
       }
     }
     expect(raisedFrames).toBeGreaterThan(0);
+  });
+});
+
+// A missed caution cue: the worm goes over the piece's rim and down the bore cut
+// through it (CAUTION_OPENING_RADIUS), never through the plastic beside the bore.
+describe.each([2, 3, 5])('a caution fall into a raised piece on a %i cube', size => {
+  it('climbs over the rim and drops down the opening, as deep as before', () => {
+    const tiles = surfaceTiles(size);
+    let falls = 0;
+    for (const target of tiles.filter(t => t.dirKey === 'PZ')) {
+      // The pad face itself, or a plain face of a piece raised by another face.
+      const other = tiles.find(t => t.x === target.x && t.y === target.y && t.z === target.z && t.dirKey !== 'PZ');
+      for (const flipped of [target, other].filter(Boolean)) {
+        for (const start of tiles) for (const moveDir of ['up', 'down', 'left', 'right']) {
+          if (!sameTile(getNextSurfacePosition(start, moveDir, size), target)) continue;
+          if (start.x === target.x && start.y === target.y && start.z === target.z) continue;
+          const { sim, step } = world(size, [flipped], start, moveDir);
+          for (let f = 0; f < 600 && sim.alive; f++) step();
+          const fall = sim.cautionFall;
+          expect(fall?.tile).toMatchObject(target);
+          expect(sim.alive).toBe(false);
+          falls++;
+          const centre = new Vector3(...cubieCenterInto([0, 0, 0], target.x, target.y, target.z, size, raisedWormExpansion(0, size)));
+          const p = new Vector3(), offset = new Vector3();
+          for (let i = 0; i <= 340; i++) {
+            cautionFallPoint(p, fall, i / 100);
+            const inBody = Math.abs(p.x - centre.x) < 0.58 && Math.abs(p.y - centre.y) < 0.58 && Math.abs(p.z - centre.z) < 0.58;
+            // Inside the piece's reach only within a bore down its own axis (an edge or
+            // corner piece rises off its floor tile sideways too), with the head's radius to spare.
+            const radial = offset.subVectors(p, centre).projectOnPlane(fall.normal).length();
+            if (inBody) expect(radial).toBeLessThan(CAUTION_OPENING_RADIUS - 0.1);
+          }
+          const floor = new Vector3(...getStickerWorldPos(target.x, target.y, target.z, 'PZ', size));
+          expect(p.sub(floor).dot(fall.normal)).toBeLessThan(-(Math.min(2.2, size * 0.65) - 0.2));
+        }
+      }
+    }
+    expect(falls).toBeGreaterThan(0);
   });
 });

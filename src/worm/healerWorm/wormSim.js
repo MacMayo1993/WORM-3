@@ -979,7 +979,7 @@ function collapseBehind(sim, ctx, passage) {
 // or a collapsed tunnel's pit. The fall is presentation; its end is the death.
 function beginCautionFall(sim, tile, size, ctx, pit = false) {
     clearJumpRescue(sim, ctx);
-    sim.cautionFall = makeCautionFall(sim, tile, size);
+    sim.cautionFall = makeCautionFall(sim, tile, size, pit ? null : raisedPlatformPosition(tile, size, ctx));
     sim.cautionFall.pit = pit;
     sim.headInterpPos.copy(sim.cautionFall.start);
     sim.phase = 'falling';

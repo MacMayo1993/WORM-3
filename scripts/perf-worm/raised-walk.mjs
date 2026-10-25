@@ -47,6 +47,55 @@ try {
     window.__perf.noDraw = true;
   }, { size, pad });
   await page.waitForTimeout(1500);
+  if (args.fall) {
+    // Raise the tile straight ahead itself and let the caution cue run out.
+    await page.evaluate(({ size, target }) => {
+      const store = window.__store, { buildManifoldGridMap, flipStickerPair } = window.__perfTopology;
+      let cubies = window.__perfMakeCubies(size);
+      cubies = flipStickerPair(cubies, size, target.x, target.y, target.z, target.dirKey, buildManifoldGridMap(cubies, size));
+      store.setState({ cubies });
+    }, { size, target });
+    await page.waitForTimeout(1500);
+    const c = cubieCenterInto([0, 0, 0], target.x, target.y, target.z, size, raisedWormExpansion(0, size));
+    const shots = args.shots ? [[0.45, 'rim'], [1.25, 'drop']] : [];
+    const fall = await page.evaluate(async ({ c, shotTimes }) => {
+      const sim = window.__wormSimRef.current, out = { frames: 0, clipped: 0, maxRadialInPiece: 0 };
+      window.__store.setState({ wormPaused: false });
+      const t0 = performance.now();
+      while (performance.now() - t0 < 120000) {
+        await new Promise(r => requestAnimationFrame(r));
+        const f = sim.cautionFall;
+        if (!f) { if (!sim.alive) break; continue; }
+        out.frames++;
+        const h = sim.headInterpPos, d = [h.x - c[0], h.y - c[1], h.z - c[2]];
+        if (d.every(v => Math.abs(v) < 0.58)) {
+          const along = d[0] * f.normal.x + d[1] * f.normal.y + d[2] * f.normal.z;
+          const radial = Math.hypot(d[0] - along * f.normal.x, d[1] - along * f.normal.y, d[2] - along * f.normal.z);
+          out.maxRadialInPiece = Math.max(out.maxRadialInPiece, radial);
+          if (radial > 0.3) out.clipped++;
+        }
+        if (shotTimes.length && f.elapsed >= shotTimes[0]) { window.__store.setState({ wormPaused: true }); out.pausedAt = f.elapsed; break; }
+        if (f.elapsed >= 3.39) break;
+      }
+      out.rise = sim.cautionFall?.rise; out.alive = sim.alive;
+      return out;
+    }, { c, shotTimes: shots.map(s => s[0]) });
+    for (const [time, name] of shots) {
+      await page.evaluate(t => { window.__perf.noDraw = false; window.__store.setState({ wormPaused: true }); return t; }, time);
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
+      await page.screenshot({ path: `${args.shots}/fall-${size}-${name}.png`, timeout: 120000 });
+      await page.evaluate(async t => {
+        window.__perf.noDraw = true;
+        const sim = window.__wormSimRef.current;
+        window.__store.setState({ wormPaused: false });
+        while (sim.cautionFall && sim.cautionFall.elapsed < t) await new Promise(r => requestAnimationFrame(r));
+        window.__store.setState({ wormPaused: true });
+      }, shots[shots.indexOf(shots.find(s => s[1] === name)) + 1]?.[0] ?? 0);
+    }
+    console.log(JSON.stringify({ size, target, fall, errors }));
+    process.exitCode = errors.length || fall.clipped ? 1 : 0;
+  }
+  if (!args.fall) {
   const samples = await page.evaluate(async () => {
     const sim = window.__wormSimRef.current, out = [];
     window.__store.setState({ wormPaused: false });
@@ -72,4 +121,5 @@ try {
   const inside = samples.filter(s => s.phase === 'crawling' && !s.flight && s.h.every((v, i) => Math.abs(v - c[i]) < 0.49));
   const route = []; for (const s of samples) { const k = `${s.pos}${s.raised ? '·raised' : ''}${s.flight ? '·flight' : ''}${s.dep ? '·off' : ''}`; if (route.at(-1) !== k) route.push(k); }
   console.log(JSON.stringify({ size, start: pos, moveDir, target, pad, frames: samples.length, insidePieceFrames: inside.length, last: samples.at(-1), route, errors }, null, 1));
+  }
 } finally { await browser?.close(); await new Promise(r => server.httpServer.close(r)); }

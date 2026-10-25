@@ -190,6 +190,12 @@ frames with the head inside the raised piece (must be 0) and page errors.
 `--shots=<dir>` saves a frame from part-way over the edge. Small boards are the
 interesting ones: most of their pieces are edges and corners.
 
+`--fall` raises the tile straight ahead instead and lets the caution cue run out:
+the worm must go over the piece's rim and down the bore cut along the piece's own
+axis. It counts frames with the head inside the piece but outside the bore
+(`clipped`, must be 0) and, with `--shots`, saves the climb (`fall-<n>-rim.png`)
+and the drop (`fall-<n>-drop.png`).
+
 ```bash
 node scripts/perf-worm/raised-walk.mjs --size=2 --shots=/tmp/raised
 node scripts/perf-worm/raised-walk.mjs --size=3
