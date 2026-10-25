@@ -180,6 +180,21 @@ those runs are explicitly marked and must not be used for timing comparisons.
 `--shot-dpr=0.5` lowers only screenshot resolution for software WebGL.
 Run before/after builds sequentially, without other benchmarks or builds running.
 
+## Walking over a raised piece
+
+`raised-walk.mjs` (same server and browser setup as `travel.mjs`) raises the
+piece straight ahead of the worm by flipping its face over the cube edge, jumps
+onto it, and crawls on over the edge onto the pad. It prints the route
+(`111PZ·raised > 111PY·raised` means the worm stayed on top), counts crawling
+frames with the head inside the raised piece (must be 0) and page errors.
+`--shots=<dir>` saves a frame from part-way over the edge. Small boards are the
+interesting ones: most of their pieces are edges and corners.
+
+```bash
+node scripts/perf-worm/raised-walk.mjs --size=2 --shots=/tmp/raised
+node scripts/perf-worm/raised-walk.mjs --size=3
+```
+
 ## Elemental ability smoke check
 
 ```bash

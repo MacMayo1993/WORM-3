@@ -5,7 +5,8 @@ import { wormExpansion } from '../wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { getNextSurfacePosition } from '../wormLogic.js';
+import { getNextSurfacePosition, isTileInSlice } from '../wormLogic.js';
+import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { shPush, ttPush } from '../circularBuffers.js';
 import { arcLift } from './jumpArc.js';
@@ -27,6 +28,12 @@ export function raisedPlatformPosition(tile, size, ctx) {
     const point = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, raisedWormExpansion(wormExpansion.amount, size)));
     return isLiveFlippedFace(cubie.stickers[tile.dirKey], cap)
         ? point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT) : point;
+}
+
+// A landing on a pad face stands on the pad, above the raised piece's own face.
+export function raisedPadHeightAt(tile, ctx) {
+    const sticker = ctx.getCubies()?.[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey];
+    return isLiveFlippedFace(sticker, ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0;
 }
 
 // Share the same two-cell aim window with the chase camera. Prefer the nearest
@@ -183,11 +190,33 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     if (!usesRaisedPlatforms(ctx) || sim.padFlight || sim.rocketActive || sim.landingGraceT > 0) return false;
     const aim = findRaisedPlatform(sim.pos, sim.moveDir, size, ctx, sim.onRaisedPlatform);
     if (!aim) return false;
+    flyToPlatform(sim, size, ctx, aim, allowRide);
+    return true;
+}
+
+// A hop that was not aimed at a platform (it turned in the air, or set off while
+// a layer was turning) and whose next step comes down on a raised piece lands on
+// top of it, from its current height. Otherwise the step would put the worm on
+// the floor inside the piece, and nothing on the floor stops a worm in the air.
+// It lands without diving: the player did not aim this jump at a mouth.
+export function catchHopOnPlatform(sim, next, size, ctx) {
+    if (!next || !sim.isJumping || sim.padFlight || sim.rocketActive || sim.onRaisedPlatform || sim.restRead ||
+        !usesRaisedPlatforms(ctx) || inMovingLayer(sim.pos) || inMovingLayer(next)) return false;
+    const target = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+    const destination = raisedPlatformPosition(target, size, ctx);
+    if (!destination) return false;
+    flyToPlatform(sim, size, ctx, { target, moveDir: next.moveDir ?? sim.moveDir, destination }, false);
+    return true;
+}
+const inMovingLayer = tile => liveRotation.active &&
+    liveRotation.sliceIndices.some(layer => isTileInSlice(liveRotation.axis, layer, tile.x, tile.y, tile.z));
+
+function flyToPlatform(sim, size, ctx, aim, allowRide) {
     const { target, moveDir, destination } = aim;
     const start = sim.headInterpPos.clone();
     if (sim.isJumping) start.addScaledVector(sim.currentNormal, arcLift(sim.jumpT, sim.jumpHeight, sim.jumpBase));
     const endNormal = FACE_NORMALS[target.dirKey].clone();
-    const padHeight = isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0;
+    const padHeight = raisedPadHeightAt(target, ctx);
     const piece = destination.clone().addScaledVector(endNormal, -(SURFACE_OFFSET + padHeight));
     const cubeHalf = (size - 1) / 2 * cubeExpansionScale(size, wormExpansion.amount) + 0.5;
     const forward = new THREE.Vector3().fromArray(DIR_FORWARD[sim.pos.dirKey]?.[sim.moveDir] ?? DIR_FORWARD[target.dirKey][moveDir]);
@@ -220,7 +249,6 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     sim.jumpBase = 0;
     sim.pendingTunnelTrigger = null;
     ctx.feel('jump');
-    return true;
 }
 export const samplePlatformArc = (flight, t, out) => bezierInto(out, flight.ctrl, Math.max(0, Math.min(1, t)));
 

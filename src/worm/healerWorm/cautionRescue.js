@@ -17,8 +17,7 @@ export const CAUTION_DISSOLVE_END = 3.2;
 // treating every colour mismatch as an open hole.
 //
 // A collapsed tunnel's pit (tunnelPits.js) stops the worm at its rim the same
-// way, with the same moment to turn away or jump clear; it is never waived for a
-// landing grace or a step off a platform, since nothing carries the worm over it.
+// way, with the same moment to turn away or jump clear.
 export function cautionEntry(sim, next, size, ctx) {
     if (!next || !usesRaisedPlatforms(ctx) || !['active', 'finalHealing'].includes(ctx.getGamePhase()) ||
         sim.isJumping || sim.padFlight || sim.rocketActive || sim.restRead || sim.signature.sweep ||
@@ -31,7 +30,9 @@ export function cautionEntry(sim, next, size, ctx) {
     if (isPitTile(sim, next) && !isPitTile(sim, sim.pos)) {
         return { tile: { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey }, pit: true };
     }
-    if (sim.onRaisedPlatform || sim.raisedDeparture || sim.landingGraceT > 0) return null;
+    // A worm on top walks on along raised pieces. Fresh off one, or just down from
+    // a rocket, the next piece is still solid: stop at its tape.
+    if (sim.onRaisedPlatform) return null;
     if (!raisedPlatformPosition(next, size, ctx) || raisedPlatformPosition(sim.pos, size, ctx)) return null;
     return { tile: { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey } };
 }
