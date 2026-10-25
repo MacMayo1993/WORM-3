@@ -5,7 +5,7 @@ import { recordCompletedHeal, tickHealChain } from './healChain.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
-import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
+import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, catchHopOnPlatform, raisedPlatformPosition, raisedPadHeightAt, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing, seamJumped } from './sliceCrossing.js';
 import { tickExpansion } from './expansion.js';
 import { makeBurrows, startBurrow, tickBurrows } from './burrows.js';
@@ -979,7 +979,7 @@ function collapseBehind(sim, ctx, passage) {
 // or a collapsed tunnel's pit. The fall is presentation; its end is the death.
 function beginCautionFall(sim, tile, size, ctx, pit = false) {
     clearJumpRescue(sim, ctx);
-    sim.cautionFall = makeCautionFall(sim, tile, size);
+    sim.cautionFall = makeCautionFall(sim, tile, size, pit ? null : raisedPlatformPosition(tile, size, ctx));
     sim.cautionFall.pit = pit;
     sim.headInterpPos.copy(sim.cautionFall.start);
     sim.phase = 'falling';
@@ -2191,7 +2191,10 @@ const PHASE_HANDLERS = {
             // arc covers it nicely.
 
             if (sim.stepAcc >= STEP_SEC) {
-                const caution = cautionEntry(sim, getNextSurfacePosition(sim.pos, sim.moveDir, size), size, ctx);
+                const ahead = getNextSurfacePosition(sim.pos, sim.moveDir, size);
+                // A hop coming down on a raised piece lands on top of it.
+                if (catchHopOnPlatform(sim, ahead, size, ctx)) return true;
+                const caution = cautionEntry(sim, ahead, size, ctx);
                 if (caution) {
                     // Stop on the safe source tile before committing any pickups,
                     // trail cells or body contacts on the other side of the tape.
@@ -2295,8 +2298,17 @@ const PHASE_HANDLERS = {
                     sim.pendingSelfCollision = null;
                 }
 
-                sim.raisedDeparture = sim.onRaisedPlatform;
-                sim.onRaisedPlatform = false;
+                // Walking on along raised pieces stays on top of them: over a cube edge
+                // onto the same piece's next face (most pieces on a small cube are edges
+                // or corners) or onto a raised neighbour. Only a step to the floor leaves.
+                const stayRaised = sim.onRaisedPlatform && !!next && !sim.restRead && !!raisedPlatformPosition(sim.pos, size, ctx);
+                sim.raisedDeparture = sim.onRaisedPlatform && !stayRaised;
+                sim.onRaisedPlatform = stayRaised;
+                if (stayRaised) {
+                    sim.raisedPadHeight = raisedPadHeightAt(sim.pos, ctx);
+                    // Expansion and burrows hold until the tail is off the raised route.
+                    sim.raisedRouteDistance = sim.stepHistory.distance;
+                }
                 // Immediately update curWorldPos so the interpolation target is correct
                 setCurWorldPosFromTile(sim, size);
                 updateRotationDeparture(sim);
