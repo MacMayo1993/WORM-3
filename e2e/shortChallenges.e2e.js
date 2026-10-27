@@ -18,7 +18,9 @@ for (const phone of [false, true]) {
     await expect(card).toContainText('Grow, ride, restore');
     await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
     await expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
-    await card.getByRole('button', { name: 'Skip Exercise', exact: true }).click({ timeout: 15000 });
+    // Use the suite's software-WebGL action budget: CI can take over 15 seconds
+    // to acknowledge this click even after the second challenge has rendered.
+    await card.getByRole('button', { name: 'Skip Exercise', exact: true }).click();
     await expect(card).toContainText('Cross your own route');
     await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
     await page.screenshot({ path: `/tmp/worm-challenges-${phone ? 'phone' : 'desktop'}.png` });
