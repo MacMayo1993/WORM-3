@@ -56,8 +56,54 @@
   .worm-instrument .orb-slot-pickup .orb-sample { animation: none; }
 }
 .worm-action-center { flex-direction: column; }
-.worm-primary-actions { display: flex; justify-content: center; gap: 8px; }
-.worm-jump-slot { position: relative; display: flex; }
+.worm-primary-actions { display: flex; justify-content: center; gap: 6px; }
+.worm-jump-slot { position: relative; display: flex; flex: 1; min-width: 0; }
+/* Every live-play key has the same opaque face and bright ink. Element and
+   character colors identify the border, never the text/background contrast. */
+.worm-instrument .worm-hud-bottom .worm-control {
+  --control-accent: #a6b99a;
+  box-sizing: border-box; min-height: 48px; min-width: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px 8px; border: 2px solid var(--control-accent); border-radius: 14px;
+  background: var(--hud-text); color: var(--hud-raised);
+  box-shadow: 0 4px 0 #18251d, 0 6px 12px #0003, inset 0 1px 0 #ffffff20;
+  opacity: 1; filter: none; font-weight: 800; line-height: 1.15;
+  text-shadow: none; letter-spacing: .02em; touch-action: manipulation;
+}
+.worm-instrument .worm-hud-bottom .worm-control:active:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--hud-ink); transform: translateY(3px);
+  box-shadow: 0 1px 0 #18251d, inset 0 2px 4px #0003;
+}
+.worm-instrument .worm-hud-bottom .worm-control:is(:disabled, [aria-disabled="true"]) {
+  color: #c5ccbf; border-color: #758370; cursor: default;
+  box-shadow: 0 2px 0 #18251d; transform: none;
+}
+.worm-instrument .worm-hud-bottom .worm-control[data-state="portal"],
+.worm-instrument .worm-hud-bottom .worm-control[data-state="rescue"] {
+  --control-accent: #ffe58a; outline: 2px solid var(--control-accent); outline-offset: 2px;
+}
+.worm-instrument .worm-hud-bottom .worm-control[data-state="air"] { --control-accent: #9ff2df; }
+.worm-instrument .worm-hud-bottom .worm-control[data-state="fire"] { --control-accent: #ffb45e; }
+.worm-instrument .worm-hud-bottom .worm-control[data-state="active"] { --control-accent: #b7ed96; }
+.worm-instrument .worm-hud-bottom .worm-jump { min-width: 0; font-size: 15px; }
+.worm-instrument .worm-hud-bottom .worm-control.worm-boost { padding-inline: 3px; position: relative; overflow: hidden; flex-shrink: 0; width: 60px; }
+.worm-instrument .worm-hud-bottom .worm-steer { padding: 6px; }
+.worm-instrument .worm-hud-bottom .worm-signature-control .worm-control { width: 100%; }
+.worm-control > svg { flex-shrink: 0; }
+.worm-control-label { font-size: 14px; font-weight: 800; }
+.worm-control-label small { display: block; font-size: 12px; font-weight: 800; }
+.worm-control-caption { font-size: 12px; font-weight: 800; }
+.worm-instrument .worm-hud-bottom .worm-combat-fire small { font-size: 12px; opacity: 1; }
+.worm-instrument .worm-hud-bottom .worm-control:focus-visible {
+  outline: 3px solid var(--hud-raised); outline-offset: 3px;
+}
+@media (max-width: 360px) {
+  .worm-instrument .worm-hud-bottom .worm-control.worm-boost { width: 56px; }
+  .worm-instrument .worm-hud-bottom .worm-control { gap: 4px; padding-inline: 5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .worm-instrument .worm-hud-bottom .worm-control:active:not(:disabled):not([aria-disabled="true"]) { transform: none; }
+}
 .worm-instrument .worm-jump-rescue {
   outline: 3px solid #ffe58a;
   outline-offset: 3px;
@@ -66,7 +112,7 @@
 .worm-jump-rescue-cue {
   position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
   width: max-content; max-width: 190px; padding: 8px 12px;
-  border: 1px solid #ffe58a; border-radius: 9px; background: var(--hud-surface, #20251e);
+  border: 1px solid #ffe58a; border-radius: 9px; background: var(--hud-text, #26372d);
   color: #ffe58a; font-size: 13px; font-weight: 800; line-height: 1.3;
   pointer-events: none; z-index: 3;
 }
@@ -267,7 +313,6 @@
 
 /* An ability recharging is not a dead key: the icon stays at full strength and
    the ring shows the charge; a ready ability breathes so the eye finds it. */
-.worm-signature-control button:disabled { opacity: 1 !important; filter: saturate(.35); }
 .worm-signature-control button[data-ready] { animation: worm-signature-ready 1.6s ease-in-out infinite; }
 @keyframes worm-signature-ready { 50% { transform: scale(1.04); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .worm-signature-control button[data-ready] { animation: none; } }

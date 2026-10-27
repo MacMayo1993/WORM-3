@@ -49,8 +49,8 @@ export function CombatFireButton() {
   useEffect(() => { window.addEventListener('blur',stop); return () => { stop(); window.removeEventListener('blur',stop); }; }, []);
   const start = e => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); callWormTurn('fire-start'); };
   const element = ELEMENTS[c?.element];
-  return <button className="worm-combat-fire worm-hud-key" aria-label={`Fire parity shot, ${c?.ammo ?? 0} of 3 ready`}
-    style={{borderColor:element?.color}}
+  return <button className="worm-combat-fire worm-hud-key worm-control" aria-label={`Fire parity shot, ${c?.ammo ?? 0} of 3 ready`}
+    style={{'--control-accent':element?.color}}
     disabled={!active || !c?.started || c.won || c.held || (c.ambient && !c.encounter)}
     onPointerDown={start} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onClick={e => { if (e.detail === 0) callWormTurn('fire'); }}>

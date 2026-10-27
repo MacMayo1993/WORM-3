@@ -44,19 +44,26 @@ it('batches readable fire, buds, shields and chain arcs, follows live tiles, and
         frame(); expect(bolts.geometry.drawRange.count).toBe(24);
         expect([...bolts.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
         expect(rings.count).toBeGreaterThan(2);
-        sim.elementalType = 'air'; sim.elementalPair = null; sim.elementalAbilities.events = [];
-        frame(); expect(wind.count).toBe(4); // visible as soon as Air is active, even grounded
-        const calm = wind.instanceMatrix.array.slice();
+        sim.elementalType = 'air'; sim.elementalPair = null; sim.elementalAbilities.events = []; sim.powerups = [];
+        frame(); expect(wind.geometry.drawRange.count).toBeGreaterThan(0); // visible as soon as Air is active, even grounded
+        expect(buds.count).toBe(0); // no orbiting particles around the face
+        const calm = wind.geometry.attributes.position.array.slice();
         sim.elementalAbilities.visualTime += 1; frame();
-        expect(wind.instanceMatrix.array).toEqual(calm); // reduced motion keeps the mantle still
+        expect(wind.geometry.attributes.position.array).toEqual(calm); // reduced motion keeps the mantle still
         useGameStore.setState({ settings: { ...before.settings, reducedMotion: false } });
-        frame(); expect(wind.instanceMatrix.array).not.toEqual(calm);
-        const pausedWind = wind.instanceMatrix.array.slice(); frame();
-        expect(wind.instanceMatrix.array).toEqual(pausedWind);
+        frame(); expect(wind.geometry.attributes.position.array).not.toEqual(calm);
+        const pausedWind = wind.geometry.attributes.position.array.slice(); frame();
+        expect(wind.geometry.attributes.position.array).toEqual(pausedWind);
         sim.isJumping = true; sim.elementalAbilities.flying = true;
         wormSegments.count = 4; wormSegments.positions.set([0, 1, 3, 0, 0.7, 3, 0, 0.4, 3, 0, 0.1, 3]);
-        frame(); expect(wind.count).toBe(7);
-        expect([...wind.instanceMatrix.array].every(Number.isFinite)).toBe(true);
+        frame();
+        expect(wind.geometry.attributes.position.array).not.toEqual(pausedWind);
+        const fullDetail = wind.geometry.drawRange.count;
+        useGameStore.setState({ perfReducedFX: true }); frame();
+        expect(wind.geometry.drawRange.count).toBeLessThan(fullDetail);
+        sim.elementalT = 0; frame(); expect(wind.geometry.drawRange.count).toBe(0);
+        sim.elementalT = 10;
+        expect([...wind.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
         for (const type of ['air', 'fire', 'water', 'grass', 'ice', 'lightning']) {
             sim.elementalType = type;
             sim.elementalAbilities.events = [{ kind: 'pickup', element: type, id: 2, duration: 1.1, ttl: .8, tiles: [sim.pos] }];
@@ -66,7 +73,7 @@ it('batches readable fire, buds, shields and chain arcs, follows live tiles, and
             expect(color.getHexString()).toBe(new THREE.Color(ELEMENTAL_DEFS[type].color).getHexString());
         }
         sim.phase = 'tunnel'; frame();
-        expect(flames.count + buds.count + rings.count + wind.count + bolts.geometry.drawRange.count).toBe(0);
+        expect(flames.count + buds.count + rings.count + wind.geometry.drawRange.count + bolts.geometry.drawRange.count).toBe(0);
         const disposed = group.children.flatMap(m => [m.geometry, m.material]).map(resource => {
             const listener = vi.fn(); resource.addEventListener('dispose', listener); return listener;
         });
