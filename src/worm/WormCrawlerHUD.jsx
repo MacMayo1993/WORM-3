@@ -1482,8 +1482,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         resumeFeel(); feel('uiKey');
         setIsPaused(false);
         setShowPowerInfo(false);
-        setWormPaused(['spawning', 'countdown'].includes(useGameStore.getState().wormGamePhase) || (storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormFinished)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
-    }, [setWormPaused, demoLesson, combatMode, storyId]);
+        const live = useGameStore.getState();
+        const demoHold = demoLesson && (!live.demoWormStarted || live.demoWormFinished || (lessonCourse === 'challenges' && live.demoWormComplete));
+        setWormPaused(['spawning', 'countdown'].includes(live.wormGamePhase) || (storyId && !live.wormStoryStarted) || demoHold || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
+    }, [setWormPaused, demoLesson, lessonCourse, combatMode, storyId]);
 
     useEffect(() => {
         // Settings can be opened from Pause. Start Capture must resume that
@@ -1507,7 +1509,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     </div>;
 
     return (
-        <div className="worm-instrument" data-arriving={wormGamePhase === 'spawning' || undefined} data-combat={combatMode || undefined} data-lesson={demoLesson ? lessonId : undefined} style={ROOT_STYLE}>
+        <div className="worm-instrument" data-arriving={wormGamePhase === 'spawning' || undefined} data-combat={combatMode || undefined} data-lesson={demoLesson ? lessonId : undefined} data-course={demoLesson ? lessonCourse : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}

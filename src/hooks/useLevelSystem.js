@@ -6,7 +6,7 @@
 
 import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { getLevel, getNextLevel } from '../levels/index.js';
+import { getLevel, getNextLevel, levelsManager } from '../levels/index.js';
 import { makeCubies } from '../game/cubeState.js';
 import { clearRefractory } from '../game/refractoryMap.js';
 
@@ -112,7 +112,10 @@ export function useLevelSystem({ onBriefingSkipped } = {}) {
 
     // A campaign level can opt into an opening cutscene. This is data-driven so
     // changing a pack's length or finale ID cannot make its cutscene unreachable.
-    if (levelData?.hasCutscene && !seen) {
+    if (levelsManager.getPackForLevel(levelId)?.id === 'short-challenges') {
+      setShowLevelTutorial(false);
+      skipRef.current?.();
+    } else if (levelData?.hasCutscene && !seen) {
       setShowCutscene(true);
     } else if (!seen) {
       setShowLevelTutorial(true);

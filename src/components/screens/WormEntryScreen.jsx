@@ -90,7 +90,7 @@ export default function WormEntryScreen({ onComplete, onCancel, onChallenges, in
         <span className="worm-levels-total" aria-label={`${totalStars} of ${totalMax} stars`}><b aria-hidden="true">★</b>{totalStars}<small>/{totalMax}</small></span></nav>
       {page === 'challenges' ? <section className="short-challenge-entry">
         <h2>Use the cube</h2>
-        <p>Three short, repeatable challenges on a calm 5×5 board. Read the target, try your route, and retry immediately. Each goal checks what you actually did.</p>
+        <p>Three timed skill checks at increasing speed. Collect a scattered supply, double-jump your moving tail, then grow a body long enough to close a ring. Plan your route before starting.</p>
         <ol>{WORM_SHORT_CHALLENGES.map(challenge => <li key={challenge.id}><ActionCue kind={challenge.cue}>{challenge.title}</ActionCue></li>)}</ol>
         <ActionLegend />
         <button type="button" className="piece" onClick={onChallenges}><span className="piece-face"><span className="piece-trailer">Start challenges</span><b aria-hidden="true">→</b></span></button>
