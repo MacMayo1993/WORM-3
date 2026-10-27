@@ -19,6 +19,7 @@ import { createCubieTicks, CubieTicksProvider } from './cubieTicks.js';
 import VoidCore from './VoidCore.jsx';
 // DragGuide removed - real-time rotation provides visual feedback
 import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
+import ActionPairPreview from '../components/overlays/ActionPairPreview.jsx';
 import SolveHighlight from '../components/overlays/SolveHighlight.jsx';
 import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosStorm from '../manifold/ChaosStorm.jsx';
@@ -1333,6 +1334,7 @@ const CubeAssembly = React.memo(({
           </group>
           </CubieTicksProvider>
           </CubieBodyBatchProvider>
+          <ActionPairPreview />
           {showCursor && cursor && (
             <CursorHighlight />
           )}

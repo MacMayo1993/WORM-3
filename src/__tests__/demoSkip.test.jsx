@@ -165,3 +165,19 @@ it('labels a skipped tour as finished and resets skips on replay', () => {
   act(() => demo.handleDemoReplay());
   expect(state()).toMatchObject({ demoStep: 'worm-traversal', demoSkipped: false, demoWormSkipped: [] });
 });
+
+it('launches short challenges directly and restores the player on finish without starting the full tour', () => {
+  useGameStore.setState({ demoMode: false, demoStep: null });
+  const settings = state().settings, character = state().wormCharacter, xp = state().playerProgress.xp;
+  draw(<Harness />);
+  act(() => demo.handleStartDemo('challenges'));
+  expect(state()).toMatchObject({ demoMode: true, demoStep: 'worm-traversal', demoWormCourse: 'challenges', wormHealerMode: true, size: 5 });
+  expect(demo.demoColdOpenVisible).toBe(false);
+  expect(demo.demoStepIntroVisible).toBe(false);
+  act(() => useGameStore.setState({ demoWormFinished: true }));
+  expect(state()).toMatchObject({ demoMode: false, demoStep: null, showMainMenu: true, wormHealerMode: false, wormCharacter: character });
+  expect(state().settings).toEqual(settings);
+  expect(state().playerProgress.xp).toBe(xp);
+  wait(60000);
+  expect(state().demoMode).toBe(false);
+});

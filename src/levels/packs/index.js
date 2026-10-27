@@ -6,6 +6,7 @@
 import storyCampaign from './story-campaign.js';
 import cubeAcademy from './cube-academy.js';
 import algorithmCodex from './algorithm-codex.js';
+import shortChallenges from './short-challenges.js';
 
 // Note: the analytically generated antipodal flip campaign is now Story mode
 // itself (the Topological Descent — see packs/story-campaign.js), so the
@@ -20,6 +21,7 @@ export const OFFICIAL_PACKS = [
   storyCampaign,
   cubeAcademy,
   algorithmCodex,
+  shortChallenges,
 ];
 
 /**
@@ -29,6 +31,7 @@ export const BUILT_IN_PACKS = {
   'story-campaign': storyCampaign,
   'cube-academy': cubeAcademy,
   'algorithm-codex': algorithmCodex,
+  'short-challenges': shortChallenges,
 };
 
 /**

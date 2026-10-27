@@ -13,6 +13,7 @@
 // Pure and React-free — the callers own the materials and the frame loop.
 
 import * as THREE from 'three';
+import { ACTION_CUES } from '../game/actionCues.js';
 
 // Face basis: outward normal + two in-plane tangents (u, v) for the quad.
 export const FACE_DEFS = {
@@ -31,8 +32,8 @@ export const EDGE_UV = 0.5 * (TILE_HALF / QUAD_HALF); // tile outline, in the qu
 
 // Warm gold, deep to pale. Deliberately richer than UI_GOLD: these colours are
 // additively blended over a live scene, so a pale token would wash out to white.
-export const GOLD_DEEP = '#ff9c1c';
-export const GOLD_CORE = '#ffe7ae';
+export const GOLD_DEEP = ACTION_CUES.turn.deep;
+export const GOLD_CORE = ACTION_CUES.turn.color;
 
 // Cheap value-noise fbm, shared by every shader in this family.
 export const NOISE_GLSL = `

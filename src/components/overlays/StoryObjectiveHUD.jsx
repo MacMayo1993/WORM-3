@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ActionLegend, { ActionCue } from '../ui/ActionCue.jsx';
 import { levelsManager } from '../../levels/index.js';
 import { getLevelPar } from '../../levels/scoring.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -90,6 +91,7 @@ export default function StoryObjectiveHUD({ level }) {
             <span>{level.name}</span>
           </div>
           <p>{objective}</p>
+          {!!tutorial.cues?.length && <><div className="action-cue-row">{tutorial.cues.map(kind => <ActionCue key={kind} kind={kind} />)}</div><ActionLegend /></>}
 
           {/* Algorithm levels carry the sequence itself. Monospace is reserved
               for grid ids and algorithm notation, so it belongs here. */}

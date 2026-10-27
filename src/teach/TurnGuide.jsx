@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { ACTION_CUES } from '../game/actionCues.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { getSliceRimGeometry, EDGE_UV } from './layerGlow.js';
 import { rimVertexShader } from './LayerHighlight.jsx';
 import { buildTurnGuideGeometry } from './turnGuideGeometry.js';
 
 const rimFragment = `
+  uniform vec3 uDeep, uCore;
   uniform float uTime, uDir, uOpacity;
   varying vec2 vUv;
   varying float vPhase;
@@ -19,7 +21,7 @@ const rimFragment = `
     float pulse = pow(max(0.0,1.0 - abs(phase - .5) * 5.0),2.0);
     float alpha = (line * .7 + halo) * (.65 + .35 * pulse) * uOpacity;
     if (alpha < .005) discard;
-    gl_FragColor = vec4(mix(vec3(1.0,.43,.025),vec3(1.0,.86,.38),pulse),alpha);
+    gl_FragColor = vec4(mix(uDeep,uCore,pulse),alpha);
     #include <colorspace_fragment>
   }
 `;
@@ -34,6 +36,7 @@ const trackVertex = `
   }
 `;
 const trackFragment = `
+  uniform vec3 uDeep, uCore;
   uniform float uTime, uDir, uOpacity, uLength;
   varying vec2 vUv;
   varying float vFacing;
@@ -50,7 +53,7 @@ const trackFragment = `
     float phase = fract(vUv.x * 2.0 - uDir * uTime * .28);
     float pulse = pow(max(0.0,1.0 - abs(phase - .5) * 5.0),2.0);
     float ink = max(arrow, rail * .75);
-    vec3 gold = mix(vec3(1.0,.49,.025),vec3(1.0,.92,.54),pulse);
+    vec3 gold = mix(uDeep,uCore,pulse);
     vec3 color = mix(vec3(.16,.075,.018),gold,ink);
     float alpha = max(outline,rail * (.55 + pulse * .4)) * uOpacity
       * smoothstep(.1,.75,vFacing);
@@ -67,7 +70,7 @@ export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false
   const age = useRef(0);
   const rim = useMemo(() => getSliceRimGeometry(size,axis,sliceIndex),[size,axis,sliceIndex]);
   const track = useMemo(() => buildTurnGuideGeometry(size,axis,sliceIndex,reduced),[size,axis,sliceIndex,reduced]);
-  const uniforms = useMemo(() => ({ uTime:{value:0},uDir:{value:dir === 1 ? 1 : -1},uOpacity:{value:calm ? 1 : 0},uLength:{value:track.userData.trackLength} }),[dir,calm,track]);
+  const uniforms = useMemo(() => ({ uDeep:{value:new THREE.Color(ACTION_CUES.turn.deep)},uCore:{value:new THREE.Color(ACTION_CUES.turn.color)},uTime:{value:0},uDir:{value:dir === 1 ? 1 : -1},uOpacity:{value:calm ? 1 : 0},uLength:{value:track.userData.trackLength} }),[dir,calm,track]);
   useEffect(() => { age.current = 0; },[axis,sliceIndex,dir,size]);
   useEffect(() => () => track.dispose(),[track]);
   useFrame((_,delta) => {

@@ -1,3 +1,4 @@
+import { ACTION_CUES } from '../game/actionCues.js';
 import { tunnelDanger } from './healerWorm/tunnelReadout.js';
 import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './healerWorm/constants.js';
@@ -40,7 +41,7 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
 
   if (compact) return <button type="button" onClick={onInspect} className="worm-tunnel-needs worm-tunnel-glance worm-hud-chip"
     data-heal-ready={funded} data-tunnel-danger={!!danger} aria-label={`${safety}. ${danger ? caption : healing}. Pause for details.`} aria-haspopup="dialog">
-    <span className="worm-tunnel-safety-symbol" aria-hidden="true">{danger ? '⊘' : need.locked ? '—' : '✓'}</span>
+    <span className="worm-tunnel-safety-symbol" aria-hidden="true">{danger ? ACTION_CUES.danger.symbol : need.locked ? '—' : ACTION_CUES.link.symbol}</span>
     <span className="worm-tunnel-safety-copy"><strong>{safety}</strong>
       <small>{danger ? (need.inTransit ? 'Collapse ahead' : !padRoute ? 'Choose another route' : danger === 'collapsed' ? 'Go around it' : "Don't land on it") : healing}</small>
     </span>

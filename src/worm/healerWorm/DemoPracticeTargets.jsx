@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { ACTION_CUES } from '../../game/actionCues.js';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos } from '../wormExpansion.js';
@@ -22,7 +23,7 @@ function PracticeMarker({ tile, size, floor }) {
   useFrame(() => { ref.current?.position.fromArray(position()); });
   return <mesh ref={ref} name="practice-target" rotation={FACES[tile.dirKey][1]} position={position()}>
     <ringGeometry args={[0.32, 0.39, 4, 1, Math.PI / 4]} />
-    <meshBasicMaterial color="#e8ff9a" transparent opacity={0.9} depthWrite={false} toneMapped={false} />
+    <meshBasicMaterial color={ACTION_CUES.target.color} transparent opacity={0.9} depthWrite={false} toneMapped={false} />
   </mesh>;
 }
 export default function DemoPracticeTargets({ size }) {

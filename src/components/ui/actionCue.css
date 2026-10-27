@@ -1,0 +1,14 @@
+.action-cue { display:inline-flex; align-items:center; gap:6px; font-weight:800; line-height:1.4; }
+.action-cue-symbol { display:inline-grid; place-items:center; flex:none; width:24px; height:24px; border-radius:6px; background:#19271f; color:var(--cue-color); border:1px solid var(--cue-deep); font-size:18px; }
+.action-legend { margin:12px 0; font-size:12px; line-height:1.5; }
+.action-legend summary { cursor:pointer; padding:10px 0; font-weight:800; }
+.action-legend dl { margin:6px 0; display:grid; gap:10px; }
+.action-legend dt,.action-legend dd { margin:0; }
+.action-legend dd { margin:3px 0 0 30px; opacity:.85; }
+.action-cue-row { display:flex; flex-wrap:wrap; gap:8px 14px; margin:8px 0; font-size:12px; }
+.short-challenge-entry { padding:clamp(18px,4vw,36px); max-width:640px; margin:auto; }
+.short-challenge-entry h2 { margin:0 0 8px; }
+.short-challenge-entry ol { padding-left:24px; display:grid; gap:14px; }
+.short-challenge-entry p { line-height:1.5; }
+.short-challenge-entry button { min-height:48px; cursor:pointer; }
+.short-challenge-entry .piece-face { padding:12px 18px; }

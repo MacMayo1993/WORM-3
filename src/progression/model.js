@@ -118,7 +118,7 @@ export function puzzleMode(state) {
   if (state.currentLevelData?.dailyKey) return 'daily';
   if (state.currentLevel) {
     if (state.activePackId === 'algorithm-codex') return 'codex';
-    if (state.activePackId === 'cube-academy') return 'cube';
+    if (['cube-academy', 'short-challenges'].includes(state.activePackId)) return 'cube';
     return 'story';
   }
   if (state.settings?.biomeMode?.enabled) return 'biome';

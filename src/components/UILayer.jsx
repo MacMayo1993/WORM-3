@@ -122,7 +122,7 @@ export default function UILayer({
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped, speedThresholdSec, chaosPreview, onBetBack, onChaosReplay,
-    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame, onWormStoryNext,
+    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormChallenges, onWormRetry, onWormNewGame, onWormStoryNext,
     onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
     onDemo,
@@ -550,7 +550,7 @@ export default function UILayer({
 
       <ScreenTransition show={showWormModeWizard}>
         <Suspense fallback={<ScreenFallback label="Loading setup" />}>
-          <WormEntryScreen initialPage={wormEntryPage} onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
+          <WormEntryScreen initialPage={wormEntryPage} onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} onChallenges={onWormChallenges} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
 

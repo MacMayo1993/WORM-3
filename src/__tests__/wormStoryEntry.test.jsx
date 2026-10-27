@@ -42,7 +42,7 @@ it('opens directly to Story Mode and switches sections without launching a run',
   show();
   expect(host.querySelector('.worm-path-split')).toBeNull();
   expect(host.querySelector('select').value).toBe('story');
-  expect([...host.querySelector('select').options].map(option => option.text)).toEqual(['Story Mode', 'Free Play', 'Worm Customization']);
+  expect([...host.querySelector('select').options].map(option => option.text)).toEqual(['Story Mode', 'Free Play', 'Short Challenges', 'Worm Customization']);
   expect(complete).not.toHaveBeenCalled();
   expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   const rules = host.querySelector('[aria-label="Star requirements"]');
@@ -159,4 +159,13 @@ it('continues level six into seven and reserves chapter completion for ten', () 
     click(id === 6 ? 'Next level' : 'Levels');
   }
   expect(next).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
+});
+
+it('opens the short challenge briefing and launches only on request', () => {
+  const launch = vi.fn(); show({ onChallenges: launch });
+  switchSection('challenges');
+  expect(host.textContent).toContain('Grow, ride, restore');
+  expect(host.textContent).toContain('Close the loop');
+  expect(launch).not.toHaveBeenCalled(); expect(complete).not.toHaveBeenCalled();
+  click('Start challenges'); expect(launch).toHaveBeenCalledOnce();
 });

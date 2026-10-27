@@ -12,38 +12,45 @@ import { bodyCoverageCount } from './bodyCoverage.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 
 export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COLORS[face]) {
+  const lessonId = lesson.practiceId ?? lesson.id;
   resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
   const c = Math.floor(size / 2);
-  const ring = ['surround', 'bomb'].includes(lesson.id);
-  const caution = ['caution-fall', 'caution-rescue'].includes(lesson.id);
-  const portal = caution || ['tunnel', 'heal'].includes(lesson.id);
+  const ring = ['surround', 'bomb'].includes(lessonId);
+  const caution = ['caution-fall', 'caution-rescue'].includes(lessonId);
+  const portal = caution || ['tunnel', 'heal', 'collect-heal'].includes(lessonId);
   const target = { x: c, y: ring ? c : Math.min(size - 2, 3), z: size - 1, dirKey: 'PZ' };
+  if (lessonId === 'collect-heal') target.y = size - 2;
   // Start within the live two-tile jump aim window. One deliberate press can
   // reach the pad, even while its two-second formation is still playing.
-  sim.pos = { x: ring ? c - 1 : c, y: ring ? c - 1 : portal ? Math.max(0, target.y - 2) : 0, z: size - 1, dirKey: 'PZ' };
+  sim.pos = { x: ring ? c - 1 : c, y: lessonId === 'collect-heal' ? 0 : ring ? c - 1 : portal ? Math.max(0, target.y - 2) : 0, z: size - 1, dirKey: 'PZ' };
   sim.moveDir = ring ? 'right' : 'up';
   sim._curWP.fromArray(getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, 'PZ', size, 0));
   sim.headInterpPos.copy(sim._curWP);
   ttReset(sim.tileTrail, tileKey(sim.pos)); ttReset(sim.pathHistory, tileKey(sim.pos));
   sim.tailLength = ring ? Math.ceil(8 / BODY_BALL_SPACING) : BASE_TAIL_LENGTH;
-  if (lesson.id === 'body-jump') {
+  if (lessonId === 'body-jump') {
     seedPracticeBody(sim, size, BODY_JUMP_PATH.map(([x, y]) => [x + c - 2, y]));
     sim.tailLength = Math.ceil(10 / BODY_BALL_SPACING);
     target.y = 2;
   }
   let cubies = makeCubies(size);
-  if (portal || lesson.id === 'surround') {
+  if (portal || lessonId === 'surround') {
     cubies = flipStickerPair(cubies, size, target.x, target.y, target.z, target.dirKey, buildManifoldGridMap(cubies, size));
   }
   const inventory = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-  if (lesson.id === 'heal') {
+  if (lessonId === 'heal') {
     const face = cubies[target.x][target.y][target.z].stickers.PZ.curr;
     inventory[face] = 2 * ORB_SEGMENT_GROWTH;
     sim.tailLength += 2 * ORB_SEGMENT_GROWTH;
     sim.orbPickupFaceIds = Array(2).fill(face);
     sim.orbPickupColors = Array(2).fill(orbColor(face));
   }
-  if (lesson.id === 'orbs') {
+  if (lessonId === 'collect-heal') {
+    // On the front face, growth cores have the antipodal colour: exactly the
+    // colour of this flipped entrance. No free inventory, random supply or timer.
+    sim.powerups = [1, 2].map(y => makeGrowthOrb({ x: c, y, z: size - 1, dirKey: 'PZ' }));
+  }
+  if (lessonId === 'orbs') {
     // A guaranteed trail carries the first growth lesson around the cube's edge.
     // Plenty of side routes remain rewarding if the player chooses to steer.
     const route = new Map();
@@ -59,27 +66,28 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     route.delete(tileKey(sim.pos));
     sim.powerups = [...route.values()].map(tile => makeGrowthOrb(tile));
   }
-  if (lesson.id === 'magnet' || lesson.id === 'signature') {
+  if (lessonId === 'magnet' || lessonId === 'signature') {
     sim.powerups = [-1, 1].map(dx => makeGrowthOrb({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ' }));
   }
-  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(lesson.id)) {
-    sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
+  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(lessonId)) {
+    sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lessonId, id: `demo-${lessonId}`, ttl: 9999, maxTtl: 9999 }];
   }
-  const marked = ring || portal || lesson.id === 'body-jump' ? { ...target, ring } : null;
+  const marked = ring || portal || lessonId === 'body-jump' ? { ...target, ring } : null;
   return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
 // jump, pickup, tunnel, ring or hazard lesson.
 export function readWormPractice(sim, practice, lesson, state, size, delta) {
+  const lessonId = lesson.practiceId ?? lesson.id;
   practice.sawAirJump ||= sim.isJumping && sim.elementalT > 0 && sim.elementalType === 'air' && !sim.rocketActive;
   practice.sawJump ||= sim.isJumping;
   practice.sawBoost ||= sim.boostActiveT > 0;
   practice.sawRocket ||= sim.rocketActive;
   practice.sawShower ||= sim.orbShowerT > 0;
-  if (sim.elementalType === lesson.id && sim.elementalFocusT <= 0) practice.elementTime += Math.min(delta, 0.05);
+  if (sim.elementalType === lessonId && sim.elementalFocusT <= 0) practice.elementTime += Math.min(delta, 0.05);
   let done = false, progress = '';
-  switch (lesson.id) {
+  switch (lessonId) {
     case 'steer': done = !!state.demoWormSteered; break;
     case 'orbs': done = state.wormSessionOrbs >= DEMO_ORB_GOAL; progress = `${Math.min(DEMO_ORB_GOAL, state.wormSessionOrbs)} / ${DEMO_ORB_GOAL} orbs — watch your tail grow`; break;
     case 'orb-shower':
@@ -122,8 +130,9 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       break;
     case 'tunnel':
     case 'heal':
-      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (lesson.id !== 'heal' || sim.healed > 0);
-      progress = state.wormTunnelCount === 0 ? 'Jump onto the raised pad ahead; Retry resets your approach'
+    case 'collect-heal':
+      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (!['heal', 'collect-heal'].includes(lessonId) || sim.healed > 0) && (lessonId !== 'collect-heal' || state.wormSessionOrbs >= 2);
+      progress = lessonId === 'collect-heal' && state.wormSessionOrbs < 2 ? `${state.wormSessionOrbs} / 2 orbs collected — stay on the floor until both are yours` : state.wormTunnelCount === 0 ? 'Jump onto the raised pad ahead; Retry resets your approach'
         : sim.phase !== 'crawling' ? 'Riding through the tunnel…'
           : sim.tunnelPassages.length ? 'Keep moving — your tail is still exiting' : '';
       break;
@@ -134,7 +143,7 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       const ring = getWormholeHealRing(practice.target, size);
       const count = [...ring].filter(key => occupied.has(key)).length;
       progress = `${count} / ${ring.size} tiles covered together`;
-      done = lesson.id === 'surround' ? sim.healed > 0 && sim.healPauseT <= 0 : state.demoWormHazardCleared === 'bomb';
+      done = lessonId === 'surround' ? sim.healed > 0 && sim.healPauseT <= 0 : state.demoWormHazardCleared === 'bomb';
       break;
     }
     case 'rocket': done = practice.sawRocket && !sim.rocketActive && !sim.isJumping; break;
