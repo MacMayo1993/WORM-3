@@ -8,18 +8,22 @@
 
 Choose **WORM → Short Challenges → Start challenges**:
 
-1. **Grow, ride, restore:** collect the two authored orbs, jump onto the pad, ride the tunnel, and clear the tail after healing.
-2. **Cross your own route:** jump over the staged body crossing and land safely.
-3. **Close the loop:** occupy the eight-tile ring around the opening to heal the pair.
+1. **Grow, ride, restore:** route through four scattered orbs, jump onto the pad, heal the pair, and clear the tail.
+2. **Cross your own route:** double-jump over the staged body, land safely, and collect three orbs on a turning route.
+3. **Close the loop:** collect the four front-face corner orbs to earn enough body length, then surround the opening. The ring is no longer traced out for the player.
 
-This is a separate course on the existing practice runtime. It does not replace the full demo or change Story saves. `practiceId` lets the crossing and surround tasks use their existing staging and outcome checks; the collection/healing task has no preloaded inventory. Retry rebuilds the board and clears run counters. Next is disabled until the simulation reports completion. Skip never records completion. Finish and Exit restore the player's settings and character and return to the menu, without launching the rest of the demo or awarding the full-demo discovery reward.
+All three have a 25-second active-play limit and increasing speeds (2.6, 2.8, 3.0). Only the authored, non-respawning pickup supply counts toward the goals. The clock reads the simulation, stops for help, pause, tab blur and forced holds, and excludes tunnel travel. Expiry ends the attempt without awarding completion; Retry resets the board and clock. Successful challenges pause for the result. The ordinary full demo retains its untimed, guided practice behavior.
+
+During play, the challenge card folds to a goal/progress strip. Its **?** button pauses play and opens instructions, Resume, Retry and Skip. Skipping never records completion. Finish and Exit restore the player's settings and character and return to the menu without awarding the full-demo discovery reward.
 
 ## Cube puzzles
 
-**TEACH → Cube puzzle campaigns → Short Challenges** opens six 3×3 puzzles. They occupy IDs 501–506, outside campaign and Daily ranges. Each uses authored turns/flips, so retries reproduce the same board. All are selectable. Stars and completion use the existing puzzle records; XP is classified as cube practice. Their exact one- to three-action pars are checked with the mixed turn/flip solver, and the returned solution is replayed against the game engine in tests.
+**TEACH → Cube puzzle campaigns → Short Challenges** opens six mixed turn/flip 3×3 puzzles with 4–9 move targets. The v2 boards use IDs 511–516, so stars earned on the retired one- to three-action boards (501–506) do not count as clearing the harder replacements. Existing saves are not deleted.
+
+Each board uses a deterministic reversible setup. Par is the replay-verified authored solution length, not a claim of global optimality. Tests also exhaustively reject solutions of at most three actions for the opening boards and four for the later boards. All puzzles are selectable, and completion uses the existing puzzle records and cube-practice XP.
+
+Challenges open directly into the board. Their objective starts folded to a small move-counter strip on every puzzle; hints remain optional and do not list the solution. No automatic pair marker gives away the repair. This does not alter the player's persisted Story guidance preference.
 
 ## Validation
 
-Tests cover exact pars and playable solutions, identity-preserving preview lookup and cap handling, collection and tunnel-tail completion through the live WORM hook, retry/skip gates, course launch/exit restoration, and entry-screen navigation. The browser smoke checks open the real WORM course from its menu on desktop and phone, and launch the cube pack through Teach. They verify that the mode picker closes, challenge controls remain usable, and the linked-pair objective is displayed.
-
-Verified on this change: 7,143 tests across 460 files; all three Chromium browser checks; production build; lint with no errors; bundle budget (551.2 KB Brotli, below the 640 KB limit); and `git diff --check`.
+Tests cover reversible solutions and shortcut bounds, complete WORM routes through the live simulation, double-crossing and landing credit, clock/expiry/retry behavior, help pauses, folded guidance and Story preference preservation. Browser checks launch both challenge modes through the real menus on desktop and phone, and bound the live guidance card's height.

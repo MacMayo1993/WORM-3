@@ -28,10 +28,18 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   sim.headInterpPos.copy(sim._curWP);
   ttReset(sim.tileTrail, tileKey(sim.pos)); ttReset(sim.pathHistory, tileKey(sim.pos));
   sim.tailLength = ring ? Math.ceil(8 / BODY_BALL_SPACING) : BASE_TAIL_LENGTH;
+  if (lesson.challenge && lessonId === 'surround') {
+    // ceil(reach) must remain below eight after three pickups. The fourth
+    // supplies the missing coverage, so the starting body cannot seal it.
+    sim.tailLength = Math.floor(7 / BODY_BALL_SPACING) - (lesson.orbGoal - 1) * ORB_SEGMENT_GROWTH;
+  }
   if (lessonId === 'body-jump') {
-    seedPracticeBody(sim, size, BODY_JUMP_PATH.map(([x, y]) => [x + c - 2, y]));
+    const path = lesson.challenge ? [[2,0],[1,0],[0,0],[0,1],[0,2],[1,2],[2,2],[2,3],[2,4],[3,4],[4,4],[4,3],[4,2],[3,2]] : BODY_JUMP_PATH;
+    seedPracticeBody(sim, size, path.map(([x, y]) => [x + c - 2, y]));
     sim.tailLength = Math.ceil(10 / BODY_BALL_SPACING);
     target.y = 2;
+    if (lesson.challenge) sim.powerups = [[size - 1, 2], [size - 1, size - 1], [c, size - 1]]
+      .map(([x, y]) => makeGrowthOrb({ x, y, z: size - 1, dirKey: 'PZ' }));
   }
   let cubies = makeCubies(size);
   if (portal || lessonId === 'surround') {
@@ -47,8 +55,13 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   }
   if (lessonId === 'collect-heal') {
     // On the front face, growth cores have the antipodal colour: exactly the
-    // colour of this flipped entrance. No free inventory, random supply or timer.
-    sim.powerups = [1, 2].map(y => makeGrowthOrb({ x: c, y, z: size - 1, dirKey: 'PZ' }));
+    // colour of this flipped entrance. No free inventory or random supply.
+    sim.powerups = (lesson.challenge ? [[c, 1], [size - 1, 1], [size - 1, size - 1], [c, size - 1]] : [[c, 1], [c, 2]])
+      .map(([x, y]) => makeGrowthOrb({ x, y, z: size - 1, dirKey: 'PZ' }));
+  }
+  if (lesson.challenge && lessonId === 'surround') {
+    sim.powerups = [[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]]
+      .map(([x, y]) => makeGrowthOrb({ x, y, z: size - 1, dirKey: 'PZ' }));
   }
   if (lessonId === 'orbs') {
     // A guaranteed trail carries the first growth lesson around the cube's edge.
@@ -72,8 +85,9 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(lessonId)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lessonId, id: `demo-${lessonId}`, ttl: 9999, maxTtl: 9999 }];
   }
+  if (lesson.challenge) for (const orb of sim.powerups) orb.challengeSupply = true;
   const marked = ring || portal || lessonId === 'body-jump' ? { ...target, ring } : null;
-  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
+  return { cubies, inventory, target: marked, elapsed: 0, lastTime: 0, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
@@ -97,7 +111,8 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'jump': done = practice.sawJump && !sim.isJumping; break;
     case 'body-jump':
       trackPracticeBodyJump(sim, practice, size);
-      done = practice.bodyJumps > 0;
+      practice.doubleCrossing ||= practice.crossedThisJump && sim.jumpCount >= 2;
+      done = practice.bodyJumps >= (lesson.jumpGoal ?? 1) && (!lesson.requireDouble || practice.doubleCrossing);
       progress = practice.crossedThisJump ? 'Body cleared — land safely' : 'Jump over the body crossing ahead';
       break;
     // Both presses must land in ONE flight: a single hop that lands resets the
@@ -131,7 +146,7 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'tunnel':
     case 'heal':
     case 'collect-heal':
-      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (!['heal', 'collect-heal'].includes(lessonId) || sim.healed > 0) && (lessonId !== 'collect-heal' || state.wormSessionOrbs >= 2);
+      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (!['heal', 'collect-heal'].includes(lessonId) || sim.healed > 0) && (lessonId !== 'collect-heal' || state.wormSessionOrbs >= (lesson.orbGoal ?? 2));
       progress = lessonId === 'collect-heal' && state.wormSessionOrbs < 2 ? `${state.wormSessionOrbs} / 2 orbs collected — stay on the floor until both are yours` : state.wormTunnelCount === 0 ? 'Jump onto the raised pad ahead; Retry resets your approach'
         : sim.phase !== 'crawling' ? 'Riding through the tunnel…'
           : sim.tunnelPassages.length ? 'Keep moving — your tail is still exiting' : '';
@@ -157,6 +172,21 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'lightning': done = practice.elementTime >= 4; break;
     case 'signature': done = sim.signature.seq > 0 && (sim.signature.glowTrail?.path.count ?? 0) >= 2; break;
     case 'rotation': done = state.rotationEpoch > practice.rotationEpoch; break;
+  }
+  if (lesson.challenge) {
+    // Use the simulation clock, not render delta or wall time. Pause, tab blur,
+    // rescue and focus holds stop it; tunnel travel is excluded explicitly.
+    const elapsed = Math.max(0, sim.timeAlive - practice.lastTime);
+    practice.lastTime = sim.timeAlive;
+    if (sim.phase === 'crawling' && state.wormPhase === 'crawling' && !sim.tunnelPassages.length) practice.elapsed += elapsed;
+    const orbs = Math.max(0, (lesson.orbGoal ?? 0) - sim.powerups.filter(orb => orb.challengeSupply).length);
+    if (lesson.orbGoal) done &&= orbs >= lesson.orbGoal;
+    const goalProgress = lessonId === 'body-jump' ? `${practice.doubleCrossing && practice.bodyJumps ? 'Crossing cleared' : 'Double-jump'} · ${orbs}/${lesson.orbGoal} orbs`
+      : lessonId === 'surround' ? `${orbs}/${lesson.orbGoal} orbs · ${sim.healed > 0 ? 'Ring sealed' : 'Close the ring'}`
+        : `${orbs}/${lesson.orbGoal} orbs · ${sim.healed > 0 ? 'Sealed' : 'Seal the tunnel'}`;
+    done &&= practice.elapsed <= lesson.timeLimit;
+    const failed = !done && practice.elapsed >= lesson.timeLimit;
+    return { done, failed, progress: `${goalProgress} · ${Math.max(0, Math.ceil(lesson.timeLimit - practice.elapsed))}s` };
   }
   return { done, progress };
 }

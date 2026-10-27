@@ -1336,7 +1336,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        if (ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
+        if (ctx.isStoryMode?.() || pickedUp.challengeSupply || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
         else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
         collectedAny = true;
     }

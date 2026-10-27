@@ -277,7 +277,11 @@ export function useWormCrawler(size, cubies) {
                 const s = useGameStore.getState();
                 return ['active', 'finalHealing'].includes(s.wormGamePhase);
             },
-            getSpeed: () => (useGameStore.getState().wormSpeed ?? 2.0) * WORM_MOVEMENT_SPEED_SCALE,
+            getSpeed: () => {
+                const s = useGameStore.getState();
+                const speed = wormDemoActive(s) && s.demoWormCourse === 'challenges' ? wormDemoLesson(s).speed : s.wormSpeed;
+                return (speed ?? 2) * WORM_MOVEMENT_SPEED_SCALE;
+            },
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
             getWormholeInterval: () => useGameStore.getState().wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
             getCharacter: () => useGameStore.getState().wormCharacter ?? 'classic',
@@ -673,11 +677,13 @@ export function useWormCrawler(size, cubies) {
             const result = readWormPractice(sim, demoPracticeRef.current, lesson, useGameStore.getState(), sizeRef.current, delta);
             if (result.done || result.progress !== state.demoWormProgress) {
                 useGameStore.setState({ demoWormProgress: result.progress,
-                    // Reaching a goal unlocks Next; it never interrupts the
-                    // live practice. Only the player pauses or leaves a lesson.
+                    // Practice stays live after success. Timed challenges
+                    // pause on their result so the player can choose what is next.
                     ...(result.done ? { demoWormComplete: true,
+                        ...(lesson.challenge ? { wormPaused: true } : {}),
                         demoWormCompleted: [...new Set([...state.demoWormCompleted, lesson.id])] } : {}) });
             }
+            if (result.failed) killWormSim(sim, ctxRef.current, { reason: 'challenge-timeout' });
         }
         if (story && state.wormStoryStarted && !state.wormPaused && !document.hidden && sim.alive && !state.wormStoryResult && storyPracticeRef.current?.runId === state.wormRunId) {
             const live = useGameStore.getState();

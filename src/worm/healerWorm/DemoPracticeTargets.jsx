@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { wormDemoLesson } from '../../game/wormDemoLessons.js';
 import { ACTION_CUES } from '../../game/actionCues.js';
 import { useFrame } from '@react-three/fiber';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -29,7 +30,9 @@ function PracticeMarker({ tile, size, floor }) {
 export default function DemoPracticeTargets({ size }) {
   const target = useGameStore(s => s.wormStoryLevel ? s.wormStoryTarget : s.demoMode && s.demoStep === 'worm-traversal' && !s.demoWormFinished && !s.demoWormComplete ? s.demoWormTarget : null);
   const phase = useGameStore(s => s.wormPhase);
+  const challenge = useGameStore(s => s.demoMode && s.demoWormCourse === 'challenges' ? wormDemoLesson(s).id : null);
   if (!target || phase !== 'crawling') return null;
+  if (challenge && challenge !== 'collect-heal') return null;
   const tiles = target.ring ? [...getWormholeHealRing(target, size)].map(key => {
     const [x, y, z, dirKey] = key.split(','); return { x: +x, y: +y, z: +z, dirKey };
   }) : [target];
