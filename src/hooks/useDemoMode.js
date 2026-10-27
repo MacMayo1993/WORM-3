@@ -497,7 +497,7 @@ export function useDemoMode({
     });
   }, []);
 
-  const handleStartDemo = useCallback(() => {
+  const handleStartDemo = useCallback((course) => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     const store = useGameStore.getState();
@@ -512,10 +512,16 @@ export function useDemoMode({
     store.clearLevel();
     store.clearDisparityGame();
     store.setRandomMode(false);
-    store.startDemo();
+    const challenges = course === 'challenges';
+    store.startDemo(challenges ? 'challenges' : 'practice');
     applyDemoSettings();
-    setDemoColdOpenVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, cancelShuffle, cancelDisparityRun]);
+    setDemoColdOpenVisible(!challenges);
+    setDemoStepIntroVisible(false);
+    if (challenges) {
+      armSceneGate?.('Worm challenges', { eager: true, holdMs: 0, z: 10600 });
+      applyDemoStepConfig('worm-traversal');
+    }
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelShuffle, cancelDisparityRun, armSceneGate, applyDemoStepConfig]);
 
   // Cold open dismissed → drop into the first step's intro.
   const handleDemoColdOpenContinue = useCallback(() => {
@@ -526,6 +532,10 @@ export function useDemoMode({
   const advanceDemoStep = useCallback((fromStep, { skipped = false } = {}) => {
     const store = useGameStore.getState();
     if (!store.demoMode || store.demoStep !== fromStep || fromStep === 'end') return;
+    if (store.demoWormCourse === 'challenges') {
+      if (skipped || store.demoWormFinished) useGameStore.setState({ demoWormFinished: true, wormPaused: true });
+      return;
+    }
     if (fromStep === 'worm-traversal' && !store.demoWormFinished && !skipped) return;
     // A stale coach click must never advance the lesson while the player is
     // choosing a palette or tile style in the Settings modal.
@@ -1056,12 +1066,13 @@ export function useDemoMode({
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal' || !demoWormFinished) return;
     useGameStore.getState().setWormPaused(true);
+    if (useGameStore.getState().demoWormCourse === 'challenges') { handleExitDemo(); return; }
     if (useGameStore.getState().demoWormSkipped.length) {
       advanceDemoStepRef.current?.('worm-traversal', { skipped: true });
       return;
     }
     celebrateStep('worm-traversal');
-  }, [demoMode, demoStep, demoWormFinished, celebrateStep]);
+  }, [demoMode, demoStep, demoWormFinished, celebrateStep, handleExitDemo]);
 
   // A failed attempt stays in the lesson. The card supplies Retry.
   const wormAlive = useGameStore((s) => s.wormAlive);

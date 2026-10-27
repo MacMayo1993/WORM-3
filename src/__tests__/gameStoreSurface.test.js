@@ -26,7 +26,7 @@ const EXPECTED_KEYS = [
   'wormMission', 'wormMissionsCompleted', 'recordWormMission', 'wormMissionCounters', 'wormRunAchievements',
   'chestWallet', 'chestRolling', 'rollCubieChest', 'finishChestRoll', 'chooseChestReward', 'exchangeChestGems', 'claimChestGems',
   'wormCombatMode', 'wormEnemiesEnabled', 'wormPauseMenuOpen',
-  'demoWormLessonIndex', 'demoWormStarted', 'demoWormPrepared', 'demoWormAttempt',
+  'demoWormCourse', 'demoWormLessonIndex', 'demoWormStarted', 'demoWormPrepared', 'demoWormAttempt',
   'demoWormComplete', 'demoWormFinished', 'demoWormCompleted', 'demoWormSkipped', 'demoSkipped', 'demoWormProgress',
   'demoWormTarget', 'demoWormHazardCleared',
   'startWormDemoLesson', 'restartWormDemoLesson', 'nextWormDemoLesson', 'skipWormDemoLesson', 'finishWormDemo',

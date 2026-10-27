@@ -1,3 +1,4 @@
+import ActionLegend from '../components/ui/ActionCue.jsx';
 import { TILE_GROWTH_HELP } from './healerWorm/tileUnits.js';
 import { ORB_SHOWER_DURATION } from './healerWorm/orbSpawning.js';
 import { getViewPowerDef, VIEW_POWER_DURATION } from './healerWorm/viewPowerups.js';
@@ -1297,6 +1298,7 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
 
                     {storyId && <StoryObjectiveCard />}
                     <WormMissionCard summary />
+                    <ActionLegend />
                     <details className="screen-disclosure"><summary>Abilities & rewards</summary>
                       <small>{TILE_GROWTH_HELP}</small>
                       <BuffStrip detailed /><FusionGuide /><TunnelNeedsCard /><SignatureGuide />
@@ -1444,10 +1446,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
+    const lessonCourse = useGameStore(s => s.demoWormCourse);
     const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormFinished);
     const storyId = useGameStore(s => s.wormStoryLevel);
     const storyStarted = useGameStore(s => s.wormStoryStarted);
-    const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex });
+    const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex, demoWormCourse: lessonCourse });
+    const lessonId = lesson.practiceId ?? lesson.id;
     const previewLesson = demoLesson && lesson.preview;
     const controlsEnabled = wormAlive && (!demoLesson || (practiceRunning && !previewLesson)) && (!storyId || storyStarted);
     const trayRef = useRef(null);
@@ -1551,7 +1555,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const questsMinimized = settings?.wormQuestsMinimized ?? false;
     const toggleQuests = () => useGameStore.getState().setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }));
     const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
-    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation');
+    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lessonId === 'rotation');
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
@@ -1583,7 +1587,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     </div>;
 
     return (
-        <div className="worm-instrument" data-arriving={wormGamePhase === 'spawning' || undefined} data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
+        <div className="worm-instrument" data-arriving={wormGamePhase === 'spawning' || undefined} data-combat={combatMode || undefined} data-lesson={demoLesson ? lessonId : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
@@ -1596,7 +1600,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {phase === 'crawling' && <FreePlayProgress />}
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
-                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'rotation'].includes(lesson.id)) && (
+                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'collect-heal', 'rotation'].includes(lessonId)) && (
                             <div className="worm-hud-reserve">
                                 {showRotationTint && <RotationCountdownHUD />}
                                 <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
@@ -1630,7 +1634,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                 </div>
                 <div className="worm-hud-status-row worm-hud-telemetry">
-                    {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
+                    {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
                 </div>
                 {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                 {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
@@ -1647,7 +1651,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
+                        {combatMode ? <CombatFireButton /> : demoLesson ? lessonId === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
                                 {jumpRescue && <JumpRescueCue caution={cautionRescue} pit={pitRescue} watching={previewLesson} />}

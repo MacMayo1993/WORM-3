@@ -1,3 +1,4 @@
+import { ACTION_CUES } from '../../game/actionCues.js';
 import { currentExplosion } from '../../worm/wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import React, { useRef, useMemo } from 'react';
@@ -91,7 +92,7 @@ const CursorHighlight = () => {
       <mesh ref={meshRef}>
         <ringGeometry args={[0.35, 0.48, 32]} />
         <meshBasicMaterial
-          color="#fbbf24"
+          color={ACTION_CUES.target.color}
           transparent
           opacity={0.5}
           side={THREE.DoubleSide}
@@ -103,7 +104,7 @@ const CursorHighlight = () => {
       <mesh ref={glowRef}>
         <ringGeometry args={[0.3, 0.55, 32]} />
         <meshBasicMaterial
-          color="#f59e0b"
+          color={ACTION_CUES.target.deep}
           transparent
           opacity={0.25}
           side={THREE.DoubleSide}
@@ -120,7 +121,7 @@ const CursorHighlight = () => {
         ]}>
           <circleGeometry args={[0.06, 16]} />
           <meshBasicMaterial
-            color="#fbbf24"
+            color={ACTION_CUES.target.color}
             transparent
             opacity={0.7}
           />

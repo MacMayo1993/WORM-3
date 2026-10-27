@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { ActionCue } from '../ui/ActionCue.jsx';
 import { chaosCountdownState } from '../../hooks/useChaosMode.js';
 
 // maxCountdown is the reference scale for the progress bar (fixed at the
@@ -78,7 +79,7 @@ const RotationPreview = ({ upcomingRotation, size }) => {
   return (
     <div className="rotation-preview">
       <div className="preview-header">
-        <span className="preview-title">Next</span>
+        <span className="preview-title"><ActionCue kind="turn">Next turn</ActionCue></span>
         <span ref={arrowRef} className="preview-arrow">{dir === 1 ? '↻' : '↺'}</span>
       </div>
 

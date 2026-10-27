@@ -973,6 +973,13 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, [clearMegaReducedFXOverride]);
 
+  const handleWormChallenges = useCallback(() => {
+    clearMegaReducedFXOverride();
+    setShowWormModeWizard(false);
+    setShowModeSelect(false);
+    handleStartDemo('challenges');
+  }, [clearMegaReducedFXOverride, handleStartDemo]);
+
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
     const wormState = useGameStore.getState();
@@ -1383,6 +1390,7 @@ export default function WORM3() {
   // camera position. Mobile needs extra room for its narrower portrait viewport.
   // Step three needs room for nine raised pairs plus its task card. A distinct
   // distance also resets any close zoom carried over from Meet the Twins.
+  const shortChallengeCourse = useGameStore(s => s.demoMode && s.demoWormCourse === 'challenges');
   const demoFlipZoom = demoMode && demoStep === 'flip-gateway' ? 1.3 : 1;
   const cameraZ = ((isMobile
     ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 8: 62, 9: 70, 10: 78, 15: 116 }
@@ -1607,6 +1615,7 @@ export default function WORM3() {
               onWormSetupComplete: handleWormSetupComplete,
               onMobiIntroComplete: handleMobiIntroComplete,
               onWormWizardCancel: handleWormWizardCancel,
+              onWormChallenges: handleWormChallenges,
               onWormRetry: handleWormRetry,
               onWormNewGame: handleWormNewGame,
               onWormStoryNext: handleWormStoryNext,
@@ -1629,7 +1638,7 @@ export default function WORM3() {
         !demoStepIntroVisible && !demoCoachCopy && !demoForecastVisible &&
         (demoCelebrationStep || showDemoResults || demoStep === 'end') &&
         <DemoProgressBar currentStep={demoStep} />}
-      {demoMode && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
+      {demoMode && !shortChallengeCourse && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
         !demoForecastVisible && !demoCelebrationStep && !demoChromeQuiet && !showDemoResults &&
         <DemoProgressBar currentStep={demoStep} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}

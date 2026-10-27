@@ -15,7 +15,7 @@
 .worm-instrument[data-lesson="signature"] .worm-signature-control button { outline: 2px solid var(--arcade-focus); outline-offset: 3px; }
 @media (max-height: 520px) and (min-width: 600px) {
   .worm-demo-card { display: grid; grid-template-columns: 1fr 230px; gap: 4px 12px; padding: 6px 10px; }
-  .worm-demo-heading, .worm-demo-track, .worm-demo-card p, .worm-demo-detail { grid-column: 1; }
-  .worm-demo-actions { grid-column: 2; grid-row: 1 / span 4; align-items: center; }
+  .worm-demo-heading, .worm-demo-track, .worm-demo-card p, .worm-demo-detail, .worm-demo-card .action-cue-row { grid-column: 1; }
+  .worm-demo-actions { grid-column: 2; grid-row: 1 / span 5; align-items: center; }
   .worm-demo-card p, .worm-demo-detail { margin: 0; }
 }

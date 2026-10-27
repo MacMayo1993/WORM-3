@@ -8,6 +8,7 @@
 // Escape handling, focus trap, and dialog semantics it never had.
 
 import React from 'react';
+import ActionLegend from '../ui/ActionCue.jsx';
 import { UI_FONT, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_PANEL, NIGHT_BORDER, UI_GOLD, UI_MOSS_LIGHT, TEXT_XS, TEXT_SM, RADIUS_SM, RADIUS_MD, Z } from '../../utils/uiTheme.js';
 import { Overlay, Panel, PanelHeader, PanelBody, PanelSectionTitle } from '../ui/index.js';
 
@@ -69,6 +70,7 @@ const HelpMenu = ({ onClose }) => (
       <PanelHeader surface="night" title="How to play" titleId="help-title" onClose={onClose} />
 
       <PanelBody>
+          <ActionLegend />
         <Section title="The one rule that isn't Rubik's">
           <Row label="Every tile has a twin" desc="The tile directly opposite it, straight through the middle of the cube" />
           <Row label="Flip" desc="With Flip on, tap a tile to swap it with its twin. Both change at once" />

@@ -1,3 +1,5 @@
+import ActionLegend, { ActionCue } from '../ui/ActionCue.jsx';
+import { WORM_SHORT_CHALLENGES } from '../../game/wormShortChallenges.js';
 import StoryStarRequirements from '../../worm/story/StoryStarRequirements.jsx';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
@@ -24,7 +26,7 @@ import '../ui/pieceKey.css';
 import '../ui/pathSelect.css';
 const FreePlaySetup = React.lazy(() => import('./WormModeSetupWizard.jsx'));
 
-export default function WormEntryScreen({ onComplete, onCancel, initialSettings, initialPage = 'story' }) {
+export default function WormEntryScreen({ onComplete, onCancel, onChallenges, initialSettings, initialPage = 'story' }) {
   const [page, setPage] = useState(initialPage === 'choice' ? 'story' : initialPage);
   const progress = useGameStore(s => s.playerProgress);
   const wormSkin = useGameStore(s => s.wormSkin);
@@ -83,10 +85,16 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
       '--world': world.color, '--world-ink': world.ink, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet" style={wizardPaperBackground}>
       <nav className="worm-entry-nav"><button className="piece-icon" onClick={back} aria-label={page === 'story' ? 'Back to modes' : 'Back to Story Mode'}><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg></button><span className="worm-levels-brand"><WormWordmark inline /></span>
-        <h1 id="worm-entry-title" className="worm-section-heading">{page === 'customize' ? 'Worm Customization' : 'Story Mode'}</h1>
+        <h1 id="worm-entry-title" className="worm-section-heading">{page === 'customize' ? 'Worm Customization' : page === 'challenges' ? 'Short Challenges' : 'Story Mode'}</h1>
         {sectionSelect}
         <span className="worm-levels-total" aria-label={`${totalStars} of ${totalMax} stars`}><b aria-hidden="true">★</b>{totalStars}<small>/{totalMax}</small></span></nav>
-      {page === 'customize' ? <div className="worm-customization-body"><WormProfile defaultExpanded /></div> : <div className="worm-levels-body">
+      {page === 'challenges' ? <section className="short-challenge-entry">
+        <h2>Use the cube</h2>
+        <p>Three short, repeatable challenges on a calm 5×5 board. Read the target, try your route, and retry immediately. Each goal checks what you actually did.</p>
+        <ol>{WORM_SHORT_CHALLENGES.map(challenge => <li key={challenge.id}><ActionCue kind={challenge.cue}>{challenge.title}</ActionCue></li>)}</ol>
+        <ActionLegend />
+        <button type="button" className="piece" onClick={onChallenges}><span className="piece-face"><span className="piece-trailer">Start challenges</span><b aria-hidden="true">→</b></span></button>
+      </section> : page === 'customize' ? <div className="worm-customization-body"><WormProfile defaultExpanded /></div> : <div className="worm-levels-body">
         <div className="worm-levels-world">
           <header className="worm-world-banner">
             <button type="button" className="worm-world-arrow" aria-label="Previous chapter" disabled={!prevChapter}

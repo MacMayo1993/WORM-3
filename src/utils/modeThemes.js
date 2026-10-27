@@ -28,4 +28,4 @@ export function modeTheme(mode) {
     : key.includes('random') ? 'random' : key.includes('teach') || key.includes('story') ? 'teach' : key.includes('store') ? 'store' : 'cube'];
 }
 
-export const PACK_ACCENTS = { 'story-campaign': '#3b82f6', 'cube-academy': '#5f7f4a', 'algorithm-codex': '#b06a2e' };
+export const PACK_ACCENTS = { 'story-campaign': '#3b82f6', 'cube-academy': '#5f7f4a', 'algorithm-codex': '#b06a2e', 'short-challenges': '#338fb5' };

@@ -1,4 +1,4 @@
-import { WORM_DEMO_LESSON_COUNT, newWormDemo, wormDemoActive } from '../../game/wormDemoState.js';
+import { wormPracticeCount, newWormDemo, wormDemoActive } from '../../game/wormDemoState.js';
 /**
  * modesSlice.js — Campaign state, solver/teach overlays, and the guided demo.
  *
@@ -84,28 +84,29 @@ export const createModesSlice = (set, _get) => ({
   demoSkipped: false,
   wormPauseMenuOpen: false,
 
-  startDemo: () => set({
+  startDemo: (course) => set({
     xpActivityRuns: {},
     demoMode: true,
     demoSkipped: false,
     wormPauseMenuOpen: false,
     ...newWormDemo(),
+    demoWormCourse: course === 'challenges' ? 'challenges' : 'practice',
     demoStep: 'worm-traversal',
     showMainMenu: false,
   }),
   setDemoStep: (demoStep) => set({ demoStep, ...(demoStep === 'worm-traversal' ? newWormDemo() : { demoWormTarget: null }) }),
   startWormDemoLesson: () => set(s => wormDemoActive(s) && s.demoWormPrepared && ['active', 'finalHealing'].includes(s.wormGamePhase) && !s.demoWormComplete && !s.demoWormFinished && s.wormAlive && !s.wormPauseMenuOpen ? { demoWormStarted: true, wormPaused: false } : {}),
   restartWormDemoLesson: () => set(s => !wormDemoActive(s) ? {} : ({ demoWormAttempt: s.demoWormAttempt + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true, showWormDeathMenu: false })),
-  nextWormDemoLesson: () => set(s => !wormDemoActive(s) || !s.demoWormComplete || s.demoWormFinished ? {} : s.demoWormLessonIndex + 1 >= WORM_DEMO_LESSON_COUNT
+  nextWormDemoLesson: () => set(s => !wormDemoActive(s) || !s.demoWormComplete || s.demoWormFinished ? {} : s.demoWormLessonIndex + 1 >= wormPracticeCount(s)
     ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null }
     : { demoWormLessonIndex: s.demoWormLessonIndex + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true }),
   skipWormDemoLesson: index => set(s => !wormDemoActive(s) || s.demoWormFinished || s.wormPauseMenuOpen || index !== s.demoWormLessonIndex ? {} : ({
     demoSkipped: true, demoWormSkipped: [...new Set([...s.demoWormSkipped, index])],
     demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormTarget: null,
     demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true, showWormDeathMenu: false,
-    ...(index + 1 >= WORM_DEMO_LESSON_COUNT ? { demoWormFinished: true } : { demoWormLessonIndex: index + 1 }),
+    ...(index + 1 >= wormPracticeCount(s) ? { demoWormFinished: true } : { demoWormLessonIndex: index + 1 }),
   })),
-  finishWormDemo: () => set(s => wormDemoActive(s) && s.demoWormComplete && s.demoWormLessonIndex === WORM_DEMO_LESSON_COUNT - 1
+  finishWormDemo: () => set(s => wormDemoActive(s) && s.demoWormComplete && s.demoWormLessonIndex === wormPracticeCount(s) - 1
     ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
   exitDemo: () => set({
     ...newWormDemo(),

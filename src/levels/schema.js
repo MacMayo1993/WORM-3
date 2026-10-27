@@ -44,6 +44,7 @@ export const LEVEL_ID_RANGES = {
   'story-campaign': [1, 99],
   'cube-academy': [101, 199],
   'algorithm-codex': [201, 299],
+  'short-challenges': [501, 599],
   // 301–399 is reserved for the standalone antipodal-descent builder
   // (antipodalLevelBridge). That pack is not registered by default — the
   // Topological Descent it generates is Story mode itself — so it is intentionally
@@ -190,6 +191,7 @@ export function createLevel(overrides) {
     // inverse of `notation`, so performing it solves the level and par equals
     // quarterTurns. null for levels that are not algorithm lessons.
     algorithm: overrides.algorithm ?? null,
+    actionFocus: overrides.actionFocus ?? null,
 
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
@@ -208,6 +210,7 @@ export function createLevel(overrides) {
       // this should describe the next concrete action the player can take.
       objective: overrides.tutorial?.objective || '',
       tip: overrides.tutorial?.tip || '',
+      cues: overrides.tutorial?.cues ?? [],
       // Optional hand-authored Mobi dialogue lines for the level briefing.
       // When omitted, the level screen derives lines from text/tip.
       mobiLines: overrides.tutorial?.mobiLines || null,

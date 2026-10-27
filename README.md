@@ -87,6 +87,7 @@ The main cube carousel has six destinations: **WORM, FLIP CUBE, TEACH, CHAOS, RA
 | **Portal Combat (preview)** | Survive three enemy waves or seal the portal; shoot parity projectiles and use elemental attacks. | WORM setup option; a **5×5** arena with no rotating slices. |
 | **FLIP CUBE** | A customizable cube puzzle with turns, antipodal flips, shuffle/reset/undo, and optional views or overlays. | Sizes **2×2 through 10×10**. |
 | **TEACH** | Learn a beginner 3×3 solution through notation, highlighted moves, guided practice, and a full solve. | Dedicated course plus in-game teaching/algorithm tools. |
+| **WORM — Short Challenges** | Collect then ride and heal, cross your body, and surround a tunnel. | Three repeatable tasks under WORM → Short Challenges, with deterministic practice boards. |
 | **Cube puzzle packs** | Complete cube challenges with move targets and progress tracking. | Topological Descent, Cube Academy, Algorithm Codex, and Daily Descent. |
 | **CHAOS / Disparity** | Start a flip cascade, predict the surviving colors, heal tiles, and watch the board collapse to a winning pair. | Five intensities; current setup/launch logic limits boards to **2×2–5×5**. |
 | **RANDOM** | Solve a cube whose palette, face materials, and per-piece views remix every ten seconds. | Sizes **2×2 through 10×10**; also a visual setting and part of later WORM Story levels. |
@@ -236,6 +237,7 @@ Rewards include Parity Points and choices of hats, palettes, skins, trails, or a
 | --- | --- | --- |
 | **Topological Descent** | Twelve chapters from First Reflection to Singularity, using 2×2, 3×3, and 4×4 cubes. | Short puzzles mixing turns and paired flips, with move targets computed for the actual puzzle. |
 | **Cube Academy** | Six lessons: a middle layer, through-cube connections, first flips, paired flips, a guided mini-solve, and graduation. | A focused introduction to the cube's interactions. |
+| **Short Challenges** | Six deterministic 3×3 puzzles with one- to three-action solutions. | Layer movement, travelling partners, reversed turn order, and combined turn/flip repairs. All six are selectable. |
 | **Algorithm Codex** | Ten 3×3 algorithm challenges, including Sune, Anti-Sune, Niklas, U-Perm, T-Perm, J-Perm, and Superflip. | Practice recognizable move sequences in authored cube states. |
 | **Daily Descent** | A date-seeded 3×3 turn-and-flip puzzle, with local records, stars, and streaks. | The same date key gives the same puzzle; current generated pars are three to five moves. |
 

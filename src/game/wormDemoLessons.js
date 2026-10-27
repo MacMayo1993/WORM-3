@@ -1,3 +1,4 @@
+import { WORM_SHORT_CHALLENGES } from './wormShortChallenges.js';
 // One live task at a time. Completion comes from simulation outcomes, never taps
 // on Next. Every exercise leads to the next required part of the demo.
 export const WORM_DEMO_LESSONS = [
@@ -26,4 +27,5 @@ export const WORM_DEMO_LESSONS = [
   { id: 'rotation', title: 'Watch the turning layer', instruction: 'Watch the lit layer and countdown. Get off it before it turns: a turn that catches your head ends the run, and one that catches your body cuts off your tail.', success: 'You cleared the turning layer. The crash jammed my ship’s gears on. Next, learn to twist and flip the cube itself.' },
 ];
 export { wormDemoActive, newWormDemo } from './wormDemoState.js';
-export const wormDemoLesson = s => WORM_DEMO_LESSONS[s.demoWormLessonIndex ?? 0] ?? WORM_DEMO_LESSONS[0];
+export const wormPracticeLessons = s => s.demoWormCourse === 'challenges' ? WORM_SHORT_CHALLENGES : WORM_DEMO_LESSONS;
+export const wormDemoLesson = s => wormPracticeLessons(s)[s.demoWormLessonIndex ?? 0] ?? wormPracticeLessons(s)[0];
