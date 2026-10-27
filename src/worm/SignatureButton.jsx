@@ -3,7 +3,6 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { wormBuffs } from './wormBuffs.js';
 import { callWormTurn } from './wormTurnBridge.js';
 import { SIGNATURES } from './healerWorm/signatures.js';
-import { GAME_HUD } from '../utils/uiTheme.js';
 
 export default function SignatureButton({ compact = false }) {
   const character = useGameStore(s => s.wormCharacter);
@@ -40,11 +39,9 @@ export default function SignatureButton({ compact = false }) {
     <button type="button" disabled={disabled} onPointerDown={press} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
       onClick={e => { if (e.detail === 0) activate(); }}
       aria-label={`${current?.returnReady ? 'Return to bookmark' : def.name}${current?.returnReady ? `, ${current.activeSeconds} seconds to return` : current?.seconds > 0 ? `, ${current.seconds} seconds remaining` : ''}`}
-      title={`${def.hint} Keyboard: Q${status ? ` · ${status}` : ''}`} className="worm-hud-key"
+      title={`${def.hint} Keyboard: Q${status ? ` · ${status}` : ''}`} className="worm-hud-key worm-control"
       data-ready={current?.ready && !disabled || undefined}
-      style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 18,
-        color: def.color, background: GAME_HUD.raised, border: `1px solid ${def.color}`, opacity: disabled && !current?.active ? 0.65 : 1,
-        boxShadow: current?.ready ? `0 0 12px ${def.color}35` : 'none', fontFamily: 'inherit', cursor: disabled ? 'default' : 'pointer' }}>
+      style={{ '--control-accent': def.color }}>
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
         <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" opacity="0.2" />
         <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" pathLength="100"
@@ -59,8 +56,8 @@ export default function SignatureButton({ compact = false }) {
             : <><path d="M7 13V7h6m6 0h6v6M7 19v6h6m6 0h6v-6" /><rect x="12" y="12" width="8" height="8" /></>}
         </g>
       </svg>
-      <span style={{ fontWeight: 800, fontSize: 12 }}>{current?.returnReady ? 'Return' : def.short}</span>
-      <span className={label === 'Q' ? 'worm-keyboard-hint' : undefined} style={{ fontSize: 10, minWidth: 30 }}>{label}</span>
+      <span className="worm-control-label">{current?.returnReady ? 'Return' : def.short}</span>
+      <span className={`worm-control-caption${label === 'Q' ? ' worm-keyboard-hint' : ''}`} style={{ minWidth: 24 }}>{label}</span>
     </button>
     {status && <div className="worm-hud-sr" role={current?.notice ? 'status' : undefined}>{status}</div>}
   </div>;

@@ -502,6 +502,22 @@ it.each([['air', null], ['fire', 'air']])('labels the touch flight control for A
   expect(jump.textContent).toBe('Jump');
 });
 
+it('prioritizes the portal instruction over flight and keeps the same jump input', () => {
+  const turns = vi.fn(); setWormTurnCallback(turns);
+  useGameStore.setState({ wormElementalTheme: 'air', wormPhase: 'crawling' });
+  act(() => root.render(<WormCrawlerHUD phase="crawling" wormAlive onFlippedTile />));
+  const jump = host.querySelector('.worm-jump');
+  expect(jump.textContent).toBe('Jump to ride');
+  expect(jump.getAttribute('aria-label')).toBe('Jump onto the raised tunnel');
+  expect(jump.dataset.state).toBe('portal');
+  act(() => jump.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
+  expect(turns).toHaveBeenLastCalledWith('jump');
+  act(() => useGameStore.setState({ wormJumpRescueActive: true }));
+  expect(jump.textContent).toBe('Jump now');
+  expect(jump.dataset.state).toBe('rescue');
+  setWormTurnCallback(null);
+});
+
 
 it('provides a clear interactive cube stage above Free Play victory results', () => {
   useGameStore.setState({ wormGamePhase: 'solved' });

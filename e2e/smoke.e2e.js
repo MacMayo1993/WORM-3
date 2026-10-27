@@ -36,6 +36,29 @@ test('starts a WORM free-play run', async ({ page }) => {
   await startFreePlay(page, { viewport: { width: 640, height: 320 } });
   await expect(page.getByRole('button', { name: /^Collect \d+ orbs: 0 of \d+/ })).toBeVisible();
   for (const control of ['Turn left', 'Turn right', 'Boost']) await expect(page.getByRole('button', { name: control, exact: true })).toBeVisible();
+  const controls = await page.locator('.worm-hud-bottom .worm-control').evaluateAll(buttons => {
+    const luminance = color => {
+      const rgb = color.match(/[\d.]+/g).slice(0, 3).map(value => {
+        const channel = Number(value) / 255;
+        return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+      });
+      return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+    };
+    return buttons.map(button => {
+      const css = getComputedStyle(button), rect = button.getBoundingClientRect();
+      const ink = luminance(css.color), face = luminance(css.backgroundColor);
+      return { label: button.getAttribute('aria-label'), contrast: (Math.max(ink, face) + .05) / (Math.min(ink, face) + .05),
+        opacity: css.opacity, height: rect.height, left: rect.left, right: rect.right };
+    });
+  });
+  expect(controls.length).toBeGreaterThanOrEqual(4);
+  for (const control of controls) {
+    expect(control.contrast, `${control.label}: readable ink`).toBeGreaterThanOrEqual(7);
+    expect(control.opacity, `${control.label}: opaque face`).toBe('1');
+    expect(control.height).toBeGreaterThanOrEqual(48);
+    expect(control.left).toBeGreaterThanOrEqual(0);
+    expect(control.right).toBeLessThanOrEqual(640);
+  }
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForTimeout(5000);   // the run is live: the sim, camera and orbs get a few seconds to throw
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();

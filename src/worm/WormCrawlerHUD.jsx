@@ -70,18 +70,6 @@ import { UI_FONT, DISPLAY_FONT, HEADING_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEE
 // copy of FACE_COLORS and would have silently disagreed if that ever moved.
 const FACE_FALLBACKS = FACE_COLORS;
 
-const toRgb = (color) => {
-    if (!color || typeof color !== 'string') return null;
-    const hex = color.trim();
-    const fullHex = /^#([0-9a-f]{3})$/i.test(hex)
-        ? `#${hex.slice(1).split('').map(ch => ch + ch).join('')}`
-        : hex;
-    const match = /^#([0-9a-f]{6})$/i.exec(fullHex);
-    if (!match) return null;
-    const value = parseInt(match[1], 16);
-    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
-};
-
 // ─── Style constants ─────────────────────────────────────────────────────────
 //
 // The HUD sits on top of a live 3D scene that can be any colour — grass, lava,
@@ -102,11 +90,6 @@ const HUD_ACCENT = GAME_HUD.accent;
 
 // Paper token, still used by the pause card / overlays that own the screen.
 const PANEL_BORDER = 'rgba(15, 23, 42, 0.12)';
-
-const withAlpha = (color, alpha) => {
-    const rgb = toRgb(color);
-    return rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})` : color;
-};
 
 const ROOT_STYLE = {
     ...GAME_HUD_VARS,
@@ -345,33 +328,6 @@ const STEER_CLUSTER_STYLE = {
     flexShrink: 0,
 };
 
-// Action keys share one size ramp with the d-pad (both live in the injected
-// stylesheet as --action / --cell) so the tray reads as a single piece of
-// hardware instead of four unrelated buttons.
-const JUMP_BTN_BASE = {
-    borderRadius: 18,
-    padding: '0 clamp(14px, 4.5vw, 24px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    fontWeight: 800,
-    letterSpacing: 1.2,
-    color: TEXT,
-    boxShadow: SHADOW,
-};
-
-const BOOST_BTN_BASE = {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 18,
-    color: TEXT,
-    boxShadow: SHADOW,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-};
-
 const BOOST_FILL_STYLE = {
     position: 'absolute',
     left: 0, bottom: 0, width: '100%',
@@ -406,8 +362,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars, rescue = false
                 }}
                 onClick={e => { if (e.detail === 0 && wormAlive) { feel('uiKey'); callWormTurn(intent); } }}
                 disabled={!wormAlive}
-                className={`worm-hud-key worm-steer worm-steer-key${rescue ? ' worm-jump-rescue' : ''}`}
-                style={{ ...vars, color: TEXT }}
+                className={`worm-hud-key worm-control worm-steer worm-steer-key${rescue ? ' worm-jump-rescue' : ''}`}
+                style={vars}
                 aria-label={label}
             >
                 <span className="worm-key-face" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -1158,37 +1114,20 @@ function BoostButton({ wormAlive }) {
         callWormTurn('boost');
     };
 
-    const readyStyle = {
-        ...BOOST_BTN_BASE, background: GAME_HUD.raised,
-        border: `1px solid ${HUD_ACCENT}`, color: TEXT,
-    };
-    const activeStyle = {
-        ...BOOST_BTN_BASE, background: GAME_HUD.active,
-        border: `1px solid ${HUD_ACCENT}`, color: HUD_ACCENT,
-    };
-    const cooldownStyle = {
-        ...BOOST_BTN_BASE, background: HUD_SURFACE,
-        border: `1px solid ${BORDER}`, cursor: 'default', color: TEXT_MUTED,
-    };
-
-    const style = fireReady ? { ...readyStyle, color: '#ffb45e', borderColor: '#ff8a40' } : boostState === 'active' ? activeStyle
-        : boostState === 'cooldown' ? cooldownStyle
-        : readyStyle;
-
     return (
         <button
             onPointerDown={handleBoost}
             onClick={e => { if (e.detail === 0) handleBoost(); }}
-            className={`worm-action worm-boost${boostState === 'cooldown' ? '' : ' worm-hud-key'}`}
-            style={style}
+            className="worm-hud-key worm-control worm-action worm-boost"
+            data-state={fireReady ? 'fire' : boostState}
             aria-label="Boost"
             aria-disabled={!wormAlive || (boostState !== 'ready' && !fireReady)}
             title={fireReady ? 'Flame dash ready' : boostState === 'cooldown' ? 'Boost recharging' : 'Boost'}
         >
             {boostState === 'cooldown' && (
-                <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%`, background: withAlpha(HUD_ACCENT, 0.18) }} />
+                <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%`, background: 'rgba(255,252,241,0.12)' }} />
             )}
-            <span style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}><BoltIcon size={20} /><span style={{ fontSize: 10 }}>{fireReady ? 'Flame dash' : 'Boost'}</span></span>
+            <span style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}><BoltIcon size={20} /><span className="worm-control-caption">{fireReady ? 'Flame dash' : 'Boost'}</span></span>
         </button>
     );
 }
@@ -1559,26 +1498,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
-    const jumpReadyStyle = {
-        ...JUMP_BTN_BASE, background: GAME_HUD.active,
-        border: `1px solid ${HUD_ACCENT}`, color: TEXT,
-    };
-
-    const jumpIdleStyle = {
-        ...JUMP_BTN_BASE,
-        background: HUD_SURFACE,
-        backdropFilter: HUD_BLUR,
-        WebkitBackdropFilter: HUD_BLUR,
-        border: `1px solid ${BORDER}`,
-        color: TEXT,
-    };
-
-    const steerVars = {
-        position: 'relative',
-        '--key-press': GAME_HUD.active,
-        '--key-edge': HUD_ACCENT,
-        '--key-glow': 'transparent',
-    };
+    const steerVars = { position: 'relative' };
 
     // Completion owns the screen, including the short beat over the live cube.
     // Remove gameplay controls immediately while the simulation is paused.
@@ -1662,14 +1582,14 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                     onLostPointerCapture={() => callWormTurn('jump-release')}
                                     onClick={e => { if (e.detail === 0) handleJumpAction(); }}
 
-                                    className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
-                                    style={isPortalReady ? jumpReadyStyle : airActive ? { ...jumpIdleStyle, background: '#b9f5ed', boxShadow: '0 0 18px #b9f5ed88' } : jumpIdleStyle}
+                                    className={`worm-hud-key worm-control worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
+                                    data-state={jumpRescue ? 'rescue' : isPortalReady ? 'portal' : airActive ? 'air' : undefined}
                                     aria-label={pitRescue ? 'Jump now to clear the pit' : cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : airActive ? 'Hold Jump to fly; release to land' : "Jump over body or vault an edge"}
-                                    title={airActive ? 'Hold Jump or Space to fly. Release to land.' : undefined}
+                                    title={jumpRescue ? undefined : isPortalReady ? 'Jump into the raised portal to ride the tunnel.' : airActive ? 'Hold Jump or Space to fly. Release to land.' : undefined}
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
-                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Jump to ride' : airActive ? <span style={{ fontSize: 12 }}>Hold to fly</span> : 'Jump'}
+                                    <span className="worm-control-label">{jumpRescue ? 'Jump now' : isPortalReady ? <>Jump <small>to ride</small></> : airActive ? <>Hold <small>to fly</small></> : 'Jump'}</span>
                                 </button>
                             </div>
                             <BoostButton wormAlive={controlsEnabled && !jumpRescue} />
