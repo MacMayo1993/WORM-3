@@ -29,6 +29,14 @@ import { LEGO_STUD_PARTS } from '../../3d/legoStud.js';
 import { ensureInstanceColor } from '../../3d/instanceUploads.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { wormDemoActive } from '../../game/wormDemoState.js';
+
+// What a lit program's key reads from the scene (environment, fog, shadows, tone
+// mapping, colour space) plus the worm's look; `tier` adds the quality tier, which
+// some effects read and the worm's own materials never do.
+const programKey = (gl, scene, s, tier) => [scene.environment?.uuid, scene.environment?.version,
+  scene.fog ? (scene.fog.isFogExp2 ? 'exp2' : 'linear') : 'none', gl.shadowMap.enabled, gl.shadowMap.type,
+  tier ? s.perfReducedFX : '-', s.wormCharacter, s.wormSkin, gl.toneMapping, gl.outputColorSpace].join('|');
 
 // Styled tiles at rest are drawn by the tile-surface batches (instancedTileStyle.js),
 // so the live scene holds none of the programs a styled tile's own mesh uses: the
@@ -76,7 +84,7 @@ function styleWarmup(settings) {
 export default function WormEffectWarmup({ body }) {
   const { gl, camera, scene } = useThree();
   const pool = usePickupPool(), resources = useRef(null), warmed = useRef(null), sceneWarmed = useRef(null);
-  const fall = useRef({ key: null, dispose: null });
+  const fall = useRef({ key: null, dispose: null }), fallKey = useRef(null);
   useEffect(() => () => fall.current.dispose?.(), []);
   const styles = useRef({ key: null, warmup: null });
   useEffect(() => () => styles.current.warmup?.dispose(), []);
@@ -145,10 +153,11 @@ export default function WormEffectWarmup({ body }) {
   useFrame(() => {
     if (!resources.current || !body.current) return;
     const s = useGameStore.getState();
-    const key = [scene.environment?.uuid, scene.environment?.version, scene.fog ? (scene.fog.isFogExp2 ? 'exp2' : 'linear') : 'none',
-      gl.shadowMap.enabled, gl.shadowMap.type, s.perfReducedFX, s.wormCharacter, s.wormSkin,
-      gl.toneMapping, gl.outputColorSpace].join('|');
+    const key = programKey(gl, scene, s, true);
     if (warmed.current === key) return;
+    // The caution fall's key (below) is this one without the tier, so it can only
+    // change when this one does.
+    fallKey.current = programKey(gl, scene, s, false);
     // A fresh live Line starts without this define, including after a quality
     // change. Reset before each warm-up so that variant retains its first key.
     resources.current.traverse(object => {
@@ -199,13 +208,22 @@ export default function WormEffectWarmup({ body }) {
   // programs used to link in the frame the worm went over the edge. Warm them per
   // look before play starts (a look that changes mid-run waits for the next run),
   // only from a live crawling worm so a fall in progress is never patched.
+  // A Story briefing and a demo lesson's intro sit in phase 'active' before play
+  // starts, so they count as before play: skipping them left every Story run to
+  // link these programs in the middle of its portal arrival. The key leaves out the
+  // quality tier, which the worm's materials never read (a tier change during the
+  // arrival re-warmed them), and the new copies compile while the old ones still
+  // hold their programs, so a re-warm that changes nothing links nothing.
   useFrame(() => {
-    if (warmed.current === null || !body.current) return;
+    if (warmed.current === null || !body.current || fall.current.key === fallKey.current) return;
     const s = useGameStore.getState();
-    if (fall.current.key === warmed.current || s.wormGamePhase === 'active' || !s.wormAlive || s.wormPhase !== 'crawling') return;
-    fall.current.dispose?.();
+    const beforePlay = s.wormGamePhase !== 'active' || (s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted)
+      || (wormDemoActive(s) && !s.demoWormStarted);
+    if (!beforePlay || !s.wormAlive || s.wormPhase !== 'crawling') return;
+    const previous = fall.current.dispose;
     fall.current.dispose = warmCautionDissolve(gl, camera, scene, body.current);
-    fall.current.key = warmed.current;
+    previous?.();
+    fall.current.key = fallKey.current;
   });
   return null;
 }

@@ -1128,7 +1128,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             </StoryArrival>
             <CautionFallFX worm={worm} body={reflectionSource} />
             <WormEffectWarmup body={reflectionSource} />
-            {wormAlive && <RocketExhaust worm={worm} size={size} />}
+            {/* Mounted for the mode's life, hidden until the worm is out: mounting it
+                with the worm made every run link its programs in the arrival's first
+                frame, and its own warm-up now runs in the scramble or briefing. */}
+            <group visible={wormAlive}><RocketExhaust worm={worm} size={size} /></group>
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
