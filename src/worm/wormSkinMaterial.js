@@ -11,6 +11,7 @@
 // swapping skins in the store preview never pays a shader-recompile stall.
 import * as THREE from 'three';
 import { BUMP_STYLES } from './wormSkinFX.js';
+import { finishWormBodyShader } from './wormBodyFinish.js';
 
 const NOISE_GLSL = `
   float wormHash13(vec3 p3) {
@@ -76,6 +77,8 @@ export function createWormSkinMaterial(options = {}) {
     toneMapped: false,
     ...options,
   });
+  const contour = { value: 1 };
+  material.userData.wormContour = contour;
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
@@ -97,8 +100,10 @@ export function createWormSkinMaterial(options = {}) {
       .replace('#include <common>', '#include <common>\nuniform float uEmissiveTint;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= mix(vec3(1.0), diffuseColor.rgb, uEmissiveTint);');
 
+    finishWormBodyShader(shader, contour);
     material.userData.shader = shader;
   };
+  material.customProgramCacheKey = () => 'worm-skin-contour-1';
 
   return material;
 }
@@ -182,6 +187,9 @@ export function updateWormSkinMaterialTime(material, elapsed) {
  */
 export function applyBioluminescence(material, glowHex, isGlow) {
   if (!material) return;
+  // The Scout keeps its luminous body and halo, with a softer contour than
+  // opaque characters. One uniform also restores it when a preview switches.
+  if (material.userData.wormContour) material.userData.wormContour.value = isGlow ? 0.6 : 1;
   material.userData.emissiveTint = isGlow ? 0 : 1;
   const uniform = material.userData.shader?.uniforms.uEmissiveTint;
   if (uniform) uniform.value = material.userData.emissiveTint;

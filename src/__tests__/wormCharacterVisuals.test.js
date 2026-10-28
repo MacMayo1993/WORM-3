@@ -10,7 +10,7 @@ import { setWormSharedRenderer, drawDirectWormPreview } from '../3d/WormPreviewR
 import { inchGaitInto, inchLoopShape } from '../worm/healerWorm/inchGait.js';
 
 describe('character visual safety', () => {
-  it.each(['prism', 'inch', 'wiggle'])('%s detail stays within the unit collision envelope', character => {
+  it.each(['classic', 'glow', 'prism', 'inch', 'wiggle'])('%s detail stays within the unit collision envelope', character => {
     const geometry = createCharacterGeometry(character);
     const p = geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
@@ -26,7 +26,7 @@ describe('character visual safety', () => {
     expect(material.flatShading).toBe(true);
     expect(material.transmission).toBe(0);
     applySkinMaterialProfile(material, fx); applyCharacterFinish(material, 'classic');
-    expect(material.vertexColors).toBe(false);
+    expect(material.vertexColors).toBe(true); // the round body's neutral belly shading
     expect(material.flatShading).toBe(!!fx.material.flatShading);
     expect(material.roughness).toBe(fx.material.roughness);
     material.dispose();
@@ -139,7 +139,8 @@ describe('picker character switching', () => {
     expect(crystal[0].geometry.name).toBe('prism-cut-crystal');
     const classic = draw('classic');
     expect(classic[0].geometry.type).toBe('SphereGeometry');
-    expect(classic.every(b => !b.material.vertexColors && !b.material.flatShading)).toBe(true);
+    expect(classic.every(b => b.material.vertexColors && !b.material.flatShading)).toBe(true);
+    expect(classic.every(b => b.geometry.name === 'classic-sculpted-segment')).toBe(true);
     expect(draw('book')).toHaveLength(1);
     expect(draw('inch')).toHaveLength(9);
   });

@@ -115,7 +115,11 @@ function _buildRig() {
   // Body beads. Material colour carries the segment colour directly (the game
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-  const characterGeometries = { inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'), wiggle: createCharacterGeometry('wiggle'), default: sphereGeo };
+  const characterGeometries = {
+    classic: createCharacterGeometry('classic'), glow: createCharacterGeometry('glow'),
+    inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'),
+    wiggle: createCharacterGeometry('wiggle'), default: sphereGeo
+  };
   const accents = Object.fromEntries(['classic', 'wiggle', 'glow', 'book', 'inch', 'prism'].map(id => [id, createCharacterAccents(id)]));
   Object.values(accents).forEach(a => group.add(a.group));
   // The Book Worm's volumes: the same spine and boards WormBody instances,
@@ -610,7 +614,7 @@ function _poseWorm(opts, time) {
 
     body.position.copy(_off);
     body.quaternion.identity();
-    if ((isInch || isPrism || isBook || characterId === 'wiggle') && i > 0) {
+    if (i > 0) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway' || roaming, roaming);
       _pbZ.subVectors(_off, _pbPrevOff).normalize();
       if (_pbZ.lengthSq() < 1e-8) _pbZ.copy(FWD).negate();
@@ -723,6 +727,14 @@ function _poseWorm(opts, time) {
   if (isBook) _anchor.y += BOOK_HEAD_LIFT;
   if (opts.companion) _menuForward.set(Math.cos(opts.companion.heading), 0, Math.sin(opts.companion.heading));
   layoutWormFace(_anchor, opts.companion ? _menuForward : (roaming ? _roamForward : FWD), UP, headScale, _faceParts);
+  if (characterId === 'classic' || isGlow) {
+    // Match the face frame: local +Y is the belly's up, local -Z is travel.
+    _pbZ.copy(opts.companion ? _menuForward : roaming ? _roamForward : FWD).negate();
+    _pbX.crossVectors(UP, _pbZ).normalize();
+    _pbY.crossVectors(_pbZ, _pbX);
+    _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
+    rig.beads[0].quaternion.setFromRotationMatrix(_pbBasisMat);
+  }
 
   for (const [id, accent] of Object.entries(rig.accents)) {
     accent.group.visible = id === characterId;
