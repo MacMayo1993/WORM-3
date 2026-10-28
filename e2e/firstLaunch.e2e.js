@@ -15,6 +15,12 @@ test('first launch goes from the intro to Story level 1, once', async ({ page })
   const mobi = page.getByRole('dialog', { name: /STORY.*Mobi/ });
   await expect(mobi).toBeVisible();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('worm3_mode_gate'))).toBe('gated');
+  // Past the briefing the level is staged and ready to start, with no menu over it:
+  // the launch once left the menu up, so the run never mounted and the start key
+  // read "Loading…" under the menu's PLAY key.
+  await mobi.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expect(page.getByRole('button', { name: /start level/i })).toBeEnabled({ timeout: 60000 });
+  await expect(page.locator('button:visible', { hasText: /^\s*play\b/i })).toHaveCount(0);
 
   // The second launch is an ordinary one: the intro ends at the menu.
   await page.reload();
