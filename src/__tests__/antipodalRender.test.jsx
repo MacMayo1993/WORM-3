@@ -1,9 +1,10 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Color, Group, PerspectiveCamera, Scene, Vector3 } from 'three';
+import { Color, DirectionalLight, Group, PerspectiveCamera, Scene, Vector3, WebGLRenderTarget } from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { antipodalViewport } from '../3d/antipodalViewport.js';
+import { setStudioRigLights, releaseStudioRig, aimStudioRig } from '../3d/studioRig.js';
 const hook = vi.hoisted(() => ({ frame: null }));
 vi.mock('@react-three/fiber', () => ({ useFrame: fn => { hook.frame = fn; } }));
 import AntipodalPiP from '../3d/AntipodalPiP.jsx';
@@ -16,13 +17,14 @@ beforeEach(() => {
   main = new PerspectiveCamera(70, 4 / 3, 0.01, 100); main.position.set(0, 0, 10); main.updateMatrixWorld();
   color = new Color('#123456'); alpha = 0.4;
   gl = { domElement: { width: 1600, height: 1200 }, getPixelRatio: () => 2, autoClear: true,
+    shadowMap: { enabled: true, autoUpdate: true, needsUpdate: false },
     setViewport: vi.fn(), setScissor: vi.fn(), setScissorTest: vi.fn(), clear: vi.fn(), render: vi.fn(),
     getClearColor: out => out.copy(color), getClearAlpha: () => alpha,
     setClearColor: (value, a) => { color.set(value); alpha = a; } };
   frame = { gl, scene, camera: main, clock: { elapsedTime: 1 } };
   host = document.createElement('div'); root = createRoot(host); act(() => root.render(<AntipodalPiP />));
 });
-afterEach(() => { act(() => root.unmount()); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+afterEach(() => { act(() => root.unmount()); releaseStudioRig(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 it('keeps the main render alive while the panel is folded', () => {
   antipodalViewport.rect = null; hook.frame(frame);
   expect(gl.render).toHaveBeenCalledExactlyOnceWith(frame.scene, main);
@@ -53,4 +55,30 @@ it('restores the full viewport even if the second render throws', () => {
   expect(gl.setViewport).toHaveBeenLastCalledWith(0, 0, 800, 600);
   expect(gl.setScissorTest).toHaveBeenLastCalledWith(false); expect(gl.autoClear).toBe(true);
   expect(color.getHexString()).toBe('123456'); expect(alpha).toBe(0.4);
+});
+
+it('shadows the inset from its own side when reduced FX redraws shadows only on some frames', () => {
+  // ShadowCadence: no auto-update, a redraw requested on this frame. The main pass
+  // draws first and clears the request, as three's shadow map does.
+  const key = new DirectionalLight(), mainMap = new WebGLRenderTarget(4, 4);
+  key.castShadow = true;
+  key.shadow.map = mainMap;
+  setStudioRigLights(key, new DirectionalLight(), new DirectionalLight());
+  aimStudioRig(main.quaternion); // GameScene's CameraRelativeRig, before this callback
+  Object.assign(gl.shadowMap, { autoUpdate: false, needsUpdate: true });
+  const seen = [];
+  gl.render = vi.fn(() => {
+    seen.push({ map: key.shadow.map, redraw: gl.shadowMap.needsUpdate, keyZ: key.position.z });
+    gl.shadowMap.needsUpdate = false;
+  });
+  hook.frame(frame);
+  const [mainPass, inset] = seen;
+  expect(mainPass.map).toBe(mainMap);
+  // The inset redraws on the main pass's frame, into a map of its own, lit from its side.
+  expect(inset.redraw).toBe(true);
+  expect(inset.map).not.toBe(mainMap);
+  expect(mainPass.keyZ).toBeGreaterThan(0);
+  expect(inset.keyZ).toBeLessThan(0);
+  // The main pass gets its own map back for the frames in between.
+  expect(key.shadow.map).toBe(mainMap);
 });
