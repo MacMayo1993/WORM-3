@@ -37,6 +37,20 @@ export function orbPerkInto(out, near, reducedMotion = false) {
   return out;
 }
 
+/** How close (in orbProximity's 0→1) the worm must be before an orb's rings start to show. */
+export const RING_FROM = 0.15;
+
+/**
+ * How much of its parity rings (the orbit rings, or the crossed halos and poles)
+ * an orb wears: none at rest, so a full board reads as gems on their bands rather
+ * than a field of rings, growing in as the worm closes on it. Reduced motion
+ * shows or hides them whole.
+ */
+export function orbRingScale(near, reducedMotion = false) {
+  if (reducedMotion) return near >= 0.5 ? 1 : 0;
+  return smooth(clamp01((near - RING_FROM) / (1 - RING_FROM)));
+}
+
 /**
  * The resting ring and its ping. `arrival` (0→1) fades the beacon in with the
  * orb's reveal; `time` is the orb's own phased clock.

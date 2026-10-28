@@ -23,7 +23,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { PARITY_ORB_SCALE } from './healerWorm/constants.js';
-import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto } from './orbBeacon.js';
+import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto, orbRingScale } from './orbBeacon.js';
 import { compileDistinct } from '../3d/compileDistinct.js';
 import { orbEntrance, orbEntranceT, orbWaveReach, orbWaveStart, orbRiseSeconds, orbRisePoseInto, orbRisePingInto } from './orbEntrance.js';
 
@@ -165,9 +165,10 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Dense food fields and showers retain the gem, Möbius band and crossed orbit rings,
-  // but use four opaque proxies. After their entrance these become shared
-  // instanced draws per colour pair, with no per-orb transparent layers.
+  // Dense food fields and showers retain the gem, Möbius band and crossed orbit rings
+  // (the rings only as the worm closes in, orbRingScale), but use four opaque
+  // proxies. After their entrance these become shared instanced draws per colour
+  // pair, with no per-orb transparent layers.
   if (shower || compact) {
     return (
       <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
@@ -209,7 +210,8 @@ function SingleOrbImpl({
       {/* Parity signature: two smooth crossed great-circle halos and two opposite
           poles connected by a luminous axis through the core. It reads as
           "antipodal pair" even when tile colours are close, but its outline is now
-          all curves — no diamond, no hard edges. */}
+          all curves — no diamond, no hard edges. It grows in as the worm closes on
+          the orb (orbRingScale), so a resting board is not a field of rings. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
         <mesh name="ParityOrbCageBatch" geometry={g.cage} material={mat.cage} />
         <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, (isTarget ? 0.34 : 0.27) * PARITY_ORB_SCALE, 0]} />
@@ -464,6 +466,10 @@ export default function ParityOrbs({
       refs.spin += frameDelta * _perk.spin;
       const spinTime = refs.spin + timeOffset;
       group.scale.setScalar(_perk.scale * riseScale);
+      // Parity rings only on the orb the worm is closing on (orbRingScale): a full
+      // board reads as gems on their bands. A target, and a shower orb still
+      // falling, wear them whole.
+      const rings = isTarget || (refs.shower && !refs.arrived) ? 1 : orbRingScale(refs.near, reducedMotion.current);
 
       // ── Tile beacon: which tile collects this orb ──────────────────────────
       if (!refs.shower && !isTunnelMode) {
@@ -517,6 +523,7 @@ export default function ParityOrbs({
 
       // ── Orbit system ───────────────────────────────────────────────────────
       if (orbitSystem) {
+        orbitSystem.scale.setScalar(rings);
         orbitSystem.rotation.y = spinTime * (isTarget ? 2.6 : 1.8);
         orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
         orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
@@ -528,7 +535,8 @@ export default function ParityOrbs({
       if (parityMark) {
         parityMark.rotation.y = -spinTime * (isTarget ? 1.15 : 0.8);
         parityMark.rotation.z = Math.PI / 4 + Math.sin(time * 1.4) * 0.12;
-        parityMark.scale.setScalar(1 + Math.sin(time * 4.2) * 0.045);
+        parityMark.visible = rings > 0;
+        parityMark.scale.setScalar((1 + Math.sin(time * 4.2) * 0.045) * rings);
       }
 
       // ── Electrons + halos ──────────────────────────────────────────────────
@@ -634,20 +642,25 @@ export default function ParityOrbs({
       // Arriving parts dissolve in one common orb frame. Once formed, put the
       // opaque pieces back into their shared draw calls.
       if (refs.shower || refs.compact) {
-        for (const part of [shell, core, ringA, ringB]) {
-          part.visible = !refs.arrived;
-          if (refs.arrived) batches.add(part);
+        shell.visible = !refs.arrived;
+        core.visible = !refs.arrived;
+        ringA.visible = !refs.arrived && rings > 0;
+        ringB.visible = !refs.arrived && rings > 0;
+        if (refs.arrived) {
+          batches.add(shell);
+          batches.add(core);
+          if (rings > 0) { batches.add(ringA); batches.add(ringB); }
         }
         continue;
       }
       if (refs.reducedDetail) core.visible = !refs.arrived;
       if (innerCore) innerCore.visible = !refs.arrived;
-      for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived;
+      for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived && rings > 0;
       if (refs.arrived) {
         if (refs.reducedDetail) batches.add(core);
         else {
           batches.add(innerCore);
-          for (const pole of refs.poles) batches.add(pole);
+          if (rings > 0) for (const pole of refs.poles) batches.add(pole);
         }
       }
     }
