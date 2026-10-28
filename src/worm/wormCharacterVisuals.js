@@ -37,6 +37,27 @@ export function createCharacterGeometry(character) {
   // Wiggle draws every link even at maximum length. Eight latitude bands keep
   // that full silhouette near the old thinned body's triangle budget.
   const geometry = new THREE.SphereGeometry(1, character === 'inch' ? 20 : 16, character === 'wiggle' ? 8 : 16);
+  if (character === 'classic' || character === 'glow') {
+    // Latitude rings run across the body, whose travel axis is local -Z.
+    // Shallow folds and a soft ventral shade give the round worms some anatomy
+    // without growing their radius or adding geometry/draws. Neutral vertex
+    // colours keep carried-orb hues and the equipped skin authoritative.
+    geometry.rotateX(Math.PI / 2);
+    const p = geometry.attributes.position;
+    const colors = [];
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const fold = 1 - 0.035 * (0.5 + 0.5 * Math.cos(z * Math.PI * 6)) * (1 - z * z);
+      p.setXYZ(i, x * fold, y * fold, z);
+      const belly = THREE.MathUtils.smoothstep(y, -0.65, 0.3);
+      const shade = 0.74 + 0.26 * belly;
+      colors.push(shade, shade, shade);
+    }
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.computeVertexNormals();
+    geometry.name = `${character}-sculpted-segment`;
+    return geometry;
+  }
   if (character !== 'inch' && character !== 'wiggle') return geometry;
   const p = geometry.attributes.position;
   const colors = [];
@@ -63,7 +84,7 @@ export function createCharacterGeometry(character) {
 
 export function applyCharacterFinish(material, character) {
   const prism = character === 'prism', inch = character === 'inch';
-  material.vertexColors = prism || inch || character === 'wiggle';
+  material.vertexColors = prism || inch || character === 'wiggle' || character === 'classic' || character === 'glow';
   if (character === 'wiggle') {
     material.roughness = Math.max(0.32, material.roughness);
     material.clearcoat = 0.65;

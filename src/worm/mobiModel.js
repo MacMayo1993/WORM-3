@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createMobiGasMaterial } from './mobiEnergyMaterials.js';
+import { finishWormBodyShader } from './wormBodyFinish.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { wormBlink } from './wormFaceExpression.js';
 import { createParityMobiusGeometry } from './parityGeometry.js';
@@ -153,8 +154,10 @@ export function createMobiFrameMaterial() {
       .replace('#include <common>', '#include <common>\nvarying float vMobiGlow;')
       .replace('#include <emissivemap_fragment>',
         '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * (0.12 + vMobiGlow * 1.6);');
+    // Only the solid bezel is contoured; the glass and gas stay transparent.
+    finishWormBodyShader(shader, { value: 0.55 });
   };
-  material.customProgramCacheKey = () => 'mobi-frame';
+  material.customProgramCacheKey = () => 'mobi-frame-contour-1';
   return material;
 }
 

@@ -75,6 +75,30 @@ function renderPoints() {
     return new THREE.Vector3().setFromMatrixPosition(matrix);
   });
 }
+
+it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('keeps the sculpted belly toward the %s surface', dirKey => {
+  const normal = FACE_NORMALS[dirKey];
+  const forward = new THREE.Vector3().fromArray(DIR_FORWARD[dirKey].up);
+  sim.phase = 'crawling'; sim.moveDir = 'up'; sim.pos.dirKey = dirKey;
+  sim.tailLength = 8;
+  sim.currentNormal.copy(normal);
+  sim.headInterpPos.copy(normal).multiplyScalar(1.65);
+  sim.curWorldPos.copy(sim.headInterpPos);
+  shReset(sim.stepHistory);
+  for (let distance = 1.2; distance >= 0; distance -= 0.01) {
+    shPush(sim.stepHistory, sim.headInterpPos.clone().addScaledVector(forward, -distance), normal, -1, -1, -1);
+  }
+  const points = renderPoints();
+  expect(points).toHaveLength(8);
+  const matrix = new THREE.Matrix4(), up = new THREE.Vector3();
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, matrix);
+    up.setFromMatrixColumn(matrix, 1).normalize();
+    expect(up.dot(normal)).toBeCloseTo(1, 5);
+    expect(points[i].dot(normal)).toBeGreaterThan(1.5);
+  }
+});
+
 function traverse(phase) {
   sim.phase = phase; sim.tunnelProgress = 0;
   for (let i = 1; i <= 60; i++) {

@@ -13,6 +13,7 @@
 // solved for beads still hold.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { finishWormBodyShader } from './wormBodyFinish.js';
 
 export const BOOK_LENGTH = 0.95;           // head to tail of the boards
 export const BOOK_COVER_WIDTH = 1.0;       // hinge to fore-edge
@@ -191,8 +192,9 @@ export function createBookBindingMaterial() {
       // little of its own glow keeps the tooling reading as gold.
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         totalEmissiveRadiance += uBookGilt * bookGold * 0.35;`);
+    finishWormBodyShader(shader, { value: 0.55 });
   };
-  material.customProgramCacheKey = () => 'book-binding-2';
+  material.customProgramCacheKey = () => 'book-binding-contour-3';
   return material;
 }
 

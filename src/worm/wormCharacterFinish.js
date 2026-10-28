@@ -75,6 +75,16 @@ export function wormBodyTaper(index, count, character) {
     const tail = Math.max(0, Math.min(1, (index - Math.max(2, count - 7)) / 6));
     return (index === 1 ? 0.94 : 1) * (1 - 0.48 * tail * tail);
   }
+  if (character === 'classic' || character === 'glow') {
+    // A full shoulder behind the neck, easing to a fine rounded tail. The
+    // taper spans at most seven beads, so long bodies retain their mass and
+    // short starting worms still have a distinct head and tail. Never enlarge
+    // the collision/clearance envelope or change the authored path spacing.
+    const start = Math.max(1, count - 8);
+    const tail = Math.max(0, Math.min(1, (index - start) / Math.max(1, count - 1 - start)));
+    const eased = tail * tail * (3 - 2 * tail);
+    return (index === 1 ? 0.9 : 1) * (1 - (character === 'glow' ? 0.40 : 0.45) * eased);
+  }
   const tail = Math.max(0, Math.min(1, (index - Math.max(1, count - 5)) / 4));
   return (index === 1 ? 0.88 : 1) * (1 - tail * (character === 'inch' ? 0.18 : 0.32));
 }

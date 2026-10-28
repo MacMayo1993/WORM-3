@@ -85,7 +85,7 @@ const _bookHeadDummy = new THREE.Object3D();
 // frame (a 1200-segment body would otherwise allocate 1200 objects a frame).
 const _inchGait = { dist: 0, arch: 0 };
 const _bodyHeadPos = new THREE.Vector3();
-const _prismHeadForward = new THREE.Vector3(), _prismHeadNormal = new THREE.Vector3();
+const _bodyHeadForward = new THREE.Vector3(), _bodyHeadNormal = new THREE.Vector3();
 const _arrivalBead = { grow: 1, lift: 0 };
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -497,8 +497,7 @@ export function WormBody({ worm, size }) {
             blendTunnelBodyProfile(rideProfile.current, null);
 
             if (i === 0) {
-                // Reset the shared segment scratch before applying a directional
-                // character's head frame; round heads keep the identity rotation.
+                // Reset the shared scratch before applying the character's frame.
                 _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_wormDummy.position, size, orbitT);
@@ -512,9 +511,9 @@ export function WormBody({ worm, size }) {
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
                     _wigglePrev.copy(_wormDummy.position); wigglePrevValid = !_bodyTransit;
                 }
-                if (_isPrism) {
-                    headFrameInto(_prismHeadForward, _prismHeadNormal, worm, size);
-                    bodyFrameInto(_bookBasisMat, _prismHeadForward, _prismHeadNormal, _bookX, _bookY, _bookZ);
+                if (_isPrism || _isGlow || patternRef.current.character === 'classic') {
+                    headFrameInto(_bodyHeadForward, _bodyHeadNormal, worm, size);
+                    bodyFrameInto(_bookBasisMat, _bodyHeadForward, _bodyHeadNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
                 }
                 // Book Worm draws its head as the orb above, so the spine box
@@ -655,15 +654,13 @@ export function WormBody({ worm, size }) {
                     }
                 }
                 _wormDummy.position.copy(_bodyClonePos);
-                if (_isBook || isMobi || _isInch || _isPrism || _isWiggle || segmentTransit) {
-                    // Orient the segment to the direction of travel (local -Z =
-                    // forward, +Y = surface normal): book space in wormBookFX.js.
-                    // A book's boards hinge off this frame, banked or not.
-                    bodyFrameInto(_bookBasisMat, _bodySegForward, _bodyCloneNormal, _bookX, _bookY, _bookZ);
-                    _bookQuat.setFromRotationMatrix(_bookBasisMat);
-                    _wormDummy.quaternion.copy(_bookQuat);
-                    if (swimWeight > 0) _wormDummy.rotateZ(stroke.bank);
-                }
+                // Local -Z follows travel, +Y the surface normal. Books hinge
+                // off this frame; round worms keep their ribbing and shaded
+                // belly aligned on every face and through live slice turns.
+                bodyFrameInto(_bookBasisMat, _bodySegForward, _bodyCloneNormal, _bookX, _bookY, _bookZ);
+                _bookQuat.setFromRotationMatrix(_bookBasisMat);
+                _wormDummy.quaternion.copy(_bookQuat);
+                if (swimWeight > 0) _wormDummy.rotateZ(stroke.bank);
                 if (_isInch) {
                     // Segments fatten at each hump's peak, thin elsewhere — only while moving.
                     const sc = inchBodyRadius(_inchArch); // 0.082 (rest/extended) → fatter at the hump
