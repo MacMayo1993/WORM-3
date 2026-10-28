@@ -45,6 +45,11 @@ export function createOrbReveal(group, { radius = 0.6, reducedMotion = false } =
     }
   };
   return {
+    /** The material `object` wears once it has arrived. */
+    sourceOf(object) {
+      for (const entry of entries) if (entry.object === object) return entry.source;
+      return object.material;
+    },
     update(progress) {
       if (finished) return false;
       if (progress >= 1) { release(); return false; }
