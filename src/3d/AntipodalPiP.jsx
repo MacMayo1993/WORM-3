@@ -6,6 +6,7 @@ import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { currentExplosion } from '../worm/wormExpansion.js';
 import { raisedCubieExtent } from './raisedCubieMotion.js';
 import { antipodalViewport, antipodalScissor } from './antipodalViewport.js';
+import { aimStudioRig } from './studioRig.js';
 
 export default function AntipodalPiP() {
   const rig = useMemo(() => ({ camera: new PerspectiveCamera(), point: new Vector3(), color: new Color(), cube: null, nextBounds: 0 }), []);
@@ -75,8 +76,12 @@ export default function AntipodalPiP() {
       gl.setViewport(view.x, view.y, view.width, view.height);
       gl.setClearColor('#e8e3d0', 1);
       gl.clear(true, true, true); // Clear color too, so the main cube cannot bleed through.
+      // The far side is lit as the near side is: the studio rig turns to this
+      // camera for its pass, then back to the main one.
+      aimStudioRig(camera.quaternion);
       gl.render(scene, camera);
     } finally {
+      aimStudioRig(main.quaternion);
       gl.setClearColor(rig.color, alpha);
       gl.setScissorTest(false);
       gl.autoClear = true;

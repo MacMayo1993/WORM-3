@@ -2,7 +2,9 @@
 // menu's studio light — a strong warm key from above and in front, a cool fill
 // from the left, and a cool rim from behind that picks out the silhouette and
 // the stickers' bevels. The play scene uses it for every look built from the
-// menu cube's parts; wireframe and glass keep their own tuned rigs.
+// menu cube's parts, turned with the camera (studioRig.js), so these positions
+// are relative to a camera in front of the cube; wireframe and glass keep their
+// own tuned rigs.
 // Pure data, no Three imports, so tests and both scenes can read it.
 
 export const CUBE_LIGHT_RIG = {

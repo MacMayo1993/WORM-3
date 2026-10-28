@@ -52,11 +52,13 @@ describe('sticker finish', () => {
     expect(withStickerFinish(odd)).toBe(odd);
   });
 
-  it('lights the finish from the studio rig the plain stickers use', () => {
+  it('lights the finish from the studio rig the plain stickers use, turned with the camera', () => {
     const src = withStickerFinish('uniform vec3 baseColor;\nvoid main() { gl_FragColor = vec4(baseColor, 1.0); }');
     const [x, y, z] = CUBE_LIGHT_RIG.key.position;
     const l = Math.hypot(x, y, z);
-    expect(src).toContain(`const vec3 KEY = vec3(${+(x / l).toFixed(4)}, ${+(y / l).toFixed(4)}, ${+(z / l).toFixed(4)});`);
+    // The play scene's turned rig (studioRig.js) when it has set one, else the authored rig.
+    expect(src).toContain('uniform vec3 rigKey;');
+    expect(src).toContain(`vec3 KEY = turned ? rigKey : vec3(${+(x / l).toFixed(4)}, ${+(y / l).toFixed(4)}, ${+(z / l).toFixed(4)});`);
   });
 
   it('feeds the finish from the tile vertex shader', () => {

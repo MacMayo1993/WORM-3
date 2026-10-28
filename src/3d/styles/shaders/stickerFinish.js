@@ -43,6 +43,9 @@ const MAIN = /void\s+main\s*\(\s*(?:void)?\s*\)/g;
 
 const FINISH_GLSL = `
 ${STICKER_FINISH_VARYINGS}
+uniform vec3 rigKey;
+uniform vec3 rigFill;
+uniform vec3 rigRim;
 vec3 stickerToDisplay(vec3 c) {
   c = clamp(c, 0.0, 1.0);
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
@@ -54,9 +57,12 @@ vec3 stickerFinish(vec3 col, float coatAmount) {
   vec3 n = normalize(vStickerNormal);
   if (!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vStickerPos);
-  const vec3 KEY = ${dirOf(CUBE_LIGHT_RIG.key.position)};
-  const vec3 FILL = ${dirOf(CUBE_LIGHT_RIG.fill.position)};
-  const vec3 RIM = ${dirOf(CUBE_LIGHT_RIG.rim.position)};
+  // The rig turns with the play camera (sharedUniforms.rigKey…, set by GameScene);
+  // a material that never received them keeps the authored world rig.
+  bool turned = dot(rigKey, rigKey) > 0.5;
+  vec3 KEY = turned ? rigKey : ${dirOf(CUBE_LIGHT_RIG.key.position)};
+  vec3 FILL = turned ? rigFill : ${dirOf(CUBE_LIGHT_RIG.fill.position)};
+  vec3 RIM = turned ? rigRim : ${dirOf(CUBE_LIGHT_RIG.rim.position)};
   float shade = 0.78 + 0.22 * max(dot(n, KEY), 0.0) + 0.08 * max(dot(n, FILL), 0.0);
   col *= shade;
   // Clearcoat: a tight key highlight on a soft sheen, a cool glint from the rim,

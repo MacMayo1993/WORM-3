@@ -51,6 +51,12 @@ export const sharedUniforms = {
   cellRoll: { value: _makePlaceholderCellTex() },
   cellGridN: { value: 1 },
   cellK: { value: 0 },
+  // The studio rig's light directions in world space (unit, toward each light).
+  // GameScene turns them with the camera every frame so a styled tile is lit by
+  // the same rig as a plain one; zero (no play scene) keeps the authored rig.
+  rigKey: { value: new THREE.Vector3() },
+  rigFill: { value: new THREE.Vector3() },
+  rigRim: { value: new THREE.Vector3() },
 };
 
 function _makePlaceholderCellTex() {
@@ -314,6 +320,9 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     cellRoll: sharedUniforms.cellRoll,
     cellGridN: sharedUniforms.cellGridN,
     cellK: sharedUniforms.cellK,
+    rigKey: sharedUniforms.rigKey,
+    rigFill: sharedUniforms.rigFill,
+    rigRim: sharedUniforms.rigRim,
   };
 
   // Antipodal patterns need a second color uniform.  Use the provided antipodal
