@@ -11,6 +11,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { CUBE_LIGHT_RIG, usesCubeLightRig, needsCubeReflections } from './cubeLighting.js';
+import { aimStudioRig, releaseStudioRig, setStudioRigLights } from './studioRig.js';
 const SceneEffects = React.lazy(() => import('./SceneEffects.jsx'));
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -58,6 +59,17 @@ function SceneFog({ enabled }) {
 }
 
 
+
+// The studio rig turns with the camera (studioRig.js): after the camera rigs
+// (-0.25), before body/effects (0).
+function CameraRelativeRig({ lights }) {
+  useEffect(() => releaseStudioRig, []);
+  useFrame(({ camera }) => {
+    setStudioRigLights(lights[0].current, lights[1].current, lights[2].current);
+    aimStudioRig(camera.quaternion);
+  }, -0.24);
+  return null;
+}
 
 /**
  * GameScene renders all in-game 3D content.
@@ -198,6 +210,7 @@ export default function GameScene({
   }, [currentLevelData, settings.backgroundTheme, bgConfig, storyEnvFile]);
 
   const menuRig = usesCubeLightRig(visualMode);
+  const rigLights = useMemo(() => [React.createRef(), React.createRef(), React.createRef()], []);
   const reflections = needsCubeReflections({
     inLevel: !!currentLevelData, storyEnvFile, backgroundFile: bgConfig?.file ?? null,
     photoPreset: PHOTO_PRESETS.has(settings.backgroundTheme)
@@ -212,7 +225,9 @@ export default function GameScene({
       {/* Lights. Every look built from the menu cube's parts takes the menu's
           studio rig (cubeLighting.js); wireframe and glass keep their own. */}
       <ambientLight intensity={menuRig ? CUBE_LIGHT_RIG.ambient : visualMode === 'wireframe' ? 0.2 : 0.5} />
+      {menuRig && <CameraRelativeRig lights={rigLights} />}
       <directionalLight
+        ref={rigLights[0]}
         position={menuRig ? CUBE_LIGHT_RIG.key.position : [5, 8, 5]}
         color={menuRig ? CUBE_LIGHT_RIG.key.color : '#ffffff'}
         intensity={menuRig ? CUBE_LIGHT_RIG.key.intensity : visualMode === 'wireframe' ? 0.3 : 1.6}
@@ -232,8 +247,8 @@ export default function GameScene({
       />
       {menuRig ? (
         <>
-          <directionalLight position={CUBE_LIGHT_RIG.fill.position} intensity={CUBE_LIGHT_RIG.fill.intensity} color={CUBE_LIGHT_RIG.fill.color} />
-          <directionalLight position={CUBE_LIGHT_RIG.rim.position} intensity={CUBE_LIGHT_RIG.rim.intensity} color={CUBE_LIGHT_RIG.rim.color} />
+          <directionalLight ref={rigLights[1]} position={CUBE_LIGHT_RIG.fill.position} intensity={CUBE_LIGHT_RIG.fill.intensity} color={CUBE_LIGHT_RIG.fill.color} />
+          <directionalLight ref={rigLights[2]} position={CUBE_LIGHT_RIG.rim.position} intensity={CUBE_LIGHT_RIG.rim.intensity} color={CUBE_LIGHT_RIG.rim.color} />
         </>
       ) : (
         <>

@@ -1005,6 +1005,11 @@ export default function WORM3() {
 
   firstRunLaunchRef.current = () => {
     const s = useGameStore.getState();
+    // The intro ends over the menu (the store starts with it up): take it down, as
+    // every other launch does before handleWormSetupComplete, or the canvas keeps
+    // the menu scene, the run never mounts and Story 1 waits on "Loading…" under
+    // the menu's PLAY key.
+    s.setShowMainMenu(false);
     handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(1)) });
   };
 
