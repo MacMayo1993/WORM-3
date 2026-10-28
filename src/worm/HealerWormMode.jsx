@@ -99,6 +99,7 @@ import {
 } from './healerWorm/bombs.js';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { rotationClock, resetRotationClock } from './healerWorm/rotationClockBridge.js';
+import { orbEntrance, holdOrbEntrance, setOrbEntranceClock, releaseOrbEntrance } from './orbEntrance.js';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, SeveredTail, CollisionGlow } from './healerWorm/impactFx.jsx';
 import { DroppedOrbs } from './healerWorm/DroppedOrbs.jsx';
@@ -508,7 +509,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // The countdown readout lives in the DOM HUD and reads this bridge, so leaving
     // the mode has to blank it — otherwise the last run's clock is still showing
     // when the next one mounts.
-    useEffect(() => () => resetRotationClock(), []);
+    useEffect(() => () => { resetRotationClock(); releaseOrbEntrance(); }, []);
 
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
@@ -539,6 +540,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             bombMembershipRef.current++;
             blastApiRef.current?.clear();
             bombTimerRef.current      = story?.mechanics?.bombs ? STORY_BOMB_OPENING_DELAY : BOMB_SPAWN_INTERVAL;
+            // The run's orbs wait off the board and rise with the arrival (orbEntrance.js).
+            // Demo lessons have no arrival and their intros point at the board: no wait.
+            if (practice) releaseOrbEntrance();
+            else holdOrbEntrance();
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
 
@@ -600,6 +605,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     const releaseArrival = () => {
         gameModePhaseRef.current = 'active';
+        releaseOrbEntrance();
         autoTimerRef.current = 0;
         pendingRotRef.current = null;
         warningProgressRef.current = 0;
@@ -701,9 +707,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormCountdownStep: pose.step });
                 if (pose.step !== null) feel(pose.step === 'go' ? 'countdownGo' : 'countdownBeat');
             }
+            setOrbEntranceClock(spawnTimerRef.current, duration);
             if (spawnTimerRef.current + 1e-9 >= duration) releaseArrival();
             return;
         }
+        // Play that starts without an arrival brings any waiting orbs in at once.
+        if (orbEntrance.held && gameModePhaseRef.current === 'active' && store.wormAlive && !store.wormPaused) releaseOrbEntrance();
 
         // Sim gameplay bursts also belong to stories and combat arenas that have
         // no ordinary hazard schedule. Keep them frozen during pause/end screens.
@@ -1145,7 +1154,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}
-            <group visible={wormGamePhase !== 'spawning'}><PowerupOrbs size={size} worm={worm} /></group>
+            <PowerupOrbs size={size} worm={worm} />
             <SpecialOrbs size={size} hidden={wormInTunnel || wormGamePhase === 'spawning'} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <SeveredTail severedRef={severedRef} />

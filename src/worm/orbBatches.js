@@ -9,6 +9,22 @@ export function createOrbBatches(capacity = 256) {
     const batches = new Map();
     const inverse = new THREE.Matrix4();
     const local = new THREE.Matrix4();
+    const batchFor = (geometry, material) => {
+        if (material.transparent) throw Error('Transparent parity parts must not be instanced');
+        const key = `${geometry.uuid}:${material.uuid}`;
+        let batch = batches.get(key);
+        if (!batch) {
+            const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+            mesh.count = 0;
+            mesh.frustumCulled = false; // source orbs were conservatively culled as a group
+            mesh.raycast = () => {};
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            batch = { mesh, count: 0 };
+            batches.set(key, batch);
+            group.add(mesh);
+        }
+        return batch;
+    };
     return {
         group,
         begin(root) {
@@ -18,22 +34,16 @@ export function createOrbBatches(capacity = 256) {
         },
         add(source) {
             if (!source) return;
-            if (source.material.transparent) throw Error('Transparent parity parts must not be instanced');
-            const key = `${source.geometry.uuid}:${source.material.uuid}`;
-            let batch = batches.get(key);
-            if (!batch) {
-                const mesh = new THREE.InstancedMesh(source.geometry, source.material, capacity);
-                mesh.count = 0;
-                mesh.frustumCulled = false; // source orbs were conservatively culled as a group
-                mesh.raycast = () => {};
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                batch = { mesh, count: 0 };
-                batches.set(key, batch);
-                group.add(mesh);
-            }
+            const batch = batchFor(source.geometry, source.material);
             if (batch.count === capacity) throw Error('Parity batch capacity exceeded');
             local.multiplyMatrices(inverse, source.matrixWorld);
             batch.mesh.setMatrixAt(batch.count++, local);
+        },
+        // Make the batch a part will join when its orb arrives (in its own material,
+        // not one it wears while arriving), with no instance yet, so a warm-up can
+        // compile the instanced program before anything is drawn.
+        prepare(source, material = source?.material) {
+            if (source) batchFor(source.geometry, material);
         },
         end() {
             for (const { mesh, count } of batches.values()) {

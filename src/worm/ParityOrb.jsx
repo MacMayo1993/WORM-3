@@ -23,7 +23,9 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { PARITY_ORB_SCALE } from './healerWorm/constants.js';
-import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto } from './orbBeacon.js';
+import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto, orbRingScale } from './orbBeacon.js';
+import { compileDistinct } from '../3d/compileDistinct.js';
+import { orbEntrance, orbEntranceT, orbWaveReach, orbWaveStart, orbRiseSeconds, orbRisePoseInto, orbRisePingInto } from './orbEntrance.js';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -47,6 +49,8 @@ const _tile = new THREE.Vector3();
 const _tileNormal = new THREE.Vector3();
 const _perk = { scale: 1, spin: 1 };
 const _beacon = {};
+const _rise = { sink: 0, scale: 1 };
+const _risePing = { scale: 1, intensity: 0 };
 // Beacon ring diameters (world units) for an orb on its tile.
 // The band sits at 70% of this radius: just inside a sticker's edge, clear of the gem.
 const BEACON_DIAMETER = 0.98;
@@ -149,6 +153,9 @@ function SingleOrbImpl({
       get styledBand()    { return styledBandRef.current; },
       timeOffset, shower, compact, cascade, reducedDetail, age: 0, reveal: null, arrived: !!cascade,
       near: 0, spin: 0,
+      // Run-start entrance (orbEntrance.js): waiting for the wave, how far out it
+      // reaches this orb (-1 until the arrival starts), seconds risen so far.
+      entering: false, reach: -1, risen: 0,
       get color()         { return gemColorRef.current; },
     });
     return () => unregisterAnim(orbKey);
@@ -158,9 +165,10 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Dense food fields and showers retain the gem, Möbius band and crossed orbit rings,
-  // but use four opaque proxies. After their entrance these become shared
-  // instanced draws per colour pair, with no per-orb transparent layers.
+  // Dense food fields and showers retain the gem, Möbius band and crossed orbit rings
+  // (the rings only as the worm closes in, orbRingScale), but use four opaque
+  // proxies. After their entrance these become shared instanced draws per colour
+  // pair, with no per-orb transparent layers.
   if (shower || compact) {
     return (
       <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
@@ -202,7 +210,8 @@ function SingleOrbImpl({
       {/* Parity signature: two smooth crossed great-circle halos and two opposite
           poles connected by a luminous axis through the core. It reads as
           "antipodal pair" even when tile colours are close, but its outline is now
-          all curves — no diamond, no hard edges. */}
+          all curves — no diamond, no hard edges. It grows in as the worm closes on
+          the orb (orbRingScale), so a resting board is not a field of rings. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
         <mesh name="ParityOrbCageBatch" geometry={g.cage} material={mat.cage} />
         <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, (isTarget ? 0.34 : 0.27) * PARITY_ORB_SCALE, 0]} />
@@ -313,6 +322,10 @@ export default function ParityOrbs({
   const animMapRef = useRef(new Map());
   const orbRootRef = useRef();
   const reducedMotion = useRef(prefersReducedMotion());
+  // The arrival clock as last read, so a rising orb advances by its step, and the
+  // run whose waiting orbs have been compiled.
+  const entranceClockRef = useRef(0);
+  const entranceWarmedRef = useRef(0);
   const visibility = useMemo(() => createOrbVisibility(), []);
   const batches = useMemo(() => createOrbBatches(), []);
   useEffect(() => () => batches.dispose(), [batches]);
@@ -324,8 +337,9 @@ export default function ParityOrbs({
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
+    const game = useGameStore.getState();
     // PiP renders a second camera: main-camera culling must not hide its orbs.
-    const cull = !useGameStore.getState().showAntipodalPiP;
+    const cull = !game.showAntipodalPiP;
     if (cull) visibility.begin(state.camera, orbRootRef.current);
     batches.begin(orbRootRef.current);
     beacons.begin();
@@ -336,6 +350,17 @@ export default function ParityOrbs({
       _head.copy(focus).applyMatrix4(_rootInverse);
     }
     const frameDelta = Math.min(delta, 0.05);
+    // Run-start entrance (orbEntrance.js). Orbs rise on the arrival's clock, which
+    // pause holds and a skip jumps (capped like any frame), then on the frame clock
+    // once play is running, held by pause like the arrival was.
+    const entranceOn = wormMode && !isTunnelMode;
+    const waveT = orbEntranceT();
+    const riseStep = orbEntrance.held
+      ? Math.min(0.05, Math.max(0, orbEntrance.elapsed - entranceClockRef.current))
+      : game.wormPaused ? 0 : frameDelta;
+    entranceClockRef.current = orbEntrance.elapsed;
+    const riseSeconds = orbRiseSeconds(orbEntrance.duration);
+    let waiting = 0;
 
     for (const refs of animMapRef.current.values()) {
       const {
@@ -347,7 +372,13 @@ export default function ParityOrbs({
       if (!group || !core) continue;
       const time = t + timeOffset;
       refs.age += Math.min(delta, 0.05);
-      const arrival = orbRevealProgress(refs.age, refs.shower);
+      let arrival = orbRevealProgress(refs.age, refs.shower);
+      // On the board when a run starts: wait for the arrival's wave instead.
+      if (entranceOn && orbEntrance.held && !refs.arrived && !refs.entering && !refs.shower && !refs.cascade) {
+        refs.entering = true;
+        refs.reach = -1;
+        refs.risen = 0;
+      }
 
       // ── World position — glued to live cubie transform ─────────────────────
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
@@ -391,6 +422,23 @@ export default function ParityOrbs({
         group.position.lerpVectors(_cascadeOrigin, group.position, 1 - (1 - flight) ** 2);
         group.position.addScaledVector(_tileNormal, Math.sin(Math.PI * flight) * 1.4);
       }
+      // ── Run-start entrance: the wave from the portal, then up out of the tile ──
+      let riseScale = 1;
+      if (refs.entering) {
+        // How far out the wave meets this orb, fixed once the arrival starts (or
+        // at once if play starts without one).
+        if (refs.reach < 0 && (orbEntrance.elapsed > 0 || !orbEntrance.held)) {
+          refs.reach = focus ? orbWaveReach(_tile.distanceTo(_head), size) : 0;
+        }
+        if (refs.reach >= 0 && waveT >= orbWaveStart(refs.reach)) refs.risen += riseStep;
+        else waiting++;
+        arrival = Math.min(1, refs.risen / riseSeconds);
+        if (arrival > 0 && arrival < 1) {
+          orbRisePoseInto(_rise, arrival, HOVER_ABOVE, reducedMotion.current);
+          group.position.addScaledVector(_tileNormal, -_rise.sink);
+          riseScale = _rise.scale;
+        }
+      }
       if (refs.shower && arrival < 1) {
         if (!cubie) _scratchBob.set(...bn);
         group.position.addScaledVector(_scratchBob, orbRainLift(arrival, reducedMotion.current));
@@ -399,12 +447,14 @@ export default function ParityOrbs({
       if (!refs.arrived) {
         refs.reveal ??= createOrbReveal(group, { radius: (isTarget ? 0.75 : 0.6) * PARITY_ORB_SCALE, reducedMotion: reducedMotion.current });
         refs.arrived = !refs.reveal.update(arrival);
+        if (refs.arrived) refs.entering = false;
       }
 
       // Keep placement current even when hidden so turning slices and camera
       // moves bring the complete orb back immediately. Off-screen parts skip
       // their individual animation and render-list traversal.
-      group.visible = !cull || visibility.contains(group.position, (isTarget ? 1.1 : 0.85) * PARITY_ORB_SCALE);
+      group.visible = !(refs.entering && arrival <= 0) &&
+        (!cull || visibility.contains(group.position, (isTarget ? 1.1 : 0.85) * PARITY_ORB_SCALE));
       if (!group.visible) continue;
 
       // ── Anticipation: the orb perks up as the worm's head closes in ────────
@@ -415,7 +465,11 @@ export default function ParityOrbs({
       orbPerkInto(_perk, refs.near, reducedMotion.current);
       refs.spin += frameDelta * _perk.spin;
       const spinTime = refs.spin + timeOffset;
-      group.scale.setScalar(_perk.scale);
+      group.scale.setScalar(_perk.scale * riseScale);
+      // Parity rings only on the orb the worm is closing on (orbRingScale): a full
+      // board reads as gems on their bands. A target, and a shower orb still
+      // falling, wear them whole.
+      const rings = isTarget || (refs.shower && !refs.arrived) ? 1 : orbRingScale(refs.near, reducedMotion.current);
 
       // ── Tile beacon: which tile collects this orb ──────────────────────────
       if (!refs.shower && !isTunnelMode) {
@@ -428,6 +482,11 @@ export default function ParityOrbs({
         const color = refs.beaconColor;
         beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.ringScale, color, _beacon.ringIntensity);
         if (_beacon.pingVisible) beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.pingScale, color, _beacon.pingIntensity);
+        // A rising orb sends one ring out across its tile as it clears it.
+        if (refs.entering) {
+          orbRisePingInto(_risePing, arrival, reducedMotion.current);
+          if (_risePing.intensity > 0) beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _risePing.scale, color, _risePing.intensity);
+        }
       }
 
       // ── Crystal core spin ──────────────────────────────────────────────────
@@ -464,6 +523,7 @@ export default function ParityOrbs({
 
       // ── Orbit system ───────────────────────────────────────────────────────
       if (orbitSystem) {
+        orbitSystem.scale.setScalar(rings);
         orbitSystem.rotation.y = spinTime * (isTarget ? 2.6 : 1.8);
         orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
         orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
@@ -475,7 +535,8 @@ export default function ParityOrbs({
       if (parityMark) {
         parityMark.rotation.y = -spinTime * (isTarget ? 1.15 : 0.8);
         parityMark.rotation.z = Math.PI / 4 + Math.sin(time * 1.4) * 0.12;
-        parityMark.scale.setScalar(1 + Math.sin(time * 4.2) * 0.045);
+        parityMark.visible = rings > 0;
+        parityMark.scale.setScalar((1 + Math.sin(time * 4.2) * 0.045) * rings);
       }
 
       // ── Electrons + halos ──────────────────────────────────────────────────
@@ -581,25 +642,50 @@ export default function ParityOrbs({
       // Arriving parts dissolve in one common orb frame. Once formed, put the
       // opaque pieces back into their shared draw calls.
       if (refs.shower || refs.compact) {
-        for (const part of [shell, core, ringA, ringB]) {
-          part.visible = !refs.arrived;
-          if (refs.arrived) batches.add(part);
+        shell.visible = !refs.arrived;
+        core.visible = !refs.arrived;
+        ringA.visible = !refs.arrived && rings > 0;
+        ringB.visible = !refs.arrived && rings > 0;
+        if (refs.arrived) {
+          batches.add(shell);
+          batches.add(core);
+          if (rings > 0) { batches.add(ringA); batches.add(ringB); }
         }
         continue;
       }
       if (refs.reducedDetail) core.visible = !refs.arrived;
       if (innerCore) innerCore.visible = !refs.arrived;
-      for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived;
+      for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived && rings > 0;
       if (refs.arrived) {
         if (refs.reducedDetail) batches.add(core);
         else {
           batches.add(innerCore);
-          for (const pole of refs.poles) batches.add(pole);
+          if (rings > 0) for (const pole of refs.poles) batches.add(pole);
         }
       }
     }
     batches.end();
     beacons.end();
+    // Waiting orbs wear their reveal variants from their first frame, but hidden,
+    // and the run's scene warm-up (WormEffectWarmup) can run before they mount:
+    // the wave then linked them as it reached them, in the middle of the arrival.
+    // Compile them once per run while they all still wait (the scramble or the
+    // briefing, where the warm-up hitches belong).
+    // That covers the opaque batches they join on arrival, made here with no instance.
+    if (waiting && entranceWarmedRef.current !== orbEntrance.run && orbRootRef.current && state.gl.compile) {
+      entranceWarmedRef.current = orbEntrance.run;
+      for (const refs of animMapRef.current.values()) {
+        if (!refs.entering || !refs.core) continue;
+        const prepare = part => { if (part) batches.prepare(part, refs.reveal?.sourceOf(part)); };
+        if (refs.shower || refs.compact) { prepare(refs.shell); prepare(refs.core); prepare(refs.ringA); prepare(refs.ringB); }
+        else if (refs.reducedDetail) prepare(refs.core);
+        else {
+          prepare(refs.innerCore);
+          for (const pole of refs.poles) prepare(pole);
+        }
+      }
+      compileDistinct(state.gl, orbRootRef.current, state.camera, state.scene);
+    }
   });
 
   const orbData = useMemo(() => {

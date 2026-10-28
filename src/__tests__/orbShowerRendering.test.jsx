@@ -6,6 +6,8 @@ import ParityOrbs from '../worm/ParityOrb.jsx';
 import { PARITY_ORB_GEOMETRIES } from '../worm/parityOrbGeometries.js';
 import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { getSegmentWorldPos } from '../worm/wormLogic.js';
+import { PROXIMITY_FAR } from '../worm/orbBeacon.js';
 
 extend(THREE);
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
@@ -45,8 +47,10 @@ it.each([6, 15])('batches a 144-pickup shower on a %s board while keeping its pa
     const initialPosition = falling.position.clone();
     advance(60);
     expect(falling.position.distanceTo(initialPosition)).toBeGreaterThan(1);
+    // Landed, at rest: gem and band only (six colour pairs, two batches each); the
+    // orbit rings belong to the orb the worm is closing on (orbRingScale).
     const firstBatchCount = visibleMeshes(store.scene).length;
-    expect(firstBatchCount).toBe(24);
+    expect(firstBatchCount).toBe(12);
 
     // Add the rest in the production six-orb waves, 0.65 s apart. Even during
     // overlapping entrances, visible mesh submissions stay below 100.
@@ -60,20 +64,35 @@ it.each([6, 15])('batches a 144-pickup shower on a %s board while keeping its pa
     const settled = visibleMeshes(store.scene);
     expect(settled).toHaveLength(firstBatchCount);
     expect(settled.every(o => o.isInstancedMesh && !o.material.transparent)).toBe(true);
-    expect(settled.reduce((n, o) => n + o.count, 0)).toBe(144 * 4);
+    expect(settled.reduce((n, o) => n + o.count, 0)).toBe(144 * 2);
     const g = PARITY_ORB_GEOMETRIES.normal;
-    expect(new Set(settled.map(o => o.geometry))).toEqual(new Set([g.shell, g.core, g.ringA, g.ringB]));
+    expect(new Set(settled.map(o => o.geometry))).toEqual(new Set([g.shell, g.core]));
 
-    // A dense ordinary food field uses the same bounded four-piece batches.
-    await render(orbs.slice(0, 90).map(orb => ({ ...orb, shower: false, spawnId: `food-${orb.spawnId}` })));
+    // A dense ordinary food field uses the same bounded batches.
+    const foodField = orbs.slice(0, 90).map(orb => ({ ...orb, shower: false, spawnId: `food-${orb.spawnId}` }));
+    await render(foodField);
     advance(60);
     const allFood = visibleMeshes(store.scene);
-    expect(allFood.length).toBeLessThanOrEqual(25); // 24 parity batches + one shared beacon
-    const food = allFood.filter(o => [g.shell, g.core, g.ringA, g.ringB].includes(o.geometry));
-    expect(food).toHaveLength(24);
+    expect(allFood.length).toBeLessThanOrEqual(13); // 12 parity batches + one shared beacon
+    const food = allFood.filter(o => [g.shell, g.core].includes(o.geometry));
+    expect(food).toHaveLength(12);
     expect(food.every(o => o.isInstancedMesh && !o.material.transparent)).toBe(true);
-    expect(food.reduce((n, o) => n + o.count, 0)).toBe(90 * 4);
-    expect(new Set(food.map(o => o.geometry))).toEqual(new Set([g.shell, g.core, g.ringA, g.ringB]));
+    expect(food.reduce((n, o) => n + o.count, 0)).toBe(90 * 2);
+    const rings = () => visibleMeshes(store.scene).filter(o => o.geometry === g.ringA || o.geometry === g.ringB)
+      .reduce((n, o) => n + o.count, 0);
+    expect(rings()).toBe(0);
+    // The worm's head on one pickup brings rings in on the orbs it is closing on
+    // (the ones whose beacons wake too), and nowhere else on the board.
+    const head = { current: new THREE.Vector3(...getSegmentWorldPos(foodField[0], size, 0)) };
+    const inReach = foodField.filter(orb => new THREE.Vector3(...getSegmentWorldPos(orb, size, 0)).distanceTo(head.current) < PROXIMITY_FAR);
+    await act(async () => { root.render(<ParityOrbs wormMode size={size} orbs={foodField} focusRef={head} />); });
+    advance(60);
+    expect(rings()).toBeGreaterThanOrEqual(2);
+    expect(rings()).toBeLessThanOrEqual(2 * inReach.length);
+    expect(inReach.length).toBeLessThan(foodField.length / 6);
+    await render(foodField);
+    advance(60);
+    expect(rings()).toBe(0);
 
     // Reward cascades stay instanced even in flight; animation reads the sim's
     // clock, so pause freezes the burst and a settled orb remains collectible.

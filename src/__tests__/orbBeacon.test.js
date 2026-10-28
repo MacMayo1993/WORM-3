@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  orbProximity, orbPerkInto, beaconPoseInto, beaconTexture, createOrbBeacons,
-  PROXIMITY_FAR, PROXIMITY_NEAR, PING_PERIOD
+  orbProximity, orbPerkInto, beaconPoseInto, beaconTexture, createOrbBeacons, orbRingScale,
+  PROXIMITY_FAR, PROXIMITY_NEAR, PING_PERIOD, RING_FROM
 } from '../worm/orbBeacon.js';
 import { PARITY_ORB_GEOMETRIES } from '../worm/parityOrbGeometries.js';
 import { PARITY_ORB_SCALE } from '../worm/healerWorm/constants.js';
@@ -133,5 +133,25 @@ describe('tile beacon', () => {
     beacons.begin(); beacons.end();
     expect(beacons.mesh.visible).toBe(false);
     beacons.dispose();
+  });
+});
+
+describe('parity rings', () => {
+  it('are off at rest and grow in smoothly as the worm closes on the orb', () => {
+    expect(orbRingScale(orbProximity(PROXIMITY_FAR + 1))).toBe(0);
+    expect(orbRingScale(RING_FROM)).toBe(0);
+    expect(orbRingScale(orbProximity(PROXIMITY_NEAR))).toBe(1);
+    let last = 0;
+    for (let near = 0; near <= 1; near += 0.05) {
+      const scale = orbRingScale(near);
+      expect(scale).toBeGreaterThanOrEqual(last);
+      expect(scale - last).toBeLessThan(0.15);
+      last = scale;
+    }
+  });
+
+  it('show or hide whole under reduced motion', () => {
+    expect(orbRingScale(0.3, true)).toBe(0);
+    expect(orbRingScale(0.7, true)).toBe(1);
   });
 });
