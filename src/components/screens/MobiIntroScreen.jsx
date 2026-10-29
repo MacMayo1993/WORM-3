@@ -83,13 +83,16 @@ export const MOBI_LINES_RANDOM = [
 //                  bar's height). Dialogues that play while the in-game HUD is
 //                  up pass this so the bar stays above the dim + blur instead
 //                  of being buried under it.
-const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, onSkipStep, onExit, topInset, demoStep }) => {
+const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, onSkipStep, onExit, topInset, demoStep, blurScene = false }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
   const dismissTimer = useRef(null);
   const dismissed = useRef(false);
   const speech = useMobiSpeech(lines[index] ?? '');
+  // Level previews deliberately blur even on touch screens, where the general
+  // paper-panel token disables blur. Mobi and his sheet stay above this layer.
+  const backdropBlur = blurScene ? 'blur(8px)' : PAPER_BACKDROP_BLUR;
   useEffect(() => {
     return () => clearTimeout(dismissTimer.current);
   }, []);
@@ -149,8 +152,8 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         inset: 0,
         zIndex: 0,
         pointerEvents: 'none',
-        backdropFilter:       isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
-        WebkitBackdropFilter: isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
+        backdropFilter:       isDismissing ? 'none' : backdropBlur,
+        WebkitBackdropFilter: isDismissing ? 'none' : backdropBlur,
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
       {(onSkipStep || onExit) && <DemoProgressBar currentStep={demoStep}

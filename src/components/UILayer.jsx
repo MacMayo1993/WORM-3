@@ -99,7 +99,7 @@ export default function UILayer({
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
     showFreeplayWizard, showRandomWizard, showWormModeWizard, wormEntryPage, showCubeModeSelect,
     showModeSelect,
-    showMobiIntro, mobiLines, mobiModeName,
+    showMobiIntro, mobiLines, mobiModeName, mobiPreviewScene,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityCountdown,
@@ -558,6 +558,7 @@ export default function UILayer({
         <MobiIntroScreen
           lines={mobiLines}
           modeName={mobiModeName}
+          blurScene={mobiPreviewScene}
           onComplete={onMobiIntroComplete}
         />
       )}
