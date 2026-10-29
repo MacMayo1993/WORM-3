@@ -27,6 +27,7 @@ import AntipodalPiP from './AntipodalPiP.jsx';
 import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 import BackgroundAmbience from './BackgroundAmbience.jsx';
 import TeachViewOffset from './TeachViewOffset.jsx';
+import SceneReadySignal from './SceneReadySignal.jsx';
 const ProjectiscopeBackground = React.lazy(() => import('../projectiscope/ProjectiscopeBackground.jsx'));
 
 const HealerWormMode3DWrapper = React.lazy(() =>
@@ -115,6 +116,8 @@ export default function GameScene({
   layerHighlight,
   // PiP toggle
   showAntipodalPiP,
+  readyToken = 0,
+  onReady,
 }) {
   // ── State from store ──────────────────────────────────────────────────────
   const {
@@ -378,6 +381,7 @@ export default function GameScene({
         )}
 
 
+        {readyToken > 0 && <SceneReadySignal key={readyToken} token={readyToken} onReady={onReady} />}
       </Suspense>
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}

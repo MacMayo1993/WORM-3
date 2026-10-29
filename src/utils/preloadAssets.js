@@ -10,6 +10,24 @@
 import { BACKGROUNDS, getBackgroundUrl } from './backgrounds.js';
 
 let started = false;
+let mobiPortrait;
+
+// Mobi's DOM image does not participate in drei's loading progress. Share the
+// warm-up with the level gate and wait for decode, including the PNG fallback.
+export function preloadMobiPortrait() {
+  const load = src => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      if (image.decode) image.decode().then(resolve, reject);
+      else resolve();
+    };
+    image.onerror = reject;
+    image.src = src;
+  });
+  return mobiPortrait ??= load(`${import.meta.env.BASE_URL}Mobi.webp`)
+    .catch(() => load(`${import.meta.env.BASE_URL}Mobi.png`))
+    .catch(() => { }); // A missing portrait must not prevent playing the level.
+}
 
 // Warm an HTTP cache entry without keeping the response.
 const warm = (url) => fetch(url, { credentials: 'same-origin' }).catch(() => { });
@@ -33,8 +51,7 @@ export function preloadAppAssets() {
   chunks.forEach((p) => p.catch(() => { }));
 
   // 2. Mobi's portrait — used by every dialogue (mode intros + demo steps).
-  const mobi = new Image();
-  mobi.src = `${import.meta.env.BASE_URL}Mobi.webp`;
+  preloadMobiPortrait();
 
   // NOTE: environment maps are deliberately NOT warmed here. They're 20–26MB
   // each, so a background warm on every cold session was fighting the critical
