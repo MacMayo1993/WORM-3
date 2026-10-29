@@ -8,13 +8,13 @@
  * useProgress(), which is readable from ordinary DOM components — so this gate
  * sits as a sibling of the <Canvas> and reads the decode progress directly.
  *
- * Arm it by bumping `armToken` to a new value at the moment the scene is
- * revealed (e.g. when a Mobi intro finishes). On arm it PROBES briefly: it only
+ * Arm it by bumping `armToken` when preparing a scene. On arm it PROBES briefly: it only
  * commits to showing if a decode is genuinely in flight (or starts within
  * probeMs). A transition whose assets are already cached therefore never flashes
  * a redundant cover. Once shown it holds until the decode settles (with a
  * min-show floor so it reads as intentional) or maxVisibleMs elapses — a hard
- * cap so it can never get stuck on screen.
+ * cap for ordinary transitions. An explicit `ready` latch also waits for the
+ * caller's scene/portrait preparation; `onReveal` runs as the cover fades out.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -27,6 +27,10 @@ export default function SceneLoadingGate({
   transparent = false,
   showTitle = false,
   eager = false,
+  // Optional readiness latch for work outside drei (lazy scene commit, rendered
+  // frames, DOM image decode). It must release before even the timeout can exit.
+  ready = true,
+  onReveal,
   // Long enough to see the cube through a full loop and read one of MOBI's tips.
   minVisibleMs = 2400,
   probeMs = 500,
@@ -37,6 +41,10 @@ export default function SceneLoadingGate({
   const prog = useProgress();
   const progRef = useRef(prog);
   progRef.current = prog;
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
+  const revealRef = useRef(onReveal);
+  revealRef.current = onReveal;
 
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -62,6 +70,7 @@ export default function SceneLoadingGate({
         clearInterval(s.poll);
         s.poll = null;
       }
+      revealRef.current?.();
       if (!s.shown) return; // never showed → nothing to fade out
       setLeaving(true);
       s.fade = setTimeout(() => {
@@ -74,7 +83,7 @@ export default function SceneLoadingGate({
       // Guaranteed cover: show at once and hold for at least minVisibleMs whether
       // or not a decode registers (used where the work — e.g. a demo step's cube
       // rebuild — isn't a clean asset load). It still extends until any decode
-      // settles and is capped by maxVisibleMs.
+      // settles. An explicit readiness latch can extend beyond maxVisibleMs.
       s.shown = true;
       s.shownAt = s.armedAt;
       setVisible(true);
@@ -101,14 +110,14 @@ export default function SceneLoadingGate({
           s.shown = true;
           s.shownAt = now;
           setVisible(true);
-        } else if (now - s.armedAt >= probeMs) {
+        } else if (readyRef.current && now - s.armedAt >= probeMs) {
           end(); // nothing to wait for; never flash the cover
         }
         return;
       }
       const elapsed = now - s.shownAt;
       const settled = !active || progress >= 100;
-      if ((settled && elapsed >= minVisibleMs) || now - s.armedAt >= maxVisibleMs) end();
+      if (readyRef.current && ((settled && elapsed >= minVisibleMs) || now - s.armedAt >= maxVisibleMs)) end();
     }, 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armToken]);
@@ -122,14 +131,17 @@ export default function SceneLoadingGate({
     []
   );
 
-  if (!visible) return null;
+  // Eager transitions cover the very first commit, before the effect arms its
+  // polling session, so a cached/fast scene cannot flash ahead of the loader.
+  const arming = eager && armToken && armToken !== sess.current.token;
+  if (!visible && !arming) return null;
   const { active, progress } = prog;
   return (
     <LoadingScreen
       label={label}
       showTitle={showTitle}
       transparent={transparent}
-      leaving={leaving}
+      leaving={!arming && leaving}
       progress={active && progress < 100 ? progress : null}
       style={style}
     />

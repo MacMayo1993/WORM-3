@@ -99,7 +99,7 @@ const ModeCarousel = React.lazy(() =>
 );
 import { useTeachMode } from './teach/useTeachMode.js';
 import { isMobile, setReducedMotionSetting } from './utils/device.js';
-import { preloadAppAssets } from './utils/preloadAssets.js';
+import { preloadAppAssets, preloadMobiPortrait } from './utils/preloadAssets.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
@@ -545,6 +545,10 @@ export default function WORM3() {
   const [mobiLines, setMobiLines] = useState([]);
   const [mobiModeName, setMobiModeName] = useState('');
   const [mobiPreviewScene, setMobiPreviewScene] = useState(false);
+  const [mobiIntroLoading, setMobiIntroLoading] = useState(false);
+  const [mobiLoadToken, setMobiLoadToken] = useState(0);
+  const [mobiSceneReadyToken, setMobiSceneReadyToken] = useState(0);
+  const [mobiPortraitReadyToken, setMobiPortraitReadyToken] = useState(0);
   const pendingMobiAction = useRef(null);
   // These local screens precede wormHealerMode, so wormPaused cannot gate them.
   useRandomMode(showMobiIntro || showWormModeWizard || showRandomWizard);
@@ -553,9 +557,24 @@ export default function WORM3() {
     setMobiLines(lines);
     setMobiModeName(modeName);
     setMobiPreviewScene(previewScene);
+    setMobiIntroLoading(previewScene);
+    if (previewScene) {
+      setMobiLoadToken(t => t + 1);
+      armSceneGate(modeName, { eager: true, z: Z.INTRO + 1 });
+    }
     pendingMobiAction.current = postAction;
     setShowMobiIntro(true);
-  }, []);
+  }, [armSceneGate]);
+
+  useEffect(() => {
+    if (!showMobiIntro || !mobiPreviewScene) return undefined;
+    let cancelled = false;
+    preloadMobiPortrait().then(() => {
+      if (!cancelled) setMobiPortraitReadyToken(mobiLoadToken);
+    });
+    return () => { cancelled = true; };
+  }, [showMobiIntro, mobiPreviewScene, mobiLoadToken]);
+  const revealMobiIntro = useCallback(() => setMobiIntroLoading(false), []);
 
 
   // Parity Store — hides main menu and freezes canvas while open
@@ -968,10 +987,10 @@ export default function WORM3() {
     const action = pendingMobiAction.current;
     pendingMobiAction.current = null;
     action?.();
-    // Mode scene is now revealed — arm the gate so the cube covers any env-map /
-    // texture decode still in flight (it self-dismisses if nothing is loading).
-    armSceneGate(mobiModeName || 'Loading');
-  }, [armSceneGate, mobiModeName]);
+    // WORM already loaded behind the cover before Mobi appeared. Only modes
+    // whose scene was deferred until dismissal need a loading gate here.
+    if (!mobiPreviewScene) armSceneGate(mobiModeName || 'Loading');
+  }, [armSceneGate, mobiModeName, mobiPreviewScene]);
 
   const handleWormWizardCancel = useCallback(() => {
     clearMegaReducedFXOverride();
@@ -1416,10 +1435,12 @@ export default function WORM3() {
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
       <CaptureController />
       <CaptureChrome>
-      {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
-          Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
-          background decodes. Self-dismisses when nothing is loading. */}
-      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager} minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }} />
+      {/* WORM prepares the scene and portrait under this cover, then reveals
+          Mobi over the finished backdrop as the cover dissolves. */}
+      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager}
+        minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }}
+        ready={!mobiIntroLoading || (mobiSceneReadyToken === mobiLoadToken && mobiPortraitReadyToken === mobiLoadToken)}
+        onReveal={mobiIntroLoading ? revealMobiIntro : undefined} />
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
@@ -1487,6 +1508,8 @@ export default function WORM3() {
           ) : (
             <Suspense fallback={null}>
               <GameScene
+                readyToken={showMobiIntro && mobiPreviewScene ? mobiLoadToken : 0}
+                onReady={setMobiSceneReadyToken}
                 onMove={onMove}
                 onTapFlip={onTapFlip}
                 onAnimComplete={handleAnimComplete}
@@ -1546,7 +1569,7 @@ export default function WORM3() {
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
               showFreeplayWizard, showRandomWizard, showWormModeWizard, wormEntryPage, showCubeModeSelect,
               showModeSelect,
-              showMobiIntro, mobiLines, mobiModeName, mobiPreviewScene,
+              showMobiIntro, mobiLines, mobiModeName, mobiPreviewScene, mobiIntroLoading,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityCountdown,
