@@ -171,7 +171,7 @@ function ClockContinuity({ paused }) {
  * CameraManager — teleports the camera when transitioning intro → menu → game.
  * Must live inside the Canvas to access useThree().
  */
-function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
+function CameraManager({ showWelcome, showMainMenu, cameraZ, previewScene }) {
   const { camera } = useThree();
   useEffect(() => {
     if (showWelcome) return; // the intro cinematic flies the camera itself
@@ -187,7 +187,7 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
     camera.position.set(0, showMainMenu ? 3 : 0, showMainMenu ? 12 : cameraZ);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-  }, [showWelcome, showMainMenu, camera, cameraZ]);
+  }, [showWelcome, showMainMenu, camera, cameraZ, previewScene]);
   return null;
 }
 
@@ -544,13 +544,15 @@ export default function WORM3() {
   const [showMobiIntro, setShowMobiIntro] = useState(false);
   const [mobiLines, setMobiLines] = useState([]);
   const [mobiModeName, setMobiModeName] = useState('');
+  const [mobiPreviewScene, setMobiPreviewScene] = useState(false);
   const pendingMobiAction = useRef(null);
   // These local screens precede wormHealerMode, so wormPaused cannot gate them.
   useRandomMode(showMobiIntro || showWormModeWizard || showRandomWizard);
 
-  const launchWithMobi = useCallback((lines, modeName, postAction) => {
+  const launchWithMobi = useCallback((lines, modeName, postAction, { previewScene = false } = {}) => {
     setMobiLines(lines);
     setMobiModeName(modeName);
+    setMobiPreviewScene(previewScene);
     pendingMobiAction.current = postAction;
     setShowMobiIntro(true);
   }, []);
@@ -885,6 +887,13 @@ export default function WORM3() {
     if (wizardSettings.storyLevel && !storyUnlocked(useGameStore.getState().playerProgress, wizardSettings.storyLevel)) return;
     setShowWormModeWizard(false);
 
+    // Retire the previous run before showing the next level behind Mobi. In
+    // particular, Story's Next Level can arrive with the old worm/camera mounted.
+    // Do this before applying the new look: teardown restores the player's style.
+    cancelDisparityRun();
+    useGameStore.getState().clearDisparityGame();
+    useGameStore.getState().clearLevel();
+
     // Apply visual settings immediately so the game scene shows the user's
     // chosen background and cube behind the Mobi intro overlay.
     const manifoldStyles = resolveWizardTileStyles(wizardSettings);
@@ -934,8 +943,6 @@ export default function WORM3() {
     const replay = !!chapterLevel && storyStars(useGameStore.getState().playerProgress, chapterLevel.id) > 0;
     launchWithMobi(chapterLevel ? storyLaunchLines(chapterLevel, { replay }) : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
       vibrate([50, 30, 100]);
-      cancelDisparityRun();
-      useGameStore.getState().clearLevel();
       // A 15×15 shell contains 1,178 rendered cubelets. Start it in the lighter
       // effects tier immediately instead of waiting for the frame monitor to
       // notice the drop and react several seconds into play.
@@ -953,7 +960,7 @@ export default function WORM3() {
         wizardSettings.wormEnemiesEnabled !== false,
         chapterLevel?.id ?? null
       );
-    });
+    }, { previewScene: true });
   }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr, cancelShuffle]);
 
   const handleMobiIntroComplete = useCallback(() => {
@@ -1457,7 +1464,8 @@ export default function WORM3() {
             onIncline={handlePerformanceIncline}
           />
           <ClockContinuity paused={pageHidden} />
-          <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
+          <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ}
+            previewScene={showMobiIntro && mobiPreviewScene} />
           <TilePreviewHost />
           <DirectWormPreviewHost />
           {showWelcome ? (
@@ -1472,9 +1480,9 @@ export default function WORM3() {
             showSettings ? <color attach="background" args={['#000005']} /> : (
               <MenuScene onCubeClick={handleMenuTeach} background={menuBackground} />
             )
-          ) : showMobiIntro || showWormModeWizard ? (
-            // Mobi is a DOM introduction. Mount the game only after dismissal;
-            // compiling an unseen Random cube can freeze speech and controls.
+          ) : (showMobiIntro && !mobiPreviewScene) || showWormModeWizard ? (
+            // WORM stages its cube/look before Mobi and starts gameplay only
+            // on dismissal. Other intros retain deferred scene compilation.
             <color attach="background" args={['#000005']} />
           ) : (
             <Suspense fallback={null}>
@@ -1538,7 +1546,7 @@ export default function WORM3() {
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
               showFreeplayWizard, showRandomWizard, showWormModeWizard, wormEntryPage, showCubeModeSelect,
               showModeSelect,
-              showMobiIntro, mobiLines, mobiModeName,
+              showMobiIntro, mobiLines, mobiModeName, mobiPreviewScene,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityCountdown,
