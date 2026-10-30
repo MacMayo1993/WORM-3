@@ -48,18 +48,3 @@ export const shieldFragment = `
    gl_FragColor=vec4(color,mask*vAlpha);
  }
 `;
-export const springFragment = `
- varying float vAlpha;
- varying float vCharge;
- varying float vVariant;
- varying vec2 vUv;
- void main() {
-   vec3 color=mix(vec3(0.22,0.53,0.15),vec3(0.78,1.0,0.53),0.5+0.5*cos(vUv.y*6.283185));
-   // Emberseed: a pad glowing like a coal, about to burst. Frostbloom: an iced pad.
-   if(vVariant>0.5 && vVariant<1.5) color=mix(vec3(0.75,0.18,0.04),vec3(1.0,0.78,0.30),0.5+0.5*cos(vUv.y*12.566));
-   else if(vVariant>1.5) color=mix(vec3(0.52,0.78,0.95),vec3(0.95,0.99,1.0),0.5+0.5*cos(vUv.y*12.566));
-   // Thunderpad: a pad the storm struck is charged, lightning violet with a white core.
-   color=mix(color,mix(vec3(0.66,0.55,0.98),vec3(0.94,0.97,1.0),0.5+0.5*cos(vUv.y*18.85)),vCharge);
-   gl_FragColor=vec4(color,vAlpha);
- }
-`;

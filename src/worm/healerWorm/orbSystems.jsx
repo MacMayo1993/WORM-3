@@ -120,6 +120,7 @@ const _specialGeos = {
 const _spPos = new THREE.Vector3();
 const _spNorm = new THREE.Vector3();
 const _spUp = new THREE.Vector3(0, 1, 0);
+const _spPadUp = new THREE.Vector3(0, 0, 1);
 const _spQuat = new THREE.Quaternion();
 
 function SpecialOrb({ special, size }) {
@@ -130,6 +131,7 @@ function SpecialOrb({ special, size }) {
     const reducedRef = useRef(prefersReducedMotion());
     const look = getSpecialDef(special.type);
     const viewPickup = isViewPower(special.type);
+    const springPickup = special.type === 'spring';
     const showerPickup = special.type === 'orb-shower';
     const arrival = useRef({ age: 0, effect: null, done: false });
     useEffect(() => () => arrival.current.effect?.dispose(), []);
@@ -148,11 +150,11 @@ function SpecialOrb({ special, size }) {
 
         const t = state.clock.elapsedTime;
         const bob = reducedRef.current ? 0 : Math.sin(t * 2.2) * 0.06;
-        group.position.copy(_spPos).addScaledVector(_spNorm, SPECIAL_HOVER_HEIGHT + bob);
+        group.position.copy(_spPos).addScaledVector(_spNorm, springPickup ? 0.01 : SPECIAL_HOVER_HEIGHT + bob);
         // Stand the orb up off its face — +Y local becomes the surface normal.
-        _spQuat.setFromUnitVectors(_spUp, _spNorm);
+        _spQuat.setFromUnitVectors(springPickup ? _spPadUp : _spUp, _spNorm);
         group.quaternion.copy(_spQuat);
-        if (spinRef.current) spinRef.current.rotation.y = reducedRef.current ? 0.55 : t * (viewPickup ? 0.65 : 1.6);
+        if (spinRef.current) spinRef.current.rotation.y = springPickup ? 0 : reducedRef.current ? 0.55 : t * (viewPickup ? 0.65 : 1.6);
 
         // Expiry urgency over the tail of the lifetime. `ttl` is mutated in place by
         // the sim (see spawnSpecial), so this reads a live countdown with no store
@@ -172,7 +174,7 @@ function SpecialOrb({ special, size }) {
         const alpha = Math.max(FADE_FLOOR, fade) * blink;
         // Specials are deliberately much larger than parity gems. Their silhouettes,
         // not a shared glowing sphere, should be the first thing the player reads.
-        group.scale.setScalar(1.28 + 0.12 * Math.max(FADE_FLOOR, fade));
+        group.scale.setScalar(springPickup ? 1 : 1.28 + 0.12 * Math.max(FADE_FLOOR, fade));
         group.traverse((o) => {
             if (o.material && o.material.transparent) o.material.opacity = (o.userData.baseOpacity ?? 1) * alpha;
         });
@@ -295,16 +297,16 @@ function SpecialOrb({ special, size }) {
             )}
 
             {/* Lifetime ring — shrinks toward the orb as its time runs out. */}
-            <mesh ref={timerRef} geometry={viewPickup ? _specialGeos.viewTimer : _specialGeos.timer} rotation={[Math.PI / 2, 0, 0]}>
+            {!springPickup && <mesh ref={timerRef} geometry={viewPickup ? _specialGeos.viewTimer : _specialGeos.timer} rotation={[Math.PI / 2, 0, 0]}>
                 <meshBasicMaterial color={look.accent} side={THREE.DoubleSide} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
-            </mesh>
+            </mesh>}
 
             {/* Halo ring flat against the face + a soft aura, so the orb is findable
                 from an oblique camera angle where the silhouette is edge-on. */}
-            <mesh geometry={viewPickup ? _specialGeos.viewHalo : _specialGeos.halo} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.55)}>
+            {!springPickup && <mesh geometry={viewPickup ? _specialGeos.viewHalo : _specialGeos.halo} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.55)}>
                 <meshBasicMaterial color={look.color} side={THREE.DoubleSide} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
-            </mesh>
-            {!viewPickup && !showerPickup && <mesh geometry={_specialGeos.glow} ref={tag(0.14)}>
+            </mesh>}
+            {!springPickup && !viewPickup && !showerPickup && <mesh geometry={_specialGeos.glow} ref={tag(0.14)}>
                 <meshBasicMaterial
                     color={look.color} transparent opacity={0.14} side={THREE.BackSide}
                     blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}

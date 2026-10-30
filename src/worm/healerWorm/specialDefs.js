@@ -1,3 +1,4 @@
+import { TRAMPOLINE } from './trampoline.js';
 // src/worm/healerWorm/specialDefs.js
 //
 // Presentation metadata for the special power-ups, in one place.
@@ -23,10 +24,9 @@ import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDef
 
 const BASE_SPECIAL_DEFS = {
   spring: {
-    label: 'Spring', color: '#ffcf40', accent: '#fff6c4', icon: 'spring',
-    iconPath: 'M5 2h14v3H5zM5 19h14v3H5zM6 5l12 3v2L10 12l8 2v2L6 19v-2l8-2-8-2v-2l8-2-8-2z',
-    iconAccent: 'M12 1l-3 3h6z',
-    description: 'Touch the spring to bounce, then automatically double jump at the top. Steer your landing!',
+    label: 'Trampoline', color: TRAMPOLINE.rim, accent: TRAMPOLINE.light, icon: 'spring',
+    iconPath: TRAMPOLINE.iconPath, iconAccent: TRAMPOLINE.iconAccent,
+    description: 'Touch down to bounce. The trampoline stays for the rest of the level, and your whole body follows the launch arc. Come back to use it again!',
   },
   'orb-shower': {
     label: 'Orb Shower', color: '#72edbb', accent: '#fff0a8', icon: 'orb-shower', particle: 'bubbles',

@@ -54,8 +54,7 @@ export function elementalFeedback(type, buffs, fusion = null) {
     return { text: `CHAIN ${ability?.lightningT > 0 ? `${ability.lightningT.toFixed(1)}s` : 'READY'} · Charges a tunnel within 3 · ${ability?.overcharged ?? 0} charged`, fraction: 1 - (ability?.lightningT ?? 0) / 4 };
 }
 export const patchOpacity = ttl => Math.min(1, Math.max(0, ttl / 0.6));
-export const springStretch = (ttl, reducedMotion) => reducedMotion ? 1 : 0.88 + 0.12 * Math.sin((8 - ttl) * 5);
-/** The shader's look for a patch: see shieldFragment / springFragment. */
+/** The shader's look for a patch: see shieldFragment / trampolineModel. */
 export function patchVariant(patch, steam) {
     if (patch.type === 'grass') return patch.ember ? 1 : patch.iced ? 2 : 0;
     if (patch.type === 'frost') return 4;

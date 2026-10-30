@@ -1,5 +1,6 @@
 import { it, expect } from 'vitest';
-import { elementalFeedback, fusionFeedback, patchOpacity, springStretch } from '../worm/healerWorm/elementalFeedback.js';
+import { elementalFeedback, fusionFeedback, patchOpacity } from '../worm/healerWorm/elementalFeedback.js';
+import { trampolineCompression } from '../worm/healerWorm/trampoline.js';
 import { getFusion } from '../worm/healerWorm/elementalFusion.js';
 import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
 it('explains each ordered fusion by its own rule, never its reverse', () => {
@@ -21,9 +22,13 @@ it('distinguishes an actionable spring from remaining pads and fire shields from
   expect(elementalFeedback('grass', { springCount: 3 }).text).toContain('3 springs');
   expect(elementalFeedback('fire', {}).text).toContain('Flames still hurt');
 });
-it('disables spring motion when reduced and fades only near expiry', () => {
-  expect(springStretch(4, true)).toBe(1);
-  expect(springStretch(4, false)).not.toBe(springStretch(4.2, false));
+it('keeps mat pulses going until the tail clears, reduces motion and fades only unused pads', () => {
+  const pad = { bounceDistance: 10 };
+  expect(trampolineCompression({}, 10, 4)).toBe(0);
+  expect(trampolineCompression(pad, 10, 4)).not.toBe(trampolineCompression(pad, 10.27, 4));
+  expect(trampolineCompression(pad, 10, 4, true)).toBe(trampolineCompression(pad, 13, 4, true));
+  expect(trampolineCompression(pad, 15, 4)).toBe(0);
+  expect(patchOpacity(Infinity)).toBe(1);
   expect(patchOpacity(1)).toBe(1);
   expect(patchOpacity(0)).toBe(0);
 });
