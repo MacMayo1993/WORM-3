@@ -14,6 +14,8 @@ export function createBodySurface() {
 
 export function updateBodySurface(surface, size, rotation) {
   const scale = cubeExpansionScale(size, wormExpansion.amount);
+  surface.spacing = scale;
+  surface.edge = (size - 1) / 2;
   const axis = rotation.active ? ({ col: 'x', row: 'y', depth: 'z' }[rotation.axis] || 'y') : 'y';
   surface.axis.set(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
   let count = 0;
@@ -73,6 +75,14 @@ export function clearBodySurfaceInto(position, normal, radius, surface, shape = 
       const p = point[axis];
       if (Math.abs(d) < 1e-8) {
         if (Math.abs(p) >= h) { exit = -Infinity; break; }
+        // A ray parallel to a cubie gap hits no solid surface. Treating an
+        // exploded slab as one filled box flattened the hanging body back up.
+        if (surface.spacing > 1) {
+          const coordinate = p + box.center[axis];
+          const cell = Math.round(coordinate / surface.spacing + surface.edge);
+          const center = (cell - surface.edge) * surface.spacing;
+          if (Math.abs(coordinate - center) > 0.5 + support) { exit = -Infinity; break; }
+        }
       } else {
         const a = (-h - p) / d;
         const b = (h - p) / d;

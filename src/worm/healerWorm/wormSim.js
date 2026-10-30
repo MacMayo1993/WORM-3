@@ -7,10 +7,10 @@ import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, catchHopOnPlatform, raisedPlatformPosition, raisedPadHeightAt, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing, seamJumped } from './sliceCrossing.js';
-import { tickExpansion } from './expansion.js';
+import { tickExpansion, expansionWillMove } from './expansion.js';
 import { makeBurrows, startBurrow, tickBurrows } from './burrows.js';
 import { burrowEntryOpen } from '../burrowBridge.js';
-import { EXPLODE_DURATION } from '../wormExpansion.js';
+import { EXPLODE_DURATION, explosionGapSag } from '../wormExpansion.js';
 import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
 import { bodyCoverageCount } from './bodyCoverage.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
@@ -271,6 +271,7 @@ export function makeWormSim(size) {
         specialTimer: SPECIAL_SPAWN_INTERVAL,
         explodeT: 0,
         expansionAmount: 0,
+        expansionSize: size,
         elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
         elementalClaimCooldown: 0,
         healChain: null,
@@ -450,6 +451,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.prevWorldPos = null;
     sim.rotationDeparture = null;
     sim.expansionAmount = 0;
+    sim.expansionSize = size;
     sim.onRaisedPlatform = false;
     sim.raisedDeparture = false;
     sim.raisedRouteDistance = null;
@@ -898,7 +900,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
     const candidate = sim.pendingSelfCollision;
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
         !(hasElement(sim, 'ice') && sim.elementalAbilities.iceShield) && sim.elementalAbilities.icePhaseT <= 0 &&
-        !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
+        !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 && !expansionWillMove(sim, Math.min(delta, MAX_TICK_DELTA)) &&
         !sim.pendingTunnelTrigger && !sim.pendingVoidKill &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
     if (sim.jumpRescueCollision) {
@@ -1867,6 +1869,9 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
             }
             if (departure) cNorm = _evalCornerNorm.lerpVectors(_departureNormal, cNorm, tValue).normalize();
         }
+    }
+    if (!departure && !sim.raisedDeparture && !sim.onRaisedPlatform) {
+        outPos.addScaledVector(cNorm, -explosionGapSag(outPos, cNorm, sim.expansionSize, sim.expansionAmount));
     }
     return cNorm;
 }

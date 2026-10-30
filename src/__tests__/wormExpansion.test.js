@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { remapExpansionPoint, EXPLODE_AMOUNT, wormExpansion, getWormStickerWorldPos, publishWormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
+import { remapExpansionPoint, remapExpansionSurfacePoint, explosionGapSag, EXPLODE_AMOUNT, wormExpansion, getWormStickerWorldPos, publishWormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
+import { createBodySurface, updateBodySurface, clearBodySurfaceInto } from '../worm/healerWorm/bodySurface.js';
 import { makeWormSim, resetWormSim, evaluatePosAndNormal } from '../worm/healerWorm/wormSim.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
@@ -51,6 +52,7 @@ describe('expanded worm geometry', () => {
     const actual = new THREE.Vector3();
     evaluatePosAndNormal(sim, 0.4, actual);
     const expected = point(sim.prevTile, size, sim.expansionAmount).lerp(point(sim.pos, size, sim.expansionAmount), 0.4);
+    expected.addScaledVector(FACE_NORMALS.PZ, -explosionGapSag(expected, FACE_NORMALS.PZ, size, sim.expansionAmount));
     expect(actual.distanceTo(expected)).toBeLessThan(1e-8);
     const record = shAt(sim.stepHistory, 0);
     expect([record.tx, record.ty, record.tz]).toEqual([2, 2, 4]);
@@ -78,6 +80,49 @@ describe('expanded worm geometry', () => {
     advanceTunnelHead(sim, 'windout', 1, size);
     expect(sim.headInterpPos.distanceTo(handoff)).toBeLessThan(1e-7);
   });
+});
+
+it.each([2, 3, 5, 15])('drapes through wider gaps on all faces without drifting over repeated cycles (%s)', size => {
+  const scale = cubeExpansionScale(size, EXPLODE_AMOUNT);
+  expect(scale - 1).toBeGreaterThan(0.9);
+  for (const [face, normal] of Object.entries(FACE_NORMALS)) {
+    const tile = surfaceTile(face, size);
+    const axis = ['x', 'y', 'z'].find(a => normal[a] === 0);
+    tile[axis] = 0;
+    const home = point(tile, size, 0).addScaledVector(normal, WORM_LIFT);
+    home[axis] += 0.5;
+    const p = home.clone();
+    for (let cycle = 0; cycle < 3; cycle++) {
+      let before = 0;
+      for (let frame = 1; frame <= 72; frame++) {
+        const amount = EXPLODE_AMOUNT * frame / 72;
+        remapExpansionSurfacePoint(p, normal, size, before, amount);
+        before = amount;
+      }
+      const straight = remapExpansionPoint(home.clone(), size, 0, EXPLODE_AMOUNT);
+      const depth = straight.clone().sub(p).dot(normal);
+      expect(depth).toBeGreaterThan(0.2);
+      expect(depth).toBeLessThanOrEqual(0.28 + 1e-8);
+      // The clearance solver must leave the sag in free space, but still keep
+      // the neighboring supported strand above the actual cubie.
+      wormExpansion.amount = EXPLODE_AMOUNT;
+      const surface = updateBodySurface(createBodySurface(), size, { active: false });
+      const hanging = p.clone();
+      clearBodySurfaceInto(hanging, normal, 0.105, surface);
+      expect(hanging.distanceTo(p)).toBeLessThan(1e-8);
+      const supported = point(tile, size, EXPLODE_AMOUNT);
+      expect(explosionGapSag(supported, normal, size, EXPLODE_AMOUNT)).toBe(0);
+      const ground = supported.clone();
+      clearBodySurfaceInto(supported, normal, 0.105, surface);
+      expect(supported.clone().sub(ground).dot(normal)).toBeGreaterThan(0);
+      for (let frame = 71; frame >= 0; frame--) {
+        const amount = EXPLODE_AMOUNT * frame / 72;
+        remapExpansionSurfacePoint(p, normal, size, before, amount);
+        before = amount;
+      }
+      expect(p.distanceTo(home)).toBeLessThan(1e-8);
+    }
+  }
 });
 
 
