@@ -1,6 +1,6 @@
 import { CASCADE_FLIGHT } from '../worm/healerWorm/orbCascade.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
-import { EXPLODE_AMOUNT, EXPLODE_TRANSITION } from '../worm/wormExpansion.js';
+import { EXPLODE_AMOUNT, EXPLODE_TRANSITION, EXPLODE_SETTLE_GRACE_STEPS } from '../worm/wormExpansion.js';
 // Deterministic tests for the worm simulation core (healerWorm/wormSim.js).
 // The sim is driven with fixed dt values and a stubbed ctx port — no React,
 // no store, no renderer. This is the test surface the wormSim extraction exists
@@ -334,6 +334,55 @@ describe('jump rescue window', () => {
     expect(eventsOf(ctx, 'death')).toHaveLength(1);
     expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
     expect(eventsOf(ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
+  });
+
+  it.each([[30, 0], [60, 0], [120, 0], [60, 0.001]])('does not freeze or bite a relocated tail while closing at %s Hz (timer %s)', (hz, timer) => {
+    const { sim, ctx } = setup();
+    sim.explodeT = 12;
+    tickExpansion(sim, 5, EXPLODE_TRANSITION, ctx);
+    sim.explodeT = timer;
+    sim.selfCollisionGraceSteps = 0;
+    sim.pendingSelfCollision = { key: tileKey(sim.pos) };
+    // A pending hit on the first closing frame used to offer a rescue before
+    // advancing the explosion, or kill as the old route compressed under it.
+    for (let frame = 0; frame < hz * 2 && sim.expansionAmount > 0; frame++) {
+      stepWormSim(sim, 1 / hz, 5, ctx);
+      expect(sim.alive).toBe(true);
+      expect(sim.jumpRescueT).toBe(0);
+    }
+    expect(sim.expansionAmount).toBe(0);
+    expect(sim.pendingSelfCollision).toBeNull();
+    expect(sim.selfCollisionGraceSteps).toBeGreaterThanOrEqual(EXPLODE_SETTLE_GRACE_STEPS - 1);
+    expect(sim.tailLength).toBe(100);
+    // Protection is measured in departing tiles, so it works at every speed,
+    // and ends instead of making the whole 12-second pickup invulnerable.
+    for (let frame = 0; frame < hz * 6 && sim.selfCollisionGraceSteps > 0; frame++) stepWormSim(sim, 1 / hz, 5, ctx);
+    expect(sim.selfCollisionGraceSteps).toBe(0);
+    expect(eventsOf(ctx, 'death')).toHaveLength(0);
+    expect(eventsOf(ctx, 'rescue')).toHaveLength(0);
+  });
+
+  it('still detects a real tail crossing after the expanded cube has settled', () => {
+    const { sim, ctx } = setup({ isJumpRescueEnabled: () => false });
+    const candidate = sim.pendingSelfCollision;
+    sim.explodeT = 12;
+    tickExpansion(sim, 5, EXPLODE_TRANSITION, ctx);
+    sim.selfCollisionGraceSteps = 0;
+    sim.pendingSelfCollision = candidate;
+    for (let i = 0; i < 90 && sim.alive; i++) stepWormSim(sim, 1 / 60, 5, ctx);
+    expect(eventsOf(ctx, 'death')[0]?.args[0].reason).toBe('self-collision');
+  });
+
+  it('preserves jump rescue when an explosion is waiting for a moving slice', () => {
+    const { sim, ctx } = setup();
+    sim.explodeT = 12;
+    liveRotation.active = true;
+    try {
+      stepWormSim(sim, 0.02, 5, ctx);
+      expect(sim.jumpRescueT).toBe(1);
+      expect(sim.expansionAmount).toBe(0);
+      expect(sim.selfCollisionGraceSteps).toBe(0);
+    } finally { resetLiveRotation(); }
   });
 
   it.each([
@@ -1637,7 +1686,7 @@ describe('self-collision after a ring heal', () => {
   });
 
   it('still heals an expanded ring when the physical body is long enough', () => {
-    const { sim } = followRing(140, 1, 60, 'disabled', true);
+    const { sim } = followRing(180, 1, 60, 'disabled', true);
     expect(sim.healed).toBe(1);
   });
 

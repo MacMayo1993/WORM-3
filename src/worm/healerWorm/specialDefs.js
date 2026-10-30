@@ -38,7 +38,7 @@ const BASE_SPECIAL_DEFS = {
     label: 'Explode', color: '#ba8cff', accent: '#fff0a8', icon: 'explode',
     iconPath: 'M2 2h7v7H2zm13 0h7v7h-7zM2 15h7v7H2zm13 0h7v7h-7z',
     iconAccent: 'M10 10h4v4h-4z',
-    description: 'Touch the split cube to open gaps for 12 seconds. The cube closes smoothly; the timer waits for jumps, turns and tunnel exits.',
+    description: 'Open wide gaps for 12 seconds and drape your body between the pieces. Tail-bite protection lasts through the movement and three steps after it settles. The timer waits for jumps, turns and tunnel exits.',
   },
   rocket: {
     label: "Rocket",
