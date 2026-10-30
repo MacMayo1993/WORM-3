@@ -6,7 +6,8 @@ import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, evaluatePosAndNormal, tileKey } from '../worm/healerWorm/wormSim.js';
+import { getStickerWorldPos } from '../game/coordinates.js';
 import { shPush, shReset, ttPush, ttReset } from '../worm/circularBuffers.js';
 import { checkWormHitBySlice, cutWormTail, rideLiveRotation } from '../worm/wormHelpers.js';
 import { liveCubies } from '../worm/liveCubies.js';
@@ -168,6 +169,55 @@ function rotatingHeadTile(axis, angle) {
   liveCubies.size = 3; liveCubies.refs = Array(27).fill(null); liveCubies.refs[26] = tile;
   return axisVector;
 }
+
+it.each(Object.keys(FACE_NORMALS))('keeps trampoline support on the live %s head and rendered body', dirKey => {
+  const normal = FACE_NORMALS[dirKey];
+  const forward = new THREE.Vector3(...DIR_FORWARD[dirKey].up);
+  const pad = { x: 1 + normal.x, y: 1 + normal.y, z: 1 + normal.z, dirKey };
+  const neighbor = { x: pad.x - forward.x, y: pad.y - forward.y, z: pad.z - forward.z, dirKey };
+  const axis = normal.y ? 'col' : 'row';
+  const axisVector = new THREE.Vector3(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, 0);
+  sim.phase = 'crawling'; sim.tailLength = 10; sim.crossingCorner = false;
+  for (const used of [false, true]) for (const leaving of [false, true]) for (const angle of [0, 0.7]) {
+    resetLiveRotation();
+    if (angle) setLiveRotation(axis, [0, 1, 2], [angle, angle, angle], 1, angle);
+    sim.pos = leaving ? neighbor : pad;
+    sim.prevTile = leaving ? pad : neighbor;
+    sim.curWorldPos.fromArray(getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, dirKey, 3));
+    sim.prevWorldPos = new THREE.Vector3().fromArray(getStickerWorldPos(sim.prevTile.x, sim.prevTile.y, sim.prevTile.z, dirKey, 3));
+    sim.elementalPatches.clear(); sim.bouncePads.clear();
+    (used ? sim.bouncePads : sim.elementalPatches).set(tileKey(pad), { ...pad, type: 'grass', ttl: used ? Infinity : 8 });
+    liveCubies.size = 3; liveCubies.refs = Array(27).fill(null);
+    for (const tile of [pad, neighbor]) {
+      const cubie = new THREE.Object3D();
+      cubie.quaternion.setFromAxisAngle(axisVector, angle);
+      cubie.position.set(tile.x - 1, tile.y - 1, tile.z - 1).applyQuaternion(cubie.quaternion);
+      liveCubies.refs[tile.x * 9 + tile.y * 3 + tile.z] = cubie;
+    }
+    for (const progress of leaving ? [0.25, 0.5] : [1, 0.75]) {
+      sim.interpT = progress;
+      shReset(sim.stepHistory);
+      const sample = new THREE.Vector3();
+      for (let i = 0; i <= 50; i++) {
+        evaluatePosAndNormal(sim, progress * i / 50, sample);
+        shPush(sim.stepHistory, sample.addScaledVector(normal, WORM_LIFT), normal, sim.pos.x, sim.pos.y, sim.pos.z);
+      }
+      sim.currentNormal.copy(evaluatePosAndNormal(sim, progress, sim.headInterpPos));
+      const bare = sim.prevWorldPos.clone().lerp(sim.curWorldPos, progress);
+      const support = sim.headInterpPos.clone().sub(bare).dot(normal);
+      expect(support).toBeCloseTo(progress === 1 ? 0.215 : progress === 0.5 ? 0 : 0.1075, 9);
+      const expected = sim.headInterpPos.clone().applyAxisAngle(axisVector, angle);
+      const liveNormal = normal.clone().applyAxisAngle(axisVector, angle);
+      // Same sequence as HealerWormMode: simulation pose, live anchoring, body render.
+      // Repeating the anchor while paused must neither erase nor accumulate support.
+      for (let frame = 0; frame < 2; frame++) {
+        expect(rideLiveRotation(worm)).toBe(true);
+        expect(sim.headInterpPos.distanceTo(expected)).toBeLessThan(1e-9);
+        expect(renderPoints()[0].distanceTo(expected.clone().addScaledVector(liveNormal, WORM_LIFT))).toBeLessThan(1e-6);
+      }
+    }
+  }
+});
 
 it.each(['col', 'row', 'depth'])('carries Prism through both signed %s slice turns without a commit snap', axis => {
   selectPrism(); sim.tailLength = 1;

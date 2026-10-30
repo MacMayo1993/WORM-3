@@ -243,6 +243,7 @@ export const regrowsCut = sim => hasElement(sim, 'grass');
 export function overgrowthTiles(sim, out) {
     if (!hasElement(sim, 'grass')) return out;
     for (const [key, patch] of sim.elementalPatches) if (patch.type === 'grass' && patch.ttl > 0) out.add(key);
+    for (const key of sim.bouncePads?.keys() ?? []) out.add(key);
     for (const orb of sim.powerups) if (orb.garden) out.add(keyOf(orb));
     return out;
 }

@@ -1,5 +1,6 @@
 import { hasElement, activeFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
+import { springPadAt } from './trampoline.js';
 
 const keyOf = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
 export const ELEMENTAL_PATCH_LIMIT = 32;
@@ -60,6 +61,11 @@ export const FUSION = Object.freeze({
  */
 export function addElementalPatch(sim, tile, type, extra = null) {
     const key = keyOf(tile);
+    // A used trampoline is level terrain, independent of temporary fire/frost.
+    if (type === 'grass' && sim.bouncePads?.has(key)) {
+        if (extra?.charged) sim.bouncePads.get(key).charged = true;
+        return;
+    }
     const previous = sim.elementalPatches.get(key);
     sim.elementalPatches.delete(key);
     const fusion = activeFusion(sim);
@@ -126,12 +132,18 @@ export function fusionSpeedBonus(sim) {
     return bonus;
 }
 
-/** Take the spring pad under the head, if there is one. Returns the pad (truthy) or null. */
-export function consumeSpring(sim) {
+/** Activate a reusable trampoline; never consume the surface under the tail. */
+export function activateSpringPad(sim) {
     const key = keyOf(sim.pos);
-    const pad = sim.elementalPatches.get(key);
-    if (pad?.type !== 'grass') return null;
-    sim.elementalPatches.delete(key);
+    const pad = springPadAt(sim);
+    if (!pad) return null;
+    if (!sim.bouncePads.has(key)) {
+        Object.assign(pad, sim.pos, { ttl: Infinity });
+        sim.bouncePads.set(key, pad);
+        sim.elementalPatches.delete(key);
+    }
+    pad.bounceDistance = sim.stepHistory.distance;
+    sim.springContactKey = key;
     return pad;
 }
 
@@ -231,10 +243,16 @@ export function isObsidianTile(patches, tile) {
 export const isFirebreakTile = (patches, tile) => isHotTile(patches, tile) || isObsidianTile(patches, tile) || isColdTile(patches, tile);
 
 export function rotateElementalPatches(sim, rotate) {
-    const patches = [...sim.elementalPatches.values()];
-    sim.elementalPatches.clear();
+  let contactKey = sim.springContactKey;
+  for (const map of [sim.elementalPatches, sim.bouncePads]) {
+    if (!map) continue;
+    const patches = [...map.values()];
+    map.clear();
     for (const patch of patches) {
         const tile = rotate(patch);
-        sim.elementalPatches.set(keyOf(tile), { ...patch, x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey });
+        if (keyOf(patch) === sim.springContactKey) contactKey = keyOf(tile);
+        map.set(keyOf(tile), { ...patch, x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey });
     }
+  }
+  sim.springContactKey = contactKey;
 }

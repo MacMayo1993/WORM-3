@@ -1,3 +1,4 @@
+import { springPadAt } from '../worm/healerWorm/trampoline.js';
 import { beforeEach, expect, it } from 'vitest';
 import { makeWormSim, resetWormSim, startElemental, startJump, stepWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { activeFusion } from '../worm/healerWorm/elementalFusion.js';
@@ -66,9 +67,9 @@ it('Dust Devil stuns at spring takeoff; Highlands grows charged pads after actua
   expect(dust.sim.fusionBursts.at(-1).tiles.length).toBeGreaterThan(9);
   expect(high.sim.fusionBursts).toHaveLength(0);
   land(high.sim,high.ctx); land(dust.sim,dust.ctx);
-  expect(high.sim.elementalPatches.get(tileKey(high.sim.pos))).toMatchObject({charged:true,ttl:12});
+  expect(springPadAt(high.sim)).toMatchObject({charged:true,ttl:Infinity});
   expect(high.sim.fusionBursts).toHaveLength(0); // Highlands grants no landing stun.
-  expect(dust.sim.elementalPatches.get(tileKey(dust.sim.pos)).charged).toBeUndefined();
+  expect(springPadAt(dust.sim).charged).toBeUndefined();
   startJump(high.sim,high.ctx,SIZE); startJump(dust.sim,dust.ctx,SIZE);
   expect(high.sim.jumpHeight).toBeGreaterThan(dust.sim.jumpHeight);
 });

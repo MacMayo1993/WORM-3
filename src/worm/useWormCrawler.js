@@ -1,3 +1,4 @@
+import { springPadAt } from './healerWorm/trampoline.js';
 import { segmentsToTiles } from './healerWorm/tileUnits.js';
 import { queueOrbCascade } from './healerWorm/orbCascade.js';
 import { STORY_DOUBLE_HEAL_WINDOW } from './healerWorm/healChain.js';
@@ -724,10 +725,9 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.signature = sim.alive ? signatureReadout(sim, sizeRef.current, ctxRef.current) : null;
         wormBuffs.elementalAbilities = sim.alive ? sim.elementalAbilities : null;
         wormBuffs.waterMomentum = sim.waterMomentum;
-        const tile = sim.pos;
         wormBuffs.springReady = !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead
-            && sim.phase === 'crawling' && sim.elementalPatches.get(`${tile.x},${tile.y},${tile.z},${tile.dirKey}`)?.type === 'grass';
-        let springs = 0;
+            && sim.phase === 'crawling' && !!springPadAt(sim);
+        let springs = sim.bouncePads.size;
         for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
         wormBuffs.springCount = springs;
         wormBuffs.meltdownT = sim.meltdownT;
@@ -931,6 +931,7 @@ export function useWormCrawler(size, cubies) {
             rewardBombDisarm: tile => queueOrbCascade(simRef.current, 'bomb', tile),
             signature: f('signature'),
             elementalPatches: f('elementalPatches'),
+            bouncePads: f('bouncePads'),
             elementalAbilities: f('elementalAbilities'),
             timeAlive: f('timeAlive'),
             pos: f('pos'),

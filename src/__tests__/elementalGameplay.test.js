@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeWormSim, resetWormSim, startJump } from '../worm/healerWorm/wormSim.js';
-import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, isHotTile, rotateElementalPatches, ELEMENTAL_PATCH_LIMIT } from '../worm/healerWorm/elementalGameplay.js';
+import { addElementalPatch, tickElementalGameplay, activateSpringPad, iceHoldsTurn, isHotTile, rotateElementalPatches, ELEMENTAL_PATCH_LIMIT } from '../worm/healerWorm/elementalGameplay.js';
 
 function simOf(type) {
     const sim = makeWormSim(5);
@@ -30,16 +30,22 @@ describe('elemental gameplay', () => {
         sim.isJumping = true;
         expect(iceHoldsTurn(sim, 0.01, 0.4)).toBe(false);
     });
-    it('consumes a spring on a grounded jump but not a second airborne press', () => {
+    it('keeps a used spring and does not reactivate it on an airborne press', () => {
         const sim = simOf('grass');
         addElementalPatch(sim, sim.pos, 'grass');
         startJump(sim, { feel() {} });
         expect(sim.jumpSpan).toBe(2.2);
         expect(sim.jumpHeight).toBe(1.8);
         expect(sim.elementalPatches.size).toBe(0);
+        const pad = [...sim.bouncePads.values()][0];
+        expect(pad.ttl).toBe(Infinity);
+        const launchDistance = pad.bounceDistance;
+        sim.stepHistory.distance += 1;
         addElementalPatch(sim, sim.pos, 'grass');
         startJump(sim, { feel() {} });
-        expect(sim.elementalPatches.size).toBe(1);
+        expect(sim.elementalPatches.size).toBe(0);
+        expect(sim.bouncePads.size).toBe(1);
+        expect(pad.bounceDistance).toBe(launchDistance);
     });
     it('expires fire before spring pads, freezes in tunnels, and bounds memory', () => {
         const sim = simOf('fire');
@@ -64,7 +70,28 @@ describe('elemental gameplay', () => {
         rotateElementalPatches(sim, () => destination);
         expect([...sim.elementalPatches.values()][0]).toEqual({ ...destination, type: 'grass', ttl: 6 });
         sim.pos = destination;
-        expect(consumeSpring(sim)).toMatchObject({ type: 'grass' });
-        expect(consumeSpring(sim)).toBeNull();
+        expect(activateSpringPad(sim)).toMatchObject({ type: 'grass' });
+        const pad = activateSpringPad(sim);
+        expect(pad.ttl).toBe(Infinity);
+        const moved = { x: 2, y: 0, z: 1, dirKey: 'NY' };
+        rotateElementalPatches(sim, () => moved);
+        sim.pos = moved;
+        expect(activateSpringPad(sim)).toMatchObject({ ...moved, type: 'grass', ttl: Infinity });
+        expect(sim.bouncePads.size).toBe(1);
+    });
+    it('preserves used pads through expiry, other elements and trail eviction, until reset', () => {
+        const sim = simOf('grass');
+        addElementalPatch(sim, sim.pos, 'grass');
+        const pad = activateSpringPad(sim);
+        addElementalPatch(sim, sim.pos, 'fire');
+        expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(true);
+        expect(activateSpringPad(sim)).toBe(pad);
+        for (let x = 0; x < 40; x++) addElementalPatch(sim, { x, y: 0, z: 0, dirKey: 'PZ' }, 'frost');
+        tickElementalGameplay(sim, 60);
+        expect(sim.elementalPatches.size).toBe(0);
+        expect(sim.bouncePads.size).toBe(1);
+        expect(activateSpringPad(sim)).toBe(pad);
+        resetWormSim(sim, 5, { orbCount: 0, wormholeInterval: 9999 });
+        expect(sim.bouncePads.size).toBe(0);
     });
 });

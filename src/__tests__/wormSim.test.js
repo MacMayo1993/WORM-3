@@ -1,3 +1,5 @@
+import { TRAMPOLINE, trampolineCompression } from '../worm/healerWorm/trampoline.js';
+import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { CASCADE_FLIGHT } from '../worm/healerWorm/orbCascade.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 import { EXPLODE_AMOUNT, EXPLODE_TRANSITION, EXPLODE_SETTLE_GRACE_STEPS } from '../worm/wormExpansion.js';
@@ -34,6 +36,7 @@ import {
   activeTunnelCap,
   MAX_ACTIVE_TUNNEL_PAIRS,
   SURFACE_JUMP_HEIGHT,
+  BODY_BALL_SPACING,
   TUNNEL_ORBIT_SECONDS,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies, healSticker } from '../game/cubeState.js';
@@ -1867,45 +1870,75 @@ it('holds a raised tunnel open throughout the reverse orbit, including a short t
 });
 
 
-describe('standalone spring pickup', () => {
+describe('reusable trampolines', () => {
   beforeEach(resetLiveRotation);
-  it('collects by contact and launches two automatic stages, then resets on landing', () => {
+  const bounceAtCenter = (source) => {
     const sim = makeSim(), ctx = makeCtx({ getCubies: () => makeCubies(SIZE), isStoryMode: () => true });
-    sim.specials = [{ ...sim.pos, type: 'spring', id: 'spring', ttl: 20 }];
-    // First arrival at the tile center is the only collection point.
+    sim.tailLength = 100;
+    if (source === 'pickup') sim.specials = [{ ...sim.pos, type: 'spring', id: 'spring', ttl: 20 }];
+    else addElementalPatch(sim, sim.pos, 'grass');
     sim.interpT = 1;
     sim.stepAcc = 1.25;
     stepWormSim(sim, 0.01, SIZE, ctx);
+    return { sim, ctx };
+  };
+  it.each(['pickup', 'grass'])('%s launches on contact and leaves a persistent pad and body arc after landing', source => {
+    const { sim, ctx } = bounceAtCenter(source);
+    const [key, pad] = [...sim.bouncePads][0];
     expect(sim.specials).toHaveLength(0);
     expect(sim.isJumping).toBe(true);
     expect(sim.jumpCount).toBe(1);
-    expect(sim.springBouncePending).toBe(true);
-    expect(runUntil(sim, ctx, () => sim.jumpCount === 2, 4)).toBe(true);
-    expect(sim.jumpBase).toBeGreaterThan(0.8);
-    expect(sim.springBouncePending).toBe(false);
+    expect(sim.jumpSpan).toBe(TRAMPOLINE.span);
+    expect(sim.jumpHeight).toBe(TRAMPOLINE.height);
+    const reach = (sim.tailLength - 1) * BODY_BALL_SPACING;
+    expect(trampolineCompression(pad, sim.stepHistory.distance, reach)).toBeGreaterThan(0);
     expect(runUntil(sim, ctx, () => !sim.isJumping, 5)).toBe(true);
+    expect(sim.alive).toBe(true);
     expect(sim.jumpCount).toBe(0);
+    expect(sim.bouncePads.get(key)).toBe(pad);
+    // The head landing must not flatten the history the trailing body follows.
+    let distance = 0, liftedSamples = 0;
+    for (let i = 1; i < sim.stepHistory.count && distance < reach; i++) {
+      const point = shAt(sim.stepHistory, i), previous = shAt(sim.stepHistory, i - 1);
+      distance += previous.pos.distanceTo(point.pos);
+      if (point.pos.dot(point.normal) > 2.2) liftedSamples++;
+    }
+    expect(liftedSamples).toBeGreaterThan(15);
+    expect(trampolineCompression(pad, sim.stepHistory.distance, reach)).toBeGreaterThan(0);
+    expect(trampolineCompression(pad, pad.bounceDistance + reach + 1, reach)).toBe(0);
     expect(sim.elementalType).toBeNull();
+  });
+  it('launches again when the head returns without consuming the pad', () => {
+    const { sim, ctx } = bounceAtCenter('grass');
+    const pad = [...sim.bouncePads.values()][0];
+    sim.tailLength = 1; // Return route is deliberately clear of self-collision.
+    expect(runUntil(sim, ctx, () => !sim.isJumping, 5)).toBe(true);
+    const firstLaunch = pad.bounceDistance;
+    expect(runUntil(sim, ctx, () => pad.bounceDistance > firstLaunch, 25)).toBe(true);
+    expect(sim.isJumping).toBe(true);
+    expect(sim.bouncePads.size).toBe(1);
   });
   it('respects pause and manual second jumps without granting a third', () => {
     const sim = makeSim(), ctx = makeCtx({ isStoryMode: () => true });
     activateSpecial(sim, ctx, 'spring', SIZE);
-    const before = sim.jumpT;
+    const before = sim.jumpT, distance = sim.stepHistory.distance;
     run(sim, { ...ctx, isPaused: () => true }, 1);
     expect(sim.jumpT).toBe(before);
+    expect(sim.stepHistory.distance).toBe(distance);
     startJump(sim, ctx, SIZE, { allowDive: false });
     expect(sim.jumpCount).toBe(2);
+    startJump(sim, ctx, SIZE, { allowDive: false });
     run(sim, ctx, 0.7);
     expect(sim.jumpCount).toBe(2);
-    expect(sim.springBouncePending).toBe(false);
+    expect(sim.bouncePads.size).toBe(1);
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
-    expect(sim.springBouncePending).toBe(false);
+    expect(sim.bouncePads.size).toBe(0);
   });
   it('does not steal a rocket flight or a platform jump', () => {
     for (const state of [{ rocketActive: true }, { padFlight: {} }, { isJumping: true }]) {
       const sim = makeSim(); Object.assign(sim, state);
       activateSpecial(sim, makeCtx(), 'spring', SIZE);
-      expect(sim.springBouncePending).toBe(false);
+      expect(sim.bouncePads.size).toBe(0);
     }
   });
 });

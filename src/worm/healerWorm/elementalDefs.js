@@ -68,7 +68,7 @@ export const ELEMENTAL_DEFS = {
     // Mountain ridges over fertile ground.
     iconPath: 'M2 19 9 5l4 7 3-5 6 12H2zM5 22h14M7 10l2 2 2-2',
     iconAccent: '',
-    description: 'Start with a spring and garden. Land to grow more buds; harvest them when gold. Regrowth: a cut tail grows straight back. Overgrowth: pads and buds count as body when you surround a tunnel.',
+    description: 'Start with a trampoline and garden. Trampolines bounce your whole body and stay after use. Land to grow more buds; harvest them when gold. Regrowth: a cut tail grows straight back. Overgrowth: pads and buds count as body when you surround a tunnel.',
   },
   ice: {
     label: "Ice",

@@ -8,6 +8,7 @@ import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, catchHopOnPlatform, raisedPlatformPosition, raisedPadHeightAt, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing, seamJumped } from './sliceCrossing.js';
 import { tickExpansion, expansionWillMove } from './expansion.js';
+import { TRAMPOLINE, springPadAt, trampolineSupport } from './trampoline.js';
 import { makeBurrows, startBurrow, tickBurrows } from './burrows.js';
 import { burrowEntryOpen } from '../burrowBridge.js';
 import { EXPLODE_DURATION, explosionGapSag } from '../wormExpansion.js';
@@ -18,7 +19,7 @@ import { makeSignature, activateSignature, tickSignature, launchSpring, isParity
 import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail, litTiles } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
-import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
+import { addElementalPatch, quenchTrail, tickElementalGameplay, activateSpringPad, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
     fusionSpeedBonus, postFusionBurst, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
 import { airFusionLaunch, airFusionStep, airFusionLanding } from './airFusionGameplay.js';
 import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
@@ -248,7 +249,6 @@ export function makeWormSim(size) {
         jumpT: 0,                 // 0 = grounded, >0 = in air
         isJumping: false,
         jumpCount: 0,
-        springBouncePending: false,
         // Span (in tiles) and apex height of the CURRENT flight. A normal jump uses the
         // SURFACE_* defaults; a rocket swaps in a longer, taller arc and restores these
         // on landing. Everything downstream (jumpT advance rate, the chain-fountain lift
@@ -290,6 +290,8 @@ export function makeWormSim(size) {
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
+        bouncePads: new Map(), // Activated trampolines persist independently of elemental trails.
+        springContactKey: null,
         elementalAbilities: makeElementalAbilities(),
         slamResolved: 0,   // the last Spring landing whose orbs were taken (signature.slam.seq)
         waterMomentum: 0,
@@ -463,7 +465,6 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.padFlight = null;
     sim.raisedPadHeight = 0;
     sim.jumpCount = 0;
-    sim.springBouncePending = false;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     sim.jumpBase = 0;
@@ -490,6 +491,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
+    sim.bouncePads.clear();
+    sim.springContactKey = null;
     sim.elementalAbilities = makeElementalAbilities();
     sim.slamResolved = 0;
     sim.waterMomentum = 0;
@@ -580,13 +583,12 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (sim.signature.sweep || sim.padFlight) return;
     if (sim.phase !== 'crawling') return;
     sim.assistedJump = false; // a rescue sets it after this call (skillMoments.js)
-    sim.springBouncePending = false; // manual input owns the follow-up, including platform flights
     // A jump press while the Spring is coiling lets it go now. If the landing is no longer
     // clear the coil is spent and this becomes the ordinary hop it would have been (a jump
     // rescue must never be swallowed by a leap that cannot land). Once the leap is airborne
     // a press is the follow-up jump: Spring uses one of the two jumps, not both.
     if (sim.signature.charge > 0 && launchSpring(sim, size, ctx)) return;
-    if (!liveRotation.active && !sim.restRead && startPlatformJump(sim, size, ctx, allowDive)) return;
+    if (!springPadAt(sim) && !liveRotation.active && !sim.restRead && startPlatformJump(sim, size, ctx, allowDive)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
     // outgoing sticker while a layer is moving or a destination is rest-read.
@@ -617,11 +619,11 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
         // An in-progress corner keeps its existing path; changing it mid-step would snap.
     }
     if (grounded) sim.springLaunch = false;
-    const pad = grounded && !sim.restRead && !liveRotation.active ? consumeSpring(sim) : null;
+    const pad = grounded && !sim.restRead && !liveRotation.active ? activateSpringPad(sim) : null;
     if (pad) {
         // Thunderpad: a pad the storm charged launches rocket-high.
-        sim.jumpSpan = pad.charged ? CHARGED_SPRING_SPAN : 2.2;
-        sim.jumpHeight = pad.charged ? CHARGED_SPRING_HEIGHT : 1.8;
+        sim.jumpSpan = pad.charged ? CHARGED_SPRING_SPAN : TRAMPOLINE.span;
+        sim.jumpHeight = pad.charged ? CHARGED_SPRING_HEIGHT : TRAMPOLINE.height;
         sim.springLaunch = true;
         // Geyser: the pad erupts. A full-momentum launch goes a tile further and higher,
         // and the leap refills the water it rides on.
@@ -632,7 +634,7 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
             }
             sim.waterMomentum = 1;
         }
-        ctx.onStoryMechanic?.('grassLaunch');
+        if (pad.source !== 'pickup') ctx.onStoryMechanic?.('grassLaunch');
     } else if (grounded && !sim.crossingCorner && !(next && next.dirKey !== sim.pos.dirKey) && activeFusion(sim) === 'ski-jump') {
         // Ski Jump: the ice is the ramp. Every jump from the ground is a spring leap, and
         // the landing grows a pad (Nature's own rule), so leaps chain.
@@ -734,7 +736,6 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
 
 /** Start or refresh the protected rocket arc. */
 export function startRocket(sim, ctx) {
-    sim.springBouncePending = false;
     if (sim.rocketActive) {
         sim.rocketT = ROCKET_DURATION;
         ctx.feel('rocket');
@@ -811,15 +812,8 @@ export function activateSpecial(sim, ctx, type, size = 0) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'spring') {
         if (sim.phase !== 'crawling' || sim.rocketActive || sim.padFlight || sim.isJumping || sim.signature.charge > 0 || sim.signature.sweep) return;
-        sim.isJumping = true;
-        sim.jumpT = 0.001;
-        sim.jumpCount = 1;
-        sim.jumpBase = 0;
-        sim.jumpSpan = 1.6;
-        sim.jumpHeight = 1.2;
-        sim.springBouncePending = true;
-        sim.pendingTunnelTrigger = null;
-        updateRotationDeparture(sim);
+        addElementalPatch(sim, sim.pos, 'grass', { source: 'pickup' });
+        startJump(sim, ctx, size, { allowDive: false });
         ctx.feel('springCharge');
     }
     else if (type === 'magnet') startMagnet(sim, ctx);
@@ -1872,6 +1866,7 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
     }
     if (!departure && !sim.raisedDeparture && !sim.onRaisedPlatform) {
         outPos.addScaledVector(cNorm, -explosionGapSag(outPos, cNorm, sim.expansionSize, sim.expansionAmount));
+        if (sim.bouncePads.size || sim.elementalPatches.size) outPos.addScaledVector(cNorm, trampolineSupport(sim, outPos));
     }
     return cNorm;
 }
@@ -2182,6 +2177,11 @@ const PHASE_HANDLERS = {
                 trySpecialPickupAt(sim, size, ctx, sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, true)) {
                 return true;
             }
+            if (headOnSurface && sim.interpT >= 1 && !sim.isJumping && !sim.rocketActive && !sim.padFlight &&
+                !liveRotation.active && !sim.restRead && !sim.signature.charge && !sim.signature.sweep &&
+                sim.springContactKey !== tileKey(sim.pos) && springPadAt(sim)) {
+                startJump(sim, ctx, size, { allowDive: false });
+            }
             // Recheck live coverage at visible contact. Consume the completed step
             // below before pausing, dropping its unused frame remainder: the next
             // traversal must resume with stepAcc and interpT both at zero. Its
@@ -2274,6 +2274,7 @@ const PHASE_HANDLERS = {
                     }
 
                     sim.pos = nextPos;
+                    if (sim.springContactKey !== nextKey) sim.springContactKey = null;
                     if (nextOnSurface) {
                         sim.tilesSinceTurn++;
                         ttPush(sim.tileTrail, nextKey);
@@ -2847,23 +2848,6 @@ export function stepWormSim(sim, delta, size, ctx) {
         // Tie jump progress to tile-traverse progress so the speed slider never changes
         // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
         sim.jumpT += airJumpAdvance(sim, delta / STEP_SEC);
-        if (sim.springBouncePending && sim.jumpT >= 0.45) {
-            sim.springBouncePending = false;
-            // A manual second jump takes precedence; never grant a third jump.
-            if (sim.jumpCount === 1 && !sim.rocketActive && !sim.padFlight) {
-                sim.jumpBase = jumpLiftOf(sim);
-                sim.jumpT = 0.001;
-                sim.jumpCount = 2;
-                sim.jumpSpan = 1.8;
-                sim.jumpHeight = 1.5;
-                if (hasElement(sim, 'air')) {
-                    sim.jumpSpan *= 1.35;
-                    sim.jumpHeight *= 1.4;
-                    ctx.onStoryMechanic?.('airLaunch');
-                }
-                ctx.feel('jump');
-            }
-        }
         if (sim.jumpT >= 1) {
             // Spring's slam belongs where the worm came down, not where it has crawled to by
             // the time the signature clock notices it is on the ground.
@@ -2891,6 +2875,9 @@ export function stepWormSim(sim, delta, size, ctx) {
             }
             sim.springLaunch = false;
             if (hasElement(sim, 'grass') && settled) {
+                // A pad grown by this landing arms after we leave. Otherwise every
+                // Earth landing would create its own immediate, endless relaunch.
+                if (!springPadAt(sim)) sim.springContactKey = tileKey(sim.pos);
                 addElementalPatch(sim, sim.pos, 'grass');
             }
             if (settled) { airFusionLanding(sim, size); elementalLanding(sim, size, ctx); }
@@ -2900,7 +2887,6 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
-            sim.springBouncePending = false;
             sim.jumpBase = 0;
             sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
             sim.jumpHeight = SURFACE_JUMP_HEIGHT;

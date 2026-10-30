@@ -17,6 +17,7 @@ extend(THREE);
 it('renders every view as its own cube, reserves elemental rendering for elements, and preserves expiry and hiding', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const previous = useGameStore.getState().wormSpecials;
+  const previousPaused = useGameStore.getState().wormPaused;
   const previousLive = { ...liveCubies };
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
@@ -27,7 +28,7 @@ it('renders every view as its own cube, reserves elemental rendering for element
   const specials = [...VIEW_POWER_TYPES, 'orb-shower', 'spring', 'fire'].map((type, id) => ({
     id, type, x: 1, y: 1, z: 2, dirKey: 'PZ', ttl: 20, maxTtl: 20,
   }));
-  useGameStore.setState({ wormSpecials: specials });
+  useGameStore.setState({ wormSpecials: specials, wormPaused: false });
   let store;
   let time = 0;
   const advance = count => { for (let i = 0; i < count; i++) store.advance(time += 1 / 60); };
@@ -74,11 +75,18 @@ it('renders every view as its own cube, reserves elemental rendering for element
     }
     const spring = store.scene.getObjectByName('spring-pickup');
     expect(spring).toBeDefined();
-    const coilGroup = spring.children[1];
-    const extension = coilGroup.scale.y;
+    const mat = spring.getObjectByName('trampoline-mat');
+    expect(spring.children).toHaveLength(5);
+    expect(spring.getObjectByName('trampoline-springs').isInstancedMesh).toBe(true);
+    expect(new THREE.Vector3(0, 0, 1).applyQuaternion(spring.parent.parent.quaternion).z).toBeCloseTo(1);
+    const press = mat.geometry.attributes.bouncePress;
+    const before = press.getX(0);
+    advance(90);
+    expect(press.getX(0)).not.toBeCloseTo(before);
+    useGameStore.setState({ wormPaused: true });
+    const paused = press.getX(0);
     advance(12);
-    expect(coilGroup.scale.y).not.toBeCloseTo(extension);
-    expect(coilGroup.children[0].geometry.type).toBe('TubeGeometry');
+    expect(press.getX(0)).toBe(paused);
     expect(store.scene.getObjectByName('elemental-fire')).toBeDefined();
     expect(store.scene.getObjectByName('elemental-view-lego')).toBeUndefined();
     expect(store.scene.getObjectByName('elemental-orb-shower')).toBeUndefined();
@@ -108,7 +116,7 @@ it('renders every view as its own cube, reserves elemental rendering for element
     expect(store.scene.getObjectByName('view-pickup-lego')).toBe(lego);
   } finally {
     await act(async () => root.unmount());
-    useGameStore.setState({ wormSpecials: previous });
+    useGameStore.setState({ wormSpecials: previous, wormPaused: previousPaused });
     Object.assign(liveCubies, previousLive);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

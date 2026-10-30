@@ -316,6 +316,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 if (thunder) {
                     pads = [];
                     for (const pad of patches.values()) if (pad.type === 'grass' && !pad.charged) pads.push(pad);
+                    for (const pad of worm.bouncePads?.current?.values() ?? []) if (!pad.charged) pads.push(pad);
                 }
                 return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid, pads, bodyShare: spareBody ? 0 : STORM.bodyShare }, r);
             },
@@ -391,7 +392,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const crowded = crowdedAt(key);
             if (hit || spared || crowded) continue;
             if (fusion === 'grounded') { worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL }); continue; }
-            if (thunder && chargeSpringPad(patches, key)) continue;
+            if (thunder && (chargeSpringPad(patches, key) || (worm.bouncePads?.current && chargeSpringPad(worm.bouncePads.current, key)))) continue;
             worm.strikeTile(spot.tile);
             // Conductor: the bolt forks through the wet ground to a second tile two away.
             if (fusion === 'conductor') {
