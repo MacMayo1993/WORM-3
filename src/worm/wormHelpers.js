@@ -17,6 +17,7 @@ import {
 import { orbsCarried, splitRemovedSegments } from './healerWorm/economy.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { findSlicePathHit, clipSliceHistory } from './healerWorm/sliceBodyPath.js';
+import { trampolineSupport } from './healerWorm/trampoline.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
@@ -25,6 +26,9 @@ const _meshHeadC = new THREE.Vector3();
 const _meshHeadP = new THREE.Vector3();
 const _meshNorm = new THREE.Vector3();
 const _meshNormP = new THREE.Vector3();
+const _meshRestHead = new THREE.Vector3();
+const _meshSupport = { pos: null, prevTile: null, curWorldPos: null, prevWorldPos: null,
+    bouncePads: null, elementalPatches: null };
 
 // Read a tile's live world surface position + outward normal straight from its cubie mesh —
 // the SAME source the body trail uses (resolveTrailTile). Returns false if the mesh isn't
@@ -96,6 +100,24 @@ export function rideLiveRotation(worm) {
     } else {
         worm.headInterpPos.current.copy(_meshHeadC);
         worm.currentNormal.current.copy(_meshNorm);
+    }
+    if ((worm.bouncePads?.current?.size || worm.elementalPatches?.current?.size) &&
+        !worm.onRaisedPlatform?.current && !worm.raisedDeparture?.current) {
+        // The live meshes supply the bare tile plane, not the trampoline mat.
+        // Sample the same resting path as the sim, then carry its support along
+        // the live normal. Never sample the already-anchored head: repeated calls
+        // while paused must not compound the lift or measure a rotated position
+        // against unrotated pad centers.
+        _meshSupport.pos = cur;
+        _meshSupport.prevTile = prev;
+        _meshSupport.curWorldPos = worm.curWorldPos.current;
+        _meshSupport.prevWorldPos = worm.prevWorldPos.current;
+        _meshSupport.bouncePads = worm.bouncePads?.current;
+        _meshSupport.elementalPatches = worm.elementalPatches.current;
+        _meshRestHead.copy(_meshSupport.curWorldPos);
+        if (t < 1 && _meshSupport.prevWorldPos) _meshRestHead.lerp(_meshSupport.prevWorldPos, 1 - t);
+        worm.headInterpPos.current.addScaledVector(worm.currentNormal.current,
+            trampolineSupport(_meshSupport, _meshRestHead));
     }
     return true;
 }
