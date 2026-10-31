@@ -19,7 +19,13 @@
 // (crawling onto one dives) are walls, a tile of the body is a wall until the tail
 // will have left it, and with jump-to-ride the raised pieces are walls too unless
 // no other route exists (they can be jumped). An item with no route is not lit.
+//
+// Story levels already name one target (`wormStoryTarget`: the pending power, the
+// next unvisited pair, the body-jump spot), marked on its tile with a lime diamond.
+// There the guide lights that tile alone, in the diamond's colour (`storyGuide`),
+// so the beam backs the level's objective instead of pointing somewhere else.
 import * as THREE from 'three';
+import { ACTION_CUES } from '../../game/actionCues.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { getAllSurfaceTiles } from './surfaceTiles.js';
 import { tunnelAt, tunnelDanger } from './tunnelReadout.js';
@@ -197,10 +203,34 @@ export function findGuide(sim, size, ctx, snapshot) {
   return null;
 }
 
+/**
+ * Story's guide: one beam on the level's own target, in the target diamond's
+ * colour. The target is a tile (`{ x, y, z, dirKey }`, or the centre of a ring
+ * for a surround heal); anything else lights nothing.
+ */
+export const STORY_BEAM_COLOR = ACTION_CUES.target.color;
+export function storyGuide(target) {
+  if (!target || !FACE_KEYS.has(target.dirKey)) return null;
+  const tile = { x: target.x, y: target.y, z: target.z, dirKey: target.dirKey };
+  return { kind: 'story', final: false, color: STORY_BEAM_COLOR, steps: null, turn: null, target: tile,
+    beams: [{ ...tile, color: STORY_BEAM_COLOR, steps: null }] };
+}
+const FACE_KEYS = new Set(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ']);
+
 /** Per-run memory for `stepGuide`, so it re-routes only when something moved. */
-export const makeGuideState = () => ({ key: null, dir: null, snapshot: null, t: 0, goal: null });
+export const makeGuideState = () => ({ key: null, dir: null, snapshot: null, t: 0, goal: null, storyTarget: null });
 export function resetGuideState(state) {
-  state.key = null; state.dir = null; state.snapshot = null; state.t = 0; state.goal = null;
+  state.key = null; state.dir = null; state.snapshot = null; state.t = 0; state.goal = null; state.storyTarget = null;
+}
+
+/** Story's guide, rebuilt only when the level moves its target. */
+export function stepStoryGuide(state, target) {
+  if (target !== state.storyTarget || state.key !== null) {
+    resetGuideState(state);
+    state.storyTarget = target;
+    state.goal = storyGuide(target);
+  }
+  return state.goal;
 }
 
 /**
@@ -208,6 +238,7 @@ export function resetGuideState(state) {
  * otherwise every GUIDE.refresh seconds of sim time (orbs come and go).
  */
 export function stepGuide(state, sim, size, ctx, snapshot, delta) {
+  if (state.storyTarget) resetGuideState(state);
   state.t += delta;
   const key = tileKeyOf(sim.pos);
   if (key === state.key && sim.moveDir === state.dir && snapshot === state.snapshot && state.t < GUIDE.refresh) return state.goal;

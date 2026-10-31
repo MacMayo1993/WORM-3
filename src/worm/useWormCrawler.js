@@ -45,7 +45,7 @@ import { comboWindowLeft } from './healerWorm/orbCombo.js';
 import { ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { SKILL_CALLOUTS, makeHopTracker, trackBodyHop } from './healerWorm/skillMoments.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
-import { guideMode, guideOn, makeGuideState, resetGuideState, stepGuide } from './healerWorm/guideTargets.js';
+import { guideMode, guideOn, makeGuideState, resetGuideState, stepGuide, stepStoryGuide } from './healerWorm/guideTargets.js';
 import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
 import { flipPadPair } from '../game/flipPad.js';
 import { canFlipStickerPair, flipStickerPair } from '../game/manifoldLogic.js';
@@ -142,20 +142,25 @@ function publishTilePress(sim, size, ctx, delta) {
 // pit republishes nothing; only a collapse or a heal changes the list, and only
 // the cubies under it re-render.
 const NO_PITS = Object.freeze([]);
-// The guide (guideTargets.js): free play only, on the surface, between slice turns.
-// Story levels, the demo and combat have their own objectives and markers.
+// The guide (guideTargets.js), on the surface and between slice turns. Free play
+// lights the items worth reaching (big boards by default); a Story level lights its
+// own target once it has started, at any size. The demo and combat have their own
+// markers. Off in the setting is off everywhere.
 function publishGuide(sim, size, ctx, state, delta) {
     const st = useGameStore.getState();
+    const mode = guideMode(st.settings);
+    const story = !!st.wormStoryLevel;
     const on = sim.alive && sim.phase === 'crawling' && !liveRotation.active && !sim.restRead
         && ['active', 'finalHealing'].includes(st.wormGamePhase)
-        && !st.wormStoryLevel && !st.demoMode && !st.wormCombatMode
-        && guideOn(guideMode(st.settings), size);
+        && !st.demoMode && !st.wormCombatMode
+        && (story ? st.wormStoryStarted && mode !== 'off' : guideOn(mode, size));
     if (!on) {
         resetGuideState(state);
         wormBuffs.guide = null;
         return;
     }
-    wormBuffs.guide = stepGuide(state, sim, size, ctx, getWormTunnelSnapshot(st.cubies, size, st.rotationEpoch), delta);
+    wormBuffs.guide = story ? stepStoryGuide(state, st.wormStoryTarget)
+        : stepGuide(state, sim, size, ctx, getWormTunnelSnapshot(st.cubies, size, st.rotationEpoch), delta);
 }
 
 function publishPits(sim, size, ctx, published) {
