@@ -19,6 +19,9 @@ export const wormBuffs = {
   jumpRescueT: 0,
   signature: null,
   tunnelNeeds: null,
+  // The guide trail's goal and route (scentTrail.js), or null. Read by the
+  // chevrons on the cube and the final-heal chip.
+  scent: null,
   elementalAbilities: null,
   waterMomentum: 0,
   springReady: false,
@@ -67,6 +70,7 @@ export function resetWormBuffs() {
   wormBuffs.jumpRescueT = 0;
   wormBuffs.signature = null;
   wormBuffs.tunnelNeeds = null;
+  wormBuffs.scent = null;
   wormBuffs.elementalAbilities = null;
   wormBuffs.waterMomentum = 0;
   wormBuffs.springReady = false;
