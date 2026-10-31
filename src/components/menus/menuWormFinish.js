@@ -16,6 +16,10 @@ export const MENU_WORM_INK = 0.016;
 // under its own body, so the life must outlast the body's length.
 export const MENU_TRAIL_DOTS = 48;
 export const MENU_TRAIL_LIFE = 2.2; // seconds of the worm's own clock
+// A burst (out of a portal, into one, a poke) is a ring of sparks in the same
+// draw, flung out along the surface and fading fast.
+export const MENU_SPARKS = 16;
+export const MENU_SPARK_LIFE = 0.65;
 
 // Soft round decal: the shadow is a dark pool, the trail a hot core in a halo.
 const DECAL_VERTEX = /* glsl */`
@@ -123,11 +127,17 @@ export function createMenuWormFinish({ geometry = null, segments, ink, glow, ink
   group.add(shadow.mesh);
 
   const trailOn = trailOpacity > 0;
-  const trail = trailOn ? decalMesh(MENU_TRAIL_DOTS, TRAIL_FRAGMENT, glow, trailOpacity, false) : null;
-  const dots = trailOn ? Array.from({ length: MENU_TRAIL_DOTS }, () => ({
-    position: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1), born: -Infinity, size: 0, spin: 0,
-  })) : [];
-  let nextDot = 0;
+  const trail = trailOn ? decalMesh(MENU_TRAIL_DOTS + MENU_SPARKS, TRAIL_FRAGMENT, glow, trailOpacity) : null;
+  const makeDot = life => ({
+    position: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1), drift: new THREE.Vector3(), born: -Infinity, size: 0, spin: 0, life,
+  });
+  // The trail's dots, then the sparks: one instanced draw for both.
+  const dots = trailOn ? [
+    ...Array.from({ length: MENU_TRAIL_DOTS }, () => makeDot(MENU_TRAIL_LIFE)),
+    ...Array.from({ length: MENU_SPARKS }, () => makeDot(MENU_SPARK_LIFE)),
+  ] : [];
+  let nextDot = 0, nextSpark = 0;
+  const _side = new THREE.Vector3(), _up = new THREE.Vector3();
   if (trail) {
     trail.mesh.name = 'menu-worm-trail';
     disposables.push(trail.mesh.geometry, trail.mesh.material);
@@ -171,12 +181,40 @@ export function createMenuWormFinish({ geometry = null, segments, ink, glow, ink
     emitTrail(surface, normal, radius, time) {
       if (!trail) return;
       const dot = dots[nextDot];
-      nextDot = (nextDot + 1) % dots.length;
+      nextDot = (nextDot + 1) % MENU_TRAIL_DOTS;
+      dot.drift.set(0, 0, 0);
       dot.position.copy(surface).addScaledVector(normal, 0.006);
       dot.normal.copy(normal);
       dot.born = time;
       dot.size = radius * (0.9 + 0.2 * Math.sin(time * 13.7 + nextDot));
       dot.spin = nextDot * 2.399;
+    },
+    /**
+     * A ring of sparks round `center` on the surface. `speed` > 0 flings them
+     * out (a worm popping out of a portal, a poke), < 0 sucks them in (one
+     * diving into it). `count` is capped by the pool.
+     */
+    burst(center, normal, radius, time, { count = 10, speed = 0.9, lift = 0.25 } = {}) {
+      if (!trail) return;
+      _side.set(1, 0, 0);
+      if (Math.abs(normal.x) > 0.9) _side.set(0, 1, 0);
+      _side.addScaledVector(normal, -_side.dot(normal)).normalize();
+      _up.crossVectors(normal, _side);
+      const n = Math.min(count, MENU_SPARKS);
+      for (let k = 0; k < n; k++) {
+        const dot = dots[MENU_TRAIL_DOTS + nextSpark];
+        nextSpark = (nextSpark + 1) % MENU_SPARKS;
+        const angle = (k / n) * Math.PI * 2 + time * 1.7;
+        const c = Math.cos(angle), s = Math.sin(angle);
+        // Sucked in: start on the rim and fall to the centre.
+        const start = speed < 0 ? radius * 2.4 : radius * 0.6;
+        dot.position.copy(center).addScaledVector(normal, 0.01).addScaledVector(_side, c * start).addScaledVector(_up, s * start);
+        dot.normal.copy(normal);
+        dot.drift.copy(_side).multiplyScalar(c * speed).addScaledVector(_up, s * speed).addScaledVector(normal, Math.abs(speed) * lift);
+        dot.born = time;
+        dot.size = radius * (0.55 + 0.25 * ((k * 7) % 3) / 2);
+        dot.spin = k * 2.399;
+      }
     },
     clearTrail() { for (const dot of dots) dot.born = -Infinity; },
     update(time, reducedMotion = false) {
@@ -185,17 +223,22 @@ export function createMenuWormFinish({ geometry = null, segments, ink, glow, ink
       if (!trail) return;
       for (let i = 0; i < dots.length; i++) {
         const dot = dots[i];
-        const age = (time - dot.born) / MENU_TRAIL_LIFE;
+        const seconds = time - dot.born;
+        const age = seconds / dot.life;
         if (!(age >= 0 && age < 1)) { trail.mesh.setMatrixAt(i, _zero); trail.fade.setX(i, 0); continue; }
         const life = 1 - age;
         // Bright when laid, then it soaks into the sticker; reduced motion
         // drops the twinkle but keeps the fade.
         const twinkle = reducedMotion ? 1 : 0.8 + 0.2 * Math.sin(time * 9 + dot.spin);
         _q.setFromUnitVectors(_zAxis, dot.normal);
-        const size = dot.size * (0.55 + 0.45 * life);
+        const spark = i >= MENU_TRAIL_DOTS;
+        // A spark pops up to full size, then shrinks as it flies.
+        const size = dot.size * (spark ? Math.min(1, age * 8) * (0.35 + 0.65 * life) : 0.55 + 0.45 * life);
         _s.set(size, size, 1);
-        trail.mesh.setMatrixAt(i, _m.compose(dot.position, _q, _s));
-        trail.fade.setX(i, life * (0.4 + 0.6 * life) * twinkle);
+        // Sparks slow as they go (ease-out), so a burst reads as a puff.
+        _p.copy(dot.position).addScaledVector(dot.drift, spark ? dot.life * (1 - life * life) * 0.5 : seconds);
+        trail.mesh.setMatrixAt(i, _m.compose(_p, _q, _s));
+        trail.fade.setX(i, (spark ? life : life * (0.4 + 0.6 * life)) * twinkle);
       }
       trail.mesh.instanceMatrix.needsUpdate = true;
       trail.fade.needsUpdate = true;

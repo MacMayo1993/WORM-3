@@ -7,6 +7,10 @@ import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, MENU_PORTAL_OVERLAY_Z, flipMenuCenters } from './menuCenterPortals.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
+import ModeDivePortal from './ModeDivePortal.jsx';
+import MenuLightSweep from './MenuLightSweep.jsx';
+import { DIVE_ZOOM_START, DIVE_ZOOM_TIME, DIVE_TOTAL, DIVE_REDUCED_TOTAL } from './menuDiveLeap.js';
+import { menuLeanInto, retainMenuPointer, wormTookTap } from './menuPointer.js';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
@@ -87,6 +91,8 @@ import {
   setCarouselStage,
   getCarouselStage,
   presentMenuCube,
+  getModeDiveState,
+  setModeDiveState,
 } from './menuCarouselState.js';
 
 // ─── Carousel-active flag ─────────────────────────────────────────────────────
@@ -643,7 +649,6 @@ const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
 const FACE_TARGETS = Object.values(FACE_TARGET_QUAT);
 const _parkedQ = new THREE.Quaternion();
-const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
 // ─── Idle spin ───────────────────────────────────────────────────────────────
 // The cube pirouettes on its own corner: its (1,1,1) body diagonal is aimed
@@ -668,6 +673,11 @@ const _DIAG_ALIGN_Q = new THREE.Quaternion().setFromUnitVectors(
 const _spinQ = new THREE.Quaternion();
 const _driftEuler = new THREE.Euler();
 const _driftQ = new THREE.Quaternion();
+const _lean = { x: 0, y: 0 };
+// Each face's portal wears its mode's colour (CAROUSEL_MODES is declared below).
+let _divePortalColors = null;
+const divePortalColors = () => (_divePortalColors ??= Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, m.tileColor])));
+const _leanTarget = { x: 0, y: 0 };
 const DIAG_SPIN_RATE = 0.32; // rad/s — a full turn in roughly twenty seconds
 const DRIFT_YAW_RATE = 0.075; // rad/s — the spin axis comes right around in ~84s
 const DRIFT_NOD_RATE = 0.043; // rad/s — and tips, on a period that does not
@@ -753,8 +763,17 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
   const stickerMats = getCarouselStickerMats();
   const faceColors = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, new THREE.Color(m.tileColor)])), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
+  const labels = useRef({});
   useFrame((_state, delta) => {
     if (!isCarouselActive()) return;
+    // PLAY opens a portal where the presented face's name stands: the name
+    // pops away as it opens.
+    const dive = getModeDiveState();
+    for (const [face, label] of Object.entries(labels.current)) {
+      if (!label) continue;
+      const gone = dive && !dive.reduced && dive.face === face ? Math.min(1, dive.t / 0.14) : 0;
+      label.scale.setScalar(Math.max(0.0001, 1 - gone * gone));
+    }
     const selected = getCarouselFace() || 'PZ';
     for (const [face, material] of Object.entries(stickerMats)) {
       const isSelected = face === selected;
@@ -783,7 +802,7 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
       {CAROUSEL_MODES.map((m) => {
         const cfg = MODE_FACE_CFG[m.face];
         return (
-          <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
+          <group key={m.id} position={cfg.pos} rotation={cfg.rot} ref={el => { labels.current[m.face] = el; }}>
             {/* The name stands just off the stickers' domes. Longer names step
                 down in size so every mode, including FLIP CUBE, fits on one line. */}
             <Text
@@ -832,7 +851,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   // flat on the floor while the cube above it tumbles.
   const shadowRef = useRef();
   const contactShadowTex = useMemo(() => makeContactShadowTexture(), []);
-  const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
+  const diveRef = useRef(null); // { t, onComplete, done, face, reduced } during a PLAY dive
+  // The worms watch the pointer and the cube leans toward it: one set of
+  // window listeners for the menu's life.
+  useEffect(() => retainMenuPointer(), []);
 
   useFrame((state, delta) => {
     if (!cubeRef.current) return;
@@ -858,15 +880,25 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // Present the active mode's face: slerp toward its target orientation
       // with a slow breathing wobble so the cube stays alive while parked.
       const face = getCarouselFace() || 'PZ';
+      // The presented face leans toward the pointer (or the way the phone is
+      // tilted), eased, so the cube reads as a solid thing in front of you.
+      menuLeanInto(_leanTarget);
+      const lean = 1 - Math.exp(-4 * delta);
+      _lean.x += (_leanTarget.x - _lean.x) * lean;
+      _lean.y += (_leanTarget.y - _lean.y) * lean;
+      const leanScale = diveRef.current || prefersReducedMotion() ? 0 : 1;
+      // On PLAY the cube squares up to the camera, so the zoom falls straight
+      // through the portal in the face's centre instead of past its edge.
+      const posed = diveRef.current && !diveRef.current.reduced ? Math.max(0, 1 - diveRef.current.t / 0.35) : 1;
       _wobbleEuler.set(
-        0.18 + Math.sin(t * 0.65) * 0.018,
-        0.30 + Math.sin(t * 0.5 + 1.7) * 0.022,
+        (0.18 + Math.sin(t * 0.65) * 0.018) * posed - _lean.y * 0.13 * leanScale,
+        (0.30 + Math.sin(t * 0.5 + 1.7) * 0.022) * posed + _lean.x * 0.2 * leanScale,
         0
       );
       _wobbleQ.setFromEuler(_wobbleEuler);
       _presentQ.multiplyQuaternions(_wobbleQ, FACE_TARGET_QUAT[face] ?? FACE_TARGET_QUAT.PZ);
       _presentQ.premultiply(_stageViewQ);
-      cubeRef.current.quaternion.slerp(_presentQ, 1 - Math.exp(-6 * delta));
+      cubeRef.current.quaternion.slerp(_presentQ, 1 - Math.exp(-(diveRef.current ? 10 : 6) * delta));
 
       // The selector can open after the cube has been off-screen for a long
       // game. Snap to the requested face on entry instead of showing a frame
@@ -890,16 +922,24 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         shadowRef.current.scale.set(SHADOW_SPREAD * settled, SHADOW_SPREAD * SHADOW_SQUASH * settled, 1);
       }
 
-      // PLAY dive: the presented face accelerates into the camera.
+      // PLAY dive: a portal opens in the presented face, the player's worm
+      // leaps into it (CubeGlowWorm, ModeDivePortal), and then the face
+      // accelerates into the camera. Reduced motion keeps only the face's rush.
       if (!diveRef.current) {
         const req = consumeModeDive();
-        if (req) diveRef.current = { t: 0, onComplete: req.onComplete, done: false };
+        if (req) diveRef.current = { t: 0, onComplete: req.onComplete, done: false, face, reduced: prefersReducedMotion() || !!useGameStore.getState().settings?.reducedMotion };
       }
       if (diveRef.current) {
         const dive = diveRef.current;
-        dive.t += delta;
-        const p = Math.min(1, dive.t / DIVE_DURATION);
-        cubeRef.current.scale.setScalar((1.022 + Math.pow(p, 3) * 7.5) * presentScale);
+        // Real time (a frame hitch can't stretch the dive past its fallback).
+        dive.t += Math.min(delta, 0.1);
+        setModeDiveState({ t: dive.t, face: dive.face, reduced: dive.reduced });
+        const zoomStart = dive.reduced ? 0 : DIVE_ZOOM_START;
+        const zoomTime = dive.reduced ? DIVE_REDUCED_TOTAL : DIVE_ZOOM_TIME;
+        const p = Math.max(0, Math.min(1, (dive.t - zoomStart) / zoomTime));
+        // While the worm is in the air the cube braces, a breath back, then rushes in.
+        const brace = dive.reduced || dive.t >= zoomStart ? 0 : Math.sin(Math.PI * dive.t / zoomStart) * 0.035;
+        cubeRef.current.scale.setScalar((1.022 - brace + Math.pow(p, 3) * 7.5) * presentScale);
         if (p >= 1 && !dive.done) {
           dive.done = true;
           // Launching a mode runs a lot of app code. If it throws, it must not
@@ -928,6 +968,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     }
 
     carouselWasActive.current = false;
+    setModeDiveState(null);
     if (shadowRef.current) shadowRef.current.visible = false;
 
     // Carousel closed — clear any finished dive so idle animation resumes clean.
@@ -992,12 +1033,23 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       _driftEuler.set(Math.sin(t * DRIFT_NOD_RATE) * DRIFT_NOD_AMP, t * DRIFT_YAW_RATE, 0);
       _driftQ.setFromEuler(_driftEuler);
       cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ).premultiply(_driftQ);
+      // Lean toward the pointer (or the phone's tilt), as the carousel does.
+      menuLeanInto(_leanTarget);
+      const lean = 1 - Math.exp(-4 * delta);
+      _lean.x += (_leanTarget.x - _lean.x) * lean;
+      _lean.y += (_leanTarget.y - _lean.y) * lean;
+      if (!prefersReducedMotion()) {
+        _driftEuler.set(-_lean.y * 0.16, _lean.x * 0.22, 0);
+        cubeRef.current.quaternion.premultiply(_driftQ.setFromEuler(_driftEuler));
+      }
       cubeRef.current.position.set(homeX, homeY, homeZ);
     }
   });
 
   const handleCubeClick = (e) => {
     e.stopPropagation();
+    // A tap on a worm pokes the worm; it doesn't shake the cube as well.
+    if (wormTookTap()) return;
     if (shaking.current) return;
     shaking.current = true;
     shakeStart.current = Date.now();
@@ -1021,8 +1073,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         {/* Always mounted (no mount-timing flash); the frame loop above shows
             the plates only on frames where it presents a mode face. */}
         <ModeFacePlates ref={platesRef} />
+        <ModeDivePortal colors={divePortalColors()} />
         <CubeGlowWorm />
       </group>
+      <MenuLightSweep target={cubeRef} />
       {/* Ground for the presented cube. Outside the cube group on purpose: as a
           child it would inherit the tumble and swing up the wall. Hidden on
           every frame that is not presenting a mode face.
@@ -1258,7 +1312,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
       launch(id);
     };
     requestModeDive(fire);
-    fallbackTimerRef.current = setTimeout(fire, 850);
+    // The worm's leap comes first now: the fallback waits out the whole dive.
+    fallbackTimerRef.current = setTimeout(fire, Math.round(Math.max(DIVE_TOTAL, DIVE_REDUCED_TOTAL) * 1000) + 900);
   }, [launch, recordModePlay, unlocked]);
 
   useEffect(() => {
@@ -1297,6 +1352,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, []);
 
   const mode = CAROUSEL_MODES[activeIndex];
+  // Where the iris opens from (the cube's stage) and when (as the zoom ends).
+  const stageBox = diving ? getCarouselStage() : null;
+  const floodAt = stageBox ? { x: stageBox.left + stageBox.width / 2, y: stageBox.top + stageBox.height / 2 } : { x: 0, y: 0 };
+  const floodDelay = prefersReducedMotion() ? DIVE_REDUCED_TOTAL * 0.55 : DIVE_ZOOM_START + DIVE_ZOOM_TIME * 0.5;
   const modeChips = useMemo(() => chipsFor(mode), [mode]);
   const statItems = useMemo(
     () => modeStatItems(mode, {
@@ -1334,6 +1393,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
   return (
     <div className="live-carousel" style={{ zIndex: Z.MENU, '--mode-accent': mode.tileColor, '--mode-ink': mode.textColor }}>
+      {/* The camera falls through the portal: an iris of the mode's colour
+          opens from the cube as the zoom ends, and the mode starts behind it. */}
+      <div className="lc-dive-flood" aria-hidden="true" data-on={diving || undefined}
+        style={{ '--flood-x': `${floodAt.x}px`, '--flood-y': `${floodAt.y}px`, '--flood-delay': `${floodDelay}s` }} />
       <div className="live-carousel-layout" style={{ opacity: diving ? 0 : 1, pointerEvents: diving ? 'none' : 'auto' }} inert={diving ? '' : undefined}>
         <header className="lc-header">
           <button type="button" className="lc-icon-button" aria-label="Back to main menu" onClick={onBack}>‹</button>

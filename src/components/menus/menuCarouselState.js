@@ -42,6 +42,12 @@ export const consumeModeDive = () => {
   return d;
 };
 
+// The dive in flight, published by the cube each frame it runs so the worm can
+// leap into the portal and the portal can open: { t, face, reduced } or null.
+let _diveState = null;
+export const setModeDiveState = (state) => { _diveState = state; };
+export const getModeDiveState = () => _diveState;
+
 // ─── Cube stage ───────────────────────────────────────────────────────────────
 // The measured viewport rectangle of the transparent DOM stage. The cube uses
 // this to stay centered and in bounds as controls, disclosures or screens resize.

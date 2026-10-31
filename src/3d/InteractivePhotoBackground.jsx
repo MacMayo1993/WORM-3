@@ -17,6 +17,8 @@ import { useFrame } from '@react-three/fiber';
 import { BackSide, RepeatWrapping } from 'three';
 import { useEnvironment } from '@react-three/drei';
 import SafeEnvironment from './SafeEnvironment.jsx';
+import { menuLeanInto } from '../components/menus/menuPointer.js';
+import { prefersReducedMotion } from '../utils/device.js';
 
 // Contain a failed texture load to the background alone (mirrors SafeEnvironment)
 // so a blocked/slow HDR fetch never blanks the whole scene.
@@ -37,9 +39,10 @@ class SkyBoundary extends React.Component {
   }
 }
 
-function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
+function PanoramaSky({ preset, files, rotationSpeed, intensity, visible, parallax }) {
   const texture = useEnvironment(files ? { files } : { preset });
   const meshRef = useRef();
+  const drift = useRef({ yaw: 0, x: 0, y: 0, target: { x: 0, y: 0 } });
 
   // Viewed from the inside (BackSide) an equirectangular texture is mirrored, so
   // flip U on a clone. Cloning keeps the shared environment map (used for
@@ -65,7 +68,18 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
     // Follow the camera so the panorama behaves like a distant skybox, then
     // drift around Y. Negative speeds counter-rotate against the menu cube.
     mesh.position.copy(state.camera.position);
-    mesh.rotation.y += delta * rotationSpeed;
+    const d = drift.current;
+    d.yaw += delta * rotationSpeed;
+    // The menu's depth: the cube leans toward the pointer (or the phone's
+    // tilt) and the far-off panorama slides the other way, eased.
+    if (parallax) {
+      menuLeanInto(d.target);
+      if (prefersReducedMotion()) d.target.x = d.target.y = 0;
+      const k = 1 - Math.exp(-3 * Math.min(delta, 0.1));
+      d.x += (d.target.x - d.x) * k;
+      d.y += (d.target.y - d.y) * k;
+    }
+    mesh.rotation.set(d.y * 0.045, d.yaw - d.x * 0.09, 0);
   });
 
   return (
@@ -81,7 +95,8 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
 
 // rotationSpeed defaults to 0 (static): only the main menu / mode-select scene
 // opts into the drift by passing a speed. In-game photo panoramas stay still.
-export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true }) {
+// `parallax` (the main menu) slides the panorama against the pointer's lean.
+export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true, parallax = false }) {
   return (
     <>
       {/* Reflections / ambient IBL only (no `background`) so the rotating sphere
@@ -90,7 +105,7 @@ export default function InteractivePhotoBackground({ preset, files, rotationSpee
       <SafeEnvironment preset={files ? undefined : preset} files={files} backgroundBlurriness={blurriness} />
       <SkyBoundary>
         <React.Suspense fallback={null}>
-          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} />
+          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} parallax={parallax} />
         </React.Suspense>
       </SkyBoundary>
     </>
