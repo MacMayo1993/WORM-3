@@ -5,7 +5,7 @@ import { makeTileTrail, ttPush } from '../worm/circularBuffers.js';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import {
   GUIDE, guideMode, guideOn, relativeTurn, guideRoutes, findGuide, makeGuideState, stepGuide,
-  guideWords, guideTargetInView, tileKeyOf, guideBeamCurveInto, guideBeamAt, beamBendShare, beamStandOff, beamSkyRise,
+  guideWords, guideTargetInView, tileKeyOf, guideBeamTipInto, guideBeamLength,
 } from '../worm/healerWorm/guideTargets.js';
 
 const SIZE = 6;
@@ -244,58 +244,27 @@ describe('guideTargetInView', () => {
   });
 });
 
-describe('guideBeamCurveInto', () => {
+describe('guideBeamTipInto', () => {
   const size = 8, half = size / 2 + 0.04;
-  const up = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3(1, 0, 0);
-  const curveOf = (foot, normal) => guideBeamCurveInto([0, 1, 2, 3, 4].map(() => new THREE.Vector3()), foot, normal, up, right, size);
-  // How far a point lies inside the cube (negative outside).
-  const depthInside = p => size / 2 - Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z));
-  const top = half + beamSkyRise(size);
-  const off = beamStandOff(size);
 
-  it('rises straight from a tile facing the camera’s up', () => {
-    const points = curveOf(new THREE.Vector3(1.5, half, -2.5), new THREE.Vector3(0, 1, 0));
-    for (const p of points) expect([p.x, p.z]).toEqual([1.5, -2.5]);
-    expect(points[4].y).toBeCloseTo(top);
-  });
-
-  it('stands off a side face before rising past the top', () => {
-    const points = curveOf(new THREE.Vector3(half, -1.5, 0.5), new THREE.Vector3(1, 0, 0));
-    expect(points[1].x).toBeCloseTo(half + off);
-    expect(points[4].x).toBeCloseTo(half + off);
-    expect(points[4].y).toBeCloseTo(top);
-  });
-
-  it('goes out from under the cube past its nearest side, or the camera’s right when dead centre', () => {
-    const under = curveOf(new THREE.Vector3(-2.5, -half, 0.5), new THREE.Vector3(0, -1, 0));
-    expect(under[4].x).toBeLessThan(-(size / 2 + off * 0.9));
-    expect(under[4].y).toBeCloseTo(top);
-    const corner = curveOf(new THREE.Vector3(3.5, -half, 3.5), new THREE.Vector3(0, -1, 0));
-    expect(Math.min(corner[4].x, corner[4].z)).toBeGreaterThan(size / 2);
-    const centre = curveOf(new THREE.Vector3(0, -half, 0), new THREE.Vector3(0, -1, 0));
-    expect(centre[4].x).toBeCloseTo(half + off);
-  });
-
-  it('never cuts through the cube from any face, and the bend flows into the rise', () => {
-    const feet = [
-      [new THREE.Vector3(0.5, half, 0.5), new THREE.Vector3(0, 1, 0)],
-      [new THREE.Vector3(half, 3.5, -3.5), new THREE.Vector3(1, 0, 0)],
-      [new THREE.Vector3(-3.5, -3.5, -half), new THREE.Vector3(0, 0, -1)],
-      [new THREE.Vector3(3.5, -half, 3.5), new THREE.Vector3(0, -1, 0)],
-      [new THREE.Vector3(-0.5, -half, 1.5), new THREE.Vector3(0, -1, 0)],
-      [new THREE.Vector3(0, -half, 0), new THREE.Vector3(0, -1, 0)],
+  it('points each beam the way its face faces, clear past the cube', () => {
+    const faces = [
+      [new THREE.Vector3(1.5, half, -2.5), new THREE.Vector3(0, 1, 0)],    // above: up
+      [new THREE.Vector3(-half, 0.5, 1.5), new THREE.Vector3(-1, 0, 0)],   // left: out to the left
+      [new THREE.Vector3(2.5, -half, 0.5), new THREE.Vector3(0, -1, 0)],   // below: down
+      [new THREE.Vector3(0.5, -1.5, half), new THREE.Vector3(0, 0, 1)],
     ];
-    const p = new THREE.Vector3(), q = new THREE.Vector3();
-    for (const [foot, normal] of feet) {
-      const points = curveOf(foot, normal);
-      for (let t = 0.01; t <= 1; t += 0.01) expect(depthInside(guideBeamAt(points, t, p))).toBeLessThan(0.05);
-      // Across the joint the path keeps heading the same way.
-      const k = beamBendShare(points);
-      guideBeamAt(points, k - 0.004, p); guideBeamAt(points, k, q);
-      const before = q.clone().sub(p).normalize();
-      guideBeamAt(points, k + 0.004, p);
-      const after = p.clone().sub(q).normalize();
-      expect(before.dot(after)).toBeGreaterThan(0.95);
+    for (const [foot, normal] of faces) {
+      const tip = guideBeamTipInto(new THREE.Vector3(), foot, normal, size);
+      const along = tip.clone().sub(foot);
+      expect(along.clone().normalize().dot(normal)).toBeCloseTo(1);
+      expect(along.length()).toBe(guideBeamLength(size));
+      expect(tip.dot(normal)).toBeGreaterThan(size * 2);
     }
+  });
+
+  it('grows with the board and never falls short of 8 units', () => {
+    expect(guideBeamLength(3)).toBe(8);
+    expect(guideBeamLength(15)).toBeGreaterThan(guideBeamLength(8));
   });
 });

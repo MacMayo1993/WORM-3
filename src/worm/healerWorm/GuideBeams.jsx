@@ -1,24 +1,21 @@
 // The guide's beams (which items, in guideTargets.js, published to wormBuffs.guide
-// by useWormCrawler): a ribbon of light leaves each lit item's tile straight out of
-// the cube, in the item's colour, then bends and rises up the screen beside the
-// cube into the sky, so an item round the side or underneath still shows as a
-// column of light standing off the cube in its direction.
+// by useWormCrawler): a beam of light stands straight out of each lit item's tile
+// along that face's outward direction (up from the face above, out to the left from
+// the face on the left), in the item's colour, long enough to stand past the cube's
+// edge from a tile round the side (`guideBeamTipInto`).
 //
-// Why it bends (`guideBeamCurveInto`, walked as `guideBeamAt`): the chase camera
-// hugs the face the head is on, so the cube hides everything round the side, and a
-// beam straight along a far face's normal stays behind the cube or shrinks into the
-// horizon. Rising along the camera's own up, beside the cube, it clears the edge
-// and never points into the lens. The stretch the cube still hides is drawn again,
-// faintly, through it (a second pass that only draws where the cube is in front,
-// GreaterDepth), so a column still leads back to its item.
+// The chase camera hugs the face the head is on, so the cube hides much of a beam
+// from round the side: the stretch it hides is drawn again, faintly, through it (a
+// second pass that only draws where the cube is in front, GreaterDepth), so a beam
+// still leads back to its item.
 //
 // The nearest item burns brightest; an item already in view, or close to the head,
-// dims so the beams never wall off the way ahead. Each beam is a bend and a rise the
-// vertex shader walks: one instanced strip geometry, two additive draws sharing
-// every buffer. Mounted for the mode's life (hidden) so the run's warm-up links
-// both programs, never the first frame they show. Light climbs the beams on the
-// sim's clock, so pause holds it, and reduced motion keeps them still. Beams fade in
-// and out per item rather than popping when the lit set changes.
+// dims so the beams never wall off the way ahead. Each beam is a camera-facing strip
+// turned about its own axis: one instanced strip geometry, two additive draws
+// sharing every buffer. Mounted for the mode's life (hidden) so the run's warm-up
+// links both programs, never the first frame they show. Light climbs the beams on
+// the sim's clock, so pause holds it, and reduced motion keeps them still. Beams fade
+// in and out per item rather than popping when the lit set changes.
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -28,25 +25,22 @@ import { wormBuffs } from '../wormBuffs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { FACE_NORMALS } from './constants.js';
-import { GUIDE, guideBeamCurveInto, guideTargetInView, tileKeyOf } from './guideTargets.js';
+import { GUIDE, guideBeamTipInto, guideTargetInView, tileKeyOf } from './guideTargets.js';
 
 const CAPACITY = GUIDE.beams * 2;   // room for the old set to fade out under the new
-const SEGMENTS = 40;                // along each beam
+const SEGMENTS = 8;                 // along each beam, so the widening strip keeps its shading even
 const BEAM_WIDTH = 0.8;             // world units across at the foot, on a 1-unit tile
 const BEAM_SPREAD = 3;              // ... and this many times that at the tip
 const BEAM_LIFT = 0.02;             // the foot sits just over the sticker
 const NEAR_FROM = 2, NEAR_TO = 4.5; // world distance from the head over which a beam fades in
 const IN_VIEW = 0.5;                // an item on screen already: half as bright
 const SECOND = 0.6;                 // every beam after the nearest
-const THROUGH = 0.25;               // the stretch the cube hides, seen through it
+const THROUGH = 0.35;               // the stretch the cube hides, seen through it
 const FADE_IN = 5, FADE_OUT = 9;    // per second
 
 const vertexShader = /* glsl */ `
-  attribute vec3 aP0;              // the foot, on the tile
-  attribute vec3 aP1;              // straight out of the tile
-  attribute vec3 aP2;              // clear of the cube
-  attribute vec3 aP3;              // the bend ends, heading up
-  attribute vec3 aP4;              // the tip, in the sky
+  attribute vec3 aFoot;            // on the tile
+  attribute vec3 aTip;             // out along the face's normal
   attribute vec3 aColor;
   attribute vec2 aBeam;            // intensity, phase seed
   uniform float uWidth;
@@ -55,22 +49,10 @@ const vertexShader = /* glsl */ `
   varying vec2 vBeam;
   varying vec3 vColor;
   void main() {
-    // uv.y walks the path (guideBeamAt): the bend's cubic over its share of the
-    // length, then the straight rise. The strip turns about it to face the camera.
+    // uv.y runs from the foot to the tip; the strip turns about the beam to face the camera.
     float t = uv.y;
-    float bend = distance(aP0, aP3) + distance(aP1, aP2) * 0.5 + 1e-3;
-    float k = bend / (bend + distance(aP3, aP4));
-    vec3 point, along;
-    if (t < k) {
-      float u = t / k, s = 1.0 - u;
-      point = s * s * s * aP0 + 3.0 * s * s * u * aP1 + 3.0 * s * u * u * aP2 + u * u * u * aP3;
-      along = 3.0 * s * s * (aP1 - aP0) + 6.0 * s * u * (aP2 - aP1) + 3.0 * u * u * (aP3 - aP2);
-    } else {
-      point = mix(aP3, aP4, (t - k) / (1.0 - k));
-      along = aP4 - aP3;
-    }
-    float alongLength = length(along);
-    along = alongLength > 1e-5 ? along / alongLength : normalize(aP4 - aP0);
+    vec3 point = mix(aFoot, aTip, t);
+    vec3 along = normalize(aTip - aFoot);
     vec3 side = cross(along, cameraPosition - point);
     float sideLength = length(side);
     side = sideLength > 1e-5 ? side / sideLength : normalize(cross(along, vec3(0.31, 0.95, 0.0)));
@@ -116,8 +98,7 @@ function createBeams() {
     a.setUsage(THREE.DynamicDrawUsage);
     return a;
   };
-  const attributes = { aP0: attribute(3), aP1: attribute(3), aP2: attribute(3), aP3: attribute(3), aP4: attribute(3),
-    aColor: attribute(3), aBeam: attribute(2) };
+  const attributes = { aFoot: attribute(3), aTip: attribute(3), aColor: attribute(3), aBeam: attribute(2) };
   for (const [name, a] of Object.entries(attributes)) geometry.setAttribute(name, a);
   geometry.instanceCount = 0;
   // Both passes read the same clock and shape.
@@ -155,10 +136,8 @@ const smooth = (a, b, v) => {
 
 const _foot = new THREE.Vector3();
 const _normal = new THREE.Vector3();
-const _up = new THREE.Vector3();
-const _right = new THREE.Vector3();
+const _tip = new THREE.Vector3();
 const _color = new THREE.Color();
-const _points = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
 
 export function GuideBeams({ worm, size }) {
   const beams = useMemo(() => createBeams(), []);
@@ -189,8 +168,6 @@ export function GuideBeams({ worm, size }) {
     });
 
     const head = worm.headInterpPos.current;
-    _up.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
-    _right.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
     let count = 0;
     for (const [key, item] of shown) {
       const { tile } = item;
@@ -205,8 +182,8 @@ export function GuideBeams({ worm, size }) {
       item.alpha += (want - item.alpha) * Math.min(1, delta * rate);
       if (item.want === 0 && item.alpha < 0.01) { shown.delete(key); continue; }
       if (item.alpha < 0.01 || count >= CAPACITY) continue;
-      guideBeamCurveInto(_points, _foot, _normal, _up, _right, size);
-      for (let k = 0; k < 5; k++) _points[k].toArray(attributes[`aP${k}`].array, count * 3);
+      _foot.toArray(attributes.aFoot.array, count * 3);
+      guideBeamTipInto(_tip, _foot, _normal, size).toArray(attributes.aTip.array, count * 3);
       _color.set(item.color).toArray(attributes.aColor.array, count * 3);
       attributes.aBeam.array[count * 2] = item.alpha;
       attributes.aBeam.array[count * 2 + 1] = item.seed;

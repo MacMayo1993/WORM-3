@@ -226,50 +226,13 @@ export function guideWords(goal) {
   return { turn: TURN_WORDS[goal.turn], tiles, label: `Nearest ${KIND_SPOKEN[goal.kind]}: ${TURN_SPOKEN[goal.turn]}, ${tiles}` };
 }
 
-// A beam's path: a short bend out of the item's tile (a cubic curve, points 0–3),
-// then a straight rise along the camera's `up` into the sky (point 3 to point 4).
-// A tile facing up rises straight; one on a side stands off it before it rises; one
-// facing down goes out from under the cube, staying below its bottom, past its
-// nearest side (`right` breaks the tie for a tile dead under the centre). The bend
-// ends heading along `up`, so the rise carries on from it without a kink. The cube
-// is centred on the origin, so the foot gives its half-width along the tile's normal.
-export const beamStandOff = size => 0.8 + size * 0.06;   // off the cube before it rises
-export const beamSkyRise = size => 3 + size * 1.2;       // above the cube's top, along up
-const _out = new THREE.Vector3();
-export function guideBeamCurveInto(points, foot, normal, up, right, size) {
-  const half = foot.dot(normal);
-  const facing = normal.dot(up);                          // 1 facing up, -1 facing down
-  const off = beamStandOff(size);
-  const under = Math.max(0, -facing);
-  // Which way out from under the cube: the way the tile already lies from the centre,
-  // as far as the cube's outline reaches that way (past a corner, not a circle).
-  _out.copy(foot).addScaledVector(up, -foot.dot(up));
-  let lateral = _out.length();
-  if (lateral < 0.3) { _out.copy(right).addScaledVector(up, -right.dot(up)); lateral = 0; }
-  _out.normalize();
-  const outline = half / Math.max(Math.abs(_out.x), Math.abs(_out.y), Math.abs(_out.z), 1e-3);
-  const [start, leave, base, rise, tip] = points;
-  start.copy(foot);
-  leave.copy(foot).addScaledVector(normal, off);
-  base.copy(foot).addScaledVector(normal, off * (1 - Math.abs(facing) + under)).addScaledVector(_out, (outline + off - lateral) * under);
-  rise.copy(base).addScaledVector(up, off);
-  tip.copy(rise).addScaledVector(up, Math.max(off, half + beamSkyRise(size) - rise.dot(up)));
-  return points;
-}
-
-/** The share of the beam's length the bend takes; the shader splits `t` the same way. */
-export function beamBendShare(points) {
-  const bend = points[0].distanceTo(points[3]) + points[1].distanceTo(points[2]) * 0.5 + 1e-3;
-  return bend / (bend + points[3].distanceTo(points[4]));
-}
-
-/** The point at `t` (0 foot, 1 tip) along a beam from `guideBeamCurveInto`, as the shader walks it. */
-export function guideBeamAt(points, t, out) {
-  const k = beamBendShare(points);
-  if (t >= k) return out.copy(points[3]).lerp(points[4], (t - k) / (1 - k));
-  const u = t / k, s = 1 - u;
-  return out.copy(points[0]).multiplyScalar(s * s * s).addScaledVector(points[1], 3 * s * s * u)
-    .addScaledVector(points[2], 3 * s * u * u).addScaledVector(points[3], u * u * u);
+// A beam stands straight out of its item's tile along that face's outward normal:
+// up from the face above, out to the left from the face on the left, down from the
+// face underneath. It is long enough to stand clear past the cube's edge from a
+// tile round the side.
+export const guideBeamLength = size => Math.max(8, size * 2.5);
+export function guideBeamTipInto(out, foot, normal, size) {
+  return out.copy(foot).addScaledVector(normal, guideBeamLength(size));
 }
 
 // An item is in view when it projects inside the frame (less a margin) and its
