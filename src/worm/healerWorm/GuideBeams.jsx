@@ -4,16 +4,14 @@
 // the face on the left), in the item's colour, long enough to stand past the cube's
 // edge from a tile round the side (`guideBeamTipInto`).
 //
-// The chase camera hugs the face the head is on, so the cube hides much of a beam
-// from round the side: the stretch it hides is drawn again, faintly, through it (a
-// second pass that only draws where the cube is in front, GreaterDepth), so a beam
-// still leads back to its item.
+// Beams are depth-tested like anything else on the cube: the part the cube hides
+// stays hidden, never drawn through it.
 //
 // The nearest item burns brightest; an item already in view, or close to the head,
 // dims so the beams never wall off the way ahead. Each beam is a camera-facing strip
-// turned about its own axis: one instanced strip geometry, two additive draws
-// sharing every buffer. Mounted for the mode's life (hidden) so the run's warm-up
-// links both programs, never the first frame they show. Light climbs the beams on
+// turned about its own axis: one instanced strip geometry, one additive draw.
+// Mounted for the mode's life (hidden) so the run's warm-up links its program, never
+// the first frame it shows. Light climbs the beams on
 // the sim's clock, so pause holds it, and reduced motion keeps them still. Beams fade
 // in and out per item rather than popping when the lit set changes.
 import { useEffect, useMemo, useRef } from 'react';
@@ -35,7 +33,6 @@ const BEAM_LIFT = 0.02;             // the foot sits just over the sticker
 const NEAR_FROM = 2, NEAR_TO = 4.5; // world distance from the head over which a beam fades in
 const IN_VIEW = 0.5;                // an item on screen already: half as bright
 const SECOND = 0.6;                 // every beam after the nearest
-const THROUGH = 0.35;               // the stretch the cube hides, seen through it
 const FADE_IN = 5, FADE_OUT = 9;    // per second
 
 const vertexShader = /* glsl */ `
@@ -67,7 +64,6 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uMotion;
-  uniform float uGain;
   varying vec2 vUv;
   varying vec2 vBeam;
   varying vec3 vColor;
@@ -82,7 +78,7 @@ const fragmentShader = /* glsl */ `
     // Light climbing the beam, away from the cube.
     float climb = 0.5 + 0.5 * sin(6.2832 * (y * 12.0 - uTime * 1.2 + vBeam.y));
     float pulse = mix(0.85, 0.65 + 0.55 * climb, uMotion);
-    float a = (glow * 0.85 * pulse + core * 0.8 + foot * glow) * span * vBeam.x * uGain;
+    float a = (glow * 0.85 * pulse + core * 0.8 + foot * glow) * span * vBeam.x;
     vec3 color = mix(vColor, vec3(1.0), core * 0.6 + foot * 0.25);
     gl_FragColor = vec4(color, a);
     #include <colorspace_fragment>
@@ -101,27 +97,19 @@ function createBeams() {
   const attributes = { aFoot: attribute(3), aTip: attribute(3), aColor: attribute(3), aBeam: attribute(2) };
   for (const [name, a] of Object.entries(attributes)) geometry.setAttribute(name, a);
   geometry.instanceCount = 0;
-  // Both passes read the same clock and shape.
-  const shared = { uTime: { value: 0 }, uMotion: { value: 1 }, uWidth: { value: BEAM_WIDTH }, uSpread: { value: BEAM_SPREAD } };
-  const pass = (gain, depthFunc) => new THREE.ShaderMaterial({
+  const material = new THREE.ShaderMaterial({
     vertexShader, fragmentShader,
-    uniforms: { ...shared, uGain: { value: gain } },
-    transparent: true, depthWrite: false, depthFunc, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uTime: { value: 0 }, uMotion: { value: 1 }, uWidth: { value: BEAM_WIDTH }, uSpread: { value: BEAM_SPREAD } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     toneMapped: false, forceSinglePass: true,
   });
-  const materials = [pass(1, THREE.LessEqualDepth), pass(THROUGH, THREE.GreaterDepth)];
-  const meshes = materials.map((material, i) => {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = i === 0 ? 'GuideBeams' : 'GuideBeamsThrough';
-    mesh.frustumCulled = false;
-    mesh.raycast = () => {};
-    mesh.renderOrder = 1;
-    mesh.visible = false;
-    return mesh;
-  });
-  const group = new THREE.Group();
-  group.add(...meshes);
-  return { group, meshes, geometry, materials, attributes, shared };
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'GuideBeams';
+  mesh.frustumCulled = false;
+  mesh.raycast = () => {};
+  mesh.renderOrder = 1;
+  mesh.visible = false;
+  return { mesh, geometry, material, attributes };
 }
 
 const seedOf = key => {
@@ -143,18 +131,18 @@ export function GuideBeams({ worm, size }) {
   const beams = useMemo(() => createBeams(), []);
   useEffect(() => () => {
     beams.geometry.dispose();
-    beams.materials.forEach(material => material.dispose());
+    beams.material.dispose();
   }, [beams]);
   // Every beam on show, by its tile's key, with its brightness easing toward `want`.
   const lit = useRef(new Map());
 
   useFrame(({ camera }, delta) => {
-    const { meshes, geometry, attributes, shared } = beams;
+    const { mesh, geometry, material, attributes } = beams;
     const shown = lit.current;
     if (worm.phase.current !== 'crawling') {
       // A ride: the camera is inside the cube. Drop them at once.
       shown.clear();
-      for (const mesh of meshes) mesh.visible = false;
+      mesh.visible = false;
       return;
     }
     const goal = !liveRotation.active && !worm.restRead.current ? wormBuffs.guide : null;
@@ -190,13 +178,13 @@ export function GuideBeams({ worm, size }) {
       count++;
     }
     geometry.instanceCount = count;
-    for (const mesh of meshes) mesh.visible = count > 0;
+    mesh.visible = count > 0;
     if (!count) return;
     const moving = !prefersReducedMotion();
-    shared.uMotion.value = moving ? 1 : 0;
-    shared.uTime.value = moving ? worm.timeAliveRef.current : 0;
+    material.uniforms.uMotion.value = moving ? 1 : 0;
+    material.uniforms.uTime.value = moving ? worm.timeAliveRef.current : 0;
     for (const a of Object.values(attributes)) uploadInstancePrefix(a, count);
   });
 
-  return <primitive object={beams.group} />;
+  return <primitive object={beams.mesh} />;
 }
