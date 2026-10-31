@@ -6,7 +6,9 @@ import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constan
 import {
   GUIDE, guideMode, guideOn, relativeTurn, guideRoutes, findGuide, makeGuideState, stepGuide,
   guideWords, guideTargetInView, tileKeyOf, guideBeamTipInto, guideBeamLength,
+  storyGuide, stepStoryGuide, STORY_BEAM_COLOR,
 } from '../worm/healerWorm/guideTargets.js';
+import { ACTION_CUES } from '../game/actionCues.js';
 
 const SIZE = 6;
 const Z = SIZE - 1;
@@ -266,5 +268,32 @@ describe('guideBeamTipInto', () => {
   it('grows with the board and never falls short of 8 units', () => {
     expect(guideBeamLength(3)).toBe(8);
     expect(guideBeamLength(15)).toBeGreaterThan(guideBeamLength(8));
+  });
+});
+
+describe('storyGuide', () => {
+  it('lights the level’s own target alone, in the target diamond’s colour', () => {
+    const goal = storyGuide({ x: 2, y: 5, z: Z, dirKey: 'PZ', type: 'magnet', spawnId: 's1' });
+    expect(STORY_BEAM_COLOR).toBe(ACTION_CUES.target.color);
+    expect(goal).toMatchObject({ kind: 'story', final: false, target: pz(2, 5) });
+    expect(goal.beams).toEqual([{ ...pz(2, 5), color: STORY_BEAM_COLOR, steps: null }]);
+    // A surround heal names the mouth its ring goes round: the beam stands on the mouth.
+    expect(storyGuide({ ...pz(1, 1), ring: true }).beams[0]).toMatchObject(pz(1, 1));
+    expect(storyGuide(null)).toBeNull();
+    expect(storyGuide({ x: 1, y: 1, z: 1 })).toBeNull();
+  });
+
+  it('rebuilds only when the level moves its target, and hands back cleanly to free play', () => {
+    const state = makeGuideState();
+    const first = pz(2, 5), second = pz(4, 1);
+    const goal = stepStoryGuide(state, first);
+    expect(stepStoryGuide(state, first)).toBe(goal);
+    expect(stepStoryGuide(state, second).target).toEqual(pz(4, 1));
+    expect(stepStoryGuide(state, null)).toBeNull();
+    // Free play's routing state starts afresh after a Story target.
+    stepStoryGuide(state, first);
+    const { cubies, snapshot } = makeBoard();
+    expect(stepGuide(state, makeSim({ powerups: [orbAt(pz(2, 5))] }), SIZE, makeCtx(cubies), snapshot, 0)).toMatchObject({ kind: 'orb' });
+    expect(state.storyTarget).toBeNull();
   });
 });

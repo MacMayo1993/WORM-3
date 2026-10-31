@@ -132,3 +132,35 @@ it('opens Cube as a page with the colours, tiles and scene, and Back returns to 
   act(() => host.querySelector('[aria-label="Back to pause menu"]').click());
   expect(host.querySelector('.worm-pause-card').classList.contains('is-main')).toBe(true);
 });
+
+it('offers the guide beams by board size in free play, and Off / On in Story', () => {
+  const before = useGameStore.getState().settings;
+  const beamKeys = () => [...host.querySelector('[role="group"][aria-label="Guide beams"]').querySelectorAll('button')];
+  const pressed = () => beamKeys().filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent);
+  const setting = () => useGameStore.getState().settings.wormGuideBeams;
+  try {
+    useGameStore.setState((s) => ({ settings: { ...s.settings, wormGuideBeams: 'always' } }));
+    act(() => root.render(<WormCrawlerHUD phase="crawling" wormAlive />));
+    act(() => host.querySelector('[aria-label="Pause"]').click());
+    act(() => key('Settings').click());
+    expect(beamKeys().map((b) => b.textContent)).toEqual(['Off', 'Big boards', 'Always']);
+    expect(pressed()).toEqual(['Always']);
+    // A Story level lights its own target at any size: only Off / On, and On keeps the free-play choice.
+    escape();
+    escape();
+    act(() => useGameStore.setState({ wormStoryLevel: 4, wormStoryStarted: true }));
+    act(() => host.querySelector('[aria-label="Pause"]').click());
+    act(() => key('Settings').click());
+    expect(beamKeys().map((b) => b.textContent)).toEqual(['Off', 'On']);
+    expect(pressed()).toEqual(['On']);
+    act(() => beamKeys()[1].click());
+    expect(setting()).toBe('always');
+    act(() => beamKeys()[0].click());
+    expect(setting()).toBe('off');
+    expect(pressed()).toEqual(['Off']);
+    act(() => beamKeys()[1].click());
+    expect(setting()).toBe('auto');
+  } finally {
+    useGameStore.setState({ settings: before });
+  }
+});

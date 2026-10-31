@@ -1173,6 +1173,10 @@ const GUIDE_BEAM_OPTIONS = [
     { value: 'auto', label: 'Big boards' },
     { value: 'always', label: 'Always' },
 ];
+const STORY_GUIDE_OPTIONS = [
+    { value: 'off', label: 'Off' },
+    { value: 'auto', label: 'On' },
+];
 
 const CubeLookSettings = React.lazy(() => import('../components/menus/settings/CubeLookSettings.jsx'));
 
@@ -1307,17 +1311,23 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
                     <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
 
                     {/* The guide (guideTargets.js): beams of light out of the cube from the
-                        items worth crawling to next. Free play only. */}
+                        items worth crawling to next, or in Story from the level's own target.
+                        Story has no board-size choice, so it offers Off / On; On keeps the
+                        free-play choice, or Big boards if it was off. */}
                     <div style={SETTING_ROW_STYLE}>
                         <span style={SETTING_LABEL_STYLE}>Guide beams</span>
                         <div style={{ display: 'flex', gap: 5, flex: 1 }} role="group" aria-label="Guide beams">
-                            {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Free play only</span> : GUIDE_BEAM_OPTIONS.map(option => (
-                                <button key={option.value} type="button" aria-pressed={guideBeams === option.value}
-                                    onClick={() => setSettings?.(s => ({ ...s, wormGuideBeams: option.value }))}
-                                    style={segmentStyle(guideBeams === option.value, blue, true)}>
-                                    {option.label}
-                                </button>
-                            ))}
+                            {(storyId ? STORY_GUIDE_OPTIONS : GUIDE_BEAM_OPTIONS).map(option => {
+                                const pressed = storyId ? (guideBeams === 'off') === (option.value === 'off') : guideBeams === option.value;
+                                const value = storyId && option.value !== 'off' && guideBeams !== 'off' ? guideBeams : option.value;
+                                return (
+                                    <button key={option.value} type="button" aria-pressed={pressed}
+                                        onClick={() => setSettings?.(s => ({ ...s, wormGuideBeams: value }))}
+                                        style={segmentStyle(pressed, blue, true)}>
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
