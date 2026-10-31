@@ -1605,7 +1605,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {combatMode ? <CombatFireButton /> : demoLesson ? lessonId === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
+                        {/* Portal Combat keeps the character's ability beside Fire: Spring's slam
+                            stuns and Glow's trail burns, so touch players need it as much as Q. */}
+                        {combatMode ? <div className="worm-ambient-actions"><SignatureButton compact /><CombatFireButton /></div>
+                            : demoLesson ? lessonId === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
                                 {jumpRescue && <JumpRescueCue caution={cautionRescue} pit={pitRescue} watching={previewLesson} />}

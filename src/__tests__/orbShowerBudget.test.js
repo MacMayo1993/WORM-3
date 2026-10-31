@@ -1,5 +1,4 @@
 import { expect, it } from 'vitest';
-import { characterOrbCount } from '../worm/characterAbilities.js';
 import { makeCubies } from '../game/cubeState.js';
 import { makeWormSim, resetWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
@@ -15,9 +14,8 @@ function board(size, perFace) {
   return { sim, cubies: makeCubies(size), tiles };
 }
 
-it('reserves a full six-face shower above the twelve Classic orbs on a 2×2 Easy board', () => {
-  const count = characterOrbCount(8, 'classic');
-  expect(count).toBe(12);
+it('reserves a full six-face shower above twelve orbs on a 2×2 board', () => {
+  const count = 12;
   const { sim, cubies } = board(2, 2);
   expect(sim.powerups).toHaveLength(count);
   expect(orbShowerCapacity(2, count)).toBe(18);

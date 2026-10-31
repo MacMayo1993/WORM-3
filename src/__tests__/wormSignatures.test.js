@@ -10,7 +10,7 @@ import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, startJu
 import { signatureAvailability, signatureReadout, isParityLocked, releaseMobiTunnel, tickSignature, SIGNATURES } from '../worm/healerWorm/signatures.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { ttPush, ttAt } from '../worm/circularBuffers.js';
-import { characterOrbCount, characterXpMultiplier, holdsRotationTimer } from '../worm/characterAbilities.js';
+import { characterXpMultiplier, holdsRotationTimer, holdsLevelClock, BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN } from '../worm/characterAbilities.js';
 import { getStableKey } from '../worm/wormLogic.js';
 
 function makeCtx(overrides = {}) {
@@ -244,11 +244,26 @@ describe('character abilities', () => {
     expect(signatureReadout(sim, SIZE, ctx).returnReady).toBe(false);
     tickSignature(sim, 5, SIZE, ctx); expect(holdsRotationTimer(sim.signature)).toBe(false);
   });
-  it('keeps Prism passive and preserves Classic orb abundance', () => {
+  it('Book stops a Story level’s clock for as long as the layer clock', () => {
+    const { sim, ctx } = world('book', { isStoryMode: () => true });
+    expect(holdsLevelClock(sim.signature)).toBe(false);
+    activate(sim, ctx); expect(holdsLevelClock(sim.signature)).toBe(true);
+    tickSignature(sim, BOOK_PAUSE_SECONDS - 0.2, SIZE, ctx); expect(holdsLevelClock(sim.signature)).toBe(true);
+    tickSignature(sim, 0.3, SIZE, ctx); expect(holdsLevelClock(sim.signature)).toBe(false);
+    // Only Book's Time Out holds the level clock; the wipers hold layer turns alone.
+    expect(holdsLevelClock({ character: 'wiggle', active: 2, sweep: {} })).toBe(false);
+  });
+  it('Book refuses a press in free play’s final heal, where there is nothing left to stop', () => {
+    const free = world('book', { getGamePhase: () => 'finalHealing', isStoryMode: () => false });
+    activate(free.sim, free.ctx);
+    expect(free.sim.signature.seq).toBe(0); expect(free.sim.signature.cooldown).toBe(0);
+    expect(signatureReadout(free.sim, SIZE, free.ctx).reason).toBe('No layer turns left');
+    const story = world('book', { getGamePhase: () => 'finalHealing', isStoryMode: () => true });
+    activate(story.sim, story.ctx); expect(story.sim.signature.seq).toBe(1);
+  });
+  it('keeps Prism passive and Book’s XP bonus', () => {
     const { sim, ctx } = world('prism'); activate(sim, ctx);
     expect(sim.signature.active).toBe(0); expect(SIGNATURES.prism.passive).toBe(true);
-    expect(characterOrbCount(5, 'classic')).toBe(8);
-    expect(characterOrbCount(5, 'prism')).toBe(5);
     expect(characterXpMultiplier('book')).toBe(1.25);
     expect(characterXpMultiplier('glow')).toBe(1);
   });
@@ -374,9 +389,9 @@ describe('character abilities', () => {
   });
 });
 
-it('caps dense Classic orb layouts at distinct surface tiles', () => {
+it('caps dense orb layouts at distinct surface tiles', () => {
   const sim = makeWormSim(3);
-  resetWormSim(sim, 3, { orbCount: characterOrbCount(100, 'classic'), wormholeInterval: 9999 });
+  resetWormSim(sim, 3, { orbCount: 150, wormholeInterval: 9999 });
   expect(sim.powerups).toHaveLength(53);
   expect(new Set(sim.powerups.map(p => `${p.x},${p.y},${p.z},${p.dirKey}`)).size).toBe(53);
 });
@@ -387,10 +402,10 @@ it('Classic Orb Call attracts real parity orbs, preserves elemental pickups, and
   sim.specials = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'fire', id: 'keep-on-surface', ttl: 100 }];
   queueTurn(sim, 'signature'); queueTurn(sim, 'signature'); step(sim, ctx);
   expect(sim.signature.seq).toBe(1);
-  expect(sim.signature.active).toBeGreaterThan(5.8);
-  expect(sim.magnetT).toBeGreaterThan(5.8);
-  expect(sim.magnetMaxT).toBe(6);
-  expect(eventsOf(ctx, 'magnetState')[0].args).toEqual([6, 6]);
+  expect(sim.signature.active).toBeGreaterThan(CLASSIC_ORB_CALL_SECONDS - 0.2);
+  expect(sim.magnetT).toBeGreaterThan(CLASSIC_ORB_CALL_SECONDS - 0.2);
+  expect(sim.magnetMaxT).toBe(CLASSIC_ORB_CALL_SECONDS);
+  expect(eventsOf(ctx, 'magnetState')[0].args).toEqual([CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_SECONDS]);
   run(sim, ctx, 1.05);
   expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
   expect(sim.pendingOrbAttractions.some(fx => !fx.gulp)).toBe(true);
@@ -398,11 +413,11 @@ it('Classic Orb Call attracts real parity orbs, preserves elemental pickups, and
   expect(sim.elementalType).toBeNull();
   activate(sim, ctx); expect(sim.signature.seq).toBe(1);
   sim.specials = [];
-  run(sim, ctx, 5.1);
+  run(sim, ctx, CLASSIC_ORB_CALL_SECONDS - 0.9);
   expect(sim.magnetT).toBe(0); expect(sim.signature.active).toBe(0);
   expect(signatureReadout(sim, SIZE, ctx).ready).toBe(false);
   expect(eventsOf(ctx, 'magnetState').at(-1).args).toEqual([0, 0]);
-  run(sim, ctx, 14.1);
+  run(sim, ctx, CLASSIC_ORB_CALL_COOLDOWN - CLASSIC_ORB_CALL_SECONDS);
   expect(signatureReadout(sim, SIZE, ctx).ready).toBe(true);
   activate(sim, ctx); expect(sim.signature.seq).toBe(2);
 });

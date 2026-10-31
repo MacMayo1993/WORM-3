@@ -40,6 +40,10 @@ it('starts explicitly, keeps the three-shot gun separate from healing inventory,
   act(()=>useGameStore.setState({wormGamePhase:'active'}));frame();
   expect(combatBridge.current.shotsFired).toBe(0);expect(combatBridge.current.started).toBe(false);
 });
+it('keeps the character ability beside Fire on the touch dock, so Glow and Spring work in the arena',()=>{
+  expect(host.querySelector('.worm-ambient-actions [aria-label^="Fire parity shot"]')).not.toBeNull();
+  expect(host.querySelector('.worm-ambient-actions .worm-signature-control')).not.toBeNull();
+});
 it('freezes combat when paused and does not resume a ready arena through the pause menu',()=>{
   act(()=>host.querySelector('[aria-label="Pause"]').click());
   act(()=>[...host.querySelectorAll('button')].find(b=>b.classList.contains('worm-pause-resume')).click());
