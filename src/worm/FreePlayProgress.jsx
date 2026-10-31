@@ -3,43 +3,43 @@
 // The number pops whenever it moves, the switch to the final heal is called out
 // with a chime, and the last pair says so. Story, the demo and combat have their
 // own objectives and never show it. In the final heal it also says which way the
-// nearest pair is (the guide trail, scentTrail.js).
+// nearest pair is (the guide, guideTargets.js).
 import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { feel } from '../utils/feel.js';
 import { freePlayProgress } from './freePlayProgress.js';
 import { wormBuffs } from './wormBuffs.js';
-import { scentWords } from './healerWorm/scentTrail.js';
+import { guideWords } from './healerWorm/guideTargets.js';
 
 const TURN_ANGLE = { ahead: 0, right: 90, behind: 180, left: -90 };
 
-// The trail's turn and distance under the pair count. It changes every tile, so it
+// The guide's turn and distance under the pair count. It changes every tile, so it
 // sits outside the chip's live region; the words are there for a reader to find.
-function ScentHeading() {
+function GuideHeading() {
   const [goal, setGoal] = useState(null);
   useEffect(() => {
     let key = '';
     const read = () => {
-      const scent = wormBuffs.scent;
-      const next = scent?.final ? `${scent.kind}|${scent.turn}|${scent.steps}` : '';
+      const guide = wormBuffs.guide;
+      const next = guide?.final ? `${guide.kind}|${guide.turn}|${guide.steps}` : '';
       if (next === key) return;
       key = next;
-      setGoal(scent?.final ? { kind: scent.kind, turn: scent.turn, steps: scent.steps } : null);
+      setGoal(guide?.final ? { kind: guide.kind, turn: guide.turn, steps: guide.steps } : null);
     };
     read();
     const id = setInterval(read, 150);
     return () => clearInterval(id);
   }, []);
-  const words = scentWords(goal);
+  const words = guideWords(goal);
   if (!words) return null;
   return (
-    <span className="worm-progress-scent" data-turn={goal.turn} aria-live="off">
+    <span className="worm-progress-guide" data-turn={goal.turn} aria-live="off">
       <svg viewBox="0 0 16 16" aria-hidden="true" style={{ transform: `rotate(${TURN_ANGLE[goal.turn] ?? 0}deg)` }}>
         <path d="M8 2 14 9h-4v5H6V9H2Z" />
       </svg>
       <span aria-hidden="true">{words.turn} · {words.tiles}</span>
-      <span className="worm-progress-scent-label">{words.label}</span>
+      <span className="worm-progress-guide-label">{words.label}</span>
     </span>
   );
 }
@@ -68,7 +68,7 @@ export default function FreePlayProgress() {
     <div ref={ref} className="worm-progress-chip" data-kind={progress.kind} role="status" aria-live="polite">
       <small>{progress.label}</small>
       <strong>{progress.value}</strong>
-      {progress.kind !== 'turns' && <ScentHeading />}
+      {progress.kind !== 'turns' && <GuideHeading />}
     </div>
   );
 }

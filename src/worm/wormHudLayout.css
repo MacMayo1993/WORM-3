@@ -473,11 +473,11 @@
 @keyframes worm-progress-pop { 0% { transform: scale(0.86); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
 @keyframes worm-last-pair { 50% { box-shadow: 0 3px 0 #17201b, 0 0 0 4px #ff8a3d66; } }
 @media (prefers-reduced-motion: reduce) { .worm-progress-chip, .worm-progress-chip.is-popping { animation: none !important; } }
-/* The guide trail's way to the nearest pair, under the count (FreePlayProgress). */
-.worm-progress-scent { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 11px; font-weight: 900; white-space: nowrap; }
-.worm-progress-scent svg { width: 13px; height: 13px; flex: none; fill: currentColor; transition: transform 160ms ease-out; }
-.worm-progress-scent-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .worm-progress-scent svg { transition: none; } }
+/* The guide's way to the nearest pair, under the count (FreePlayProgress). */
+.worm-progress-guide { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.worm-progress-guide svg { width: 13px; height: 13px; flex: none; fill: currentColor; transition: transform 160ms ease-out; }
+.worm-progress-guide-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .worm-progress-guide svg { transition: none; } }
 
 /* A skill moment (SkillCallout): one word punched in over the play, then gone. */
 .worm-skill-callout {

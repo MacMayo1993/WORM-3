@@ -22,7 +22,7 @@ import JumpRescueCue from './JumpRescueCue.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 import { elementalFeedback, fusionFeedback } from './healerWorm/elementalFeedback.js';
-import { scentTrailMode } from './healerWorm/scentTrail.js';
+import { guideMode } from './healerWorm/guideTargets.js';
 // src/worm/WormCrawlerHUD.jsx
 // Mobile-first "Antipodal HUD" for WORM Chase-Cam Mode.
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
@@ -1167,8 +1167,8 @@ function SignatureGuide() {
 // buzz, quests, speed, turns, horizon, camera distance, the inspection tools);
 // Cube holds how the cube looks (the Settings sheet's own Colors, Tiles and Scene
 // panels, CubeLookSettings.jsx). Escape steps back a page, then resumes.
-// 'auto' is the default: from SCENT.autoFromSize, where the camera frames the head.
-const GUIDE_TRAIL_OPTIONS = [
+// 'auto' is the default: from GUIDE.autoFromSize, where the camera frames the head.
+const GUIDE_BEAM_OPTIONS = [
     { value: 'off', label: 'Off' },
     { value: 'auto', label: 'Big boards' },
     { value: 'always', label: 'Always' },
@@ -1214,7 +1214,7 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
     const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
     const setSettings = useGameStore(s => s.setSettings);
-    const guideTrail = useGameStore(s => scentTrailMode(s.settings));
+    const guideBeams = useGameStore(s => guideMode(s.settings));
     // Read from the wormClock bridge (not the store) on purpose: the countdown changes
     // every frame while crawling but the crawler tick is frozen while paused, so a
     // mount-time snapshot is exact for as long as this menu is visible. Keeping it out
@@ -1306,15 +1306,15 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
                         behind the menu; the mouse wheel sets it too while crawling. */}
                     <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
 
-                    {/* The guide trail (scentTrail.js): chevrons to the nearest thing worth
-                        crawling to when it is out of view. Free play only. */}
+                    {/* The guide (guideTargets.js): beams of light out of the cube from the
+                        items worth crawling to next. Free play only. */}
                     <div style={SETTING_ROW_STYLE}>
-                        <span style={SETTING_LABEL_STYLE}>Guide trail</span>
-                        <div style={{ display: 'flex', gap: 5, flex: 1 }} role="group" aria-label="Guide trail">
-                            {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Free play only</span> : GUIDE_TRAIL_OPTIONS.map(option => (
-                                <button key={option.value} type="button" aria-pressed={guideTrail === option.value}
-                                    onClick={() => setSettings?.(s => ({ ...s, wormGuideTrail: option.value }))}
-                                    style={segmentStyle(guideTrail === option.value, blue, true)}>
+                        <span style={SETTING_LABEL_STYLE}>Guide beams</span>
+                        <div style={{ display: 'flex', gap: 5, flex: 1 }} role="group" aria-label="Guide beams">
+                            {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Free play only</span> : GUIDE_BEAM_OPTIONS.map(option => (
+                                <button key={option.value} type="button" aria-pressed={guideBeams === option.value}
+                                    onClick={() => setSettings?.(s => ({ ...s, wormGuideBeams: option.value }))}
+                                    style={segmentStyle(guideBeams === option.value, blue, true)}>
                                     {option.label}
                                 </button>
                             ))}

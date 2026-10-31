@@ -45,7 +45,7 @@ import { comboWindowLeft } from './healerWorm/orbCombo.js';
 import { ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { SKILL_CALLOUTS, makeHopTracker, trackBodyHop } from './healerWorm/skillMoments.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
-import { makeScentState, resetScentState, scentTrailMode, scentTrailOn, stepScent } from './healerWorm/scentTrail.js';
+import { guideMode, guideOn, makeGuideState, resetGuideState, stepGuide } from './healerWorm/guideTargets.js';
 import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
 import { flipPadPair } from '../game/flipPad.js';
 import { canFlipStickerPair, flipStickerPair } from '../game/manifoldLogic.js';
@@ -142,20 +142,20 @@ function publishTilePress(sim, size, ctx, delta) {
 // pit republishes nothing; only a collapse or a heal changes the list, and only
 // the cubies under it re-render.
 const NO_PITS = Object.freeze([]);
-// The guide trail (scentTrail.js): free play only, on the surface, between slice
-// turns. Story levels, the demo and combat have their own objectives and markers.
-function publishScent(sim, size, ctx, state, delta) {
+// The guide (guideTargets.js): free play only, on the surface, between slice turns.
+// Story levels, the demo and combat have their own objectives and markers.
+function publishGuide(sim, size, ctx, state, delta) {
     const st = useGameStore.getState();
     const on = sim.alive && sim.phase === 'crawling' && !liveRotation.active && !sim.restRead
         && ['active', 'finalHealing'].includes(st.wormGamePhase)
         && !st.wormStoryLevel && !st.demoMode && !st.wormCombatMode
-        && scentTrailOn(scentTrailMode(st.settings), size);
+        && guideOn(guideMode(st.settings), size);
     if (!on) {
-        resetScentState(state);
-        wormBuffs.scent = null;
+        resetGuideState(state);
+        wormBuffs.guide = null;
         return;
     }
-    wormBuffs.scent = stepScent(state, sim, size, ctx, getWormTunnelSnapshot(st.cubies, size, st.rotationEpoch), delta);
+    wormBuffs.guide = stepGuide(state, sim, size, ctx, getWormTunnelSnapshot(st.cubies, size, st.rotationEpoch), delta);
 }
 
 function publishPits(sim, size, ctx, published) {
@@ -197,8 +197,8 @@ export function useWormCrawler(size, cubies) {
     const simRef = useRef(null);
     // What publishPits last wrote; reset with the run so a fresh sim republishes.
     const pitsPublishedRef = useRef({ version: -1, list: '' });
-    const scentRef = useRef(null);
-    if (scentRef.current === null) scentRef.current = makeScentState();
+    const guideRef = useRef(null);
+    if (guideRef.current === null) guideRef.current = makeGuideState();
     if (simRef.current === null) simRef.current = makeWormSim(size);
 
     const feedbackRef = useRef(null);
@@ -767,7 +767,7 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.elementalOrigin = sim.elementalOrigin;
         publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
         publishPits(sim, sizeRef.current, ctxRef.current, pitsPublishedRef.current);
-        publishScent(sim, sizeRef.current, ctxRef.current, scentRef.current, delta);
+        publishGuide(sim, sizeRef.current, ctxRef.current, guideRef.current, delta);
     }, []);
 
     const queueTurn = useCallback((dir) => {
@@ -844,7 +844,7 @@ export function useWormCrawler(size, cubies) {
         }
         useGameStore.getState().setWormBoostState('ready');
         pitsPublishedRef.current = { version: -1, list: '' };
-        resetScentState(scentRef.current);
+        resetGuideState(guideRef.current);
         useGameStore.setState({
             wormPitGrids: NO_PITS,
             wormMobiLine: null,
