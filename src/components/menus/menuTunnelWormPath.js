@@ -1,8 +1,11 @@
 import { CubicBezierCurve3, Vector3 } from 'three';
 
-export const MENU_WORM_RADIUS = 0.14;
+// Chunky enough to read at menu size: the head still clears the 0.19 mouth of
+// the flip portal it dives into, and beads overlap by about half their width.
+export const MENU_WORM_RADIUS = 0.155;
+export const MENU_WORM_BODY_RADIUS = 0.135;
 export const MENU_WORM_SEGMENTS = 14;
-export const MENU_WORM_SPACING = 0.105;
+export const MENU_WORM_SPACING = 0.115;
 export const MENU_WORM_SPEED = 1.65;
 export const MENU_WORM_TAIL = (MENU_WORM_SEGMENTS - 1) * MENU_WORM_SPACING;
 

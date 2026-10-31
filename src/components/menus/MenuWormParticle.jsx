@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { isCarouselActive } from './menuCarouselState.js';
 import { createMenuCharacterRig } from './menuCharacterRig.js';
-import { menuWormTransitPose } from './menuWormTransit.js';
+import { menuWormTransitPose, menuWormGround } from './menuWormTransit.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { raisedMenuDistance } from './menuPortalFrames.js';
@@ -25,8 +25,10 @@ export default function MenuWormParticle({ route, character = 'classic', elapsed
       const segmentDistance = distance - i * MENU_WORM_SPACING;
       const visible = sampleMenuTunnelWorm(trail, segmentDistance, pose.position, pose.normal, pose.forward);
       menuWormTransitPose(route.beats, segmentDistance, i, time, motion, reduced);
+      motion.ground = menuWormGround(route.beats, segmentDistance);
       model.pose(i, pose.position, pose.normal, pose.forward, visible, time, motion, reduced);
     });
+    model.endFrame(time, reduced);
   });
   return <primitive object={model.group} dispose={null} />;
 }

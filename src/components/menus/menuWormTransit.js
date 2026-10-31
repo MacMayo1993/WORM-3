@@ -47,3 +47,14 @@ export function menuWormTransitPose(beats, distance, segment, time, out, reduced
   out.transit = Math.abs(delta) < 0.4;
   return out;
 }
+
+// 1 while a segment lies on the face, easing to 0 as it nears either mouth:
+// a body still in the throat casts no shadow and lays no trail.
+export function menuWormGround(beats, distance) {
+  let ground = 1;
+  for (const beat of beats) {
+    const d = beat.kind === 'exit' ? distance - beat.distance : beat.distance - distance;
+    ground = Math.min(ground, smooth(0.08, 0.32, d));
+  }
+  return ground;
+}

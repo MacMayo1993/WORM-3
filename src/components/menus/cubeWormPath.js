@@ -61,3 +61,25 @@ export function sampleWigglingCubeWorm(distance, segment, time, position, normal
   forward.addScaledVector(normal, -forward.dot(normal)).normalize();
   if (antipodal) { position.negate(); normal.negate(); forward.negate(); }
 }
+
+// The carousel's companion: the player's worm, sized for the mode cube.
+export const CAROUSEL_WORM_SEGMENTS = 11;
+// Route spacing between beads, before the travelling squeeze.
+export const CAROUSEL_WORM_STEP = 0.13;
+export const CAROUSEL_WORM_HEAD = 0.18;
+export const CAROUSEL_WORM_BODY = 0.155;
+
+// Peristalsis: a squeeze runs down the body, each bead shortening and fattening
+// (volume kept) and arching off the sticker as it bunches.
+export function carouselWormMotion(segment, time, out, reducedMotion = false) {
+  out.lift = out.sway = out.roll = out.pulse = 0;
+  out.stretch = out.width = 1;
+  out.transit = false;
+  out.ground = 1;
+  if (reducedMotion || segment === 0) return out;
+  const contraction = Math.sin(time * 6 - segment * 0.7);
+  out.stretch = 1 - 0.09 * contraction;
+  out.width = 1 / Math.sqrt(out.stretch);
+  out.lift = 0.022 * Math.max(0, contraction) ** 2;
+  return out;
+}
