@@ -6,6 +6,7 @@ import { feel } from '../utils/feel.js';
 import { freePlayProgress } from '../worm/freePlayProgress.js';
 import FreePlayProgress from '../worm/FreePlayProgress.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { wormBuffs } from '../worm/wormBuffs.js';
 
 // Free play shows where the run stands: slice turns still to come, then the pairs
 // left to heal, with the final heal and the last pair called out.
@@ -54,5 +55,36 @@ describe('the chip', () => {
       act(() => root.render(<FreePlayProgress />));
       expect(host.querySelector('.worm-progress-chip')).toBeNull();
     }
+  });
+});
+
+describe('the way to the nearest pair', () => {
+  let root, host, before;
+  beforeEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true; vi.useFakeTimers();
+    before = useGameStore.getState();
+    useGameStore.setState({ wormHealerMode: true, wormAlive: true, wormStoryLevel: null, demoMode: false, wormCombatMode: false,
+      wormGamePhase: 'finalHealing', wormTurnsLeft: 0, wormOpenPairs: 2 });
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  });
+  afterEach(() => {
+    act(() => root.unmount()); host.remove(); useGameStore.setState(before, true);
+    wormBuffs.scent = null; vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  });
+
+  it('follows the guide trail in the final heal, and only there', () => {
+    act(() => root.render(<FreePlayProgress />));
+    const heading = () => host.querySelector('.worm-progress-scent');
+    expect(heading()).toBeNull();
+    wormBuffs.scent = { kind: 'pair', final: true, turn: 'left', steps: 6 };
+    act(() => vi.advanceTimersByTime(200));
+    expect(heading().dataset.turn).toBe('left');
+    expect(heading().textContent).toContain('Left · 6 tiles');
+    expect(heading().getAttribute('aria-live')).toBe('off');
+    expect(host.querySelector('.worm-progress-scent-label').textContent).toBe('Nearest open pair: turn left, 6 tiles');
+    // Before the final heal the chip counts turns and the trail speaks through the cube alone.
+    wormBuffs.scent = { kind: 'orb', final: false, turn: 'right', steps: 4 };
+    act(() => vi.advanceTimersByTime(200));
+    expect(heading()).toBeNull();
   });
 });
