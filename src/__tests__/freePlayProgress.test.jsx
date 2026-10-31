@@ -69,21 +69,21 @@ describe('the way to the nearest pair', () => {
   });
   afterEach(() => {
     act(() => root.unmount()); host.remove(); useGameStore.setState(before, true);
-    wormBuffs.scent = null; vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    wormBuffs.guide = null; vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   });
 
-  it('follows the guide trail in the final heal, and only there', () => {
+  it('follows the guide in the final heal, and only there', () => {
     act(() => root.render(<FreePlayProgress />));
-    const heading = () => host.querySelector('.worm-progress-scent');
+    const heading = () => host.querySelector('.worm-progress-guide');
     expect(heading()).toBeNull();
-    wormBuffs.scent = { kind: 'pair', final: true, turn: 'left', steps: 6 };
+    wormBuffs.guide = { kind: 'pair', final: true, turn: 'left', steps: 6 };
     act(() => vi.advanceTimersByTime(200));
     expect(heading().dataset.turn).toBe('left');
     expect(heading().textContent).toContain('Left · 6 tiles');
     expect(heading().getAttribute('aria-live')).toBe('off');
-    expect(host.querySelector('.worm-progress-scent-label').textContent).toBe('Nearest open pair: turn left, 6 tiles');
-    // Before the final heal the chip counts turns and the trail speaks through the cube alone.
-    wormBuffs.scent = { kind: 'orb', final: false, turn: 'right', steps: 4 };
+    expect(host.querySelector('.worm-progress-guide-label').textContent).toBe('Nearest open pair: turn left, 6 tiles');
+    // Before the final heal the chip counts turns and the beams speak for themselves.
+    wormBuffs.guide = { kind: 'orb', final: false, turn: 'right', steps: 4 };
     act(() => vi.advanceTimersByTime(200));
     expect(heading()).toBeNull();
   });

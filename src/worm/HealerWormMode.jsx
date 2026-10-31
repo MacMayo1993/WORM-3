@@ -75,7 +75,7 @@ import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
 import { warmUpElementalSkins } from './healerWorm/elementalWarmup.js';
 import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { JumpLandingMarker } from './healerWorm/JumpLandingMarker.jsx';
-import { ScentChevrons } from './healerWorm/ScentChevrons.jsx';
+import { GuideBeams } from './healerWorm/GuideBeams.jsx';
 import RocketExhaust from './healerWorm/RocketExhaust.jsx';
 import { WormBody, GlowWormAura } from './healerWorm/WormBody.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
@@ -1135,9 +1135,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 frame, and its own warm-up now runs in the scramble or briefing. */}
             <group visible={wormAlive}><RocketExhaust worm={worm} size={size} /></group>
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
-            {/* The guide trail (scentTrail.js): mounted for the mode's life and hidden
-                until it has somewhere to point, so the warm-up links its program. */}
-            <ScentChevrons worm={worm} size={size} />
+            {/* The guide's beams (guideTargets.js): mounted for the mode's life and
+                hidden until there is something to light, so the warm-up links its program. */}
+            <GuideBeams worm={worm} size={size} />
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
