@@ -1,5 +1,4 @@
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
-import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import { rollStoryElements, storyElementTypes } from './elementGoals.js';
@@ -153,7 +152,7 @@ const routeCell = (size, [u, v]) => {
   return [Math.round(u * (size - 1) / 4), Math.round(v * (size - 1) / 4)];
 };
 
-export function stageStory(sim, size, level, character) {
+export function stageStory(sim, size, level) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
   const pairCount = Math.max(['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0,
@@ -209,10 +208,10 @@ export function stageStory(sim, size, level, character) {
     base.target = { x: Math.floor(size / 2), y: row, z: edge, dirKey: 'PZ' };
   }
   if (level.kind === 'tunnel') base.target = getActiveTunnels(base.cubies, size)[0]?.entry ?? null;
-  // Mini stages need empty routes as well as food. Classic still gets extra
-  // orbs, but cannot fill almost every remaining tile on the pocket cube.
+  // Mini stages need empty routes as well as food: never fill almost every remaining
+  // tile on the pocket cube.
   const pickupBudget = size <= 3 ? Math.floor(6 * size * size * 0.6) : Infinity;
-  const targetCount = Math.min(characterOrbCount(sim.powerups.length, character), pickupBudget);
+  const targetCount = Math.min(sim.powerups.length, pickupBudget);
   const reservedMouths = getActiveTunnels(reserved, size).flatMap(tunnel => [tunnel.entry, tunnel.exit]);
   while (sim.powerups.length < targetCount) {
     const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos, ...reservedMouths, ...body.map(([x, y]) => ({ x, y, z: edge, dirKey: 'PZ' }))]);
@@ -220,7 +219,7 @@ export function stageStory(sim, size, level, character) {
     sim.powerups.push(makeGrowthOrb(tile));
   }
   sim.specials = [];
-  // Preserve the staged density (including Classic's bonus) by sticker color,
+  // Preserve the staged density by sticker color,
   // so a layer turn cannot strand a depleted healing color on another face.
   const orbTargets = {};
   for (const orb of sim.powerups) {

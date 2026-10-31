@@ -101,7 +101,9 @@ export async function startFreePlay(page, { viewport } = {}) {
   // Twenty render-clock turns can take over two minutes on software GL. Leave
   // enough of the existing four-minute test budget for the scramble and countdown.
   await expect(pause).toBeEnabled({ timeout: 180_000 });
-  await expect(page.getByRole('button', { name: 'Turn left', exact: true })).toBeVisible();
+  // The rest of the arrival also advances on rendered frames: about 35 s at the
+  // 3 fps software GL draws here, so a slow runner overruns the default 45 s.
+  await expect(page.getByRole('button', { name: 'Turn left', exact: true })).toBeVisible({ timeout: 120_000 });
 }
 
 /**

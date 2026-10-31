@@ -94,7 +94,8 @@ describe('mini cube precision stages', () => {
     }
     const normal = stage(level, 'glow');
     const classic = stage(level, 'classic');
-    expect(classic.sim.powerups.length).toBeGreaterThan(normal.sim.powerups.length);
+    // Every worm stages the same food: Classic no longer gets extra orbs.
+    expect(classic.sim.powerups.length).toBe(normal.sim.powerups.length);
     for (const { size, sim, staged } of [normal, classic]) {
       const tiles = 6 * size * size;
       expect(sim.powerups.length / tiles).toBeLessThanOrEqual(0.6);

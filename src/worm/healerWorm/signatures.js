@@ -1,5 +1,5 @@
 import {
-  BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS,
+  BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, GLOW_TRAIL_LINGER_SECONDS, MOBI_REENTRY_SECONDS,
   SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT, SPRING_COOLDOWN, SPRING_SLAM_WINDOW, SPRING_AIM_MAX, SIGNATURE_READY_BEAT
 } from '../characterAbilities.js';
 import { makeWiggleSweep, WIGGLE_DURATION } from './wiggleSweep.js';
@@ -11,12 +11,12 @@ import { springLanding } from './jumpLanding.js';
 import { makeGlowTrail } from './glowTrail.js';
 
 export const SIGNATURES = {
-  classic: { name: 'Orb Call', short: 'Orb Call', cooldown: CLASSIC_ORB_CALL_COOLDOWN, duration: CLASSIC_ORB_CALL_SECONDS, color: '#a6eb9b', hint: `Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds. Also spawns 50% more orbs.` },
-  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause layer turns for 5 seconds. Earn 25% more XP.' },
+  classic: { name: 'Orb Call', short: 'Orb Call', cooldown: CLASSIC_ORB_CALL_COOLDOWN, duration: CLASSIC_ORB_CALL_SECONDS, color: '#a6eb9b', hint: `Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds.` },
+  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: `Stop the clocks for ${BOOK_PAUSE_SECONDS} seconds: layer turns wait, and so does a Story level's timer. Earn 25% more XP.` },
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
   wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs and any dropped orbs it crosses. Steering locks until finished.' },
   inch: { name: 'Spring Loaded', short: 'Spring', cooldown: SPRING_COOLDOWN, duration: 0, color: '#c6ec86', hint: 'Tap to coil and leap four tiles; hold to stay coiled and see where you will land, then release to leap. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Landing must be clear; you can still jump once more in the air.' },
-  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds; the trail stays for 12 more. Your head slips through your own body wherever it lies on the light, and enemies that run into it are burned and thrown back.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: `Glow for ${GLOW_TRAIL_SECONDS} seconds: your head passes through your own body anywhere. The trail you paint stays ${GLOW_TRAIL_LINGER_SECONDS} seconds more; your head still slips through your body where it lies on the light, and enemies that run into it are burned and thrown back.` },
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 // Spring's numbers live in characterAbilities.js; re-exported for the effects and the body.
@@ -63,6 +63,8 @@ export function signatureAvailability(sim, size, ctx, launching = false) {
   else if (sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0) reason = 'Wait a moment';
   else if (!launching && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';
   else if (character === 'classic' && sim.magnetT > 0) reason = 'Magnet already active';
+  // Free play's final heal has no layer turns left and no level clock: nothing to stop.
+  else if (character === 'book' && ctx.getGamePhase() === 'finalHealing' && !ctx.isStoryMode?.()) reason = 'No layer turns left';
   else if (['inch', 'wiggle', 'mobi'].includes(character) && sim.isJumping) reason = 'Land first';
   else if (['wiggle', 'mobi'].includes(character) && (sim.crossingCorner || sim.pendingVoidKill || sim.pendingTunnelHeal || sim.tunnelPassages.length)) reason = 'Finish the crossing first';
   else if (character === 'mobi' && sig.mobiTunnel) reason = 'Heal your tunnel first';

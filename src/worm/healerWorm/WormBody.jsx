@@ -1039,7 +1039,9 @@ export function GlowWormAura({ worm, size }) {
             rocketOrbitInto(lightRef.current.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting
             const inTunnel = worm.phase.current === 'tunnel';
-            lightRef.current.intensity = (inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4)
+            // Brighter while Light Trail shines and the head can pass through the body.
+            const shining = worm.signature.current?.active > 0 ? 1.35 : 1;
+            lightRef.current.intensity = (inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4) * shining
                 * (1 - (worm.cautionFall?.current?.dissolve ?? 0));
         }
     });

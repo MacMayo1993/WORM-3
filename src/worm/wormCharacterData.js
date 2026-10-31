@@ -1,6 +1,6 @@
 // src/worm/wormCharacterData.js
 // Core playable worm character archetypes (distinct silhouette + movement personality).
-import { CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN } from './characterAbilities.js';
+import { BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, GLOW_TRAIL_LINGER_SECONDS } from './characterAbilities.js';
 
 export const WORM_CHARACTERS = [
   {
@@ -17,7 +17,7 @@ export const WORM_CHARACTERS = [
     type: 'Ranger',
     subtitle: 'Original rounded crawler',
     stats: { speed: 55, healing: 60, agility: 65, glow: 10 },
-    special: `Orb Call — Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds. Also spawns 50% more orbs.`,
+    special: `Orb Call — Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds.`,
   },
   {
     id: 'inch',
@@ -33,7 +33,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Light Trail — Paint behind your tail for 8 seconds; the trail stays for 12 more seconds. Enemies that run into it are burned and thrown back.',
+    special: `Light Trail — Glow for ${GLOW_TRAIL_SECONDS} seconds and pass through your own body anywhere. The trail you leave stays ${GLOW_TRAIL_LINGER_SECONDS} seconds more: you can still slip through yourself on it, and enemies that run into it are burned.`,
   },
   {
     id: 'book',
@@ -41,7 +41,7 @@ export const WORM_CHARACTERS = [
     type: 'Sage',
     subtitle: 'Gilded pages and brass spectacles',
     stats: { speed: 40, healing: 75, agility: 50, glow: 15 },
-    special: 'Time Out — Earn 25% more XP. Pause layer turns for 5 seconds.',
+    special: `Time Out — Stop layer turns and a Story level's timer for ${BOOK_PAUSE_SECONDS} seconds. Earn 25% more XP.`,
   },
   {
     id: 'wiggle',

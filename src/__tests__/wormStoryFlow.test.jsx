@@ -489,7 +489,7 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
   expect(Object.values(state().wormHealingProgress).some(p => isHealReady(p.deposited))).toBe(true);
 });
 
-it('Classic adds 50 percent more Story orbs without changing the authored tunnel objective', () => {
+it('stages the same Story orbs and tunnel objective for Classic as for any worm', () => {
   for (const level of [1, 2, 6]) {
     act(() => useGameStore.setState({ wormCharacter: 'glow' }));
     begin(level);
@@ -497,7 +497,7 @@ it('Classic adds 50 percent more Story orbs without changing the authored tunnel
     const tunnels = getActiveTunnels(state().cubies, state().size).length;
     act(() => useGameStore.setState({ wormCharacter: 'classic' }));
     begin(level);
-    expect(state().wormPowerups).toHaveLength(Math.ceil(ordinaryOrbs * 1.5));
+    expect(state().wormPowerups).toHaveLength(ordinaryOrbs);
     expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(tunnels);
   }
 });

@@ -1,8 +1,11 @@
 // Central balance values shared by simulation, rewards and character descriptions.
 export const BOOK_XP_MULTIPLIER = 1.25;
 export const BOOK_PAUSE_SECONDS = 5;
-export const CLASSIC_ORB_CALL_SECONDS = 6;
-export const CLASSIC_ORB_CALL_COOLDOWN = 20;
+// Classic is the baseline crawler: one modest active and no passive. It used to also
+// spawn half again as many orbs everywhere, which on top of a 6 s magnet every 20 s made
+// the starter the strongest orb gatherer in the cast.
+export const CLASSIC_ORB_CALL_SECONDS = 5;
+export const CLASSIC_ORB_CALL_COOLDOWN = 25;
 export const GLOW_TRAIL_SECONDS = 8;
 export const GLOW_TRAIL_LINGER_SECONDS = 12;
 export const GLOW_TRAIL_FADE_SECONDS = 2;
@@ -23,5 +26,8 @@ export const SPRING_AIM_MAX = 2.5;
 // ability draws nothing on the cube otherwise: the HUD button says it is ready.
 export const SIGNATURE_READY_BEAT = 0.8;
 export const characterXpMultiplier = character => character === 'book' ? BOOK_XP_MULTIPLIER : 1;
-export const characterOrbCount = (count, character) => character === 'classic' ? Math.ceil(count * 1.5) : count;
-export const holdsRotationTimer = signature => !!signature?.sweep || (signature?.character === 'book' && signature.active > 0);
+// Book's Time Out stops the clocks: the layer-turn clock everywhere, and a Story level's
+// own clock (its limit and par). The wipers hold the layer clock too, because steering is
+// locked for the sweep.
+export const holdsLevelClock = signature => signature?.character === 'book' && signature.active > 0;
+export const holdsRotationTimer = signature => !!signature?.sweep || holdsLevelClock(signature);

@@ -32,6 +32,9 @@ test('boots to the main menu and keeps landscape actions inside the safe area', 
 test('starts a WORM free-play run', async ({ page }) => {
   // Keep the full wizard/launch path, but render fewer pixels on software GL.
   // The opening turns and arrival advance on rendered frames, not wall time.
+  // That is about 2.5 minutes here and well over 3 on a slow runner, so this one
+  // test gets more than the four-minute default.
+  test.setTimeout(330_000);
   await page.setViewportSize({ width: 640, height: 480 });
   await startFreePlay(page, { viewport: { width: 640, height: 320 } });
   await expect(page.getByRole('button', { name: /^Collect \d+ orbs: 0 of \d+/ })).toBeVisible();

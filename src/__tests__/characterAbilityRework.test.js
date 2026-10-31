@@ -148,10 +148,12 @@ describe('the ready beat', () => {
 
 describe('Glow: the light lets the head slip through its own body', () => {
   // Up the front face, then three left turns: the head comes back round into its own body.
-  function loopIntoBody(paint) {
+  function loopIntoBody(paint, shine = false) {
     const { sim, ctx } = world('glow');
     sim.tailLength = 100;
     run(sim, ctx, 3);
+    // Light Trail shining: the whole worm is light, wherever its body lies.
+    if (shine) { sim.signature.character = 'glow'; sim.signature.active = 30; }
     if (paint) {
       const trail = makeGlowTrail();
       ttPush(trail.path, '2,4,4,PZ');
@@ -176,6 +178,12 @@ describe('Glow: the light lets the head slip through its own body', () => {
   it('on a lit tile the head passes through and says so', () => {
     const { sim } = loopIntoBody(true);
     expect(sim.alive).toBe(true);
+  });
+
+  it('while the light shines the head passes through its body anywhere, painted or not', () => {
+    const { sim } = loopIntoBody(false, true);
+    expect(sim.alive).toBe(true);
+    expect(sim.signature.notice).toBe('Slipped through the light');
   });
 });
 

@@ -1377,13 +1377,16 @@ function sweepCrosses(sweep, oldTime, samples, bodySamples, tile, size, expansio
     return false;
 }
 
-// Glow Worm's Light Trail: where the body lies on lit tiles it is light, and the head
-// slips through it there instead of biting it. Only the paint the player can see counts
-// (litTiles), so the rule ends exactly when the trail has faded.
+// Glow Worm's Light Trail: while it shines the whole worm is light, and the head slips
+// through its own body anywhere instead of biting it. Afterwards, where the body lies on
+// the trail it painted, it is still light there. Only light the player can see counts
+// (the shine, then litTiles), so the rule ends exactly when the paint has faded.
 function slipsThroughLight(sim, key) {
-    if (!key || !litTiles(sim)?.has(key)) return false;
-    sim.signature.notice = 'Slipped through the light';
-    sim.signature.noticeT = 1.2;
+    const sig = sim.signature;
+    const shining = sig.character === 'glow' && sig.active > 0;
+    if (!shining && (!key || !litTiles(sim)?.has(key))) return false;
+    sig.notice = 'Slipped through the light';
+    sig.noticeT = 1.2;
     return true;
 }
 

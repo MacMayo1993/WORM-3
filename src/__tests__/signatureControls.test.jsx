@@ -14,6 +14,7 @@ import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { makeCubies } from '../game/cubeState.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
+import { CLASSIC_ORB_CALL_SECONDS } from '../worm/characterAbilities.js';
 vi.mock('@react-three/fiber', () => ({ useThree: () => ({ camera: {} }) }));
 vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
 let host, root, worm;
@@ -113,9 +114,9 @@ it('shows correct pickup requirements through the real tunnel lookup and store',
   expect(host.querySelector('[aria-label="Tunnel healing requirements"]')).toBeNull();
 });
 
-it('Classic receives extra orbs from the actual run reset', () => {
+it('gives Classic the same orbs as every other worm on the actual run reset', () => {
   act(() => useGameStore.setState({ wormCharacter: 'classic', wormOrbCount: 5, wormRunId: 103 })); frame();
-  expect(useGameStore.getState().wormPowerups).toHaveLength(8);
+  expect(useGameStore.getState().wormPowerups).toHaveLength(5);
   act(() => useGameStore.setState({ wormCharacter: 'glow', wormRunId: 104 })); frame();
   expect(useGameStore.getState().wormPowerups).toHaveLength(5);
 });
@@ -127,7 +128,7 @@ it('exposes Classic Orb Call on the touch dock and Q, with a paused countdown an
   act(() => button.dispatchEvent(new Event('pointerdown', { bubbles: true }))); frame();
   expect(worm.signature.current.seq).toBe(1);
   expect(useGameStore.getState().wormMagnetActive).toBe(true);
-  expect(wormBuffs.magnetMaxT).toBe(6);
+  expect(wormBuffs.magnetMaxT).toBe(CLASSIC_ORB_CALL_SECONDS);
   expect(button.textContent).toContain('Active'); expect(button.disabled).toBe(true);
   const remaining = wormBuffs.magnetT, cooldown = worm.signature.current.cooldown;
   act(() => useGameStore.setState({ wormPaused: true }));

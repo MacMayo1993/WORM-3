@@ -4,7 +4,7 @@ import { queueOrbCascade } from './healerWorm/orbCascade.js';
 import { STORY_DOUBLE_HEAL_WINDOW } from './healerWorm/healChain.js';
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
 import { getStableKey } from './wormLogic.js';
-import { characterOrbCount } from './characterAbilities.js';
+import { holdsLevelClock } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
 import { shouldFinishStory } from './story/starGoals.js';
@@ -580,7 +580,7 @@ export function useWormCrawler(size, cubies) {
         feedbackRef.current.advance(delta);
         const story = storyLevel(state.wormStoryLevel);
         if (story && state.wormGamePhase === 'active' && storyPracticeRef.current?.runId !== state.wormRunId && !liveRotation.active) {
-            const practice = stageStory(sim, sizeRef.current, story, state.wormCharacter);
+            const practice = stageStory(sim, sizeRef.current, story);
             storyPracticeRef.current = { ...practice, runId: state.wormRunId, rotationEpoch: state.rotationEpoch };
             resetWormBuffs(); resetWormSegments(); resetWormPress();
             useGameStore.setState({ cubies: practice.cubies, wormOrbInventory: practice.inventory,
@@ -709,9 +709,10 @@ export function useWormCrawler(size, cubies) {
             const replenished = replenishStoryTunnel(sim, storyPracticeRef.current, live, sizeRef.current, activeTunnelsRef.current.length);
             if (replenished) { useGameStore.setState({ cubies: replenished }); return; }
             // Observe a landing even if it immediately triggers the next rescue.
-            // Rescue and pickup reveals hold the deadline/par clock until play resumes.
+            // Rescue and pickup reveals hold the deadline/par clock until play resumes, and
+            // so does Book's Time Out while it runs.
             const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current,
-                sim.jumpRescueHeld || elementalRevealHeld ? 0 : delta);
+                sim.jumpRescueHeld || elementalRevealHeld || holdsLevelClock(sim.signature) ? 0 : delta);
             if (!sim.jumpRescueHeld && !live.animState && !liveRotation.active && sim.cutFocusT <= 0 && sim.healPauseT <= 0) {
                 const offered = offerStoryPower(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies);
                 const bonus = offerStoryBonus(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies);
@@ -832,7 +833,7 @@ export function useWormCrawler(size, cubies) {
         feedbackRef.current.reset();
         wormExpansion.amount = 0;
         useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
-        resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
+        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         skillHopRef.current = makeHopTracker();
         burrowBridge.current = sim.burrows;
         resetWormBuffs();
@@ -842,7 +843,7 @@ export function useWormCrawler(size, cubies) {
         const story = storyLevel(state.wormStoryLevel);
         let storyStart = null;
         if (story && !liveRotation.active) {
-            const practice = stageStory(sim, size, story, state.wormCharacter);
+            const practice = stageStory(sim, size, story);
             storyPracticeRef.current = { ...practice, runId: state.wormRunId, rotationEpoch: state.rotationEpoch };
             storyStart = { cubies: practice.cubies, wormOrbInventory: practice.inventory,
                 wormStoryTarget: practice.target, wormStoryReady: true, wormPaused: true };
