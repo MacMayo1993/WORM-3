@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Vector3, Group } from 'three';
 import {
-  createDiveLeap, planDiveLeap, sampleDiveLeap, diveLeapTravel, portalOpenAt,
+  createDiveLeap, planDiveLeap, sampleDiveLeap, diveLeapTravel, portalOpenAt, diveSegmentLookInto,
   DIVE_LEAP_START, DIVE_LEAP_TIME, DIVE_ZOOM_START, DIVE_TOTAL, DIVE_PORTAL_LIFT,
 } from '../components/menus/menuDiveLeap.js';
 import {
@@ -12,7 +12,7 @@ import { registerPokeTarget, findPokeTarget, wormTookTap, menuLeanInto, retainMe
 import { lightSweepAt, SWEEP_PERIOD, SWEEP_TIME } from '../components/menus/menuLightSweep.js';
 import { animateWormFace } from '../worm/wormFaceExpression.js';
 import { createMenuCharacterRig } from '../components/menus/menuCharacterRig.js';
-import { CUBE_WORM_HALF, CUBE_WORM_CLEARANCE } from '../components/menus/cubeWormPath.js';
+import { CUBE_WORM_HALF, CUBE_WORM_CLEARANCE, sampleWigglingCubeWorm } from '../components/menus/cubeWormPath.js';
 
 const motion = () => ({ width: 1, stretch: 1, lift: 0, sway: 0, roll: 0 });
 
@@ -45,6 +45,26 @@ describe('the dive leap', () => {
       // A worm frame that never flips: up stays perpendicular to travel.
       expect(Math.abs(n.dot(f))).toBeLessThan(1e-6);
       expect(n.length()).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('keeps every segment drawn until it has gone down the portal, even leaving from another face', () => {
+    // A worm on a face next to the chosen one starts deep below the portal's
+    // plane: depth alone hid its head the moment it jumped.
+    const start = { position: new Vector3(), normal: new Vector3(), forward: new Vector3() };
+    sampleWigglingCubeWorm(6, 0, 6 / 1.1, start.position, start.normal, start.forward);
+    const p = new Vector3(), n = new Vector3(), f = new Vector3(), look = {};
+    for (const face of ['NX', 'PX', 'NY', 'PY', 'NZ', 'PZ']) {
+      const leap = planDiveLeap(createDiveLeap(), start, face);
+      for (let s = 0; s < leap.mouth; s += leap.mouth / 40) {
+        const depth = sampleDiveLeap(leap, s, p, n, f);
+        expect(diveSegmentLookInto(look, leap, s, depth).visible).toBe(true);
+        // Squeezed only through the mouth, never mid-air.
+        if (s < leap.mouth - 0.3) expect(look.throat).toBe(0);
+      }
+      const gone = leap.mouth + 0.6;
+      expect(diveSegmentLookInto(look, leap, gone, sampleDiveLeap(leap, gone, p, n, f)).visible).toBe(false);
+      expect(diveSegmentLookInto(look, leap, leap.mouth, 0).throat).toBe(1);
     }
   });
 
