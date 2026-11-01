@@ -12,6 +12,8 @@ import { registerPokeTarget, findPokeTarget, wormTookTap, menuLeanInto, retainMe
 import { lightSweepAt, SWEEP_PERIOD, SWEEP_TIME } from '../components/menus/menuLightSweep.js';
 import { animateWormFace } from '../worm/wormFaceExpression.js';
 import { createMenuCharacterRig } from '../components/menus/menuCharacterRig.js';
+import { COIN_RADIUS, COIN_SEGMENT } from '../components/menus/menuWormCoin.js';
+import { Box3 } from 'three';
 import { CUBE_WORM_HALF, CUBE_WORM_CLEARANCE, sampleWigglingCubeWorm } from '../components/menus/cubeWormPath.js';
 
 const motion = () => ({ width: 1, stretch: 1, lift: 0, sway: 0, roll: 0 });
@@ -290,6 +292,50 @@ describe('the rig answering the player', () => {
     rig.setHat('none');
     expect(rig.segments[0].holder.getObjectByName('menu-worm-hat')).toBeUndefined();
     rig.dispose();
+  });
+
+  it('carries the Store coin on its shoulders, big enough to read, and spins it', () => {
+    const rig = createMenuCharacterRig('classic');
+    rig.setProp('coin');
+    const coin = rig.segments[COIN_SEGMENT].holder.getObjectByName('menu-worm-coin');
+    expect(coin).toBeDefined();
+    expect(rig.segments[0].holder.getObjectByName('menu-worm-coin')).toBeUndefined();
+    // Big: wider than 1.6 bead radii, like every handmade piece. Inked.
+    expect(COIN_RADIUS * 2).toBeGreaterThan(1.6);
+    expect(coin.getObjectByName('menu-worm-coin-ink')).toBeDefined();
+    // Sits on the back, sunk a little into the bead rather than floating.
+    const bead = rig.segments[COIN_SEGMENT].radius;
+    coin.updateMatrixWorld(true);
+    const box = new Box3().setFromObject(coin);
+    expect(box.min.y).toBeLessThan(bead);
+    expect(box.min.y).toBeGreaterThan(0);
+    // Spins on the worm's clock; a frozen clock and reduced motion hold it.
+    const spin = coin.children[0].children[0]; // the coin turns inside its leaned mount
+    rig.prop.pose(0.5);
+    const a = spin.rotation.y;
+    rig.prop.pose(0.5);
+    expect(spin.rotation.y).toBe(a);
+    rig.prop.pose(1.5);
+    expect(spin.rotation.y).not.toBe(a);
+    rig.prop.pose(1.5, true);
+    const held = spin.rotation.y;
+    rig.prop.pose(9, true);
+    expect(spin.rotation.y).toBe(held);
+    // Taken off again, and its resources go with it.
+    const disposed = vi.spyOn(spin.children[0].material, 'dispose');
+    rig.setProp(null);
+    expect(rig.segments[COIN_SEGMENT].holder.getObjectByName('menu-worm-coin')).toBeUndefined();
+    expect(disposed).toHaveBeenCalled();
+    rig.dispose();
+  });
+
+  it('gives the coin to the Store face only, and never to MOBI', () => {
+    expect(carouselWormMood('PY').prop).toBe('coin');
+    for (const face of CAROUSEL_MOOD_FACES.filter(f => f !== 'PY')) expect(carouselWormMood(face).prop).toBeNull();
+    const mobi = createMenuCharacterRig('mobi');
+    mobi.setProp('coin');
+    expect(mobi.prop).toBeNull();
+    mobi.dispose();
   });
 
   it('never hangs a hat on MOBI', () => {
