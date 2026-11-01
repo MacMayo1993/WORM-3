@@ -7,7 +7,7 @@ import { feel } from '../../utils/feel.js';
 import { isCarouselActive, getCarouselFace, getModeDiveState } from './menuCarouselState.js';
 import { sampleWigglingCubeWorm, carouselWormMotion, CUBE_WORM_CLEARANCE, CAROUSEL_WORM_SEGMENTS, CAROUSEL_WORM_STEP, CAROUSEL_WORM_HEAD, CAROUSEL_WORM_BODY } from './cubeWormPath.js';
 import { createMenuCharacterRig } from './menuCharacterRig.js';
-import { createDiveLeap, planDiveLeap, sampleDiveLeap, diveLeapTravel } from './menuDiveLeap.js';
+import { createDiveLeap, planDiveLeap, sampleDiveLeap, diveLeapTravel, diveSegmentLookInto } from './menuDiveLeap.js';
 import { carouselWormMood, carouselMoodPace, carouselMoodRoll, carouselMoodJitter, carouselMoodBeat } from './carouselWormMood.js';
 import { registerPokeTarget, retainMenuPointer } from './menuPointer.js';
 import { updatePokeTarget, pointerLookPoint } from './menuWormPoke.js';
@@ -38,6 +38,7 @@ function CarouselCompanion({ shared, character, skinId, hatId, antipodal = false
     position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
     look: new THREE.Vector3(), center: new THREE.Vector3(), portal: new THREE.Vector3(), motion: {},
     hat: undefined, glow: undefined, beat: null, zapUntil: -Infinity, entered: false, now: 0,
+    segment: { visible: true, throat: 0 },
   }), []);
   useEffect(() => () => model.dispose(), [model]);
   useEffect(() => { local.hat = undefined; local.glow = undefined; }, [model, local]);
@@ -114,11 +115,12 @@ function CarouselCompanion({ shared, character, skinId, hatId, antipodal = false
         } else {
           const depth = sampleDiveLeap(dive.leap, u, local.position, local.normal, local.forward);
           if (antipodal) { local.position.negate(); local.normal.negate(); local.forward.negate(); }
-          visible = depth < 0.4;
-          // Stretched out in flight, squeezed thin through the portal.
-          const throat = Math.max(0, 1 - Math.abs(depth) / 0.3);
-          motion.stretch = 1.14 + 0.2 * throat;
-          motion.width = 0.94 - 0.16 * throat;
+          // Stretched out in flight, squeezed thin through the portal, gone
+          // once it is down the hole (never earlier: see diveSegmentLookInto).
+          const look = diveSegmentLookInto(local.segment, dive.leap, u, depth);
+          visible = look.visible;
+          motion.stretch = 1.14 + 0.2 * look.throat;
+          motion.width = 0.94 - 0.16 * look.throat;
           motion.lift = 0;
           motion.ground = 0;
         }

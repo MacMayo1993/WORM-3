@@ -150,6 +150,20 @@ export function sampleDiveLeap(leap, s, position, normal, forward) {
   return DIVE_PORTAL_LIFT - position.dot(leap.normal);
 }
 
+/**
+ * How the segment `s` along the leap is drawn, given the `depth` that
+ * sampleDiveLeap returned for it. Depth is measured from the portal's whole
+ * plane, so a segment still in the air beside the cube (setting off from a
+ * neighbouring face, or crossing the plane on its way over) can read as deep:
+ * only past the mouth, on the plumb drop, does depth mean "inside the hole".
+ * Hidden once it has gone that far down; squeezed thin only through the mouth.
+ */
+export function diveSegmentLookInto(out, leap, s, depth) {
+  out.visible = s < leap.mouth || depth < 0.4;
+  out.throat = Math.max(0, 1 - Math.abs(s - leap.mouth) / 0.3);
+  return out;
+}
+
 /** The head's distance along the flight `t` seconds into the dive. */
 export function diveLeapTravel(leap, t) {
   if (!leap.planned) return 0;
