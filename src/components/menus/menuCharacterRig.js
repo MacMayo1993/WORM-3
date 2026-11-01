@@ -15,6 +15,7 @@ import { MENU_WORM_RADIUS, MENU_WORM_BODY_RADIUS, MENU_WORM_SEGMENTS } from './m
 import { createMenuWormFinish } from './menuWormFinish.js';
 import { createWormReaction, pokeWorm, wagWorm, aimWormHead, wormReactionFaceInto, wormReactionSegmentInto } from './menuWormReaction.js';
 import { wearMenuWormHat } from './menuWormHat.js';
+import { wearMenuWormCoin, COIN_SEGMENT } from './menuWormCoin.js';
 
 // Each species wears a skin that tells it apart from the other five at menu
 // size: the Ranger's slime green, the Brute's molten lava, the Scout's sea
@@ -188,7 +189,7 @@ export function createMenuCharacterRig(character, options = {}) {
   const headSurface = new THREE.Vector3(), headNormal = new THREE.Vector3(0, 1, 0);
   let headTime = 0, headSeen = false;
   const scratch = { width: 1, stretch: 1, lift: 0, sway: 0, roll: 0, pulse: 0, transit: false, ground: 1 };
-  let hat = null;
+  let hat = null, prop = null, propId = null;
   return {
     group, segments, finish, skin, reaction,
     /**
@@ -224,6 +225,22 @@ export function createMenuCharacterRig(character, options = {}) {
       hat?.dispose();
       hat = mobi || !id || id === 'none' ? null : wearMenuWormHat(segments[0].holder, id, headRadius);
     },
+    /**
+     * Something carried on the back: 'coin' (the Store's), or null. MOBI's
+     * blocks have no back to carry it on, and a worm too short for the
+     * shoulders carries it on its last segment.
+     */
+    setProp(id) {
+      if (id === propId) return;
+      prop?.dispose();
+      prop = null;
+      propId = id;
+      if (id !== 'coin' || mobi) return;
+      const index = Math.min(COIN_SEGMENT, count - 1);
+      prop = wearMenuWormCoin(segments[index].holder, segments[index].radius ?? bodyRadius);
+    },
+    /** What `setProp` hung on the back (tests, previews). */
+    get prop() { return prop; },
     /** Where segment `i` is, in world space (last frame's transforms). */
     segmentWorldInto(i, out) { return segments[i].holder.getWorldPosition(out); },
     pose(i, position, normal, forward, visible, time, motion = null, reducedMotion = prefersReducedMotion()) {
@@ -298,6 +315,7 @@ export function createMenuCharacterRig(character, options = {}) {
         poseCharacterAccents(accents.group, origin, localForward, localUp, headRadius);
         accents.update(reducedMotion ? 0 : time);
         hat?.pose(reducedMotion ? 0 : time);
+        prop?.pose(time, reducedMotion);
         if (mobi) {
           mobi.group.visible = visible; mobi.group.position.copy(origin); mobi.group.scale.setScalar(headRadius);
           orientMobi(mobi.group, localForward, localUp);
@@ -317,6 +335,7 @@ export function createMenuCharacterRig(character, options = {}) {
     resetTrail() { finish?.clearTrail(); hasDropped = false; },
     dispose() {
       hat?.dispose();
+      prop?.dispose();
       disposeEyes(); accents.dispose(); resources.forEach(r => r.dispose()); finish?.dispose();
       if (mobi) { disposeMobi(mobi); mobiTails.forEach(t => t.core.material.dispose()); disposeMobiSegmentAssets(mobiAssets); }
     },

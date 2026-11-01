@@ -7,7 +7,8 @@
 //   TEACH (PX)      studious: slower, in a mortarboard if it wears no hat of its own
 //   CHAOS (NZ)      jittery and quick, crackling with sparks
 //   RANDOM (PZ)     dizzy, wandering eyes and a pace that speeds and slows
-//   STORE (PY)      pleased with itself: a gold trail and the odd glint
+//   STORE (PY)      pleased with itself: a gold coin on its back, a gold trail
+//                   and the odd glint
 
 export const CAROUSEL_MOOD_FACES = ['NX', 'NY', 'PX', 'NZ', 'PZ', 'PY'];
 
@@ -31,6 +32,7 @@ function buildMood(face) {
   return Object.freeze({
     speed: face === 'PX' ? 0.75 : face === 'NZ' ? 1.45 : 1,
     hat: face === 'PX' ? 'grad' : null,
+    prop: face === 'PY' ? 'coin' : null,
     glow: face === 'PY' ? '#ffd34d' : face === 'NZ' ? '#ffb14a' : null,
     dizzy: face === 'PZ' ? 0.85 : 0,
     rolls: face === 'NY',

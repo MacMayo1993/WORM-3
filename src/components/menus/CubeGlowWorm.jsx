@@ -37,11 +37,11 @@ function CarouselCompanion({ shared, character, skinId, hatId, antipodal = false
   const local = useMemo(() => ({
     position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
     look: new THREE.Vector3(), center: new THREE.Vector3(), portal: new THREE.Vector3(), motion: {},
-    hat: undefined, glow: undefined, beat: null, zapUntil: -Infinity, entered: false, now: 0,
+    hat: undefined, glow: undefined, prop: undefined, beat: null, zapUntil: -Infinity, entered: false, now: 0,
     segment: { visible: true, throat: 0 },
   }), []);
   useEffect(() => () => model.dispose(), [model]);
-  useEffect(() => { local.hat = undefined; local.glow = undefined; }, [model, local]);
+  useEffect(() => { local.hat = undefined; local.glow = undefined; local.prop = undefined; }, [model, local]);
   useEffect(() => {
     const release = retainMenuPointer();
     const target = registerPokeTarget(() => {
@@ -65,10 +65,12 @@ function CarouselCompanion({ shared, character, skinId, hatId, antipodal = false
     const clock = dive ? dive.time0 + dive.t : shared.time;
     const mood = shared.mood;
 
-    // Dress for the face: the player's own hat, else the mode's; the mode's trail colour.
+    // Dress for the face: the player's own hat, else the mode's; the mode's
+    // trail colour and anything it carries (the Store's coin).
     const hat = hatId && hatId !== 'none' ? hatId : mood.hat;
     if (hat !== local.hat) { model.setHat(hat); local.hat = hat; }
     if (mood.glow !== local.glow) { model.setGlow(mood.glow); local.glow = mood.glow; }
+    if (mood.prop !== local.prop) { model.setProp(mood.prop); local.prop = mood.prop; }
 
     // What it looks at: the portal it is about to dive into, else the pointer.
     model.group.getWorldPosition(local.center);
