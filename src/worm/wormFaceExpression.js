@@ -24,8 +24,13 @@ const offset = new THREE.Vector3();
  * `ko` (0…1) is the knocked-out look once the worm dies: eyes droop to heavy lids,
  * pupils spin in dizzy circles (on `koTime`, which keeps running while the game
  * clock is frozen) and the mouth drops to a stunned "o".
+ *
+ * Menus add three more: `look` ({ x, y }, each -1…1 across the face, x toward
+ * the worm's own left) aims both pupils at something instead of the idle
+ * wander; `surprise` (0…1) widens the eyes, shrinks the pupils and rounds the
+ * mouth; `dizzy` (0…1) circles the pupils without the knocked-out droop.
  */
-export function animateWormFace(parts, character, time, { pulse = 0, transit = false, reducedMotion = false, ko = 0, koTime = 0 } = {}) {
+export function animateWormFace(parts, character, time, { pulse = 0, transit = false, reducedMotion = false, ko = 0, koTime = 0, look = null, surprise = 0, dizzy: giddy = 0 } = {}) {
   const profile = WORM_FACE_PROFILES[character] || WORM_FACE_PROFILES.classic;
   const t = reducedMotion ? 0 : time;
   const stun = Math.max(0, Math.min(1, ko));
@@ -36,24 +41,33 @@ export function animateWormFace(parts, character, time, { pulse = 0, transit = f
     const eye = parts.eyes?.[i], pupil = parts.pupils?.[i];
     if (!eye || !pupil) continue;
     const asymmetry = character === 'wiggle' && i === 0 ? 1.12 : 1;
-    eye.scale.y *= profile.eye * asymmetry * blink * focus * (1 + delight * 0.14);
-    pupil.scale.y *= profile.eye * asymmetry * blink * focus;
-    pupil.scale.x *= character === 'prism' ? 0.8 : 1;
-    const gaze = reducedMotion ? 0 : Math.sin(t * 0.65) * 0.13;
+    const wide = Math.max(0, Math.min(1, surprise)) * (1 - stun);
+    // A surprised blink is held open.
+    const lid = wide > 0.2 ? 1 : blink;
+    eye.scale.y *= profile.eye * asymmetry * lid * focus * (1 + delight * 0.14 + wide * 0.38);
+    eye.scale.x *= 1 + wide * 0.16;
+    pupil.scale.y *= profile.eye * asymmetry * lid * focus * (1 - wide * 0.3);
+    pupil.scale.x *= (character === 'prism' ? 0.8 : 1) * (1 - wide * 0.3);
+    // Looking at something replaces the idle wander; the pupil stays inside
+    // the eye at full reach.
+    const gazeX = look ? Math.max(-1, Math.min(1, look.x)) * 0.72 : reducedMotion ? 0 : Math.sin(t * 0.65) * 0.13;
+    const gazeY = look ? Math.max(-1, Math.min(1, look.y)) * 0.5 : 0;
     // Dizzy: the two pupils circle in opposite directions.
-    const spin = reducedMotion ? 0.6 : koTime * 7.5 * (i ? -1 : 1);
-    const dizzy = stun * 0.42;
+    const giddyOn = reducedMotion ? 0 : Math.max(0, Math.min(1, giddy)) * (1 - stun);
+    const spin = reducedMotion ? 0.6 : (stun > 0 ? koTime : t) * 7.5 * (i ? -1 : 1);
+    const dizzy = stun * 0.42 + giddyOn * 0.36;
     offset.set(
-      pupil.scale.x * (gaze * (1 - stun) + Math.cos(spin) * dizzy),
-      pupil.scale.x * ((0.10 + delight * 0.2) * (1 - stun) + Math.sin(spin) * dizzy),
+      pupil.scale.x * ((gazeX * (1 - giddyOn)) * (1 - stun) + Math.cos(spin) * dizzy),
+      pupil.scale.x * ((0.10 + delight * 0.2 + gazeY * (1 - giddyOn)) * (1 - stun) + Math.sin(spin) * dizzy),
       0
     ).applyQuaternion(pupil.quaternion);
     pupil.position.add(offset);
     const brow = eye.userData.wormBrow;
-    if (brow) brow.rotation.z = (i ? -1 : 1) * (profile.tilt + delight * 0.16 - stun * 0.35);
+    if (brow) brow.rotation.z = (i ? -1 : 1) * (profile.tilt + delight * 0.16 - stun * 0.35 - wide * 0.3);
   }
   if (parts.mouth) {
-    parts.mouth.scale.x *= profile.smile * (1 + delight * 0.12) * (1 - 0.45 * stun);
-    parts.mouth.scale.y *= ((transit && !reducedMotion ? 1.3 : 1) + delight * 0.65) * (1 + 0.9 * stun);
+    const wide = Math.max(0, Math.min(1, surprise)) * (1 - stun);
+    parts.mouth.scale.x *= profile.smile * (1 + delight * 0.12) * (1 - 0.45 * stun) * (1 - 0.4 * wide);
+    parts.mouth.scale.y *= ((transit && !reducedMotion ? 1.3 : 1) + delight * 0.65) * (1 + 0.9 * stun) * (1 + 1.1 * wide);
   }
 }

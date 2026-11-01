@@ -13,6 +13,8 @@ import { makeWormHaloSprite } from '../../worm/wormGlowHalo.js';
 import { createBookParts, createBookSegment, createBookBindingMaterial, poseBookSegment, bookScaleForRadius, bookVolumeScale, bookGroundLift } from '../../worm/wormBookFX.js';
 import { MENU_WORM_RADIUS, MENU_WORM_BODY_RADIUS, MENU_WORM_SEGMENTS } from './menuTunnelWormPath.js';
 import { createMenuWormFinish } from './menuWormFinish.js';
+import { createWormReaction, pokeWorm, wagWorm, aimWormHead, wormReactionFaceInto, wormReactionSegmentInto } from './menuWormReaction.js';
+import { wearMenuWormHat } from './menuWormHat.js';
 
 // Each species wears a skin that tells it apart from the other five at menu
 // size: the Ranger's slime green, the Brute's molten lava, the Scout's sea
@@ -159,7 +161,7 @@ export function createMenuCharacterRig(character, options = {}) {
     segments: count,
     ink: menuWormInk(skin),
     inkWidth,
-    glow: _ink.set(skin.glow).lerp(_white, 0.15),
+    glow: new THREE.Color(skin.glow).lerp(_white, 0.15),
     trailOpacity: character === 'glow' ? 0.85 : 0.6,
   }) : null;
   if (finish) group.add(finish.group);
@@ -177,44 +179,103 @@ export function createMenuCharacterRig(character, options = {}) {
     down.set(0, -1, 0).transformDirection(inverse);
   };
   let hasDropped = false;
+  // The player's side of things: what the worm looks at, a poke, a wag.
+  const reaction = createWormReaction();
+  const faceMood = { surprise: 0, delight: 0, look: null };
+  const lookWorld = new THREE.Vector3(), lookLocal = new THREE.Vector3(), headWorld = new THREE.Matrix4();
+  let looking = false, now = 0, dizzy = 0, live = true, startle = 0, delightBoost = 0;
+  const glowColor = new THREE.Color(_ink.set(skin.glow).lerp(_white, 0.15));
+  const headSurface = new THREE.Vector3(), headNormal = new THREE.Vector3(0, 1, 0);
+  let headTime = 0, headSeen = false;
+  const scratch = { width: 1, stretch: 1, lift: 0, sway: 0, roll: 0, pulse: 0, transit: false, ground: 1 };
+  let hat = null;
   return {
-    group, segments, finish, skin,
+    group, segments, finish, skin, reaction,
+    /**
+     * Before posing a frame: the real-time clock `at` (seconds), what to look
+     * at (`lookAt`, a world point, or null), and the mood (`dizzy`,
+     * `surprise` and `delight`, each 0…1, on top of a poke's own). `active`
+     * false freezes reactions (a hidden or paused worm).
+     */
+    react(at, { lookAt = null, dizzy: giddy = 0, surprise = 0, delight = 0, active = true } = {}) {
+      now = at;
+      looking = !!lookAt;
+      if (lookAt) lookWorld.copy(lookAt);
+      dizzy = giddy;
+      startle = surprise;
+      delightBoost = delight;
+      live = active;
+    },
+    /** Tint the trail and sparks (null puts the skin's own glow back). */
+    setGlow(color) { finish?.setGlow(color ?? glowColor); },
+    /** Startle the worm: it flinches, hops and grins; sparks fly off its head. */
+    poke(at = now, reducedMotion = prefersReducedMotion()) {
+      pokeWorm(reaction, at);
+      if (!reducedMotion && headSeen) finish?.burst(headSurface, headNormal, headRadius, headTime, { count: 10, speed: 1.1 });
+    },
+    /** A friendly flick of the tail. */
+    wag(at = now) { wagWorm(reaction, at); },
+    /** A ring of sparks off the head (a mood's zap or glint). */
+    sparkle(options) { if (headSeen) finish?.burst(headSurface, headNormal, headRadius, headTime, options); },
+    /** A ring of sparks round a point on the surface (a portal's mouth). */
+    burst(center, normal, time, options) { finish?.burst(center, normal, headRadius, time, options); },
+    /** Wear hat `id` (a felt hat appears once its chunk has loaded). */
+    setHat(id) {
+      hat?.dispose();
+      hat = mobi || !id || id === 'none' ? null : wearMenuWormHat(segments[0].holder, id, headRadius);
+    },
+    /** Where segment `i` is, in world space (last frame's transforms). */
+    segmentWorldInto(i, out) { return segments[i].holder.getWorldPosition(out); },
     pose(i, position, normal, forward, visible, time, motion = null, reducedMotion = prefersReducedMotion()) {
       const segment = segments[i]; segment.holder.visible = visible;
+      const m = Object.assign(scratch, { width: 1, stretch: 1, lift: 0, sway: 0, roll: 0, pulse: 0, transit: false, ground: 1 }, motion);
+      if (live) wormReactionSegmentInto(m, reaction, i, count, now, segment.radius ?? headRadius, reducedMotion);
       segment.holder.position.copy(position);
       back.copy(forward).negate(); side.crossVectors(normal, back).normalize();
       basis.makeBasis(side, normal, back); segment.holder.quaternion.setFromRotationMatrix(basis);
-      segment.holder.scale.set(motion?.width ?? 1, motion?.width ?? 1, motion?.stretch ?? 1);
-      if (motion) {
-        segment.holder.position.addScaledVector(normal, motion.lift).addScaledVector(side, motion.sway);
-        segment.holder.rotateZ(motion.roll);
+      segment.holder.scale.set(m.width, m.width, m.stretch);
+      segment.holder.position.addScaledVector(normal, m.lift).addScaledVector(side, m.sway);
+      segment.holder.rotateZ(m.roll);
+      if (i === 0) {
+        // Turn the head toward what it is looking at, in its own frame.
+        let dir = null;
+        if (looking && visible && live) {
+          segment.holder.updateMatrix();
+          headWorld.multiplyMatrices(group.matrixWorld, segment.holder.matrix).invert();
+          lookLocal.copy(lookWorld).applyMatrix4(headWorld);
+          if (lookLocal.lengthSq() > 1e-6) dir = lookLocal.normalize();
+        }
+        aimWormHead(reaction, dir, now, reducedMotion);
+        segment.holder.rotateY(reaction.yaw);
+        segment.holder.rotateX(reaction.pitch);
       }
       if (segment.material) {
         syncSkinBump(segment.material, fx);
         updateWormSkinMaterialTime(segment.material, time);
         if (character === 'prism') prismColor(segment.material.color, i, time);
       }
-      if (segment.book) poseBookSegment(segment.book, motion?.pulse ?? 0, reducedMotion ? 0 : time, i);
+      if (segment.book) poseBookSegment(segment.book, m.pulse, reducedMotion ? 0 : time, i);
       if (segment.mobiTail) {
         const sway = mobiTailSwayInto(mobiSway, i / 3, time * 0.6, time, reducedMotion);
         segment.mobiTail.group.rotation.set(sway.pitch, sway.yaw, sway.roll);
         segment.mobiTail.group.position.y = sway.lift * bodyRadius * 1.04;
       }
       if (finish) {
-        const ground = visible ? (motion?.ground ?? 1) : 0;
+        const ground = visible ? m.ground : 0;
         finish.outlineSegment(i, segment.holder, segment.body, visible);
         // Shadows pool under the segment on the sticker below it, shrinking
         // as the segment arches away from the surface.
         if (i === 0) updateDown();
         surface.copy(position).addScaledVector(normal, -clearance);
         const r = segment.radius ?? bodyRadius;
-        const arch = Math.max(0, motion?.lift ?? 0) / Math.max(1e-4, r);
+        const arch = Math.max(0, m.lift) / Math.max(1e-4, r);
         // Down across the face; on a face turned to the floor or the sky,
         // where down has nowhere to go, the shadow stays underneath.
         fall.copy(down).addScaledVector(normal, -down.dot(normal));
-        cast.copy(surface).addScaledVector(fall, r * 0.55);
-        finish.shadowSegment(i, cast, normal, r, ground * (1 - Math.min(0.6, arch * 0.8)));
+        cast.copy(surface).addScaledVector(fall, r * 0.55 * (1 + arch * 0.5));
+        finish.shadowSegment(i, cast, normal, r, ground * (1 - Math.min(0.6, arch * 0.6)));
         if (i === 0) {
+          headSurface.copy(surface); headNormal.copy(normal); headTime = time; headSeen = visible && ground > 0.5;
           // The head lays the trail: one dot per short stretch of road travelled.
           if (visible && ground > 0.5) {
             if (!hasDropped || lastDrop.distanceToSquared(surface) > TRAIL_SPACING * TRAIL_SPACING) {
@@ -227,14 +288,20 @@ export function createMenuCharacterRig(character, options = {}) {
       if (i === 0) {
         faceParts.forEach(part => { part.visible = visible && !mobi; });
         accents.group.visible = visible && !mobi;
+        wormReactionFaceInto(faceMood, reaction, now, reducedMotion);
+        faceMood.surprise = Math.max(faceMood.surprise, startle);
+        const pulse = Math.max(m.pulse, faceMood.delight, delightBoost);
         layoutWormFace(origin, localForward, localUp, headRadius, face);
-        animateWormFace(face, character, time, { reducedMotion, pulse: motion?.pulse ?? 0, transit: motion?.transit ?? false });
+        animateWormFace(face, character, time, {
+          reducedMotion, pulse, transit: m.transit, look: faceMood.look, surprise: faceMood.surprise, dizzy,
+        });
         poseCharacterAccents(accents.group, origin, localForward, localUp, headRadius);
         accents.update(reducedMotion ? 0 : time);
+        hat?.pose(reducedMotion ? 0 : time);
         if (mobi) {
           mobi.group.visible = visible; mobi.group.position.copy(origin); mobi.group.scale.setScalar(headRadius);
           orientMobi(mobi.group, localForward, localUp);
-          animateMobi(mobi, reducedMotion ? 0 : time, { pulse: motion?.pulse ?? 0, transit: motion?.transit ?? false });
+          animateMobi(mobi, reducedMotion ? 0 : time, { pulse, transit: m.transit });
           for (const tail of mobiTails) {
             tail.core.material.uniforms.uTime.value = time;
             tail.gas.material.uniforms.uTime.value = time;
@@ -249,6 +316,7 @@ export function createMenuCharacterRig(character, options = {}) {
     /** Forget the trail, e.g. when the worm is about to reappear elsewhere. */
     resetTrail() { finish?.clearTrail(); hasDropped = false; },
     dispose() {
+      hat?.dispose();
       disposeEyes(); accents.dispose(); resources.forEach(r => r.dispose()); finish?.dispose();
       if (mobi) { disposeMobi(mobi); mobiTails.forEach(t => t.core.material.dispose()); disposeMobiSegmentAssets(mobiAssets); }
     },

@@ -93,3 +93,16 @@
   .live-carousel .mc-cube-window { grid-row:2 / 4; height:clamp(253px,71dvh,391px); min-height:253px; }
 }
 @media (prefers-reduced-motion:reduce) { .live-carousel-layout,.lc-info,.lc-face-map span { transition:none; } }
+
+/* PLAY: the mode's colour opens like an iris from the cube as the camera falls
+   through the portal (timing from menuDiveLeap.js via --flood-delay). */
+.lc-dive-flood {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at var(--flood-x, 50%) var(--flood-y, 50%), #fffdf2 0, var(--mode-accent, #2fa84f) 22%, var(--mode-accent, #2fa84f) 100%);
+  clip-path: circle(0 at var(--flood-x, 50%) var(--flood-y, 50%));
+}
+.lc-dive-flood[data-on] { animation: lc-dive-flood 0.38s cubic-bezier(.5, 0, .9, .4) var(--flood-delay, 0.9s) forwards; }
+@keyframes lc-dive-flood {
+  from { opacity: 1; clip-path: circle(0 at var(--flood-x, 50%) var(--flood-y, 50%)); }
+  to { opacity: 1; clip-path: circle(150vmax at var(--flood-x, 50%) var(--flood-y, 50%)); }
+}

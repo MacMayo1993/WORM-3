@@ -219,6 +219,7 @@ function MenuScene({ onCubeClick, background }) {
           rotationSpeed={isMobile ? -0.025 : -0.055}
           intensity={isMobile ? 0.84 : 0.98}
           blurriness={0}
+          parallax
         />
       </Suspense>
       <Suspense fallback={null}>

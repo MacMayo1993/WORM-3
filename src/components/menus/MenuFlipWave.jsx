@@ -17,6 +17,8 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
   const frames = useContext(MenuPortalContext);
   const mouths = useRef([]);
   const traffic = useMemo(() => createMenuWormTraffic(characterCycle), [characterCycle]);
+  // Every worm's head, so passing worms can notice each other.
+  const heads = useMemo(() => new Set(), []);
   const elapsed = useRef(0);
   const root = useRef();
   const waves = useRef([]);
@@ -57,7 +59,7 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
       </mesh>
     </group>)}
     {traffic.routes.map(route => <MenuWormParticle key={route.id}
-      route={route} character={route.character} elapsed={elapsed}
+      route={route} character={route.character} elapsed={elapsed} heads={heads}
     />)}
   </group>;
 }
