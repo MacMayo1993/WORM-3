@@ -112,6 +112,11 @@ const CAM_CULL_HIDE = 0.2;
 const CAM_CULL_FULL = 0.36;
 const CAM_CULL_AHEAD = 0.5;
 const CAM_CULL_TOUCH = 0.1;
+// Those distances are for a full bead of this radius. What fills the frame is
+// angular size, so they shrink with a smaller bead: inside the core the band's
+// lane squeezes beads to a third of this, and the raised lens rides close enough
+// over them at a core wall that full-size distances hid a stretch of body.
+const CAM_CULL_BEAD = 0.09;
 const _camWorldPos = new THREE.Vector3();
 const _camAhead = new THREE.Vector3();
 const _camUp = new THREE.Vector3();
@@ -784,12 +789,15 @@ export function WormBody({ worm, size }) {
             // own trailing distance keeps it clear of the lens anyway.
             if (_transitCull && i !== 0) {
                 _camToBead.subVectors(_bodyClonePos, _camWorldPos);
-                const _camD = _camToBead.length();
+                const footprint = isMobi ? 1.45 : _isBook ? BOOK_BELLY : 1;
+                const bead = THREE.MathUtils.clamp(Math.max(_wormDummy.scale.x, _wormDummy.scale.y, _wormDummy.scale.z)
+                    * footprint / CAM_CULL_BEAD, 0.25, 1);
+                const _camLength = Math.max(_camToBead.length(), 1e-6), _camD = _camLength / bead;
                 if (_camD < CAM_CULL_TOUCH) continue;
                 const close = 1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_HIDE, CAM_CULL_FULL);
-                const ahead = THREE.MathUtils.smoothstep(_camToBead.dot(_camAhead) / _camD, 0.55, 0.85)
+                const ahead = THREE.MathUtils.smoothstep(_camToBead.dot(_camAhead) / _camLength, 0.55, 0.85)
                     * (1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_FULL, CAM_CULL_AHEAD));
-                const below = THREE.MathUtils.smoothstep(-_camToBead.dot(_camUp) / _camD, 0.3, 0.6);
+                const below = THREE.MathUtils.smoothstep(-_camToBead.dot(_camUp) / _camLength, 0.3, 0.6);
                 const keep = 1 - Math.max(close, ahead) * (1 - below);
                 if (keep <= 0.001) continue;
                 if (keep < 1) _wormDummy.scale.multiplyScalar(keep);

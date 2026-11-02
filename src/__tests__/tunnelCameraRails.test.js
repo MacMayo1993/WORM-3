@@ -18,6 +18,7 @@ import {
   blendTunnelPosesInto,
   tunnelExitPoseInto,
   tunnelEntryPoseInto,
+  CORE_ROOM_MARGIN,
 } from '../worm/tunnelCameraRails.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { tunnelBoreRadiusAt as tubeRadiusAt } from '../utils/tunnelPath.js';
@@ -25,8 +26,8 @@ import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
-import { coreZoomLimit, CORE_HALF } from '../3d/antipodalCore.js';
-import { tunnelPathArcPointInto, tunnelTraversalT, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
+import { coreZoomLimit, CORE_HALF, CORE_STICKER_OFFSET } from '../3d/antipodalCore.js';
+import { tunnelTraversalT, tunnelCoreScale, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
@@ -357,7 +358,7 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
-  it('threads the carved entry and exit at every zoom, including the trailing exit camera', () => {
+  it('threads the carved entry and exit at every zoom, and never touches a mirror outside them', () => {
     const passage = makeCorePassage(), pose = makeTunnelCamPose();
     const closest = new THREE.Vector3(), segment = new THREE.Line3(), start = makeTunnelCamPose();
     const plane = new THREE.Plane(), normal = new THREE.Vector3(), wall = new THREE.Vector3();
@@ -370,21 +371,25 @@ describe('tunnelCamPoseInto', () => {
         const limit = coreZoomLimit(path.midA, size);
         start.cam.copy(path.vStart).addScaledVector(path.nStart, portalDist(size));
         start.look.copy(path.vStart); start.up.set(1, 0, 0);
-        const bounds = [1, (limit + 1) / 2, limit].map(zoom => {
+        // The lens reads the live zoom, which may be anywhere on its way to the limit.
+        for (const zoom of [1, (limit + 1) / 2, limit]) {
           const center = path.midA.clone().multiplyScalar(1 - zoom);
-          return new THREE.Box3(center.clone().addScalar(-CORE_HALF * zoom - .01), center.clone().addScalar(CORE_HALF * zoom + .01));
-        });
-        const crossed = bounds.map(() => 0);
-        for (let i = 0; i <= 600; i++) {
-          const t = i / 600;
-          if (t < ARM_A_END) tunnelEntryPoseInto(pose, tunnel, t / ARM_A_END, size, start);
-          else if (t < ARM_B_START) tunnelCamPoseInto(pose, tunnel, t, size);
-          else tunnelExitPoseInto(pose, tunnel, (t - ARM_B_START) / (1 - ARM_B_START), size);
-          for (const [index, box] of bounds.entries()) if (box.containsPoint(pose.cam)) {
-            crossed[index]++;
-            const zoom = [1, (limit + 1) / 2, limit][index];
-            wall.copy(pose.cam).addScaledVector(path.midA, zoom - 1);
-            const shell = Math.max(Math.abs(wall.x), Math.abs(wall.y), Math.abs(wall.z)) >= CORE_MIRROR_HALF * zoom;
+          const shell = (CORE_HALF + tunnelCoreScale(size) * (CORE_STICKER_OFFSET - 0.5)) * zoom + .005;
+          const room = CORE_MIRROR_HALF * zoom;
+          let crossed = 0;
+          for (let i = 0; i <= 600; i++) {
+            const t = i / 600;
+            if (t < ARM_A_END) tunnelEntryPoseInto(pose, tunnel, t / ARM_A_END, size, start, zoom);
+            else if (t < ARM_B_START) tunnelCamPoseInto(pose, tunnel, t, size, zoom);
+            else tunnelExitPoseInto(pose, tunnel, (t - ARM_B_START) / (1 - ARM_B_START), size, zoom);
+            wall.copy(pose.cam).sub(center);
+            const extent = Math.max(Math.abs(wall.x), Math.abs(wall.y), Math.abs(wall.z));
+            if (extent >= shell) continue;
+            crossed++;
+            // Deep in the room the lens is free; in a wall, or touching a mirror,
+            // it must be inside the opening the route bores through it.
+            if (extent < room - .04) continue;
+            const inWall = extent >= room;
             // Match the shader's slice in the wall plane. A nearest-point
             // cylinder can pass here while an oblique circular cutout fails.
             const axis = Math.abs(wall.x) >= Math.abs(wall.y) && Math.abs(wall.x) >= Math.abs(wall.z) ? 0 : Math.abs(wall.y) >= Math.abs(wall.z) ? 1 : 2;
@@ -393,25 +398,40 @@ describe('tunnelCamPoseInto', () => {
             let gap = Infinity;
             for (let j = 1; j < points.length; j++) {
               segment.set(points[j - 1], points[j]);
-              if (shell) {
+              if (inWall) {
                 if (!plane.intersectLine(segment, closest)) continue;
               } else segment.closestPointToPoint(pose.cam, true, closest);
               gap = Math.min(gap, closest.distanceTo(pose.cam));
             }
             // Include a near-plane-sized margin, not just the lens point.
-            expect(gap + .004, JSON.stringify({ size, tunnel, zoom, t, shell, lens: pose.cam.toArray() })).toBeLessThan(coreOpeningRadius(size, zoom));
+            expect(gap + .004, JSON.stringify({ size, tunnel, zoom, t, inWall, lens: pose.cam.toArray() })).toBeLessThan(coreOpeningRadius(size, zoom));
           }
+          expect(crossed).toBeGreaterThan(0);
         }
-        crossed.forEach(count => expect(count).toBeGreaterThan(0));
-        // Before the exit blend accelerates the lens, it also stays on the
-        // exact rider centerline wherever that line crosses the core.
-        for (let t = ARM_A_END; t < ARM_B_START; t += .01) {
-          const arc = cameraArcForHead(path, t, size);
-          tunnelPathArcPointInto(closest, path, arc);
-          if (!bounds[0].containsPoint(closest)) continue;
-          tunnelCamPoseInto(pose, tunnel, t, size);
-          expect(pose.cam.distanceTo(closest)).toBeLessThan(1e-8);
+      }
+    }
+  });
+
+  it('rides above the body through the mirror room instead of on its centreline', () => {
+    // The lens used to sit on the route for the whole crossing, inside the body
+    // it trails: the near-lens cull hid the tail and the band was cut away. With
+    // room to spare it now rides well clear of the route across the room.
+    for (const size of [5, 7, 15]) for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
+      for (const tunnel of [route, { entry: route.exit, exit: route.entry }]) {
+        const path = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, size);
+        const zoom = coreZoomLimit(path.midA, size);
+        const center = path.midA.clone().multiplyScalar(1 - zoom), room = CORE_MIRROR_HALF * zoom;
+        const pose = makeTunnelCamPose(), rel = new THREE.Vector3();
+        let inside = 0, raised = 0;
+        for (let t = ARM_A_END; t <= 0.95; t += 0.005) {
+          tunnelCamPoseInto(pose, tunnel, t, size, zoom);
+          rel.copy(pose.cam).sub(center);
+          if (Math.max(Math.abs(rel.x), Math.abs(rel.y), Math.abs(rel.z)) >= room - CORE_ROOM_MARGIN) continue;
+          inside++;
+          if (pose.lift > 0.25) raised++;
         }
+        expect(inside, JSON.stringify({ size, tunnel })).toBeGreaterThan(0);
+        expect(raised / inside, JSON.stringify({ size, tunnel })).toBeGreaterThan(0.5);
       }
     }
   });

@@ -14,6 +14,7 @@ export default {
       name: 'perf-expose-store',
       transform(code, id) {
         if (id.endsWith('/src/game/cubeState.js')) return `${code}\nwindow.__perfMakeCubies = makeCubies;\n`;
+        if (id.endsWith('/src/game/cubeRotation.js')) return `${code}\nwindow.__perfRotateSlice = rotateSliceCubies;\n`;
         if (id.endsWith('/src/game/manifoldLogic.js')) return `${code}\nwindow.__perfTopology = { buildManifoldGridMap, flipStickerPair };\n`;
         if (id.endsWith('/src/worm/wormExpansion.js')) return `${code}\nwindow.__wormExpansion = wormExpansion;\n`;
         // Ride probes: the bridge, the live sim and its context, and a way into a tunnel.

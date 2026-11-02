@@ -719,6 +719,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         // routes used to lose it off a phone's edge or behind the lens), and
         // tightens round it through the crossing close-up.
         tunnelState.rideHead = null;
+        tunnelState.lensLift = 0;
         const applyRidePose = (pose, alpha) => {
             // The cutaway keeps the crossing head visible, so frame the worm itself.
             if (closeUp > 0) pose.look.lerp(_closeUp.subject, closeUp);
@@ -729,6 +730,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             lookAtRef.current.copy(pose.cam).addScaledVector(_rideLook, pose.cam.distanceTo(pose.look));
             camUpRef.current.copy(camera.up);
             tunnelState.lensT = pose.lensT;
+            tunnelState.lensLift = pose.lift ?? 0;
             tunnelState.rideHead = _rideHead;
         };
 
@@ -972,7 +974,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
                 applyTunnelPose(transitionPose.current);
                 tunnelState.lensT = 0;
             } else {
-                tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
+                tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current, tunnelState.coreZoom);
                 // The dive itself is exact. Once it has landed on the rail, turn the
                 // lens as the rest of the ride does: on a long Mega arm the shoulder
                 // swung the bare rail six or seven degrees a frame.
@@ -991,8 +993,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             tunnelState.t = tHead;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
             tunnelState.tunnel = tunnel;
-            if (phase === 'exiting') tunnelExitPoseInto(_rails, tunnel, tp, size);
-            else tunnelCamPoseInto(_rails, tunnel, tHead, size);
+            // The live core zoom (VoidCore, last frame): the lens only rises
+            // off the route as far as the room and its openings have grown.
+            if (phase === 'exiting') tunnelExitPoseInto(_rails, tunnel, tp, size, tunnelState.coreZoom);
+            else tunnelCamPoseInto(_rails, tunnel, tHead, size, tunnelState.coreZoom);
             applyRidePose(_rails, 1 - Math.exp(-10 * delta));
         } else if (phase === 'windout') {
             const tunnel = worm.activeTunnel.current;

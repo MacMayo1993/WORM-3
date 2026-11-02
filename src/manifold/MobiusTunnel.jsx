@@ -1,5 +1,5 @@
 import { tunnelCoreClipUniforms } from './tunnelCoreClip.js';
-import { tunnelCameraUniforms } from './tunnelCameraClearance.js';
+import { tunnelCameraUniforms, tunnelCameraClearRadius } from './tunnelCameraClearance.js';
 import { vertexShader, fragmentShader, bumperVertexShader, bumperFragmentShader } from './mobiusTunnelShaders.js';
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
@@ -32,7 +32,7 @@ import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
 import { makeTunnelEnergyUniforms, tunnelEnergySeed } from './tunnelEnergy.js';
 import { tunnelRiderDockWidth } from '../utils/tunnelPath.js';
-import { coreOpeningBandWidth } from '../3d/corePassage.js';
+import { coreRiddenBandWidth } from '../3d/corePassage.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
 // highlighted; all other possible routes keep their normal idle brightness.
@@ -331,6 +331,8 @@ const MobiusTunnel = ({
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
     uCameraClearance: { value: 0 },
+    // 1 while this is the band being ridden: it carries on through the core's mirror room.
+    uRiddenCore:  { value: 0 },
     ...tunnelCameraUniforms,
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
@@ -356,6 +358,7 @@ const MobiusTunnel = ({
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
+    uRiddenCore: uniforms.uRiddenCore,
     ...tunnelCameraUniforms,
     uGrowT: uniforms.uGrowT,
     uTime: uniforms.uTime,
@@ -388,6 +391,7 @@ const MobiusTunnel = ({
     if (wormMode && tunnelState.active && _state.camera.getWorldDirection) {
       _state.camera.getWorldDirection(tunnelCameraUniforms.uCameraAhead.value);
       _state.camera.getWorldPosition(tunnelCameraUniforms.uTunnelCameraPosition.value);
+      tunnelCameraUniforms.uCameraClearRadius.value = tunnelCameraClearRadius(tunnelState.lensLift);
     }
     syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
@@ -395,6 +399,7 @@ const MobiusTunnel = ({
     // only fragments near the lens instead of removing whole alternate routes.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
+    uniforms.uRiddenCore.value = wormMode && tunnelState.active && tunnelState.activeTunnelId === tunnelId ? 1 : 0;
     const mirror = mirrored.current, root = rootRef.current;
     if (root && wormMode) {
       // Link the variants a ride draws the band with when it appears (with its
@@ -458,9 +463,10 @@ const MobiusTunnel = ({
 
     // Unoccupied bands follow the enlarged core. Occupied bands keep their route
     // until the last body segment clears; the one being ridden widens with the
-    // opening it dives into, so it fills the hole instead of entering as a sliver.
+    // opening it dives into, up to the track width it carries on at through the
+    // mirror room (coreRiddenBandWidth).
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = isActive && wormMode ? coreOpeningBandWidth(state.size, tunnelState.coreZoom ?? 1)
+    const dockW = isActive && wormMode ? coreRiddenBandWidth(state.size, tunnelState.coreZoom ?? 1)
       : occupied && wormMode ? tunnelRiderDockWidth(state.size) : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
