@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TRAMPOLINE } from './trampoline.js';
+import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 
 class SpringWire extends THREE.Curve {
     constructor(x, y) { super(); this.x = x; this.y = y; }
@@ -85,8 +86,15 @@ export function createTrampolineBatch(capacity) {
         },
         flush() {
             for (const mesh of meshes) {
-                mesh.instanceMatrix.needsUpdate = true;
-                for (const attr of ['bouncePress', 'bounceAlpha', 'bounceVariant']) mesh.geometry.attributes[attr].needsUpdate = true;
+                // Only the pads placed this frame: the pool holds one per tile.
+                const { attributes } = mesh.geometry;
+                uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
+                uploadInstancePrefix(attributes.bouncePress, mesh.count);
+                uploadInstancePrefix(attributes.bounceAlpha, mesh.count);
+                uploadInstancePrefix(attributes.bounceVariant, mesh.count);
+                // Empty, a pad part would still cost two program selections a pass
+                // (transparent and double-sided): hide it.
+                mesh.visible = mesh.count > 0;
             }
         },
         dispose() { for (const mesh of meshes) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose(); } },

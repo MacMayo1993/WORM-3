@@ -24,7 +24,8 @@ export default {
         if (id.endsWith('/src/3d/CubeAssembly.jsx')) return code.replace(/import gsap from ["']gsap["'];?/, m => `${m}\nwindow.__gsap = gsap;`);
         // Flip probes: the same flip a tap makes, without the pointer path.
         if (id.endsWith('/src/hooks/useCubeState.js')) return code.replace(/\n {2}return \{\n/, '\n  if (typeof window !== "undefined") window.__flipSticker = flipSticker;\n  return {\n');
-        if (id.endsWith('/src/worm/healerWorm/wormSim.js')) return `${code}\nwindow.__beginTunnelTransition = beginTunnelTransition; window.__startElemental = startElemental; window.__queueWormTurn = queueTurn; window.__stepWormSim = stepWormSim; window.__resetWormSim = resetWormSim;\n`;
+        // --tail: a long-body probe keeps the worm alive (window.__wormImmortal).
+        if (id.endsWith('/src/worm/healerWorm/wormSim.js')) return `${code.replace('export function killWormSim(sim, ctx, details = null) {', '$& if (window.__wormImmortal) return;')}\nwindow.__beginTunnelTransition = beginTunnelTransition; window.__startElemental = startElemental; window.__queueWormTurn = queueTurn; window.__stepWormSim = stepWormSim; window.__resetWormSim = resetWormSim;\n`;
         if (id.endsWith('/src/worm/useWormCrawler.js')) {
           return code.replace('const ctxRef = useRef(null);', 'const ctxRef = useRef(null); window.__wormSimRef = simRef; window.__wormCtxRef = ctxRef;');
         }

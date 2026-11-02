@@ -53,15 +53,20 @@ export function aimStudioRig(quaternion) {
  * draws this pass's shadows into a map and matrix of its own, swapped in for the
  * pass and swapped back after, so the main pass keeps exactly the map it drew.
  * This pass redraws its map on the frames the main pass redraws its own, so both
- * lag the same few frames, and on its first frame or after a frame it was not
- * drawn. Allocates nothing per frame.
+ * lag the same few frames, but at most every WINDOW_SHADOW_GAP frames (with
+ * shadows redrawn every frame, the window's own shadow pass drew the whole board's
+ * casters a second time each frame for a small panel), and always on its first
+ * frame or after a frame it was not drawn. Allocates nothing per frame.
  */
+/** The far-side window redraws its shadows at most this often, in frames. */
+export const WINDOW_SHADOW_GAP = 2;
+
 export function createStudioRigPass() {
   const ownMaps = [null, null, null], ownLights = [null, null, null];
   const ownMatrices = [new Matrix4(), new Matrix4(), new Matrix4()];
   const mainMaps = [null, null, null], mainMatrices = [new Matrix4(), new Matrix4(), new Matrix4()];
   const swapped = [null, null, null];
-  let stale = true;
+  let stale = true, frame = 0, drawnAt = -Infinity, heldAuto = null;
   const release = i => {
     ownMaps[i]?.dispose();
     ownMaps[i] = null;
@@ -75,7 +80,8 @@ export function createStudioRigPass() {
      */
     begin(renderer, quaternion, refresh) {
       aimStudioRig(quaternion);
-      let redraw = refresh || stale, casting = false;
+      frame++;
+      let redraw = stale || (refresh && frame - drawnAt >= WINDOW_SHADOW_GAP), casting = false;
       for (let i = 0; i < 3; i++) {
         const light = lights[i], shadow = light?.castShadow ? light.shadow : null;
         swapped[i] = shadow ? light : null;
@@ -97,10 +103,23 @@ export function createStudioRigPass() {
         shadow.map = ownMaps[i];
         shadow.matrix.copy(ownMatrices[i]);
       }
-      if (casting && redraw) renderer.shadowMap.needsUpdate = true;
+      if (!casting) return;
+      if (redraw) {
+        renderer.shadowMap.needsUpdate = true;
+        drawnAt = frame;
+      } else if (renderer.shadowMap.autoUpdate) {
+        // Shadows redraw on every render while autoUpdate is on: hold it off for
+        // this pass, which keeps sampling the map and matrix it drew last.
+        renderer.shadowMap.autoUpdate = false;
+        heldAuto = renderer;
+      }
     },
     /** Hand the main pass back its shadows and turn the rig back to `quaternion`. */
     end(quaternion) {
+      if (heldAuto) {
+        heldAuto.shadowMap.autoUpdate = true;
+        heldAuto = null;
+      }
       for (let i = 0; i < 3; i++) {
         const light = swapped[i];
         if (!light) continue;

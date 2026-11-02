@@ -13,6 +13,7 @@ import { fusionOf } from './elementalFusion.js';
 import { ELEMENTAL_PATCH_LIMIT } from './elementalGameplay.js';
 import { patchOpacity, patchVariant } from './elementalFeedback.js';
 import { patchVertex, shieldFragment } from './elementalPatchShaders.js';
+import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
 function patchMesh(geometry, fragmentShader) {
@@ -75,11 +76,14 @@ export function ElementalPatches({ worm, size }) {
           }
         }
         resources.pads.flush();
-        const mesh = resources.fire;
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.geometry.attributes.patchVariant.needsUpdate = true;
-        mesh.geometry.attributes.patchAlpha.needsUpdate = true;
-        mesh.geometry.attributes.patchCharge.needsUpdate = true;
+        // Only the patches drawn this frame (the pool holds ELEMENTAL_PATCH_LIMIT).
+        const mesh = resources.fire, { attributes } = mesh.geometry;
+        uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
+        uploadInstancePrefix(attributes.patchVariant, mesh.count);
+        uploadInstancePrefix(attributes.patchAlpha, mesh.count);
+        uploadInstancePrefix(attributes.patchCharge, mesh.count);
+        // Empty, it would still cost a program selection per pass: hide it.
+        mesh.visible = mesh.count > 0;
     });
     return <>{[resources.fire, ...resources.pads.meshes].map(mesh => <primitive key={mesh.uuid} object={mesh} />)}</>;
 }
