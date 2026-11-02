@@ -44,13 +44,14 @@ export function SignatureEffects({ worm, size }) {
         route: [],
         pose: new THREE.Object3D(), normal: new THREE.Vector3(), axis: new THREE.Vector3(),
     }), []);
+    const meshes = useMemo(() => [r.target, r.pulse, r.lock, r.pages, r.arc, r.ready], [r]);
     useEffect(() => () => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc, r.ready]) {
+        for (const mesh of meshes) {
             mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose();
         }
-    }, [r]);
-    useFrame(() => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc, r.ready]) mesh.count = 0;
+    }, [meshes]);
+    const draw = () => {
+        for (const mesh of meshes) mesh.count = 0;
         const sig = worm.signature.current;
         const state = useGameStore.getState();
         if (!state.wormAlive || worm.phase.current !== 'crawling'
@@ -157,6 +158,12 @@ export function SignatureEffects({ worm, size }) {
             for (let i = 0; i < 3; i++) place(r.pulse, tailTile,
                 reduced ? 1.4 + i * 0.8 : 0.7 + ((age * 1.8 + i) % 3), 0.12 + i * 0.02);
         }
+    };
+    useFrame(() => {
+        draw();
+        // An empty pool still costs three.js a program selection per pass (two for a
+        // transparent double-sided one), and the far-side window doubles the passes: hide it.
+        for (const mesh of meshes) mesh.visible = mesh.count > 0;
     });
-    return <>{[r.target, r.pulse, r.lock, r.pages, r.arc, r.ready].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
+    return <>{meshes.map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
 }

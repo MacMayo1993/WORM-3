@@ -120,6 +120,28 @@ describe('the far-side pass shadows', () => {
     pass.dispose();
   });
 
+  it('redraws the window\'s shadows every other frame when shadows redraw every frame, and the main pass\'s on each', () => {
+    const { lights, renderer, frame } = setup();
+    renderer.shadowMap.autoUpdate = true;
+    const pass = createStudioRigPass(), mainMap = lights[0].shadow.map;
+    const redrawn = [];
+    let mainDrawn = mainMap.drawnWith, farDrawn = null;
+    for (let i = 0; i < 6; i++) {
+      const { main, far } = frame(pass, false);
+      expect(main.map).toBe(mainMap);
+      expect(mainMap.drawnWith).not.toBe(mainDrawn);
+      mainDrawn = mainMap.drawnWith;
+      redrawn.push(far.map.drawnWith !== farDrawn);
+      farDrawn = far.map.drawnWith;
+      // A held frame samples the map and matrix the window drew last.
+      expect(near(far.map.drawnWith, far.matrix)).toBe(true);
+      expect(near(far.matrix, matrixFor(FAR))).toBe(true);
+      expect(renderer.shadowMap.autoUpdate).toBe(true);
+    }
+    expect(redrawn).toEqual([true, false, true, false, true, false]);
+    pass.dispose();
+  });
+
   it('keeps the main map out of the window pass when shadows redraw every frame too', () => {
     const { lights, renderer, frame } = setup();
     renderer.shadowMap.autoUpdate = true;

@@ -9,6 +9,8 @@
 //
 // Common flags: --url=http://localhost:5173/WORM-3/  --size=5  --mobile
 //               --throttle=4 (CDP CPU throttling)     --draw (keep real draw calls)
+//               --story=100 (a Story level instead of free play)
+//               --tail=180 (grow an immortal worm)  --farside=on|off (the far-side window)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -94,6 +96,35 @@ const click = async (re, timeout = 30000) => {
 await page.addInitScript(() => { if (!localStorage.getItem('worm3_mode_gate')) localStorage.setItem('worm3_mode_gate', 'gated'); });
 await page.goto(`${URL}${URL.includes('?') ? '&' : '?'}unlockall=1`, { waitUntil: 'load' });
 await page.getByRole('button', { name: /skip intro/i }).click({ timeout: 60000 });
+if (args.story) {
+  // --story=<id>: a Story level instead of free play. Story levels open by
+  // stars, not by ?unlockall=1, so give the save a star on every level before
+  // it; the main menu's Continue key then launches exactly this one.
+  const id = +args.story;
+  await page.evaluate(async (base) => {
+    if (window.__store) return;
+    window.__store = (await import(`${base}src/hooks/useGameStore.js`)).useGameStore;
+  }, new globalThis.URL(URL).pathname);
+  await page.evaluate((id) => window.__store.setState(s => {
+    const stars = { ...(s.playerProgress?.wormStory?.stars || {}) };
+    for (let level = 1; level < id; level++) stars[level] = Math.max(stars[level] || 0, 1);
+    delete stars[id];
+    return { playerProgress: { ...s.playerProgress, wormStory: { ...(s.playerProgress?.wormStory || {}), stars } } };
+  }), id);
+  await page.locator('.menu-key--continue').click({ timeout: 30000 });
+  // Mobi's briefing (skip it), then the mission card's Start key.
+  const until = Date.now() + 180000;
+  while (!(await page.evaluate(() => window.__store.getState().wormStoryStarted))) {
+    if (Date.now() > until) throw new Error(`Story level ${id} never started`);
+    const skip = page.locator('button:visible', { hasText: /^\s*skip\b/i }).first();
+    if (await skip.count()) await skip.click().catch(() => {});
+    const start = page.locator('button.worm-story-start:visible:not([disabled])').first();
+    if (await start.count()) await start.click().catch(() => {});
+    await page.waitForTimeout(500);
+  }
+  const level = await page.evaluate(() => window.__store.getState().wormStoryLevel);
+  if (level !== id) throw Error(`Requested Story level ${id}, launched ${level}`);
+} else {
 await click(/^\s*play\b/i);
 await click(/play worm/i);
 await page.getByRole('combobox', { name: 'Worm mode section', exact: true }).selectOption('free');
@@ -106,6 +137,7 @@ for (const category of ['Character', 'Scene', 'Colors', 'Style', 'Gameplay']) {
   }
   await wizard.locator('.mode-wizard-primary').click();
 }
+}
 // --style=eyeball (every face) or --style=eyeball,marble,… (faces 1–6, cycled):
 // the wizard has already applied its own styles, and the scramble's warm-up runs
 // after Mobi's skip, so this lands before anything is compiled for the run.
@@ -114,7 +146,7 @@ if (args.style) await page.evaluate((list) => {
   const manifoldStyles = Object.fromEntries([1, 2, 3, 4, 5, 6].map((face, i) => [face, styles[i % styles.length]]));
   window.__store.setState(s => ({ settings: { ...s.settings, manifoldStyles } }));
 }, args.style);
-await click(/^\s*skip\s*$/i); // Mobi's intro
+if (!args.story) await click(/^\s*skip\s*$/i); // Mobi's intro
 await page.evaluate(async (base) => {
   if (window.__store) return;
   window.__store = (await import(`${base}src/hooks/useGameStore.js`)).useGameStore;
@@ -166,6 +198,11 @@ if (args['probe-arrival']) {
   arrival.activeAt = Date.now();
   console.log(`arrival: hint shown ${arrival.hint}, tapped ${arrival.tapped}, spawning to active ${arrival.spawnAt ? arrival.activeAt - arrival.spawnAt : '?'} ms, steps ${(arrival.steps || []).join(' ')}`);
 }
+// --tail=N: a long body (the sim's tail set to N; the body fills in as it
+// crawls) on an immortal worm, since the runner cannot steer round itself.
+if (args.tail) await page.evaluate((n) => { window.__wormImmortal = true; const sim = window.__wormSimRef.current; sim.tailLength = n; sim.peakTailLength = n; }, +args.tail);
+// --farside=on|off: force the far-side window (a Story world may open it).
+if (args.farside) await page.evaluate((on) => window.__store.getState().setShowAntipodalPiP(on), args.farside !== 'off');
 if (args.freeze || MODE === 'batching' || MODE === 'events') await page.evaluate(() => window.__store.setState({ wormPaused: true }));
 const cdp = await context.newCDPSession(page);
 if (args.throttle) await cdp.send('Emulation.setCPUThrottlingRate', { rate: +args.throttle });

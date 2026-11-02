@@ -9,7 +9,7 @@ import { WORM_CAUTION_POLE_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../../game/rais
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import React, { useLayoutEffect, useRef } from 'react';
-import { ensureInstanceColor } from '../../3d/instanceUploads.js';
+import { ensureInstanceColor, uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
@@ -554,28 +554,21 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         voidFrames.count = frameIdx;
         motes.count = moteIdx;
 
-        // Re-upload only buffers that were written this frame — skips idle GPU uploads.
-        if (liveIdx > 0) {
-            liveMesh.instanceMatrix.needsUpdate = true;
-            if (liveMesh.instanceColor) liveMesh.instanceColor.needsUpdate = true;
-        }
-        if (voidIdx > 0) {
-            voidOuter.instanceMatrix.needsUpdate = true;
-            voidInner.instanceMatrix.needsUpdate = true;
-            maws.instanceMatrix.needsUpdate = true;
-        }
-        if (bubbleIdx > 0) bubbles.instanceMatrix.needsUpdate = true;
-        if (sparkIdx > 0) {
-            sparks.instanceMatrix.needsUpdate = true;
-            if (sparks.instanceColor) sparks.instanceColor.needsUpdate = true;
-        }
-        if (poleIdx > 0) poles.instanceMatrix.needsUpdate = true;
-        if (tapeIdx > 0) tapes.instanceMatrix.needsUpdate = true;
-        if (frameIdx > 0) voidFrames.instanceMatrix.needsUpdate = true;
-        if (moteIdx > 0) {
-            motes.instanceMatrix.needsUpdate = true;
-            if (motes.instanceColor) motes.instanceColor.needsUpdate = true;
-        }
+        // Upload only the slots written this frame: each pool is sized for every
+        // tile on the cube, and sending it whole was ~530 KB a frame on an 8×8.
+        uploadInstancePrefix(liveMesh.instanceMatrix, liveIdx);
+        uploadInstancePrefix(liveMesh.instanceColor, liveIdx);
+        uploadInstancePrefix(voidOuter.instanceMatrix, voidIdx);
+        uploadInstancePrefix(voidInner.instanceMatrix, voidIdx);
+        uploadInstancePrefix(maws.instanceMatrix, voidIdx);
+        uploadInstancePrefix(bubbles.instanceMatrix, bubbleIdx);
+        uploadInstancePrefix(sparks.instanceMatrix, sparkIdx);
+        uploadInstancePrefix(sparks.instanceColor, sparkIdx);
+        uploadInstancePrefix(poles.instanceMatrix, poleIdx);
+        uploadInstancePrefix(tapes.instanceMatrix, tapeIdx);
+        uploadInstancePrefix(voidFrames.instanceMatrix, frameIdx);
+        uploadInstancePrefix(motes.instanceMatrix, moteIdx);
+        uploadInstancePrefix(motes.instanceColor, moteIdx);
 
         clearedRef.current = allPositions.length === 0;
     });

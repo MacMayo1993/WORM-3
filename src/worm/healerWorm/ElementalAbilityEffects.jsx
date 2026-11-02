@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { ensureInstanceColor, uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos } from '../wormExpansion.js';
 import { readLiveTile } from '../wormHelpers.js';
@@ -17,6 +18,9 @@ function instances(geometry) {
     const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ transparent: true,
         opacity: 0.85, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }), CAPACITY);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; mesh.count = 0;
+    // Its colour buffer from the start: setColorAt's first call would switch the
+    // material to another program in the frame the first effect appears.
+    ensureInstanceColor(mesh);
     return mesh;
 }
 // Three bounded instance batches, lightning lines and one wind ribbon mesh. Gameplay
@@ -28,9 +32,10 @@ export function ElementalAbilityEffects({ worm, size }) {
         geometry.setDrawRange(0, 0);
         const bolts = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: '#e4caff', transparent: true, opacity: 0.9, toneMapped: false }));
         bolts.frustumCulled = false;
-        return { flames: instances(new THREE.ConeGeometry(0.1, 0.4, 5)),
-            buds: instances(new THREE.IcosahedronGeometry(0.11, 1)),
-            rings: instances(new THREE.RingGeometry(0.28, 0.32, 24)), bolts,
+        const flames = instances(new THREE.ConeGeometry(0.1, 0.4, 5)),
+            buds = instances(new THREE.IcosahedronGeometry(0.11, 1)),
+            rings = instances(new THREE.RingGeometry(0.28, 0.32, 24));
+        return { flames, buds, rings, pools: [flames, buds, rings], bolts,
             wind: createAirSlipstream(),
             pose: new THREE.Object3D(), color: new THREE.Color(), p: new THREE.Vector3(), n: new THREE.Vector3(),
             frame: new THREE.Quaternion(),
@@ -39,9 +44,8 @@ export function ElementalAbilityEffects({ worm, size }) {
     useEffect(() => () => {
         for (const mesh of [r.flames, r.buds, r.rings, r.bolts, r.wind.mesh]) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose?.(); }
     }, [r]);
-    useFrame(() => {
-        const meshes = [r.flames, r.buds, r.rings];
-        const previous = meshes.map(m => m.count);
+    const draw = () => {
+        const meshes = r.pools;
         for (const m of meshes) m.count = 0;
         r.bolts.geometry.setDrawRange(0, 0);
         r.wind.mesh.geometry.setDrawRange(0, 0);
@@ -168,7 +172,18 @@ export function ElementalAbilityEffects({ worm, size }) {
         }
         r.bolts.geometry.setDrawRange(0, lineCount);
         if (lineCount) positions.needsUpdate = true;
-        meshes.forEach((mesh, i) => { if (mesh.count || previous[i]) { mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; } });
+        for (const mesh of meshes) {
+            uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
+            uploadInstancePrefix(mesh.instanceColor, mesh.count);
+        }
+    };
+    useFrame(() => {
+        draw();
+        // An empty pool still costs three.js a program selection per pass (two for a
+        // transparent double-sided one), and the far-side window doubles the passes: hide it.
+        for (const mesh of r.pools) mesh.visible = mesh.count > 0;
+        r.bolts.visible = r.bolts.geometry.drawRange.count > 0;
+        r.wind.mesh.visible = r.wind.mesh.geometry.drawRange.count > 0;
     });
     return <group name="elemental-ability-feedback"><primitive object={r.flames} /><primitive object={r.buds} /><primitive object={r.rings} /><primitive object={r.bolts} /><primitive object={r.wind.mesh} /></group>;
 }

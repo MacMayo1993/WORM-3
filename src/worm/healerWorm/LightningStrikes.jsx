@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -60,7 +61,7 @@ export function LightningStrikes({ stormRef, worm, size }) {
         for (const mesh of meshes) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose(); }
     }, [meshes]);
 
-    useFrame(({ clock } = {}) => {
+    const draw = (clock) => {
         for (const mesh of meshes) mesh.count = 0;
         const storm = stormRef.current;
         const mouths = worm.chargedMouths?.();
@@ -125,9 +126,15 @@ export function LightningStrikes({ stormRef, worm, size }) {
             }
         }
         for (const mesh of meshes) {
-            mesh.instanceMatrix.needsUpdate = true;
-            mesh.instanceColor.needsUpdate = true;
+            uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
+            uploadInstancePrefix(mesh.instanceColor, mesh.count);
         }
+    };
+    useFrame(({ clock } = {}) => {
+        draw(clock);
+        // An empty pool still costs three.js a program selection per pass (two for a
+        // transparent double-sided one), and the far-side window doubles the passes: hide it.
+        for (const mesh of meshes) mesh.visible = mesh.count > 0;
     });
 
     return <group name="lightning-strikes">{meshes.map((mesh, i) => <primitive key={i} object={mesh} />)}</group>;
