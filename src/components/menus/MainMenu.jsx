@@ -695,6 +695,12 @@ const MENU_BUTTON_LIFT_PX = 24;
 const menuHeroDrop = (width, height) => Math.max(0, Math.min(
   height > width ? 64 : 24, (height - 600) * 0.28,
 ));
+// The wordmark and cube sit this much higher than the drop alone would put
+// them, so the cube's tumbling silhouette clears the Play key. Never more than
+// the drop itself: a short screen keeps the title clear of the top bar.
+const MENU_HERO_RAISE_PX = 8;
+const menuHeroRaise = (width, height) => Math.min(MENU_HERO_RAISE_PX, menuHeroDrop(width, height));
+const menuHeroTop = (width, height) => menuHeroDrop(width, height) - menuHeroRaise(width, height);
 const menuTitleSize = (width, height) => Math.max(74, Math.min(width * 0.21, height * 0.16, 170));
 const MENU_CUBE_ZOOM = 0.8 * MENU_CUBE_GROWTH;
 const MENU_REST_SCALE = 1.022 * MENU_CUBE_ZOOM;
@@ -1000,8 +1006,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     // the idle home pose; the carousel/dive paths above keep their own framing.
     const { width, height } = state.size;
     const landscape = width > height && height <= 600;
-    const heroTop = 80 + menuHeroDrop(width, height) + menuTitleSize(width, height) * 1.1 + 24;
-    const heroBottom = height - (landscape ? 16 : height > width ? 260 : 300);
+    // Both edges of the cube's band move up with the wordmark, so the cube
+    // rises by the same amount at the same size.
+    const heroTop = 80 + menuHeroTop(width, height) + menuTitleSize(width, height) * 1.1 + 24;
+    const heroBottom = height - (landscape ? 16 : height > width ? 260 : 300) - menuHeroRaise(width, height);
     const heroHeight = Math.max(64, heroBottom - heroTop);
     const homeScale = Math.min(1, heroHeight / (height * 4 / state.viewport.height));
     cubeRef.current.scale.setScalar(cubeCurrentScale.current * homeScale);
@@ -1604,7 +1612,7 @@ export const MenuTitleCard = ({ visible }) => {
   }, []);
   return <div className="worm-menu-title" style={{
     ...menuStyles.titleWrap,
-    top: menuHeroDrop(...viewport),
+    top: menuHeroTop(...viewport),
     '--menu-title-size': `${menuTitleSize(...viewport)}px`,
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0)' : 'translateY(-18px)',
