@@ -191,7 +191,11 @@
 @media(max-width:650px) {
   /* Phones: the category rail becomes a swipeable tab strip above the shelf. */
   .catalogue-layout { display:flex; flex-direction:column; }
-  .catalogue-sidebar { display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding:10px 12px; border-right:0; border-bottom:1px solid var(--paper-line); scrollbar-width:none; }
+  /* The strip keeps its full height (flex:none): as a shrinkable flex item the
+     long shelf below squeezed it to half a tab, and overflow-y:hidden cut the
+     tabs in two. The shelf takes what is left and scrolls. */
+  .catalogue-sidebar { flex:none; display:flex; gap:8px; overflow-x:auto; overflow-y:hidden; padding:10px 12px; border-right:0; border-bottom:1px solid var(--paper-line); scrollbar-width:none; }
+  .catalogue-selector { flex:1 1 auto; min-height:0; }
   .catalogue-sidebar::-webkit-scrollbar { display:none; }
   .catalogue-category { flex:0 0 auto; width:auto; min-height:48px; padding:8px 14px; border:2px solid #26372d33; border-radius:999px; background:#fffcf1; }
   .catalogue-category small, .catalogue-category::after { display:none !important; }
