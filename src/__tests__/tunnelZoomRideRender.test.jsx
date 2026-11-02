@@ -10,7 +10,7 @@ import { buildTunnelPathForTunnel, getTunnelWorldPosSmoothInto } from '../worm/w
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
 import { makeTunnelPath, tunnelPathTToArc, tunnelRiderDockWidth, tunnelGaugeAt, tunnelArmFractionAt } from '../utils/tunnelPath.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideSampleArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
-import { coreOpeningBandWidth } from '../3d/corePassage.js';
+import { coreRiddenBandWidth } from '../3d/corePassage.js';
 
 extend(THREE);
 
@@ -47,9 +47,10 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       const positions = ribbon.geometry.attributes.position;
       const segments = positions.count / 2 - 1;
       const ride = makeTunnelRideFrame(), actual = new THREE.Vector3(), expected = new THREE.Vector3();
-      // The ridden band widens with the swollen core's opening; a tail-occupied
-      // one keeps its tile width. Neither moves off the route.
-      const checkFloor = (dockWidth = coreOpeningBandWidth(size, tunnelState.coreZoom)) => {
+      // The ridden band widens with the swollen core's opening, up to the track
+      // width it runs on at through the mirror room; a tail-occupied one keeps
+      // its tile width. Neither moves off the route.
+      const checkFloor = (dockWidth = coreRiddenBandWidth(size, tunnelState.coreZoom)) => {
         let maxError = 0;
         for (let i = 0; i <= segments; i++) {
           const arc = tunnelRideSampleArc(path, i, segments);

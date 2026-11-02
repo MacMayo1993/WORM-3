@@ -13,6 +13,14 @@ export const coreOpeningRadius = (size, zoom = 1) => tunnelRiderDockWidth(size) 
 // hole (leaving a rim) instead of arriving as a sliver of the unzoomed tile, and
 // never narrows below its own tile's width. Width only — the route never moves.
 export const coreOpeningBandWidth = (size, zoom = 1) => Math.max(tunnelRiderDockWidth(size), coreOpeningRadius(size, zoom) * 2 * .85);
+// The band being ridden runs on through the mirror room as the track under the
+// worm, so it widens with the opening only up to a little more than the worm's
+// lane: at the full width of a 6x zoom's opening it was half a unit across, and
+// the raised ride lens, which corkscrews round the route more gently than the
+// band makes its half-twist, saw it edge-on as a sheet filling the frame.
+export const RIDDEN_TRACK_WIDTH = 0.18;
+export const coreRiddenBandWidth = (size, zoom = 1) =>
+  Math.min(Math.max(RIDDEN_TRACK_WIDTH, tunnelRiderDockWidth(size) * 1.5), coreOpeningBandWidth(size, zoom));
 export const CORE_MIRROR_HALF = TUNNEL_MINI_FACE_R * 0.9;
 // Maximum face extent after zooming about any dock. Outer throats are always
 // beyond the core; omit them and crop long shoulders to this bounded region.

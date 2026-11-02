@@ -16,7 +16,7 @@ import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { tunnelDockWidth } from '../utils/tunnelPath.js';
-import { coreOpeningBandWidth } from '../3d/corePassage.js';
+import { coreRiddenBandWidth } from '../3d/corePassage.js';
 import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/healerWorm/wormSim.js';
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 extend(THREE);
@@ -206,7 +206,7 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
   }
 });
 
-it('widens the ridden band to the core opening without moving its route', async () => {
+it('widens the ridden band toward the core opening, up to its track width, without moving its route', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), bridge = { ...tunnelState };
   useGameStore.setState({ wormHealerMode: true, demoMode: false, settings: { ...before.settings, reducedMotion: true } });
@@ -239,7 +239,7 @@ it('widens the ridden band to the core opening without moving its route', async 
     Object.assign(tunnelState, { active: true, activeTunnelId: 'a|b', coreZoom: 4, coreZoomAnchor: new THREE.Vector3(-.2125, 0, 0) });
     store.getState().advance(1 / 60);
     const ridden = read();
-    expect(ridden.crossing).toBeCloseTo(coreOpeningBandWidth(size, 4), 4);
+    expect(ridden.crossing).toBeCloseTo(coreRiddenBandWidth(size, 4), 4);
     ridden.mids.forEach((mid, i) => expect(mid.distanceTo(idle.mids[i])).toBeLessThan(1e-6));
   } finally {
     Object.assign(tunnelState, bridge);

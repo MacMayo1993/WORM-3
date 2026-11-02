@@ -20,7 +20,7 @@ npx vite build --config scripts/perf-worm/vite.perf.config.mjs     # → dist-pe
 npx vite preview --config scripts/perf-worm/vite.perf.config.mjs --port 4173
 ```
 
-That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed, and GSAP and the live rotation (`window.__gsap`, `window.__liveRotation`) so a probe can freeze a slice turn. It also exposes `window.__tunnelState`, the live worm sim and its context (`window.__wormSimRef`, `window.__wormCtxRef`) and `window.__beginTunnelTransition`, so a probe can start a real tunnel ride and film it, plus the live cubie meshes (`window.__liveCubies`) and the flip a tap makes (`window.__flipSticker(pos, dirKey)`), so a probe can find a tile on screen and flip it on a frozen clock. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
+That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed, and GSAP and the live rotation (`window.__gsap`, `window.__liveRotation`) so a probe can freeze a slice turn. It also exposes `window.__tunnelState`, the live worm sim and its context (`window.__wormSimRef`, `window.__wormCtxRef`) and `window.__beginTunnelTransition`, so a probe can start a real tunnel ride and film it, plus the live cubie meshes (`window.__liveCubies`) and the flip a tap makes (`window.__flipSticker(pos, dirKey)`), so a probe can find a tile on screen and flip it on a frozen clock, and a bare slice turn (`window.__perfRotateSlice`), so a probe can stage a scrambled board. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
 
 ## Modes
 
@@ -28,7 +28,8 @@ That config is the deploy config, unminified (so profiles keep function names) w
 
 ```bash
 CHROMIUM=/path/to/chrome node scripts/perf-worm/ride-camera.mjs --size=5 [--attrib] [--mobile] [--raw=frames.json] \
-  [--shots=dir --shot-list=windout:0.02,windout:0.6] [--profile=4000] [--longtasks]
+  [--shots=dir --shot-list=windout:0.02,windout:0.6 --dpr=0.5] [--tail=30 --crawl=12000] [--scramble=6] \
+  [--profile=4000] [--longtasks]
 ```
 
 Starts a real raised-pad ride once the run is live (so the scramble's own warm-up is not counted) and records every frame
@@ -36,7 +37,10 @@ of it: sim phase and progress, the lens pose, the head, the frame's CPU cost and
 largest per-frame lens move and turn, how far the head strays from the view axis, the worst frame and the links;
 `--attrib` names each link's owner and logs every `renderer.compile` over 5 ms with its caller; `--shots` freezes the ride
 at each `phase:progress` and films it with real draws (slow: the clock keeps running while SwiftShader renders, so a
-shot of a short phase can land later than its label); `--profile` takes a CPU profile of the crawl after the ride.
+shot of a short phase can land later than its label; `--dpr` sets the shots' pixel ratio); `--tail` grows an immortal worm
+and lets it crawl `--crawl` ms first, so a long body rides through the core; `--scramble` turns N seeded slices before
+the flip, so the route bends or skews through the core instead of running straight down a diameter; `--profile` takes a
+CPU profile of the crawl after the ride.
 
 ### Tunnel camera clearance regression
 
@@ -44,13 +48,15 @@ shot of a short phase can land later than its label); `--profile` takes a CPU pr
 CHROMIUM=/path/to/chrome node scripts/perf-worm/camera-clearance.mjs
 ```
 
-Runs the production clearance GLSL in WebGL without loading the game. Its 448
+Runs the production clearance GLSL in WebGL without loading the game. Its 628
 pixel checks cover every direction around the lens, four camera rolls, the
-forward corridor, distant track and adjacent routes, inactive rides, and mirror
-captures. Both opaque bands and the transparent veil are checked. The former
-below-camera exemption fails this regression; nearby floor fragments must clear
-even when the camera banks differently from the ribbon. This is a visibility
-test, not a GPU performance measurement.
+forward corridor, distant track and adjacent routes, inactive rides, mirror
+captures, the ridden band carrying on through the core's mirror room while every
+other band is cut away there, and the smaller capsule round a raised lens. Both
+opaque bands and the transparent veil are checked. The former below-camera
+exemption fails this regression; nearby floor fragments must clear even when the
+camera banks differently from the ribbon. This is a visibility test, not a GPU
+performance measurement.
 
 ### Performance modes
 

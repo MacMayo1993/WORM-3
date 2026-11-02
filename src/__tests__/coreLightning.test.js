@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning, coreLightningGLSL } from '../3d/coreLightning.js';
-import { coreOpeningBandWidth, coreOpeningRadius } from '../3d/corePassage.js';
+import { coreOpeningBandWidth, coreOpeningRadius, coreRiddenBandWidth, RIDDEN_TRACK_WIDTH } from '../3d/corePassage.js';
 import { tunnelCoreScale, tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { coreCubieMatrixInto, CORE_ZOOM_MAX } from '../3d/antipodalCore.js';
 
@@ -51,6 +51,21 @@ describe('core lightning seams', () => {
 });
 
 describe('the ridden band and the core opening', () => {
+  it('runs through the mirror room as a track a little wider than the lane, never wider than the opening', () => {
+    // At the full width of a swollen opening the ridden band was half a unit
+    // across in the mirror room and filled the raised lens edge-on.
+    for (const size of [2, 3, 5, 10, 15]) {
+      expect(coreRiddenBandWidth(size, 1)).toBeCloseTo(coreOpeningBandWidth(size, 1), 10);
+      for (let zoom = 1; zoom <= CORE_ZOOM_MAX; zoom += 0.25) {
+        const width = coreRiddenBandWidth(size, zoom);
+        expect(width).toBeLessThanOrEqual(coreOpeningBandWidth(size, zoom) + 1e-12);
+        expect(width).toBeGreaterThanOrEqual(tunnelRiderDockWidth(size));
+        expect(width).toBeLessThanOrEqual(Math.max(RIDDEN_TRACK_WIDTH, tunnelRiderDockWidth(size) * 1.5) + 1e-12);
+      }
+      expect(coreRiddenBandWidth(size, CORE_ZOOM_MAX)).toBeLessThan(0.3);
+    }
+  });
+
   it('fills the opening as the core swells, leaving a rim, and never narrows below its tile', () => {
     for (const size of [2, 3, 5, 10, 15]) {
       expect(coreOpeningBandWidth(size, 1)).toBeCloseTo(tunnelRiderDockWidth(size), 10);

@@ -1,5 +1,7 @@
 // Execute the production clearance GLSL in real WebGL, including the floor
-// hemisphere that used to be exempt. No game fixture or performance build needed.
+// hemisphere that used to be exempt, the ridden band carrying on through the
+// mirror room and the smaller capsule round a raised lens. No game fixture or
+// performance build needed.
 // CHROMIUM=/path/to/chrome node scripts/perf-worm/camera-clearance.mjs
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
@@ -9,7 +11,7 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
   resolveDir: fileURLToPath(new URL('../../', import.meta.url)),
   contents: `
     import * as THREE from 'three';
-    import { tunnelCameraClearanceGLSL, tunnelCameraUniforms } from './src/manifold/tunnelCameraClearance.js';
+    import { tunnelCameraClearanceGLSL, tunnelCameraUniforms, tunnelCameraClearRadius } from './src/manifold/tunnelCameraClearance.js';
     import { tunnelCoreClipUniforms } from './src/manifold/tunnelCoreClip.js';
     import { makeCautionOpeningUniforms } from './src/worm/healerWorm/cautionOpening.js';
     window.checkClearance = () => {
@@ -21,6 +23,7 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
       const uniforms = {
         ...tunnelCameraUniforms, ...tunnelCoreClipUniforms, ...makeCautionOpeningUniforms(),
         uCameraClearance: { value: 1 },
+        uRiddenCore: { value: 0 },
         point: { value: new THREE.Vector3() },
       };
       const shader = mode => new THREE.ShaderMaterial({ uniforms,
@@ -43,19 +46,24 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
       const local = (x, y, z) => new THREE.Vector3(x, y, z).applyQuaternion(camera.quaternion).add(camera.position);
       for (const mode of ['opaque', 'veil']) {
         quad.material.dispose(); quad.material = shader(mode);
-        // The occupied band must also disappear inside the mirror room, at
-        // every zoom and translated dock. The exterior approach stays intact.
+        // Every other band must disappear inside the mirror room, at every zoom
+        // and translated dock; the one being ridden runs on through it. The
+        // exterior approach stays intact either way.
         uniforms.uCameraClearance.value = 0;
-        for (const half of [.2, .6, 1.2]) {
-          uniforms.uTunnelCoreHalf.value = half;
-          uniforms.uTunnelCoreCenter.value.set(.7, -.4, .2);
-          const center = uniforms.uTunnelCoreCenter.value;
-          check('core center', center, false);
-          for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
-            check('inside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * .99), false);
-            check('outside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * 1.01), true);
+        for (const ridden of [0, 1]) {
+          uniforms.uRiddenCore.value = ridden;
+          for (const half of [.2, .6, 1.2]) {
+            uniforms.uTunnelCoreHalf.value = half;
+            uniforms.uTunnelCoreCenter.value.set(.7, -.4, .2);
+            const center = uniforms.uTunnelCoreCenter.value;
+            check('core center', center, !!ridden);
+            for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+              check('inside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * .99), !!ridden);
+              check('outside core face', center.clone().setComponent(axis, center.getComponent(axis) + sign * half * 1.01), true);
+            }
           }
         }
+        uniforms.uRiddenCore.value = 0;
         uniforms.uTunnelCoreHalf.value = 0;
         uniforms.uCameraClearance.value = 1;
         for (const bank of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
@@ -74,6 +82,13 @@ const bundle = await build({ bundle: true, write: false, format: 'iife', stdin: 
           check('band curling ahead', local(.12, -.12, -.65), false);
           check('distant track', local(0, -.12, -1), true);
           check('adjacent route', local(.65, -.1, -.3), true);
+          // A lens raised off the route clears only what would reach it: the
+          // band riding below stays, anything at the lens still goes.
+          uniforms.uCameraClearRadius.value = tunnelCameraClearRadius(.6);
+          check('band below a raised lens', local(0, -.25, -.05), true);
+          check('band ahead of a raised lens', local(.12, -.12, -.65), true);
+          check('band touching a raised lens', local(0, -.05, -.02), false);
+          uniforms.uCameraClearRadius.value = tunnelCameraClearRadius(0);
           // The mirror camera must see the same world-space cut as the rider.
           const cleared = local(0, -.2, -.1), intact = local(0, -.12, -1);
           camera.position.set(-3, 2, 4); camera.rotation.set(.8, 1.2, .5);

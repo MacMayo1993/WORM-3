@@ -37,13 +37,28 @@ try {
   }, +(args.size || 5));
   // Ride only once the run is live, so the scramble's own warm-up is not counted.
   await page.waitForFunction(() => window.__wormSimRef?.current && window.__store.getState().wormGamePhase === 'active', null, { timeout: 120000 });
-  await page.evaluate(() => {
+  if (args.tail) {
+    // --tail=N: a long, immortal worm crawls a while first (--crawl ms) so the
+    // ride carries a long body through the core.
+    await page.evaluate(n => {
+      window.__wormImmortal = true; const sim = window.__wormSimRef.current; sim.tailLength = n; sim.peakTailLength = n;
+      window.__store.setState({ wormStoryStarted: true, wormPaused: false, wormPowerups: [], wormSpecials: [] });
+    }, +args.tail);
+    await page.waitForTimeout(+args.crawl || 9000);
+  }
+  await page.evaluate(turns => {
     const store = window.__store, size = store.getState().size, sim = window.__wormSimRef.current, pos = sim.pos;
     const { buildManifoldGridMap, flipStickerPair } = window.__perfTopology;
     let cubies = window.__perfMakeCubies(size);
+    // --scramble=N: N seeded slice turns first, so the tile's partner is not its
+    // antipode and the route bends or skews through the core.
+    for (let i = 0; i < turns; i++) {
+      cubies = window.__perfRotateSlice(cubies, size, ['x', 'y', 'z'][Math.floor(Math.random() * 3)],
+        Math.floor(Math.random() * size), Math.random() < .5 ? 1 : -1);
+    }
     cubies = flipStickerPair(cubies, size, pos.x, pos.y, pos.z, pos.dirKey, buildManifoldGridMap(cubies, size));
     store.setState({ cubies, wormStoryStarted: true, wormPaused: true, wormPowerups: [], wormSpecials: [] });
-  });
+  }, +(args.scramble || 0));
   await page.waitForTimeout(2500);
   if (args.attrib) {
     await page.evaluate(`(${fs.readFileSync(path.join(root, 'scripts/perf-worm/inpage.js'), 'utf8')})()`);
@@ -88,7 +103,7 @@ try {
       await page.waitForFunction(([phase, p]) => {
         const sim = window.__wormSimRef.current; return sim.phase === phase && sim.tunnelProgress >= +p;
       }, [phase, progress], { timeout: 120000, polling: 'raf' });
-      await page.evaluate(() => { window.__store.setState({ wormPaused: true }); window.__perf.noDraw = false; window.__perf.roots.r3f.containerInfo.getState().setDpr(0.5); });
+      await page.evaluate(dpr => { window.__store.setState({ wormPaused: true }); window.__perf.noDraw = false; window.__perf.roots.r3f.containerInfo.getState().setDpr(dpr); }, +(args.dpr || 0.5));
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await page.screenshot({ path: path.join(args.shots, `${String(n).padStart(2, '0')}-${phase}-${progress}.png`), timeout: 240000 });
       await page.evaluate(() => { window.__perf.noDraw = true; window.__store.setState({ wormPaused: false }); });

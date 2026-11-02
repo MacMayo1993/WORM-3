@@ -19,7 +19,9 @@ it('keeps large same-face rides readable and bounds both aim and bank across fra
       const route = {entry: cell(reverse ? b : a), exit: cell(reverse ? a : b), padHeight: .2};
       const result = auditRide(15, route, aspect, fps);
       expect(result.worstFrame).toBeLessThan(.94);
-      expect(result.minCoreHeight).toBeGreaterThan(.045);
+      // The crossing no longer telephotos onto the head (it magnified the band
+      // and body under the raised lens into slabs), but the head stays legible.
+      expect(result.minCoreHeight).toBeGreaterThan(.025);
       expect(result.maxRotation * fps, JSON.stringify({fps,aspect,axis,reverse,result})).toBeLessThan(310);
     }
   }

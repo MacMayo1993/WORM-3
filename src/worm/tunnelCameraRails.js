@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelCameraFrameInto, tunnelRideWidthAt } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -16,11 +16,11 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto, tunnelRideWidthAt } from '.
 // start pose.
 
 import * as THREE from 'three';
-import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
-import { coreOpeningRadius } from '../3d/corePassage.js';
+import { coreZoomBoundsInto, coreZoomLimit, CORE_HALF, CORE_STICKER_OFFSET } from '../3d/antipodalCore.js';
+import { coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
-import { makeTunnelPath, tunnelDockWidth, tunnelRiderDockWidth, tunnelPathTToArc, tunnelPathArcToT, tunnelPathArcPointExtendedInto,
-  ARM_A_END, tunnelTraversalT } from '../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcToT, tunnelPathArcPointExtendedInto,
+  ARM_A_END, tunnelTraversalT, tunnelCoreScale } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
 //
@@ -150,15 +150,233 @@ export function cameraArcForHead(path, tHead, size) {
   return headArc - Math.max(0, smoothMin(trail, 0.18 + headArc * 0.5));
 }
 
+// ── Through the core ─────────────────────────────────────────────────────────
+// The lens used to drop onto the worm's own centreline for the whole core
+// crossing, because both core walls are solid apart from the bore round the
+// route. On that line it sat inside the body it trails, so the cull that keeps
+// beads out of the lens hid most of the tail, and the band (which then had to
+// be cut away in the mirror room, or it filled the lens) vanished with it.
+//
+// Now the lens keeps a raised chase shot the whole way. It comes down only to
+// pass through each wall, and then only as far as the wall's opening needs: it
+// crosses at CORE_BORE_LIFT of the opening's radius above the route, and while
+// the head is on the far side of a wall it holds the line of sight to the head
+// inside that opening. Inside the mirror room it rises again, toward the room's
+// interior (corner routes graze a side wall) and never closer to a mirror than
+// CORE_ROOM_MARGIN. Same-face returns keep their own out-of-plane shot.
+
+/** Share of the opening's radius the lens may sit off the route at a core wall. */
+export const CORE_BORE_LIFT = 0.7;
+/** How high the lens rides inside the mirror room, as a share of the room's half-width (and at most TUNNEL_CAM_UP). */
+export const CORE_ROOM_LIFT = 0.55;
+/** Nearest the lens comes to a mirror wall (its sight corridor opens anything
+ *  closer), unless the route itself runs nearer and the lens is no nearer than it. */
+export const CORE_ROOM_MARGIN = 0.1;
+// How fast the lens climbs away from a wall, per unit of distance from it,
+// reached over WALL_EASE so the climb never jolts the lens's pace.
+const WALL_CLIMB = 1.1;
+const WALL_EASE = 0.35;
+const climb = x => WALL_CLIMB * (x <= 0 ? 0 : x < WALL_EASE ? x * x / (2 * WALL_EASE) : x - WALL_EASE / 2);
+// Blend width of the smooth minimum between the lift limits.
+const LIFT_BLEND = 0.12;
+const smin = (a, b, k = LIFT_BLEND) => {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - h * h * k * 0.25;
+};
+
+const _room = {
+  zoom: 1, center: new THREE.Vector3(), half: 0, shell: 0, bore: 0, boreLift: 0, active: false,
+  // Where the route passes through the entry and exit mirrors, and the exit wall's outward normal.
+  entryPoint: new THREE.Vector3(), exitPoint: new THREE.Vector3(), exitNormal: new THREE.Vector3(),
+  exitCrossing: new THREE.Vector3(),
+};
+const _roomRel = new THREE.Vector3();
+const _roomProbe = new THREE.Vector3();
+
+const boxAxisMax = v => Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
+
+/**
+ * The mirror room at `zoom`: VoidCore grows the core about the entry dock, so
+ * the room is centred at dock·(1 − zoom) with half-width CORE_MIRROR_HALF·zoom,
+ * inside a shell CORE_HALF·zoom (plus the stickers) across. The route enters
+ * through the wall at the dock and leaves through whichever wall it crosses on
+ * the way out, found by bisection from the cube's centre, which every zoom keeps
+ * inside the room.
+ */
+function coreRoomInto(room, path, size, zoom) {
+  room.zoom = zoom;
+  room.center.copy(path.midA).multiplyScalar(1 - zoom);
+  room.half = CORE_MIRROR_HALF * zoom;
+  room.shell = (CORE_HALF + tunnelCoreScale(size) * (CORE_STICKER_OFFSET - 0.5)) * zoom;
+  room.bore = coreOpeningRadius(size, zoom);
+  // A same-face return leaves through the wall it entered by, and has its own shot.
+  room.active = path.nStart.dot(path.nEnd) <= 0.95;
+  if (!room.active) return room;
+  // The route meets the entry wall square on at its dock.
+  room.entryPoint.copy(path.midA).addScaledVector(path.nStart, room.half - _roomRel.subVectors(path.midA, room.center).dot(path.nStart));
+  let lo = path.legArc0[3], hi = path.total;
+  for (let i = 0; i < 22; i++) {
+    const mid = (lo + hi) / 2;
+    cameraArcPointInto(_roomProbe, path, mid);
+    if (boxAxisMax(_roomRel.subVectors(_roomProbe, room.center)) < room.half) lo = mid;
+    else hi = mid;
+  }
+  cameraArcPointInto(room.exitPoint, path, hi);
+  // An oblique crossing slices the opening wider than the lens's offset from
+  // the route, by 1 / cos of its angle to the wall: offset that much less.
+  cameraArcPointInto(_roomProbe, path, lo);
+  const crossing = room.exitCrossing.subVectors(_roomProbe, room.exitPoint).normalize();
+  _roomRel.subVectors(room.exitPoint, room.center);
+  const ax = Math.abs(_roomRel.x), ay = Math.abs(_roomRel.y), az = Math.abs(_roomRel.z);
+  room.exitNormal.set(0, 0, 0);
+  if (ax >= ay && ax >= az) room.exitNormal.x = Math.sign(_roomRel.x);
+  else if (ay >= az) room.exitNormal.y = Math.sign(_roomRel.y);
+  else room.exitNormal.z = Math.sign(_roomRel.z);
+  const cos = Math.abs(crossing.dot(room.exitNormal));
+  room.boreLift = CORE_BORE_LIFT * room.bore * (cos > 1e-3 ? Math.min(1, cos) : 1);
+  return room;
+}
+
+/** Signed distance from `point` to the cube of half-width `half` about the room's centre. */
+function roomBoxDistance(point, half) {
+  _roomRel.subVectors(point, _room.center);
+  const qx = Math.abs(_roomRel.x) - half, qy = Math.abs(_roomRel.y) - half, qz = Math.abs(_roomRel.z) - half;
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0);
+}
+/** How far inside the mirror of the wall with outward `normal` a room point lies. */
+const wallDepth = (point, normal) => _room.half - _roomRel.subVectors(point, _room.center).dot(normal);
+/** How far a room point is from either opening the route passes through. */
+const openingDistance = point => Math.min(point.distanceTo(_room.entryPoint), point.distanceTo(_room.exitPoint));
+
+/**
+ * The most the lens may sit off the route point `point` for the core's walls:
+ * CORE_BORE_LIFT of the opening while the point is in a wall, climbing with
+ * distance from the core outside it and from the crossed walls inside the room,
+ * and, while the head is on the other side of a wall, no more than keeps the
+ * line of sight to it inside that wall's opening.
+ */
+function coreLiftLimit(point, head) {
+  const bore = _room.boreLift;
+  const out = roomBoxDistance(point, _room.shell), inRoom = -roomBoxDistance(point, _room.half);
+  const headOut = roomBoxDistance(head, _room.shell), headIn = -roomBoxDistance(head, _room.half);
+  if (out > 0) {
+    let limit = bore + climb(out);
+    // Approaching the entry wall with the head already through it.
+    const far = headIn > 0 ? wallDepth(head, _camPath.nStart) : 0;
+    if (far > 1e-4) limit = smin(limit, bore * (out + far) / far);
+    return limit;
+  }
+  if (inRoom > 0) {
+    // Away from the openings the mirrors themselves bound the lens (roomLiftInto).
+    let limit = bore + climb(openingDistance(point));
+    // Leaving through the exit wall behind a head that is already out.
+    if (headOut > 1e-4) limit = smin(limit, bore * (Math.max(0, wallDepth(point, _room.exitNormal)) + headOut) / headOut);
+    return limit;
+  }
+  return bore;
+}
+
+// Below this zoom the core is still its own small self (reduced motion keeps it
+// there): no room to ride in, so the lens keeps to the carved centreline.
+const ROOM_ZOOM_FROM = 1.15;
+const ROOM_ZOOM_FULL = 1.6;
+
 function cameraRideHeight(point, arc, tHead, size) {
   const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
-  // Follow the exact carved centerline through BOTH core holes. Ease out of the
-  // elevated chase view before reaching any position the zoomed core can occupy.
-  // Using its complete zoom envelope avoids a frame of clipping when VoidCore
-  // grows after the camera update, and keeps the shot still as the zoom recedes.
-  const coreClearance = THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(point), 0.2, 1);
   const insideShell = THREE.MathUtils.smoothstep(size / 2 + .03 - Math.max(Math.abs(point.x), Math.abs(point.y), Math.abs(point.z)), .1, .6);
-  return cameraUpForHead(tHead) * mouthClearance * coreClearance * insideShell;
+  const chase = cameraUpForHead(tHead) * mouthClearance * insideShell;
+  // Follow the exact carved centerline through BOTH core holes, easing out of
+  // the elevated view before any position the zoomed core can occupy (its
+  // complete zoom envelope, so the shot holds still while the zoom moves).
+  // Same-face returns keep this: their offset shot supplies the clearance.
+  const centreline = chase * THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(point), 0.2, 1);
+  const grown = _room.active ? THREE.MathUtils.smoothstep(_room.zoom, ROOM_ZOOM_FROM, ROOM_ZOOM_FULL) : 0;
+  if (grown <= 0) return centreline;
+  // In the room the ride is still going: the head nearing its exit mouth only
+  // lowers the lens once the lens itself has left the room.
+  const roomShare = THREE.MathUtils.smoothstep(-roomBoxDistance(point, _room.half), 0, 0.2);
+  const rideUp = THREE.MathUtils.lerp(cameraUpForHead(tHead), TUNNEL_CAM_UP * THREE.MathUtils.smoothstep(tHead, 0.04, 0.16), roomShare);
+  let limit = coreLiftLimit(point, _headPoint);
+  // In the room, no higher than its share of the half-width.
+  if (roomBoxDistance(point, _room.shell) < 0) limit = smin(limit, Math.max(_room.boreLift, CORE_ROOM_LIFT * _room.half));
+  const raised = Math.max(0, smin(rideUp * mouthClearance * insideShell, limit));
+  return THREE.MathUtils.lerp(centreline, raised, grown);
+}
+
+const _clearRel = new THREE.Vector3();
+const _clearAxis = new THREE.Vector3();
+const _clearRoute = new THREE.Vector3();
+/** Whether the route bored through the wall at `point` (outward `normal`) passes near enough to it. */
+function throughOpening(point, normal, opening, along, wallNormal) {
+  if (normal.dot(wallNormal) < 0.5) return false;
+  const across = along.dot(normal);
+  if (Math.abs(across) < 1e-4) return false;
+  _clearRoute.copy(opening).addScaledVector(along, _clearRel.subVectors(point, opening).dot(normal) / across);
+  return point.distanceTo(_clearRoute) < 0.85 * _room.bore;
+}
+const ENTRY_ALONG = new THREE.Vector3();
+/**
+ * Whether a lens at `point` is clear of the core's plastic: outside the core,
+ * inside the mirror room (CORE_ROOM_MARGIN from its mirrors, or no nearer to
+ * them than the route point `from` it rises off: routes skim the ceiling), or
+ * in a wall only where the route's opening passes through it. The shell's
+ * cutout slices each wall in the plane of its own axis, so this one does too.
+ */
+function lensClearOfCore(point, from) {
+  _clearRel.subVectors(point, _room.center);
+  const ax = Math.abs(_clearRel.x), ay = Math.abs(_clearRel.y), az = Math.abs(_clearRel.z);
+  const extent = Math.max(ax, ay, az);
+  if (extent >= _room.shell + 0.01 || extent <= _room.half - CORE_ROOM_MARGIN) return true;
+  if (extent < _room.half && extent <= boxAxisMax(_roomRel.subVectors(from, _room.center)) + 1e-3) return true;
+  _clearAxis.set(0, 0, 0);
+  if (ax >= ay && ax >= az) _clearAxis.x = Math.sign(_clearRel.x);
+  else if (ay >= az) _clearAxis.y = Math.sign(_clearRel.y);
+  else _clearAxis.z = Math.sign(_clearRel.z);
+  ENTRY_ALONG.copy(_camPath.nStart).negate();
+  return throughOpening(point, _clearAxis, _room.entryPoint, ENTRY_ALONG, _camPath.nStart)
+    || throughOpening(point, _clearAxis, _room.exitPoint, _room.exitCrossing, _room.exitNormal);
+}
+
+const _roomPull = new THREE.Vector3();
+const _roomUp = new THREE.Vector3();
+const _lensProbe = new THREE.Vector3();
+const LENS_SEARCH_STEP = 0.03;
+/**
+ * Inside the room the lift leans toward its interior: a corner tile's route
+ * runs a few hundredths from a side wall, and straight "up" from it can point
+ * into that wall. It never leans below the band, which would hide the worm.
+ * Turns `dir` (the band's up) into a unit direction and returns the most lift
+ * along it for which the lens, and everything between it and the route, stays
+ * clear of the core's plastic (Infinity for a route away from the core).
+ */
+function roomLiftInto(dir, point, tangent, reach = TUNNEL_CAM_UP) {
+  if (!_room.active) return Infinity;
+  const depth = _room.half - boxAxisMax(_roomRel.subVectors(point, _room.center));
+  if (depth > 0) {
+    _roomUp.copy(dir).normalize();
+    // Gentle only near the openings, where the lens is still low; a route that
+    // skims a mirror the whole way across still leans away from it.
+    const inside = THREE.MathUtils.smoothstep(openingDistance(point), 0, 0.3);
+    _roomPull.subVectors(_room.center, point);
+    _roomPull.addScaledVector(tangent, -_roomPull.dot(tangent)).multiplyScalar(1.2 * inside / Math.max(_room.half, 1e-6));
+    dir.copy(_roomUp).add(_roomPull);
+    const length = dir.length(), along = dir.dot(_roomUp);
+    if (along < 0.35 * length) dir.addScaledVector(_roomUp, 0.35 * length - along);
+    dir.normalize();
+  }
+  if (roomBoxDistance(point, _room.shell) > reach + 0.02) return Infinity;
+  // March out from the route; the first blocked step, refined, is the limit.
+  let clear = 0;
+  for (let lift = LENS_SEARCH_STEP; lift <= reach + 1e-6; lift += LENS_SEARCH_STEP) {
+    if (lensClearOfCore(_lensProbe.copy(point).addScaledVector(dir, lift), point)) { clear = lift; continue; }
+    let lo = clear, hi = lift;
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      if (lensClearOfCore(_lensProbe.copy(point).addScaledVector(dir, mid), point)) lo = mid; else hi = mid;
+    }
+    return lo;
+  }
+  return Infinity;
 }
 
 const _cameraLift = new THREE.Vector3();
@@ -182,6 +400,19 @@ function cameraLiftInto(out, up, tHead) {
   // the transported frame bends. Release that constraint beyond the entry arm.
   return out.copy(up).addScaledVector(_camPath.nStart,
     -up.dot(_camPath.nStart) * (1 - THREE.MathUtils.smoothstep(tHead, ARM_A_END, ARM_A_END + .08)));
+}
+
+/**
+ * The lens's offset from the route point `point` (at `arc`): writes its
+ * direction into `dir`, from the band's `up` and the route's `tangent`, and
+ * returns how far along it the lens sits. Shared by the ride and the dive so the
+ * dive lands exactly on the rail.
+ */
+function rideLiftInto(dir, point, arc, tHead, size, up, tangent) {
+  cameraLiftInto(dir, up, tHead);
+  const height = cameraRideHeight(point, arc, tHead, size);
+  if (height <= 0) return 0;
+  return Math.max(0, smin(height, roomLiftInto(dir, point, tangent)));
 }
 
 // How far apart the two samples used to differentiate the route are, in world
@@ -224,11 +455,14 @@ const _rideFrame = makeTunnelRideFrame();
  * @param {Object} tunnel  active tunnel descriptor (entry/exit tiles)
  * @param {number} tHead   0→1 position of the worm's head along the traversal
  * @param {number} size    cube size
+ * @param {number} [zoom]  the core's live zoom (VoidCore's tunnelState.coreZoom);
+ *                         the ride's full zoom when omitted
  * @returns {typeof out}
  */
-export function tunnelCamPoseInto(out, tunnel, tHead, size) {
+export function tunnelCamPoseInto(out, tunnel, tHead, size, zoom = null) {
   buildTunnelPathForTunnel(_camPath, tunnel, size);
   coreZoomBoundsInto(_coreBounds, _camPath.midA, size);
+  coreRoomInto(_room, _camPath, size, zoom ?? coreZoomLimit(_camPath.midA, size));
   const camArc = cameraArcForHead(_camPath, tHead, size);
   out.lensT = tunnelPathArcToT(_camPath, camArc);
 
@@ -266,12 +500,14 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
 
   // Clear the worm's back once inside, then look slightly down at the track.
   // A parallel raised aim left the core and worm at the bottom of a phone view.
-  const rideHeight = cameraRideHeight(out.cam, camArc, tHead, size);
-  cameraLiftInto(_cameraLift, out.up, tHead);
+  // Through the core the lift leans toward the mirror room's interior and stays
+  // clear of its walls (see "Through the core" above).
+  const rideHeight = rideLiftInto(_cameraLift, out.cam, camArc, tHead, size, out.up, out.tangent);
+  out.lift = rideHeight;
   out.cam.addScaledVector(_cameraLift, rideHeight);
   out.look.add(out.cam).addScaledVector(_cameraLift, -rideHeight * 0.75);
-  // From the farther, elevated approach keep looking down the track. Lock to
-  // the head once the lens has lowered onto the route through the core holes.
+  // From the raised lens keep looking down the track (rideFraming holds the
+  // head in frame). Lock to the head while the lens is low in a core opening.
   const followHead = (1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5))
     * (1 - THREE.MathUtils.smoothstep(rideHeight, 0, .15));
   out.look.lerp(_headPoint, followHead);
@@ -280,6 +516,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   // cannot keep a head that crosses the lens in view. Both mouths stay axial.
   if (_camPath.nStart.dot(_camPath.nEnd) > 0.95) {
     out.cam.add(returnCameraOffsetInto(_returnSide, _camPath, tHead, camArc, out.cam, size));
+    out.lift = Math.max(out.lift, _returnSide.length());
     out.look.copy(_headPoint);
     // A return has no stable tangent-defined horizon at the U-turn. Use the
     // mouths' separation as its screen-up reference; it stays transverse to
@@ -298,7 +535,9 @@ export const makeTunnelCamPose = () => ({
   // Where the LENS is along the route, in the head's traversal t (0 at the
   // entry mouth, 0.5 at the centre). The lens trails the head by most of a
   // cubie, so beats the player should see happen when the lens gets there.
-  lensT: 0
+  lensT: 0,
+  // How far the lens sits off the route (the band clears less round a raised lens).
+  lift: 0
 });
 
 const _poseMatrix = new THREE.Matrix4();
@@ -332,6 +571,7 @@ const _entryRide = makeTunnelCamPose();
 const _entryStart = makeTunnelCamPose();
 const _entryRideUp = new THREE.Vector3();
 const _entryLateral = new THREE.Vector3();
+const _entryTangent = new THREE.Vector3();
 const _rollAxis = new THREE.Vector3();
 const _rollA = new THREE.Vector3();
 const _rollB = new THREE.Vector3();
@@ -358,12 +598,12 @@ function rollBetween(from, to) {
 const ENTRY_ROLL_START = 0.12;
 
 /** Dive along route distance, so corner-tile tunnels use their own opening too. */
-export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
+export function tunnelEntryPoseInto(out, tunnel, progress, size, from, zoom = null) {
   const p = THREE.MathUtils.clamp(progress, 0, 1);
   const tHead = tunnelTraversalT('entering', p);
-  tunnelCamPoseInto(_entryStart, tunnel, tunnelTraversalT('entering', 0), size);
+  tunnelCamPoseInto(_entryStart, tunnel, tunnelTraversalT('entering', 0), size, zoom);
   const settle = rollBetween(from, _entryStart);
-  tunnelCamPoseInto(_entryRide, tunnel, tHead, size);
+  tunnelCamPoseInto(_entryRide, tunnel, tHead, size, zoom);
   // Position lift follows the transported rail, independently of shot banking.
   _entryRideUp.copy(_rideFrame.normal);
   const remaining = settle * (1 - THREE.MathUtils.smoothstep(p, ENTRY_ROLL_START, 1));
@@ -381,8 +621,12 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   // Centre on the mouth over the whole descent, so an offset approach (the
   // raised pad's shot sits behind the heading) never slides in at the last moment.
   out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height)));
-  out.cam.addScaledVector(cameraLiftInto(_cameraLift, _entryRideUp, tHead), cameraRideHeight(out.cam, arc, tHead, size) * blend);
+  cameraArcPointInto(_entryTangent, _camPath, arc + TANGENT_EPS).sub(out.cam);
+  if (_entryTangent.lengthSq() < 1e-12) _entryTangent.copy(_camPath.nStart).negate();
+  out.lift = rideLiftInto(_cameraLift, out.cam, arc, tHead, size, _entryRideUp, _entryTangent.normalize()) * blend;
+  out.cam.addScaledVector(_cameraLift, out.lift);
   out.cam.addScaledVector(returnCameraOffsetInto(_returnSide, _camPath, tHead, arc, out.cam, size), blend);
+  out.lift = Math.max(out.lift, _returnSide.length() * blend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
 }
@@ -397,16 +641,22 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
  * room in the mouth to fly a lens round the worm, and climbing past it lost the
  * worm from the shot for a quarter of a second while it looked at the sky.
  */
-export function tunnelExitPoseInto(out, tunnel, progress, size) {
-  return tunnelCamPoseInto(out, tunnel, tunnelTraversalT('exiting', THREE.MathUtils.clamp(progress, 0, 1)), size);
+export function tunnelExitPoseInto(out, tunnel, progress, size, zoom = null) {
+  return tunnelCamPoseInto(out, tunnel, tunnelTraversalT('exiting', THREE.MathUtils.clamp(progress, 0, 1)), size, zoom);
 }
 
 // ── Crossing close-up ────────────────────────────────────────────────────────
-// Frame the crossing head while the lens trails the entry dock. The active
-// lane has a physical minimum gauge and corePassage opens a bounded line of
-// sight, so the shot can follow the worm through bends. Its FOV targets an 8%
-// tall head, bounded by the opening composition and a 30-degree minimum lens.
-// Release before the lens reaches the dock to rejoin the broad tunnel view.
+// Frame the crossing head while the lens trails the entry dock: aim at it, and
+// narrow the lens until the entry opening fills CROSSING_FILL of the frame's
+// narrower half (corePassage opens a bounded line of sight to the head, so the
+// shot can follow the worm through bends). Release before the lens reaches the
+// dock to rejoin the broad tunnel view.
+//
+// It used to narrow further, to a 30-degree telephoto holding the thin in-core
+// head at 8% of the frame height. That suited the old lens on the worm's own
+// centreline peering down the hole, but from the raised lens (see "Through the
+// core") it magnified the band and the body under the lens into slabs and read
+// as a camera jammed up against the tail. The worm is in view without it.
 // The opening's radius as a share of the frame's narrower half-extent.
 export const CROSSING_FILL = 0.75;
 // Never narrower than this (a telephoto magnifies every wobble of the rail).
@@ -417,7 +667,7 @@ const CLOSE_UP_LEAD = 0.3;
 const CLOSE_UP_RELEASE = 0.35;
 const _closePose = makeTunnelCamPose();
 
-export const makeCrossingCloseUp = () => ({ weight: 0, center: new THREE.Vector3(), subject: new THREE.Vector3(), radius: 0, distance: 1, headRadius: 0, headDistance: 1 });
+export const makeCrossingCloseUp = () => ({ weight: 0, center: new THREE.Vector3(), subject: new THREE.Vector3(), radius: 0, distance: 1 });
 
 /**
  * The crossing close-up for the head at `tHead`: `weight` 0–1, and the entry
@@ -434,10 +684,8 @@ export function crossingCloseUpInto(out, tunnel, tHead, size, zoom = 1) {
   out.center.copy(_camPath.midA);
   out.radius = coreOpeningRadius(size, zoom);
   tunnelPathArcPointExtendedInto(out.subject, _camPath, headArc);
-  tunnelCamPoseInto(_closePose, tunnel, tHead, size);
+  tunnelCamPoseInto(_closePose, tunnel, tHead, size, zoom);
   out.distance = _closePose.cam.distanceTo(out.center);
-  out.headDistance = _closePose.cam.distanceTo(out.subject);
-  out.headRadius = 0.19 * tunnelRideWidthAt(_camPath, headArc, tunnelRiderDockWidth(size));
   return out;
 }
 
@@ -448,9 +696,6 @@ export function crossingCloseUpInto(out, tunnel, tHead, size, zoom = 1) {
  */
 export function crossingFov(closeUp, aspect, widest) {
   const tanNarrow = closeUp.radius / (CROSSING_FILL * Math.max(closeUp.distance, 1e-3));
-  // Aim for an 8% tall head, even when the enlarged core's aperture is much
-  // wider than the body. Keep the old porthole bound as a second composition.
-  const subjectTan = closeUp.headRadius > 0 ? closeUp.headRadius / (0.08 * Math.max(closeUp.headDistance, 1e-3)) : Infinity;
-  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.min(tanNarrow / Math.min(1, aspect), subjectTan)));
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanNarrow / Math.min(1, aspect)));
   return THREE.MathUtils.clamp(fov, CROSSING_FOV_MIN, widest);
 }
