@@ -48,6 +48,20 @@ let _diveState = null;
 export const setModeDiveState = (state) => { _diveState = state; };
 export const getModeDiveState = () => _diveState;
 
+// What the carousel's paper needs from the rest of the screen, published by
+// its owners each frame or change and read by MenuPaperBackdrop: the presented
+// mode's look ({ face, color, locked }) from the carousel, and where the cube
+// is ({ x, y, z, radius } in world space) from the cube.
+let _theme = null;
+export const setCarouselTheme = (theme) => { _theme = theme; };
+export const getCarouselTheme = () => _theme;
+const _cubeFrame = { x: 0, y: 0, z: 0, radius: 0, live: false };
+export const setCarouselCubeFrame = (x, y, z, radius) => {
+  _cubeFrame.x = x; _cubeFrame.y = y; _cubeFrame.z = z; _cubeFrame.radius = radius; _cubeFrame.live = true;
+};
+export const clearCarouselCubeFrame = () => { _cubeFrame.live = false; };
+export const getCarouselCubeFrame = () => _cubeFrame;
+
 // ─── Cube stage ───────────────────────────────────────────────────────────────
 // The measured viewport rectangle of the transparent DOM stage. The cube uses
 // this to stay centered and in bounds as controls, disclosures or screens resize.

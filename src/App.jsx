@@ -223,7 +223,7 @@ function MenuScene({ onCubeClick, background }) {
         />
       </Suspense>
       <Suspense fallback={null}>
-        {carouselActive && <MenuPaperBackdrop />}
+        {carouselActive && <MenuPaperBackdrop carousel />}
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (

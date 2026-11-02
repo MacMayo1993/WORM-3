@@ -93,6 +93,9 @@ import {
   presentMenuCube,
   getModeDiveState,
   setModeDiveState,
+  setCarouselTheme,
+  setCarouselCubeFrame,
+  clearCarouselCubeFrame,
 } from './menuCarouselState.js';
 
 // ─── Carousel-active flag ─────────────────────────────────────────────────────
@@ -911,6 +914,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       }
       carouselWasActive.current = true;
       cubeRef.current.position.set(fit.x, presentY + Math.sin(t * 0.8) * 0.025, 0);
+      // The paper dips, glows and doodles round wherever the cube is (its
+      // corner radius, so the dip clears the silhouette at any turn).
+      setCarouselCubeFrame(fit.x, presentY, 0, CUBE_HALF * 1.2 * cubeRef.current.scale.x);
 
       // Park the contact shadow under the cube. It tracks the cube's settled
       // scale rather than its bobbing Y, so the pool stays put on the floor and
@@ -969,6 +975,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
     carouselWasActive.current = false;
     setModeDiveState(null);
+    clearCarouselCubeFrame();
     if (shadowRef.current) shadowRef.current.visible = false;
 
     // Carousel closed — clear any finished dive so idle animation resumes clean.
@@ -1386,6 +1393,12 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   };
 
   const locked = !unlocked(mode.id);
+  // The paper behind the cube takes on the presented mode (its colour, its
+  // doodles, a padlock stamp while it is locked).
+  useEffect(() => {
+    setCarouselTheme({ face: mode.face, color: mode.tileColor, locked });
+  }, [mode.face, mode.tileColor, locked]);
+  useEffect(() => () => setCarouselTheme(null), []);
   const actionLabel = locked ? modeLockText(mode.id, playerProgress)
     : mode.id === 'cube' ? 'Learn to solve' : mode.id === 'store' ? 'Open store' : `Play ${mode.label}`;
   const lockNeed = modeUnlockLevels(mode.id);
