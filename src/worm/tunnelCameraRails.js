@@ -1,4 +1,6 @@
 import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.js';
+import { tunnelArmSeconds, tunnelHandoffSeconds } from './healerWorm/constants.js';
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -144,10 +146,11 @@ export function cameraArcForHead(path, tHead, size) {
   const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
   const back = backForHead(tHead, size);
   const trail = THREE.MathUtils.lerp(back, smoothMin(back, close), follow);
-  // Follow closely through the outer mouth, then let the head pull away to the
-  // wider mirror-room framing. A full trailing distance at the first frame
-  // keeps the lens outside until the head is already deep in the entry arm.
-  return headArc - Math.max(0, smoothMin(trail, 0.18 + headArc * 0.5));
+  // Keep a readable head silhouette at the mouth. The former 0.18 start put
+  // the lens inside the head's silhouette and erased the tail with proximity
+  // culling. The exterior already follows the actual lens, so it can safely
+  // remain outside for the first stretch of the dive.
+  return headArc - Math.max(0, smoothMin(trail, 0.62 + headArc * 0.35));
 }
 
 // ── Through the core ─────────────────────────────────────────────────────────
@@ -439,6 +442,19 @@ function cameraArcPointInto(out, path, arc) {
 
 const _lead = new THREE.Vector3();
 const _rideFrame = makeTunnelRideFrame();
+const _mouthSide = new THREE.Vector3();
+const _mouthFrame = makeTunnelRideFrame();
+
+// Sit beside the string of beads when the track narrows into an outer mouth.
+// The old axial lens had to hide them to avoid filming from inside the worm.
+// Stay within the .325 bore, and release this shoulder before the core shot.
+function mouthShoulderInto(out, point, arc) {
+  const weight = 1 - THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.15, 1.0);
+  tunnelCameraFrameInto(_mouthFrame, _camPath, arc);
+  out.copy(_mouthFrame.right).multiplyScalar(0.28 * weight);
+  if (_room.active && !lensClearOfCore(_lensProbe.copy(point).add(out), point)) out.set(0, 0, 0);
+  return out;
+}
 
 /**
  * Write the on-rails camera pose at `tHead` into `out`.
@@ -523,6 +539,9 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size, zoom = null) {
     // this offset shot and avoids a second whip from banking at the reversal.
     out.up.subVectors(_camPath.midB, _camPath.midA).normalize();
   }
+  mouthShoulderInto(_mouthSide, out.cam, camArc);
+  out.cam.add(_mouthSide);
+  out.lift = Math.max(out.lift, _mouthSide.length());
   return out;
 }
 
@@ -627,22 +646,69 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from, zoom = nu
   out.cam.addScaledVector(_cameraLift, out.lift);
   out.cam.addScaledVector(returnCameraOffsetInto(_returnSide, _camPath, tHead, arc, out.cam, size), blend);
   out.lift = Math.max(out.lift, _returnSide.length() * blend);
+  mouthShoulderInto(_mouthSide, out.cam, arc);
+  out.cam.addScaledVector(_mouthSide, blend);
+  out.lift = Math.max(out.lift, _mouthSide.length() * blend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
 }
 
-/**
- * Exiting trails the head up the exit arm on the same rail as the rest of the
- * ride. It used to blend the lens out to a shot beside the mouth, which flew it
- * through the worm's head halfway up the arm and left it looking back at the
- * hole, so windout then had to swing it half a turn onto the chase. The lens
- * now follows the head up the arm and, as the head reaches the mouth, cuts to
- * the chase pose crawling resumes from (WormChaseCamera's windout): there is no
- * room in the mouth to fly a lens round the worm, and climbing past it lost the
- * worm from the shot for a quarter of a second while it looked at the sky.
- */
+/** The underlying exit-arm rail; emergence builds continuously on this pose. */
 export function tunnelExitPoseInto(out, tunnel, progress, size, zoom = null) {
   return tunnelCamPoseInto(out, tunnel, tunnelTraversalT('exiting', THREE.MathUtils.clamp(progress, 0, 1)), size, zoom);
+}
+
+// Start the surface reveal while the head is still on the exit arm. The same
+// clock runs through windout, so neither position nor orientation cuts at the
+// phase boundary. Thread the actual curved bore before fanning out above the
+// pad; a straight lerp to the chase cuts diagonally through the solid cubie.
+export const EXIT_REVEAL_START = 0.35;
+const _emergeRide = makeTunnelCamPose();
+const _emergeAxis = new THREE.Vector3();
+const _emergeOffset = new THREE.Vector3();
+const _emergeSide = new THREE.Vector3();
+const _emergeSurface = new THREE.Vector3();
+const _emergeFrame = makeTunnelRideFrame();
+
+export function tunnelEmergencePoseInto(out, tunnel, phase, progress, size, surface, zoom = null) {
+  const p = THREE.MathUtils.clamp(progress, 0, 1);
+  const exitP = phase === 'windout' ? 1 : p;
+  tunnelExitPoseInto(_emergeRide, tunnel, exitP, size, zoom);
+  const arm = tunnelArmSeconds(tunnel), handoff = tunnelHandoffSeconds(tunnel);
+  const elapsed = phase === 'windout' ? (1 - EXIT_REVEAL_START) * arm + p * handoff
+    : (p - EXIT_REVEAL_START) * arm;
+  const blend = diveEase(elapsed / ((1 - EXIT_REVEAL_START) * arm + handoff));
+  blendTunnelPosesInto(out, _emergeRide, surface, blend);
+  const rideArc = cameraArcForHead(_camPath, tunnelTraversalT('exiting', exitP), size);
+  cameraArcPointInto(_emergeAxis, _camPath, rideArc);
+  _emergeOffset.subVectors(_emergeRide.cam, _emergeAxis);
+  _emergeSurface.subVectors(surface.cam, _camPath.vEnd);
+  const height = Math.max(0.15, _emergeSurface.dot(_camPath.nEnd));
+  _emergeSurface.addScaledVector(_camPath.nEnd, -height);
+  // A shoulder inside the 0.325-radius bore lets the worm stay in view as the
+  // lens passes beside it. Only expand to the full chase once clear of the lip.
+  const arc = THREE.MathUtils.lerp(rideArc, _camPath.total + height, blend);
+  const outside = THREE.MathUtils.smoothstep(arc - _camPath.total, 0.08, height);
+  tunnelCameraFrameInto(_emergeFrame, _camPath, arc);
+  cameraArcPointInto(_emergeAxis, _camPath, arc);
+  // Give the overtaking move room inside the cube, then tuck into the bore.
+  // A fixed mouth-sized shoulder for the entire arm passed too close to the
+  // head and produced a rapid pan even without the old camera cut.
+  const innerHalf = (size - 1) / 2 * cubeExpansionScale(size, tunnel.padExpansion ?? 0) + 0.4;
+  let shoulder = 0.7;
+  for (const axis of ['x', 'y', 'z']) {
+    const direction = _emergeFrame.right[axis];
+    if (Math.abs(direction) > 1e-6) shoulder = Math.min(shoulder,
+      (innerHalf - Math.sign(direction) * _emergeAxis[axis]) / Math.abs(direction));
+  }
+  const toMouth = _camPath.total - arc;
+  shoulder = THREE.MathUtils.lerp(0.28, Math.max(0.28, shoulder), THREE.MathUtils.smoothstep(toMouth, 0.4, 1.2));
+  _emergeSide.copy(_emergeFrame.right).multiplyScalar(shoulder).lerp(_emergeSurface, outside);
+  _emergeOffset.lerp(_emergeSide, THREE.MathUtils.smoothstep(blend, 0, 0.18));
+  cameraArcPointInto(out.cam, _camPath, arc).add(_emergeOffset);
+  out.lensT = tunnelPathArcToT(_camPath, Math.min(arc, _camPath.total));
+  out.lift = _emergeOffset.length();
+  return out;
 }
 
 // ── Crossing close-up ────────────────────────────────────────────────────────

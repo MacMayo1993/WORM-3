@@ -15,8 +15,4 @@ export const tunnelState = {
   tunnel: null,    // that tunnel's descriptor ({ entry, exit } grid tiles), for the core's approach zoom
   coreZoom: 1,     // cosmetic core growth (VoidCore); occupied tracks keep their simulation route
   coreZoomAnchor: null, // the fixed dock of that growth, in cube coordinates
-  // Called by the chase camera in the frame it cuts from the exit arm to the
-  // pad (windout). The DOM overlay marks the cut in that same frame; waiting for
-  // the store's wormPhase left the jump unmasked for one or two frames.
-  onExitCut: null,
 };

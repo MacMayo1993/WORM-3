@@ -36,8 +36,8 @@ export function tunnelCameraClearRadius(lift = 0) {
 // Using the rider's published position also keeps mirror captures from moving
 // this opening to their own probe camera.
 //
-// Every band stops at the core shell, except the one being ridden
-// (uRiddenCore): the lens rides raised above it through the mirror room, so it
+// Every band stops at the core shell, except those occupied by the head or
+// recorded tail (uRiddenCore): the lens rides raised above it through the mirror room, so it
 // carries on across the room and into the reflections instead of vanishing
 // with the worm on it. Other routes would only clutter the room.
 export const tunnelCameraClearanceGLSL = `

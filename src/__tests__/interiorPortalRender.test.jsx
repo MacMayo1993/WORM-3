@@ -87,7 +87,9 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     expect(scene.getObjectByName('tunnel-interior-mouth-0').material.uniforms.uTime.value).toBe(mouthTime);
     worm.activeTunnel.current = null;
     worm.tunnelPassages.current = [{ tunnel }];
+    worm.phase.current = 'crawling';
     await frame();
+    expect(interior.visible).toBe(true);
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(1);
     expect(room.visible).toBe(true);
     worm.tunnelPassages.current = [];

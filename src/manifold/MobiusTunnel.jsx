@@ -399,7 +399,7 @@ const MobiusTunnel = ({
     // only fragments near the lens instead of removing whole alternate routes.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
-    uniforms.uRiddenCore.value = wormMode && tunnelState.active && tunnelState.activeTunnelId === tunnelId ? 1 : 0;
+    uniforms.uRiddenCore.value = wormMode && occupied ? 1 : 0;
     const mirror = mirrored.current, root = rootRef.current;
     if (root && wormMode) {
       // Link the variants a ride draws the band with when it appears (with its
@@ -411,7 +411,7 @@ const MobiusTunnel = ({
         gl.compile?.(root, _state.camera, scene);
         warmMirrorPrograms(gl, scene, [root]);
       }
-      const ridden = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
+      const ridden = occupied;
       if (ridden !== mirror.ridden) {
         mirror.ridden = ridden;
         if (ridden) addMirrorSubject(root); else removeMirrorSubject(root);

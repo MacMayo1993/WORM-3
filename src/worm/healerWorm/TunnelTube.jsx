@@ -73,6 +73,7 @@ const fragmentShader = `
   uniform float uTime;
   uniform float uOpacity;
   uniform float uHead;
+  uniform float uDirection;
   varying vec2 vUv;
   varying vec3 vWorldPoint;
   ${tunnelFinishGLSL}
@@ -94,6 +95,9 @@ const fragmentShader = `
     vec3 hot = mix(laneColor, vec3(0.94, 0.98, 1.0), 0.65);
     float panel = 0.5 + 0.5 * cos(twist * 2.0);
     float flow = 0.5 + 0.5 * sin(y * 12.5663706 - uTime * 0.65);
+    // Travelling light gives the anchored arches depth without moving the
+    // physical route. Reverse visits carry the stream toward their own exit.
+    float stream = pow(0.5 + 0.5 * cos(y * 25.132741 - uTime * 3.2 * uDirection), 6.0);
 
     // Eight slow depth stations and two continuous guide rails. All sharp
     // features are filtered in screen space, including the twisting rails.
@@ -107,7 +111,8 @@ const fragmentShader = `
 
     vec3 col = base * (0.48 + panel * 0.14 + flow * 0.04 + nearHead * 0.10);
     col += hot * hoop * (0.32 + nearHead * 0.12);
-    col += hot * rail * (0.36 + flow * 0.10);
+    col += hot * rail * (0.36 + flow * 0.10 + stream * 0.28);
+    col += hot * hoop * stream * 0.18;
     col += laneColor * railHalo * 0.08;
     col += hot * arrival * hoop * 0.20;
     col += hot * spiral * 0.22;
@@ -174,6 +179,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     uTime:    { value: 0 },
     uOpacity: { value: 0 },
     uHead:    { value: 0 },
+    uDirection: { value: 1 },
   }), []);
 
   useEffect(() => () => geo.dispose(), [geo]);
@@ -248,9 +254,9 @@ function TunnelTubeSlot({ slot, worm, size }) {
     const enterP = Math.min(1, Math.max(0, worm.tunnelProgress.current ?? 0));
     const dive = diveProgress(enterP);
     const target = slot.tailOccupied ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : riding ? OP_RIDE
-      : phase === 'windout' ? OP_ENTER : 0;
+      : phase === 'windout' ? OP_RIDE : phase === 'windup' ? OP_ENTER : 0;
     const lerp = target > slot.opacity ? OP_LERP_IN : OP_LERP_OUT;
-    slot.opacity += (target - slot.opacity) * Math.min(1, delta * lerp);
+    slot.opacity += (target - slot.opacity) * (1 - Math.exp(-delta * lerp));
 
     const st = useGameStore.getState();
     if (!st.wormPaused && st.wormAlive && !st.settings?.reducedMotion && !prefersReducedMotion()) uniforms.uTime.value += Math.min(delta, 0.05);
@@ -279,6 +285,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     const tp = worm.tunnelProgress.current ?? 0;
     const headProgress = tunnelTraversalT(phase, tp);
     uniforms.uHead.value = tunnelTubeHeadProgress(slot, headProgress);
+    uniforms.uDirection.value = tunnelTubeHeadProgress(slot, 0) === 1 ? -1 : 1;
   });
 
   return (
