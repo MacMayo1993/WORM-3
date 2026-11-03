@@ -311,7 +311,7 @@ export const TILE_STYLES = {
   endlessStairs:      { label: 'Endless Stairs',      cost: 'med', type: 'animated' },
   impossibleFork:     { label: 'Impossible Fork',     cost: 'low', type: 'procedural' },
   neckerFlip:         { label: 'Necker Flip',         cost: 'low', type: 'animated' },
-  mobiusBand:         { label: 'Möbius Band',         cost: 'med', type: 'animated' },
+  mirrorFacets:       { label: 'Mirror Facets',       cost: 'low', type: 'procedural' },
   interlockingWings:  { label: 'Interlocking Wings',  cost: 'low', type: 'procedural' },
   impossibleCube:     { label: 'Impossible Cube',     cost: 'med', type: 'procedural' },
   cubeTriangle:       { label: 'Cube Triangle',       cost: 'med', type: 'procedural' },

@@ -52,7 +52,7 @@ export const STORY_WORLDS = {
   35: world('Hollow Siege', 'bioluminescence', 'blackhole', 'eyeball', 'branches', { hollowMode: true }),
   36: world('Ghost Storm', 'inkwell', 'snow', 'skyCurtain', 'lanes', { visualMode: 'wireframe' }),
   37: world('Brick Blast', 'retro', 'desert', 'liquidCheckers', 'bastions', { visualMode: 'lego' }),
-  38: world('Mirror Numbers', 'noire', 'nebula', 'mobiusBand', 'orbit', { visualMode: 'sudokube', farSide: true }),
+  38: world('Mirror Numbers', 'noire', 'nebula', 'mirrorFacets', 'orbit', { visualMode: 'sudokube', farSide: true }),
   39: world('Mega Crawl', 'standard', 'fireplace', 'apollonian', 'lanes'),
   40: world('Eternal Crown', 'gemstone', 'shanghai', 'solid', 'orbit'),
 
@@ -126,7 +126,7 @@ export const STORY_WORLDS = {
   97: world('Inside-Out Deck', 'bioluminescence', 'cave', 'circleInversion', 'branches'),
   98: world('Echo Chamber', 'mondrian', 'stadium', 'opConcentric', 'diagonals', { visualMode: 'lego' }),
   99: world('Twin Strike', 'cyberpunk', 'shanghai', 'holographic', 'diamonds'),
-  100: world('The Center Mirror', 'eclipse', 'nebula', 'mobiusBand', 'orbit', { farSide: true }),
+  100: world('The Center Mirror', 'eclipse', 'nebula', 'mirrorFacets', 'orbit', { farSide: true }),
 
   // Chapter 11 · The Mega Decks
   101: world('Cargo Hold', 'standard', 'stadium', 'galaxy', 'lanes'),

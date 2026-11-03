@@ -9,6 +9,7 @@ import { readPlayerSave, newProgress } from '../../progression/model.js';
  */
 
 import { DEFAULT_SETTINGS } from '../../utils/colorSchemes.js';
+import { migrateTileStyle, migrateTileItem } from '../../utils/tileStyleMigration.js';
 import { newChestWallet } from '../../economy/chests.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
 import { syncCharacterUnlocks } from '../../worm/wormUnlocks.js';
@@ -47,7 +48,7 @@ const migrateSettings = (rawSettings, version) => {
 };
 
 // Trails were retired from the game, so their ids are dropped from old saves.
-const ownedForProgress = (items, progress) => [...new Set(syncCharacterUnlocks(items.filter(id => !id.startsWith('trail_')), progress))];
+const ownedForProgress = (items, progress) => [...new Set(syncCharacterUnlocks(items.filter(id => typeof id === 'string' && !id.startsWith('trail_')).map(migrateTileItem), progress))];
 
 // Load persisted state from localStorage
 const loadPersistedState = () => {
@@ -125,7 +126,8 @@ const loadPersistedState = () => {
     if (migratedSettings.manifoldStyles) {
       const safeStyles = {};
       for (const [faceId, styleKey] of Object.entries(migratedSettings.manifoldStyles)) {
-        safeStyles[faceId] = ownedItems.includes(`tile_${styleKey}`) ? styleKey : 'solid';
+        const style = migrateTileStyle(styleKey);
+        safeStyles[faceId] = ownedItems.includes(`tile_${style}`) ? style : 'solid';
       }
       migratedSettings.manifoldStyles = safeStyles;
     }

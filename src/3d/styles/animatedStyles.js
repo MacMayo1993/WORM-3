@@ -26,8 +26,8 @@ const ANIMATED_STYLES = new Set([
   'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
   'modularTiling', 'horocycleFlow', 'sphericalTiling', 'hyperbolicParallels',
   // Impossible (the triangle, fork, wings, impossible cube and cube triangle are
-  // static — they stay out)
-  'endlessStairs', 'neckerFlip', 'mobiusBand',
+  // static, as is Mirror Facets — they stay out)
+  'endlessStairs', 'neckerFlip',
   'perpetualFall', 'schroderStairs', 'amesRoom', 'rubinVase',
   // Surreal (every one carries its own weather)
   'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',

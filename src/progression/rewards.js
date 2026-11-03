@@ -7,7 +7,7 @@ const THEMES = {
   15: ['hat_flower', 'skin_emerald', 'tile_crystalGrowth', 'scheme_tropical'],
   20: ['tile_cymatics', 'tile_compass', 'skin_toxic', 'scheme_bioluminescence'],
   25: ['hat_wizard', 'skin_bubble', 'tile_paradoxWeave', 'scheme_aurora'],
-  30: ['tile_mobiusBand', 'tile_rp2Geodesics', 'skin_sunset', 'scheme_eclipse'],
+  30: ['tile_mirrorFacets', 'tile_rp2Geodesics', 'skin_sunset', 'scheme_eclipse'],
   35: ['hat_halo', 'skin_ice', 'tile_hyperbolicWeave', 'scheme_arctic'],
   40: ['tile_orbChamber', 'tile_paintedWindow', 'skin_galaxy', 'scheme_deepsea'],
   45: ['hat_crown', 'skin_gold', 'tile_stellarLensing', 'scheme_gemstone'],
