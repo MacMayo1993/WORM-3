@@ -8,11 +8,12 @@ import { menuLeanInto } from '../components/menus/menuPointer.js';
 import { lightSweepAt } from '../components/menus/menuLightSweep.js';
 import { DIVE_TOTAL } from '../components/menus/menuDiveLeap.js';
 import { PAPER_FX as FX, carouselPaperLayoutInto, paintDoodles, paperTintInto } from '../components/menus/carouselPaper.js';
+import { INTRO_PAPER_SHADER } from '../components/intro/introPaper.js';
 
 // The paper's numbers live in PAPER_GRID, which the loading screen also draws its
 // 2D-canvas copy of this sheet from: tune them there and both stay one paper.
 //
-// The opening draws the plain sheet. The mode carousel (`carousel`) compiles a
+// The opening washes the sheet in the cube's sticker colours. The mode carousel (`carousel`) compiles a
 // second program on the same shader (CAROUSEL) that makes the paper answer the
 // screen: it glows in the presented mode's colour, dips round the cube, ripples
 // when a swipe turns it, swirls into the PLAY dive, slides against the
@@ -106,6 +107,9 @@ const fragmentShader = `varying vec2 paperUv;
           vec2 line = abs(fract(gridUv - 0.5) - 0.5) / fwidth(gridUv);
           float grid = 1.0 - min(min(line.x, line.y), 1.0);
           vec3 paper = mix(${glslVec3(P.paperEdge)}, ${glslVec3(P.paperCentre)}, 1.0 - distance(paperUv, vec2(${P.highlight.map(f).join(', ')})));
+          #ifdef OPENING
+          ${INTRO_PAPER_SHADER}
+          #endif
           vec3 ink = ${glslVec3(P.line)};
           #ifdef CAROUSEL
           // Paper, not plastic: fibres and the odd speck, and a darker edge.
@@ -171,7 +175,7 @@ function createDoodleCanvas() {
 // A screen-aligned backdrop INSIDE the existing WebGL scene. The transparent
 // carousel overlay never paints over the live cube. Grid density uses the
 // viewport aspect, so it is stable on high-DPR phones too.
-export default function MenuPaperBackdrop({ carousel = false }) {
+export default function MenuPaperBackdrop({ carousel = false, opening = false }) {
   const size = useThree(state => state.size);
   const reducedMotion = useRef(true);
   const doodles = useMemo(() => {
@@ -208,7 +212,7 @@ export default function MenuPaperBackdrop({ carousel = false }) {
     } : {}),
   }), [carousel, doodles]);
   uniforms.aspect.value = size.width / Math.max(size.height, 1);
-  const defines = useMemo(() => (carousel ? { CAROUSEL: 1 } : {}), [carousel]);
+  const defines = useMemo(() => (carousel ? { CAROUSEL: 1 } : opening ? { OPENING: 1 } : {}), [carousel, opening]);
   const state = useMemo(() => ({ face: null, lean: { x: 0, y: 0 }, leanTarget: { x: 0, y: 0 }, layout: {}, cube: { x: 0.5, y: 0.5, r: 0.25 } }), []);
 
   useEffect(() => {
