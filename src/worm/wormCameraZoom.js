@@ -32,13 +32,3 @@ export function wheelCameraZoom(zoom, deltaY) {
 
 /** Short label for the slider, e.g. "1.2×". */
 export const wormCameraZoomLabel = zoom => `${clampWormCameraZoom(zoom).toFixed(2).replace(/0$/, '')}×`;
-
-// How far the desktop chase aims at the head rather than the cube's centre. Small
-// cubes keep the whole-board composition. On a big board the centre lies far below
-// the surface, so aiming at it pitched the lens into the face and parked the worm
-// at the top edge, its path ahead under the HUD; from 6×6 the aim slides over to
-// the head, and from 8×8 the head is centred as it is on phones.
-export function desktopHeadFraming(size) {
-  const t = Math.min(1, Math.max(0, (size - 5) / 3));
-  return t * t * (3 - 2 * t);
-}
