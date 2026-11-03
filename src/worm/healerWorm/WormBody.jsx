@@ -1,3 +1,4 @@
+import { advanceTunnelBodyClearance, tunnelBodyCameraKeep } from './tunnelBodyClearance.js';
 import { WormPointLight } from '../WormLighting.jsx';
 import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../wormAccessories.js';
@@ -102,16 +103,7 @@ const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
 const _normalA = new THREE.Vector3();
 const _normalB = new THREE.Vector3();
-// Camera-proximity cull while riding a wormhole, the same rule the band's camera
-// clearance uses: a bead close to the lens is hidden inside CAM_CULL_HIDE and back
-// to full size by CAM_CULL_FULL (a little further straight ahead), unless it lies
-// below the lens, on the band the rider is seen on; any bead touching the lens
-// (CAM_CULL_TOUCH) goes. See the cull block in the segment loop for why the
-// camera ends up by its own worm.
-const CAM_CULL_HIDE = 0.2;
-const CAM_CULL_FULL = 0.36;
-const CAM_CULL_AHEAD = 0.5;
-const CAM_CULL_TOUCH = 0.1;
+// Camera clearance uses the bead footprint, preserving small core riders.
 // Those distances are for a full bead of this radius. What fills the frame is
 // angular size, so they shrink with a smaller bead: inside the core the band's
 // lane squeezes beads to a third of this, and the raised lens rides close enough
@@ -146,6 +138,7 @@ export function WormBody({ worm, size }) {
     const prevHeadDirRef = useRef(new THREE.Vector3());
     const bookInitedRef = useRef(false);
     const bookTurnRef = useRef(0);
+    const cameraClearanceRef = useRef(0);
     const transitScaleRef = useRef(1); // dissolve: 1 on surface, 0 inside tunnel
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
@@ -231,6 +224,7 @@ export function WormBody({ worm, size }) {
     useEffect(() => {
         bookInitedRef.current = false; bookTurnRef.current = 0;
         prevHeadPosRef.current.set(0, 0, 0); prevHeadDirRef.current.set(0, 0, 0);
+        cameraClearanceRef.current = 0;
         transitScaleRef.current = 1; characterTimeRef.current = 0;
         inchStateRef.current = makeInchGaitState(); lastHaloHexRef.current = null;
         const pickup = pickupRef.current;
@@ -283,10 +277,12 @@ export function WormBody({ worm, size }) {
         bodyPathHeadInto(_bodyHeadPos, worm, _bodyTransit);
         _headPathPoint.transit = _bodyTransit;
         blendTunnelBodyProfile(_headPathPoint, _bodyTransit ? worm.tunnelRide?.current : null);
-        // Only the in-tunnel shots put the lens on the body's own line — the surface
-        // chase camera sits well above and behind it, so nothing there needs culling
-        // and gating on the phase keeps segments from blinking out during a jump.
-        const _transitCull = _bodyTransit || worm.phase.current === 'windup';
+        // Ease clearance with the lens's entry/departure instead of restoring
+        // hidden beads on one phase boundary. Ordinary jumps reset the weight,
+        // so the surface body's airborne animation never starts hiding segments.
+        cameraClearanceRef.current = advanceTunnelBodyClearance(cameraClearanceRef.current,
+            _bodyTransit, worm.isJumping?.current ? 'jumping' : worm.phase.current, animationDelta);
+        const _transitCull = cameraClearanceRef.current > 1e-5;
         if (_transitCull) {
             _camWorldPos.copy(state.camera.position);
             if (state.camera.getWorldDirection) state.camera.getWorldDirection(_camAhead); else _camAhead.set(0, 0, -1);
@@ -773,7 +769,7 @@ export function WormBody({ worm, size }) {
                 _wormDummy.scale.multiplyScalar(bead.grow);
                 _wormDummy.position.addScaledVector(_bodyCloneNormal, bead.lift);
             }
-            // Camera-proximity cull, transit only.
+            // Camera-proximity clearance during transit and its departure glide.
             //
             // Inside a wormhole the camera trails the head along the very centerline
             // the body is strung down, and at the entry mouth it has to be ON that
@@ -793,12 +789,9 @@ export function WormBody({ worm, size }) {
                 const bead = THREE.MathUtils.clamp(Math.max(_wormDummy.scale.x, _wormDummy.scale.y, _wormDummy.scale.z)
                     * footprint / CAM_CULL_BEAD, 0.25, 1);
                 const _camLength = Math.max(_camToBead.length(), 1e-6), _camD = _camLength / bead;
-                if (_camD < CAM_CULL_TOUCH) continue;
-                const close = 1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_HIDE, CAM_CULL_FULL);
-                const ahead = THREE.MathUtils.smoothstep(_camToBead.dot(_camAhead) / _camLength, 0.55, 0.85)
-                    * (1 - THREE.MathUtils.smoothstep(_camD, CAM_CULL_FULL, CAM_CULL_AHEAD));
-                const below = THREE.MathUtils.smoothstep(-_camToBead.dot(_camUp) / _camLength, 0.3, 0.6);
-                const keep = 1 - Math.max(close, ahead) * (1 - below);
+                const keep = tunnelBodyCameraKeep(_camD,
+                    _camToBead.dot(_camAhead) / _camLength,
+                    -_camToBead.dot(_camUp) / _camLength, cameraClearanceRef.current);
                 if (keep <= 0.001) continue;
                 if (keep < 1) _wormDummy.scale.multiplyScalar(keep);
             }
