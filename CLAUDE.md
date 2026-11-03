@@ -4,7 +4,7 @@ This file provides guidance for Claude Code when working on the WORM-3 project.
 
 ## Project Overview
 
-WORM-3 (World of Rubik's Manifolds) is a 3D Rubik's Cube puzzle game built on real projective plane (RP2) topology. It features antipodal point identification, multiple game modes (Classic, Sudokube, Ultimate, Worm), a 10-level story campaign, a teaching mode, and co-op worm mode. Built with React 18, Three.js, and Zustand.
+WORM-3 (World of Rubik's Manifolds) is a 3D Rubik's Cube puzzle game built on real projective plane (RP2) topology: every tile is glued to its antipode. The modes are the six faces of the menu cube (`MODE_THEMES` in `src/utils/modeThemes.js`): WORM (a 120-level authored Story, Free Play and the Portal Combat preview), Flip Cube (free play plus the level packs and daily challenge in `src/levels/`), Chaos, Random, Teach and the Store. Biome and the Möbius Cubelet are previews (`ComingSoonScreen`). Retired modes (Hands, Holonomy, Merge, the co-op platformer and crawler) live in `archive/scrapped-modes/`, outside the build; the Sudokube and Ultimate screens are gone. Built with React 18, Three.js (r159) and Zustand.
 
 ## Build & Development Commands
 
@@ -36,10 +36,10 @@ Supported toolchain: **Node 20** (`.nvmrc`, `engines`, CI, devcontainer all agre
 ## Testing
 
 - **Framework**: Vitest with jsdom environment
-- **Test location**: `src/__tests__/*.test.js`
+- **Test location**: `src/__tests__/*.test.js` and `*.test.jsx`
 - **Run all tests**: `npm run test`
 - **Run a single test**: `npx vitest run src/__tests__/cubeRotation.test.js`
-- **Coverage scope**: `src/game/**`, `src/utils/**`, `src/levels/**`
+- **Coverage scope**: `src/game/**`, `src/utils/**`, `src/levels/**`, `src/hooks/**`
 - **Browser tests**: `e2e/*.e2e.js` (Playwright, config in `playwright.config.js`) run the production build in real Chromium: the app boots, a WORM run starts, every selector thumbnail draws, and a deleted lazy chunk recovers instead of leaving a blank page. The unit suite is jsdom and cannot see those. WebGL is software-rendered, so they assert that things appear and nothing throws, never frame rates. The `e2e` CI job does not gate deploy yet.
 - **Credits**: third-party art is credited from `src/utils/credits.js` (Settings → About) and inventoried in `docs/ASSET_CREDITS.md`; `assetCredits.test.js` fails when a model or environment map is added to `public/` without a credit or an explicit "unverified" entry, and when a credit disagrees with the model's own embedded Sketchfab metadata. The nine biome models are CC BY 4.0, so crediting them is a licence condition.
 - **Globals**: Vitest globals enabled (`describe`, `it`, `expect`, `vi` available without import)
@@ -78,22 +78,26 @@ describe('makeCubies', () => {
 
 ```
 src/
-├── 3d/           # Three.js 3D components (CubeAssembly, Cubie, StickerPlane, materials)
+├── 3d/           # Three.js 3D components (CubeAssembly, Cubie, StickerPlane, VoidCore, materials, tile styles)
 ├── components/
-│   ├── menus/    # UI menus (MainMenu, TopMenuBar, SettingsMenu, MobileControls)
-│   ├── screens/  # Full-screen overlays (Welcome, Victory, Tutorial, LevelSelect)
+│   ├── menus/    # UI menus (MainMenu, TopMenuBar, SettingsMenu, MobileControls, the mode carousel)
+│   ├── screens/  # Full-screen surfaces (Welcome, Loading, setup wizards, LevelSelect, Store, Victory)
 │   ├── overlays/ # In-game overlays (Cursor, Rotation buttons, Solve highlight)
-│   └── intro/    # Welcome animation components
+│   ├── intro/    # Opening animation components
+│   └── ui/       # Shared UI pieces (Button, Panel, ActionCue) and the arcade theme CSS
 ├── game/         # Pure game logic (NO React dependencies)
-├── hooks/        # Custom React hooks (Zustand store + domain hooks)
-├── levels/       # Level data and progression system
-├── manifold/     # Manifold/wormhole visualization components
-├── teach/        # Teaching mode (algorithms, solver, step-by-step UI)
-├── utils/        # Constants, color schemes, audio
-├── worm/         # Worm co-op mode (platformer, crawler)
-├── holonomy/     # Holonomy loop mode
-├── modes/        # Mode-specific rules (merge, city biome)
-├── coming-soon/  # Preview environments for unreleased modes
+├── hooks/        # Custom React hooks (Zustand store + domain hooks; store slices in storeSlices/)
+├── levels/       # Flip Cube level packs, daily challenge and progression
+├── manifold/     # Möbius tunnels, wormhole and Chaos storm visualization
+├── teach/        # Teaching mode (algorithms, course, step-by-step UI)
+├── utils/        # Constants, color schemes, UI theme, audio
+├── worm/         # WORM mode: healerWorm/ (sim and scene), story/ (campaign), combat/ (Portal Combat)
+├── chaos/        # Chaos round screens (countdown, ignition prompt, art)
+├── economy/      # Chests and their rewards
+├── progression/  # Player progress, achievements, mode unlocks, personal bests
+├── projectiscope/ # Projectiscope background and creator
+├── modes/        # Mode-specific rules (City Biome)
+├── coming-soon/  # Pieces from preview modes, several still shared by the release
 ├── workers/      # Web workers (chaos simulation)
 ├── assets/       # Static assets imported by components
 ├── App.jsx       # Main application component
@@ -146,10 +150,10 @@ set((state) => ({ moves: state.moves + 1 }));
 
 ## CI/CD
 
-- **Pipeline**: `.github/workflows/deploy.yml` — lint → test → build → deploy
+- **Pipeline**: `.github/workflows/deploy.yml` — lint and test → build (with `bundle:check`) → deploy; the browser smoke tests (`e2e`) run alongside but do not gate deploy
 - **Deploy**: GitHub Pages from `dist/` on push to `main`
 - **Base path**: `/WORM-3/` (configured in `vite.config.js`)
-- **Node version**: 20 in CI, 18 in devcontainer
+- **Node version**: 20 in CI and the devcontainer
 
 ## Naming Conventions
 
@@ -176,7 +180,7 @@ import { checkRubiksWin } from './game/winDetection.js';
 import { useGameStore, useCubeState, useAnimation } from './hooks/index.js';
 
 // Constants
-import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
+import { COLORS, ANTIPODAL_COLOR, DIR_TO_VEC } from './utils/constants.js';
 ```
 
 ## Important Notes
@@ -185,7 +189,7 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 - Three.js/R3F components run inside a `<Canvas>` context — they use `useFrame` and Three.js primitives, not DOM elements
 - Animations use both GSAP and requestAnimationFrame
 - Mobile support is built-in with touch controls (`MobileControls.jsx`) and responsive layout
-- Cube sizes range from 2×2 to 5×5, configurable per level
+- Cube sizes range from 2×2 to 10×10 in the setup wizards (`SIZE_TIERS` in `src/components/screens/wizardSteps/shared.jsx`), plus WORM's 15×15 Mega (`MEGA_CUBE_SIZE` in `WormModeSetupWizard.jsx`); levels set their own
 - **Lightning is a storm** (`src/worm/healerWorm/lightningStorm.js`, resolved in `runStorm` in `HealerWormMode.jsx`, drawn by `LightningStrikes.jsx`): while a Lightning wash is up the sky marks `STORM.strikes` tiles (a new orb restarts the count), each charging for `STORM.telegraph` seconds before it strikes; marks still strike after the wash ends, only new ones stop. Marks never go on the head's `STORM.headSafeTiles` ring, an orb, a special, a bomb or another mark, and `STORM.bodyShare` of them aim at the worm's own body. A strike resolves through the bomb-blast helpers: a grounded head dies (`reason: 'lightning'`, WORM'D kind `struck`; a jumping or rocketing head is untouched), a body tile cuts the tail off there (`severAndScatter`), enemies in the 3x3 (`springSlamTiles`) are killed (`strikeEnemies` in `portalCombat.js`), and a tile holding none of that flips like any flip via `strikeTile` in `useWormCrawler.js` (under `activeTunnelCap`) and the tunnel is *charged*: `sim.chargedTunnels` pays `CHARGED_TOLL` heal segments of the toll for free on each ride (the worm's orbs and tail are only spent on the rest) and its mouths crackle. It is held like the rest of the sim (pause, tunnels, slice turns, the orb and cut freeze beats, countdown) and is off in the demo. Randomness comes from `sim.rand`, so tests inject it. The telegraph is a closing ring and diamond, readable without flashes; reduced motion drops the bolt column. Settings → Scene → Lightning flashes (`settings.reduceFlashing`) caps the rest: strikes swell and fade at `GENTLE_STRIKE` brightness, marks never pulse fast, charged mouths glow steadily, and the lightning shell and storm reaction coats slow and dim their flashes through the shared `uFlashCap` uniform (`elementalUniforms.js`), so no new program.
 - **Elemental pickups are told apart by shape, not colour** (`ElementalOrb.jsx`): Water, Ice and Air share a pale-blue palette, so each element's body has its own silhouette echoing its HUD icon (`elementalOrbShapes.js`: droplet, flame crown, boulder, hex crystal, charge star, tornado), billboarded upright so a flame always points up the screen. The body is dense, over an ink hull in the element's `fogColor` (`elementalOrbShader.js`) that outlines it and stops the sticker beneath tinting it; the crest floats above as a name tag (bright glyph on dark enamel in an element-coloured rim), and the countdown is a draining arc on the tile. Don't bring back glass spheres, gold medals or orbit rings: those made every element the same pickup. A new element needs a shape and a `PARTICLE_KINDS` entry (`elementalOrbShapes.test.js`).
 - **Every element helps with nothing to fight** (`ELEMENT_ABILITIES` in `src/worm/healerWorm/elementalAbilities.js`, `elementalCoreAbilities.test.js`): Water's Riptide pulls dropped orbs back from 3 steps and holds their clock, and a ride under Water doesn't wear the tunnel (`tunnelRideWears`); Fire's Smelter pays 1 heal segment a ride (2 mid-dash, 3 per pickup, `smeltToll`, after any charge); Earth regrows a cut's orbs instead of scattering them (`dropCutOrbs`) and its pads and buds count as cover for a surround heal (`overgrowthTiles`); Ice halves the slice-turn clock (`hazardClockRate`, read in `HealerWormMode`); each Lightning discharge charges the nearest tunnel within 3 steps (`overchargeTunnel`); an Air landing after 0.5 s of flight sweeps orbs and dropped orbs within 2 steps (`airGale`). All of it is sim-owned and crawling-clocked.
@@ -196,7 +200,7 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 - **Jump height has one curve**: every surface-jump lift (the head's `jumpLiftOf`, the body lift baked into `stepHistory`, and a raised-pad launch from mid-air) goes through `arcLift` in `src/worm/healerWorm/jumpArc.js`. A double jump starts its new arc from the current height via `sim.jumpBase`; writing `Math.sin(jumpT * π) * jumpHeight` directly is what used to drop a mid-air worm to the floor on its second press.
 - **Rocket burn has one envelope**: the sim only owns `rocketActive`/`rocketT`/`rocketFlight` and the landing grace; `rocketBurnInto` in `src/worm/healerWorm/rocketFx.js` turns them into the burn's beats (ignite, liftoff surge, descent, touchdown, booster scale). `RocketExhaust` (booster on the rendered tail, plume, world-space smoke pool, pad shock ring) and `WormChaseCamera` (FOV punch, liftoff lag, three-quarter flight view, desktop-only shake; phones get haptics) both read it, so a refuel keeps the flame lit and replays the surge everywhere at once. Render-only: nothing writes back to the sim, and pause/reduced motion freeze or drop the motion.
 - **One dissolve shader**: the opening cube's crumble (`addIntroDissolve`) and defeated WORM enemies (`addFrameDissolve`, driven by `combat/enemyDissolve.js`) share `src/components/intro/introDissolve.js`. Kills stay in `combat.dying` on the combat clock (held with pause/tunnels like bursts); `CombatScene` keys rigs by enemy id so a dying enemy crumbles in the rig it fell in. Orb pickups use `OrbPickupBurst` (motion in `orbPickupBurst.js`), laid out in the tile's frame.
-- **A flipped face is one batched portal** (`src/3d/flipPortal.js`): outside WORM, a displaced tile (curr ≠ orig) wears a bevelled lens in its current colour onto a twisting parallax tunnel whose far end is its home colour, with comets on the lip, a world-space light sweep, a red throb on the last flip, and a pop when it opens. Every portal on the cube is ONE opaque instanced draw through `TileSurfaceInstance` (current colour as the instance colour, `flipPortalData` as `aInstanceData` (home rgb, flips/cap + 2 on the last flip), `flipPortalStart` as `aInstanceSeed`), animated in the shader off `sharedUniforms.time`, so a flipped tile's sticker sleeps once its flip has played (its frame loop stays awake only for WORM or `flipPads: 'off'`'s tremor). The opening time is keyed by the sticker's grid id and flip count, so a Chaos slice turn that remounts a slot never reopens it. It replaced the helix ring, crack disc, seam leak, neon border, sticker worms, parity breakthrough and tally strokes, which WORM still draws under its aperture (`legacyFlipDecor`). `CubeAssembly` warms the program against the live scene; the health bar lifts over the frame (`PORTAL_TOP`). Don't add per-tile meshes or frame callbacks to a flipped tile: put the effect in the portal shader.
+- **A flipped face is one batched portal** (`src/3d/flipPortal.js`): in every mode and view (WORM and Sudokube too, Sudokube laying the tile's number over the lens), a displaced tile (curr ≠ orig) wears a bevelled lens in its current colour onto a twisting parallax tunnel whose far end is its home colour, with comets on the lip, a world-space light sweep, a red throb on the last flip, and a pop when it opens. Every portal on the cube is ONE opaque instanced draw through `TileSurfaceInstance` (current colour as the instance colour, `flipPortalData` as `aInstanceData` (home rgb, flips/cap + 2 on the last flip), `flipPortalStart` as `aInstanceSeed`), animated in the shader off `sharedUniforms.time`, so a flipped tile's sticker sleeps once its flip has played (its frame loop stays awake only for WORM or `flipPads: 'off'`'s tremor). The opening time is keyed by the sticker's grid id and flip count, so a Chaos slice turn that remounts a slot never reopens it. It replaced the helix ring, crack disc, seam leak, neon border, sticker worms, parity breakthrough and tally strokes; `TallyMarks` keeps only the ×N count past six flips. `CubeAssembly` warms the program against the live scene; the health bar lifts over the frame (`PORTAL_TOP`). Don't add per-tile meshes or frame callbacks to a flipped tile: put the effect in the portal shader.
 - **A flip never washes the tile**: the flip is motion (squeeze shut, re-open in the new colour), so no flip effect may lay one flat colour or white over the whole tile. The eyelid overlay draws only light (gleam, seam pinpoint, iris) and the sticker recolours at the crossing while shut, as homing flips and Chaos do; the crossing glow is thin rings (`AntipodalGlowFill`), the crossing flash a small glint (`flashFragment`), and a portal opens with a coloured rim on its leading edge while its floor keeps its height above the sticker (`flipPortal.js`). A tile flipping home keeps its portal, fully open (`FLIP_PORTAL_OPEN_SEED`), until it has squeezed shut. Instanced effects with their own `ShaderMaterial` must apply `instanceMatrix` in the vertex shader: the flip chips once did not, and twenty full-size chips stacked into a solid slab of the new colour over every flip (`flipNoWash.test.jsx`).
 - **Flips are paired and reversible**: `flipStickerPair` is atomic across the β-pair (both members move or neither), which keeps antipodalEngine's ∆ = 0 invariant. To take a flip back use `unflipStickerPair`, not a second `flipStickerPair` — re-flipping restores the colour but spends the tile's life again.
 - **A tunnel's last ride collapses it behind you into pits** (`src/worm/healerWorm/tunnelPits.js`): a tunnel holds `WORMHOLE_MAX_TRAVERSALS` (3) rides. The third collapses it once the tail is out and no part of the worm lies on either mouth (`collapseBehind` in the passage loop of `wormSim.js`; a funded last ride heals instead): both mouths join `sim.voidTunnelKeys` and `sim.pitTiles`, and their pads drop into their slots. A pit is not a platform (`raisedPlatformPosition` reads `ctx.isPitFace`), so crawling up to one stops the worm at its rim with the caution rescue (kind `'pit'`, "Pit ahead — turn or jump clear!") and a timeout falls in; coming down in one from a jump falls straight in; both die with reason `'pit'`. A ring heal (surround) mends it. A ride re-entered before the collapse lands keeps the old mid-ride collapse (`'void-tunnel-exhausted'`). Tunnel-keyed state (`tunnelUseCounts`, `voidTunnelKeys`, `chargedTunnels`, passages) is keyed by the mouths' cells and is carried through every slice turn by `remapTunnelKeys`; before that, a turned layer reset its tunnels' rides. Renderers see pits as the stickers' grid ids in the store (`wormPitGrids`, published by `useWormCrawler` only when the set changes): `Cubie` selects only its own pit faces (`cubiePitFaces`, `wormPieceRaised`), so a collapse re-renders the two pit pieces; `PadProvider`, `raisedPortalPosition`, the caution fence and `WormholeNetwork` drop them; `WormholeRings` draws the maw. Story's two-pair refill does not count pits. The HUD warns before the last ride ("Last ride · then it collapses") and names a pit ("Pit · don't go in").
@@ -257,159 +261,33 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 - **Screen ownership**: `src/hooks/uiSurfaces.js` decides which surface owns the screen. Anything that adds a full-screen modal should register there so keyboard gating and Escape-to-dismiss pick it up automatically; ambient side panels stay out of the blocking set.
 - **UI theme (one light arcade style)**: shared tokens live in `src/utils/uiTheme.js`. Fonts: `DISPLAY_FONT` (Bungee, titles and primary keys, uppercase), `HEADING_FONT` (Outfit, labels/numbers/keys), `UI_FONT` (Nunito, reading text); Mobi's dialogue uses `HEADING_FONT` on the arcade paper via `MobiStage` (no handwriting face); bare `monospace` only for manifold grid IDs and algorithm notation. Surfaces are all the `ARCADE_*` look: cream graph paper, deep-green ink, ivory keys and cards on a hard ledge. `NIGHT_*` and `GAME_HUD` now carry the same light values (the in-play HUD is ivory plastic with dark-green outlines); use `VIEWPORT_*` only for type laid directly over a photo or 3D preview. Mode colours are the Rubik's cube faces from `MODE_THEMES` in `src/utils/modeThemes.js` (WORM green, Flip Cube yellow, Teach blue, Chaos orange, Random red, Store white), each with a readable `ink`; a mode's one primary key wears its face via `arcadeModeVars(mode)` (`src/utils/arcadeTheme.js`). Classes live in `src/components/ui/arcadeTheme.css`, imported by the screens that use them rather than globally, to keep the initial CSS inside the bundle budget. Do not add new dark sheets or pastel mode accents. The game scene adds `BackgroundAmbience` (mini cubes and antipodal twin wormholes, laid out in `src/3d/backgroundAmbience.js` beyond `MAX_DISTANCE_BY_SIZE` in `src/3d/cameraLimits.js` so nothing ever passes in front of the puzzle). The opening/carousel graph paper (`MenuPaperBackdrop`; the main menu shows a level panorama from `MENU_BACKGROUNDS` instead) and the loading screen's 2D-canvas copy of it both read `PAPER_GRID` in `src/utils/paperGrid.js`; tune the paper there. The mode carousel's sheet (`<MenuPaperBackdrop carousel />`, a `CAROUSEL` branch of the same shader, so the opening's program is unchanged) answers the screen: it glows in the presented mode's colour round the cube (a pale mode, the Store's white, glows gold: `paperTintInto`), dips round the cube, sends a ripple out when the cube turns to a new face, swirls into the PLAY dive (`getModeDiveState`), slides against the pointer's lean, catches the cube's light sweep (`lightSweepAt`), greys out with a red padlock stamp for a locked mode, inks that mode's two doodles into its margins (`carouselPaper.js`: strokes drawn in by `revealStrokes` onto a small 2D canvas texture, never a second WebGL context) and has a doodle worm inching along the grid line through the cube's lower half. It reads `setCarouselTheme` (the carousel) and `setCarouselCubeFrame` (the cube) from `menuCarouselState.js`; colours are raw display values, as the paper writes them (no sRGB decode); everything drawn on the sheet fades into the dive, and reduced motion holds every motion still. The main menu cube is the opening's cube, built from the same parts (`src/3d/rubiksPiece.js`: black-plastic cubies, glossy classic stickers); tapping it runs the opening's antipodal flip wave. The mode carousel's cube (`ModeFacePlates`) is that cube solved, each face's stickers in its mode colour with the name standing off the face; the play cube's classic looks use the same parts too (`createPlayStickerGeometry`, a thin 0.85 variant whose front face is at z = 0 so tile overlays stay in front, and the 0.96 plastic body from `CLASSIC_BODY_*` in `src/3d/cubeViewStyles.js`). Both scenes light the cube with one studio rig, `CUBE_LIGHT_RIG` in `src/3d/cubeLighting.js` (wireframe and glass keep their own), and the play scene adds a reflection map wherever no photo panorama supplies one, so the stickers' gloss shows in the space scenes too. The main menu's keys and the mode carousel's Play key are deliberately cube pieces rather than ivory keys: a glossy sticker in a black-plastic bezel (`src/components/menus/mainMenuKeys.css`). The setup screens use the same pieces from `src/components/ui/pieceKey.css` (`.piece` + `.piece-face` + `.piece-trailer`, sticker colour via `--piece-color`; `.piece-icon` for round ivory back keys): every wizard's primary key (WizardShell), the Chaos bet key, and the path pickers in `src/components/ui/pathSelect.css` (WORM's Levels / Free Play, Flip Cube / Chaos). The loading cover is a small static shell (`LoadingScreen`) around a lazy `LoadingScene` that `preloadAssets.js` warms, keeping its CSS out of the initial bundle: a CSS 3D cube falls for ever between two linked portals drawn by `LoadingPortal`'s canvases (a twin one drop below makes the loop; both portals are seen from above and the shaft is clipped on each one's surface, a flat arc inside the mouth `FALL.cut` deep at the front (`shaftClipPath`), so the cube visibly comes out of the upper mouth and sinks into the lower one, never sliding out from behind a rim; cube and twin are cut on the same line, so exactly as much comes out of the top as has sunk into the paper, and the lips canvas lights the cut as a membrane while the cube breaks through (`crossing`)), timed by `FALL` in `loadingWormhole.js`, which the stylesheets must match (tests check). The cube never waits on the main thread (the cover goes up while it is busy decoding): it falls on the compositor from the first paint, CSS stand-in portals (the `.wl-well` pseudo-elements) hold the portals' places until `LoadingPortal`'s canvases draw their first frame (`wl-ready`) and fade in over them, MOBI's first line is rendered with the cover (`openingLine`), and the canvases read their clock from the `wl-fall` animation's `currentTime`, never from a mount timestamp. Never gate the cube's visibility or animation on a canvas frame: that left it invisible for a whole decode. The cover is also a toy (`loadingPlay.js`, driven from LoadingPortal's frame loop, no React state): the portals spring open on arrival, holding anywhere dives (every animation in `.wl-scene` re-timed together through `updatePlaybackRate`, quantized to `WARP.step` so a press re-times a handful of times, with `wl-warp` speed lines and stretch), a tap spins the cube inside its own frame (`.wl-spin`) and rings both portals, and MOBI's chip at the foot counts loops and cycles through gameplay tips (`MOBI_TIPS`, each a real rule) on a real-time clock (`TIP_MS`, with a bar running down each one), so a dive never hurries one off (`loadingPlay.test.js`). The cover holds at least 2.4 s (`SceneLoadingGate`'s `minVisibleMs`, App's `sceneGateHold`), long enough for a loop and a tip. The view tilts (`TILT`): a mouse over the cover, a finger held on it, or a phone's own tilt (`deviceorientation`; iOS is never prompted for permission) leans the viewer, so the scene and the portal canvases slide together by `TILT.near` (they must move as one or the mouths leave the shaft's cut lines; LoadingPortal writes the canvas transforms before measuring the wells), the oversized paper canvas (`PAPER_PAD`) slides by `TILT.far` with its lens offset to match, the cubes turn through the individual `rotate` property (outside their animated `transform`), and the throats lean inside their mouths (`funnelLean`). Nothing is written while the tilt is at rest.
 
-## Elemental Cube Art Upgrade Plan (Design Only)
+## Elemental Cube Skins
 
-This section is the implementation brief for a future Claude Code pass. It is intentionally a plan, not an instruction to change gameplay while doing unrelated work.
-
-**Implementation checkpoint (skins live):** every element's cube skin has been rebuilt on a shared contract. Read these before touching a skin:
+Every element's cube skin, and every fusion's reaction coat, is built on one shared contract. Read these before touching a skin:
 
 - **Cells** (`healerWorm/elementalCells.js`): each cover cell carries exact world-unit extents to its four borders and a cube-edge flag per border; cells tile each face exactly with no overhang. Instance matrices are unit scale and follow the cubie's full live rotation (roll included); every claim/expiry ramp lives in the shaders off the shared envelope. Cells are centred on stickers, so shaders recover the seam lattice with `fract(local + 0.5)` at any board size.
 - **Shared GLSL/uniforms** (`elementalGlsl.js`, `elementalUniforms.js`): noise, the cell frame, `seamPoint`/`sweepStart` for seam-rooted detail, and shared worm-body / claim-origin uniforms published once per frame. Splice JS numbers into GLSL through `glf()` — `${0}` is an int literal and GLSL ES rejects `float * int`.
 - **Fire** (`ElementalFireSkin.jsx`): lava-crack bed in the grout, opaque cel-banded tongues rooted in the seams (alpha-to-coverage, depth-written), crowns on edges, additive halos/embers. Flames rise toward the camera's up and part around the worm's body.
-- **Water / ice / lightning** (`ElementalSurface.jsx`): one rounded offset shell (edges and corners wrapped, flooding from the claim tile in world space), one compiled program per element. Shell light is added un-encoded and the body only absorbs head-on, so sticker hues survive.
+- **Water / ice / lightning / air, and fusion coats** (`ElementalSurface.jsx`, `SURFACE_MODE`): one rounded offset shell (edges and corners wrapped, flooding from the claim tile in world space), one compiled program per element (a reaction coat compiles per pattern). Shell light is added un-encoded and the body only absorbs head-on, so sticker hues survive.
 - **Nature** (`ElementalGrassSkin.jsx`, `natureMeadow.js`): moss in the grout, grass rooted in the seams and clumped (lusher on edges, clear over sticker centres), ivy over the edges, sparse flowers; grows moss → grass → flowers and wilts on release.
-- **Draw order:** in worm mode cubie bodies are transparent and render at `renderOrder -1` (`Cubie.jsx`); without that, the nearer bodies drew over any cube-wide transparent layer and turned every seam into a black bar.
-
+- **Draw order:** in worm mode cubie bodies are transparent and render at `renderOrder -1` (`Cubie.jsx`, and their batches in `cubieBodyBatches.js`); without that, the nearer bodies drew over any cube-wide transparent layer and turned every seam into a black bar.
 - **Drips and icicles** (`healerWorm/elementalAdornments.js`): water beads run down the side faces to the cube's world-downward edges, swell under the rim and fall along world −Y; ice hangs icicles from the same edges. Both are a second geometry group of the shell's own instanced mesh with their own material (`getElementalAdornmentMaterial`, depths from `elementalShell.js`), so they take the shell's matrices and envelope; the count fits the tier's `adornments` budget (`adornmentSlots`), drips need motion, and both clear the worm's body.
+- **Pipeline**: each `ELEMENTAL_DEFS` entry names its `renderer` (`surface`, `flames` or `blades`); `elementalRenderers.js` says how the frame loop drives it (instanced or per cell, uniform scale or not), and `ElementalCubeSkin` looks the component up in `SKINS`, so an unknown renderer is a soft null. One envelope (`elementalEnvelope` in `elementalLifecycle.js`) drives the skin, particles and light through claim, hold and release; each element's sweep and fade-out pace is in `ELEMENTAL_EXPERIENCE` (`elementalExperience.js`). `resolveElementalQuality` picks one of `ELEMENTAL_TIERS` (`elementalQuality.js`), whose budget bounds cells per face (`skinGrid`), particles, flames, adornments and animation; reduced motion keeps a static themed skin. Per-cell randomness comes from face and cell keys (`elementalSeeds.js`), mirrored in GLSL, never `Math.random`.
+- **Readability**: never hide the cube under opaque boxes. Keep sticker centres quiet for numbers, colours, warnings, bombs, orbs and heals; put the strongest cues on seams, cube edges, corners and outside the surface; tint the light rather than flattening the face colours.
+- **Lifecycle**: a claim sweeps out from the claimed tile instead of lighting every face at once; on release accents stop spawning first, then everything fades together; a new element or recipe hands off through the retiring layer and leaves nothing behind.
+- **Cost**: no per-frame React state, no unbounded arrays or timers, no GPU resources that grow across claims, and cached shared materials and geometries are never disposed by transient children.
+- **State**: a skin never changes the authoritative cube (recolouring or rotating cubies, spending or healing a tile, triggering Chaos, the win). Gameplay effects stay in the sim; the Lightning storm's only change to the cube is an ordinary flip.
+- **Bolts** come from `boltPath.js` (`makeBoltPath`, shared with `ChaosWave` and `ChaosStorm`); never import the Chaos cascade controller or fake Chaos tile events to draw one.
 
-Still planned from the brief below: matched perf profiling on mobile.
-
-### Product intent and current-state reading
-
-Elemental orbs combine temporary presentation with simulation-owned movement, trail and combat effects. The ordered fusion map above is authoritative; the visual design brief below records earlier presentation goals. Claiming an orb sets `sim.elementalType`, freezes the simulation for the short focus shot, then runs a ten-second wash while crawling. That key is mirrored into `wormElementalTheme`; `ElementalAtmosphere` composes the cube skin, particles, and fill light; the HUD shows the same definition; expiry clears the theme. Preserve that single source of truth and pause/tunnel clock behavior.
-
-The five-element pipeline is data-driven in `elementalDefs.js`, but rendering still branches by hand:
-
-- **Water** and **ice** share `ElementalSurface` geometry and select separate shader modes.
-- **Fire** uses per-cell flame sprites from `ElementalFireSkin`.
-- **Nature/grass** reuses `GrassBlades`.
-- `ElementalAtmosphere` supplies generic point particles plus an element-colored light.
-- `ElementalCubeSkin` samples at most a 5×5 grid per face and follows each sampled live tile, so skins move with turning slices and remain bounded on large cubes.
-
-The upgrade should make the **whole cube silhouette, seams, corners, light, and nearby space** express each element—not merely place a different texture over every sticker. The base sticker color, heal state, warning state, markings, raycasting, and worm navigation must remain legible and unchanged. Treat “cube state” below as a visual state layered on top of the authoritative puzzle/simulation state.
-
-### Shared visual grammar
-
-Every element should use the same readable three-scale composition:
-
-1. **Sticker scale:** local material movement and small details that follow live cubies.
-2. **Cube scale:** a distinct silhouette treatment spanning faces—edge flow, corner buildup, crowns, drips, arcs, or volume—so the active element reads from the overview camera.
-3. **World scale:** sparse particles, reactive light, and occasional hero beats around the worm.
-
-Keep a common claim/hold/release envelope. During the 1.8-second focus beat, sweep the effect outward from the claimed tile across the six faces instead of making all cells appear uniformly. During hold, use calm ambient motion with rare accents. During the last 1.25 seconds, stop spawning accents first, then dissolve cube-scale geometry, sticker details, light, and particles together. Element replacement should crossfade or cleanly reset all pooled effects; it must never leave geometry from the previous theme.
-
-Do not hide the cube under six opaque boxes. Preserve a quiet inset over sticker centers for numbers, colors, danger indicators, bombs, orbs, and healing feedback. Put the strongest element cues along sticker edges, cube edges, corners, and outside the surface. Use the active theme to tint existing light, not flatten all face colors into one hue.
-
-### Art direction by orb
-
-#### Water — the cube becomes a moving aquarium
-
-- Replace the repeated “wet tile” reading with one coherent water volume whose wave phase continues across cells while each face still follows live slice motion.
-- Keep animated caustics and specular crests, but bias opacity lower at sticker centers and stronger along rims. Add a thin waterline meniscus around the cube silhouette.
-- Run broad traveling swells across a face, then hand them across adjacent cube edges with phase offsets; do not require a watertight global mesh during slice turns.
-- Add a few face-edge streams and corner droplets that peel away, orbit briefly, and fall upward/downward according to a consistent world gravity. Avoid a dense rain curtain.
-- Around the worm, add a subtle displacement wake, two or three trailing bubbles, and a soft ripple ring when the head crosses a tile boundary. These are visual observers only and must not alter movement.
-- Palette: deep blue body, cyan caustics, white foam accents. Lighting should feel refracted rather than merely blue-tinted.
-
-#### Fire — the cube becomes a banked furnace
-
-- Retain the successful flame-sprite vocabulary, but vary height and timing in coherent gust bands rather than independent identical flames on every sampled cell.
-- Establish a dark ember-crust close to the surface, hot orange fissures along sticker gaps, and taller yellow-white flames concentrated at the silhouette and upper-facing edges.
-- Add a slow heat-haze shell just above the cube and occasional ember vortices that follow the worm’s wake. The haze must not distort HUD or make tile selection inaccurate.
-- Let corners flare in sequence during the claim sweep. During hold, rare localized “whoomph” pulses may briefly brighten one face without implying damage.
-- Around the worm, use warm rim light, a short ember tail, and tiny contact sparks; never obscure bomb fuse colors or warning lights.
-- Palette: near-black red crust, orange body, pale-gold cores. Avoid covering the cube in evenly spaced campfires.
-
-#### Nature — the cube becomes a living terrarium
-
-- Expand beyond identical grass tufts: use low moss/fine grass at sticker centers, thicker blades at gaps, and a few bounded vines that bridge neighboring cells visually without binding their transforms.
-- Grow the treatment in visible stages during the claim beat: moss wash, grass sprout, then vine/flower accents. Reverse with drifting pollen and leaf motes on expiry rather than scaling all blades to zero at once.
-- Give each face a controlled biome rhythm: clusters, clearings, and occasional small flowers or leaves seeded deterministically from face/cell keys. Preserve clean reading zones around gameplay marks.
-- Add vine curls around outer cube edges and small leafy crowns at selected corners. Re-anchor or hide a bridge while either attached slice rotates so no vine stretches through space.
-- Around the worm, bend nearby grass away from the head and emit a restrained pollen wake. This is a renderer-only proximity response.
-- Palette: deep moss shadows, saturated green growth, soft mint highlights, rare warm flower accents. “Nature” is the player-facing label; keep the internal key `grass` unless a migration is deliberately planned.
-
-#### Ice — the cube becomes a carved glacier
-
-- Preserve the faceted plate shader and cracks, but add real silhouette thickness: frosted bevels along outer edges, crystal ridges at corners, and sparse icicles on world-downward edges.
-- Make frost nucleate from the claim tile and branch through gaps; cracks should form a coherent hierarchy (large branch, medium plates, fine grain), not six unrelated noise fields.
-- Use a translucent blue underlayer plus opaque white rim frost so healed green tiles cannot turn the ice muddy while markings remain readable.
-- Add a slow internal light sweep and rare crystal twinkles, capped so the cube never strobes. During expiry, cracks dim, frost retreats, then a few shards sublimate into flakes.
-- Around the worm, add a fine powder trail and a brief crystalline contact glint. Do not change traction or crawler physics.
-- Palette: deep glacial blue shadows, clear cyan body, white rims. Favor hard facets and restrained sparkle over a flat pale film.
-
-#### Lightning — the cube becomes a charged storm cage
-
-Add a fifth `lightning` elemental definition with an electric-violet/blue body, white-hot accent, storm-dark fill light, a bolt badge/icon, a `lightning` particle kind, and Living-style-compatible tile identity. If no dedicated tile style exists, choose an explicit supported fallback rather than adding an invalid catalogue key merely to satisfy the definition test.
-
-- Sticker scale: faint branching charge veins crawl mostly through gaps and rims; individual stickers pulse in short, non-simultaneous groups. Use a dark conductive sheen so white cores have contrast.
-- Cube scale: charge rails trace outer cube edges and jump between selected corners. A low-opacity storm corona breathes around the silhouette. The claim sweep should arrive as one major bolt from the orb impact, then charge each face in sequence.
-- World scale: sparse ion motes drift upward, with momentary local fill flashes when a strike lands. Avoid continuous full-screen bloom.
-- Worm interaction: **superseded by the storm below.** The decorative "worm is a lightning rod" strikes (`ElementalStrikes`, `strikeScheduler`) were removed: a bolt that hurt nothing would teach players to ignore the real ones. See "Lightning is a storm" under Important Notes.
-- Keep strikes fair and readable: never fire during countdown, pause, tunnel transit, death/victory, the elemental focus freeze, or reduced-motion mode; suppress them when the worm target is off-camera; use a minimum cooldown and no back-to-back hits on the same body point.
-- Randomness must be seeded or emitted as render-only events from stable simulation data. Tests must not depend on `Math.random`, and network/replay determinism must not be affected.
-
-### Reusing Chaos-mode bolts safely
-
-`ChaosWave` already owns the desired bolt vocabulary: a jagged white core, colored halo, traveling spark head, ghost trail, optional seam flash/face bloom, and destination impact. Do **not** import the chaos cascade controller or fake chaos tile events to produce lightning-orb strikes.
-
-Instead, refactor the visual primitive without changing Chaos behavior:
-
-1. Extract reusable path construction and a configurable one-shot bolt renderer (working name `ElectricBolt`) from `ChaosWave`.
-2. Keep `ChaosWave` as a thin compatibility wrapper supplying its current speed, cross-face bloom, colors, ghost trail, and completion semantics.
-3. Give the primitive an explicit seed, start/end points, duration/speed, jitter, thickness/glow profile, branch count, and impact options. Avoid hidden per-instance `Math.random` for the lightning theme.
-4. Add a lightweight branch mode for lightning strikes, but cap branches and geometries. Branches should fork late and fade before the main impact; Chaos defaults remain visually identical.
-5. Introduce a lightning-theme strike scheduler/pool owned by the elemental renderer. It reads live worm segment transforms and phase/theme state, but writes nothing back to the sim.
-6. Resolve live source and target positions every frame or snapshot them intentionally. A strike must not remain attached to a stale rest-grid point during a slice ride; conversely, a short ballistic strike may snapshot its target so the bolt does not rubber-band.
-
-### Proposed architecture
-
-- Extend `ELEMENTAL_DEFS` with optional renderer metadata such as `surface`, `particle`, and effect palette fields, while keeping the module dependency-free.
-- Replace growing `if/set` branches in `ElementalCubeSkin` with a small renderer registry keyed by element. Each renderer receives the same sampled cells, live transform mechanism, definition, fade envelope, and quality budget.
-- Split shared lifecycle calculation into one hook/controller so skin, particles, lights, and strikes consume a common `{ claim, hold, release, intensity }` envelope rather than each interpreting `wormBuffs.elementalT` differently.
-- Add cube-scale adornments as a sibling to the cell skin, not as more per-sticker children. Use instancing, pooled sprites/lines, shared geometry/materials, and bounded counts.
-- Keep all scene content under `ElementalAtmosphere` so `HealerWormMode` continues to mount one elemental feature boundary.
-- Add a quality tier derived from existing device/performance conventions: reduce particles, vines, droplets, icicles, bolt branches, and update rates before removing the core identity. Reduced motion keeps a static themed skin/light and disables sweeps, wakes, pulses, and lightning strikes.
-- Audit disposal carefully. Cached shared materials/geometries must not be disposed by transient JSX children; per-strike paths must be returned to a pool or disposed on completion/unmount.
-
-### Implementation sequence
-
-1. **Baseline and guardrails:** capture overview and chase-camera reference images for all four elements at 3×3 and a large supported size; record draw calls/frame time; add tests around the current definition list, lifecycle, offering count, replacement, and expiry.
-2. **Shared lifecycle/registry:** centralize the visual envelope and renderer selection without changing output. Verify slice-following, pause, focus freeze, tunnels, cleanup, and rapid element replacement.
-3. **Cube-scale foundation:** add shared edge/corner masks, deterministic face/cell seeds, quality budgets, and readable-center rules.
-4. **Upgrade one element at a time:** water, fire, nature, then ice. Take matched screenshots and performance readings after each; do not land four half-finished styles in one pass.
-5. **Extract the chaos bolt primitive:** prove `ChaosWave` visual/API compatibility with focused tests before using it elsewhere.
-6. **Add lightning definition and static skin:** wire catalogue, offering, orb shader/badge, HUD, atmosphere, and cube skin. Because offerings place one orb per type on distinct face centers, update placement logic for five types and verify size/occupancy fallbacks rather than assuming the old four-face layout.
-7. **Add worm strikes (done differently: the storm, see Important Notes — gameplay, not render-only):** originally planned as gated render-only scheduling, live segment target lookup, pooling, camera visibility checks, cooldowns, and reduced-motion behavior.
-8. **Polish and accessibility:** tune contrast from both camera modes, cap flashes, validate color readability, profile mobile/large cubes, and document intentional fallbacks.
-
-### Tests and acceptance criteria
-
-- Pure definition tests accept exactly `water`, `fire`, `grass`, `ice`, and `lightning`; every definition has a valid label, colors, icon, supported tile style/fallback, renderer key, and particle kind.
-- Offering tests expect two distinct elemental choices, prove collision/occupancy fallback placement, and prove the first claim leaves its partner available while a fusion clears remaining elemental offerings. Ordered fusion tests also cover base reclaims, catalyst refreshes, timed Story partner supply, and objective credit.
-- Lifecycle tests cover elemental start, replacement, focus freeze, pause/tunnel behavior, full duration, expiry, reset, and store/HUD synchronization. Gameplay effects stay in the simulation; renderers only display them.
-- Visual registry tests prove every canonical type resolves to a renderer and unknown types fail softly without leaking a cached resource.
-- Bolt helper tests use fixed seeds to verify pinned endpoints, bounded jitter, stable branches, degenerate endpoints, and completion exactly once. Existing chaos tests must pass unchanged.
-- Strike scheduler tests use a fake clock and seeded generator to verify cooldown bounds, phase gates, unique/reachable worm targets, reduced-motion suppression, unmount cleanup, and zero simulation writes.
-- Manual checks cover all elements in overview and chase cameras; active slice rotations; 2×2, 3×3, 5×5, and the largest advertised cube; claim while another element is active; pause/resume; tunnel transit; death/victory; low quality; and reduced motion.
-- Performance acceptance: effect object counts stay bounded by quality tier and do not scale quadratically beyond the existing face-grid cap; no per-frame React state updates; no unbounded arrays/timers; no persistent GPU-resource growth across repeated claims.
-- Readability acceptance: face colors, sticker marks, heal/bomb/warning feedback, worm silhouette, and pickup badges remain identifiable throughout every theme. Lightning flashes must remain localized, infrequent, and below an accessibility-safe intensity after reduced-motion/flash settings are applied.
-
-### Explicit non-goals
-
-- Do not recolor or rotate authoritative cubies, consume tile life, heal tiles, trigger chaos propagation, or alter win state.
-- Do not give the four existing elements gameplay powers as part of this art pass.
-- Lightning's strikes are gameplay (see "Lightning is a storm"); they never *control* the worm, and the only change they make to the cube is an ordinary flip.
-- Do not replace the existing orb/badge/HUD language with unrelated assets; extend it consistently.
-- Do not solve cross-face continuity with one monolithic mesh that breaks during live slice rotations.
+Still open: matched performance profiling of the skins on mobile.
 
 ## Flip Cube Main Design and Implementation
 
 The brief for making the Flip Cube the game's hero object lives in `docs/features/flip-cube-main-design.md`. It covers:
 
 - flipped tiles popping out as bouncing flip pads with Möbius-funnel springs;
-- WORM's jump-to-ride tunnel entry, behind a `tunnelEntry` flag;
+- WORM's jump-to-ride tunnel entry, now the only entry rule (`tunnelEntryRule` in `src/worm/healerWorm/padEntry.js` always returns `'pad'`);
 - the Rumbler under the tiles;
 - Mobi's WORM³ lore.
 
-The implementation checkpoint at the top records what is live and what remains planned. Cube/menu pads use `PadProvider` and a separate normal-offset transform. In cube modes (Flip Cube, Chaos), any live flipped face also pops its whole cubie a hair out of the cube — `CUBE_PIECE_POP` (0.1) via `cubeRaisedAmount(size)`, never the full Explode position, so the tunnel shows only as a sliver; carried unflipped faces are platforms, not tunnel entries. Large tunnel anchors follow this finite piece movement, never the small pad’s continuous bounce. Stalk colors use the visible tile’s antipodal back color. WORM raises the whole flipped piece by `WORM_PIECE_POP` (0.355) along each outer face normal, via `wormRaisedAmount(size)`. With `WORM_PAD_HEIGHT` (0.3), its landing meets `WORM_CAUTION_TAPE_TOP` (0.655) on every board size. Caution posts and tape stay on the unraised cube surface; never place them with `raisedPortalPosition`. Raised WORM shells are translucent with depth writing off, and band anchors extend to the lifted tile. The piece eases outward over two seconds while the Möbius band grows from both mouths; pause holds formation and reduced motion finishes it immediately. `PadEnergy` retains the small render-only shudder. Other faces travel with the piece as jumpable platforms, and only flipped faces enter tunnels. `raisedPlatforms.js` handles deliberate jumps and hurries a still-forming platform up to meet the jump (`rushPlatformFormation`). These values live in `src/game/raisedCubie.js` and feed the sim landing, portal visuals, pad renderer and tunnel handoffs; never hard-code them. Demo uses the same raised platforms and deliberate jump entry as live WORM runs. Read the checkpoint and integration contracts before touching pad, tunnel-entry or rumble code.
+The implementation checkpoint at the top records what is live and what remains planned. Cube/menu pads use `PadProvider` and a separate normal-offset transform. In cube modes (Flip Cube, Chaos), any live flipped face also pops its whole cubie out of the cube by `CUBE_PIECE_POP` (0.55) via `cubeRaisedAmount(size)`, so the whole piece and its connecting band show (with flip pads off, `LEGACY_PIECE_POP` (0.1) keeps the old sliver), never the full Explode position; carried unflipped faces are platforms, not tunnel entries. Large tunnel anchors follow this finite piece movement, never the small pad’s continuous bounce. Stalk colors use the visible tile’s antipodal back color. WORM raises the whole flipped piece by `WORM_PIECE_POP` (0.355) along each outer face normal, via `wormRaisedAmount(size)`. With `WORM_PAD_HEIGHT` (0.3), its landing is `WORM_PLATFORM_LANDING_HEIGHT` (0.655) on every board size. Caution posts and tape stand halfway up to it (`WORM_CAUTION_TAPE_TOP` 0.3275) on the unraised cube surface; never place them with `raisedPortalPosition`. Raised WORM shells are translucent with depth writing off, and band anchors extend to the lifted tile. The piece eases outward over two seconds while the Möbius band grows from both mouths; pause holds formation and reduced motion finishes it immediately. `PadEnergy` retains the small render-only shudder. Other faces travel with the piece as jumpable platforms, and only flipped faces enter tunnels. `raisedPlatforms.js` handles deliberate jumps and hurries a still-forming platform up to meet the jump (`rushPlatformFormation`). These values live in `src/game/raisedCubie.js` and feed the sim landing, portal visuals, pad renderer and tunnel handoffs; never hard-code them. Demo uses the same raised platforms and deliberate jump entry as live WORM runs. Read the checkpoint and integration contracts before touching pad, tunnel-entry or rumble code.
