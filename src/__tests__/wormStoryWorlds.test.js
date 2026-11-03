@@ -104,3 +104,12 @@ it('does not apply locked levels or grant themed cosmetics to inventory', () => 
   init(1);
   expect(state().ownedItems).toEqual(owned);
 });
+
+it('uses the static night-sky panorama and Mirror Facets on 10-10, including retries', () => {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    init(100);
+    expect(state().settings.backgroundTheme).toBe('desert');
+    expect(BACKGROUNDS.find(bg => bg.id === state().settings.backgroundTheme)?.file).toBe('desert.exr');
+    expect(Object.values(state().settings.manifoldStyles)).toEqual(Array(6).fill('mirrorFacets'));
+  }
+});

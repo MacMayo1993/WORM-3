@@ -42,70 +42,11 @@ for (const [name, value] of Object.entries(UI_CSS_VARS)) {
   document.documentElement.style.setProperty(name, value)
 }
 
-// Service worker: precaches the app shell so deploys are atomic and repeat
-// visits load from local cache (see VitePWA config). Registration is deferred
-// until after first paint (window load + idle) so precaching the ~3MB shell
-// never competes with the critical boot path. When a new deploy is ready we
-// show a dismissible "update" toast instead of force-reloading (registerType:
-// 'prompt' in vite.config.js) — the page only reloads if the user asks it to.
+// Keep the installed game checking for updates while open and after resume.
+// Applying an update is always an explicit player action.
 import { registerSW } from 'virtual:pwa-register'
-
-const showUpdateToast = (reload) => {
-  if (document.getElementById('worm3-update-toast')) return
-  const toast = document.createElement('div')
-  toast.id = 'worm3-update-toast'
-  toast.setAttribute('role', 'status')
-  toast.style.cssText = [
-    'position:fixed', 'left:50%', 'bottom:max(20px, env(safe-area-inset-bottom))', 'transform:translateX(-50%)',
-    'z-index:99999', 'display:flex', 'align-items:center', 'gap:12px',
-    'padding:10px 14px', 'border-radius:12px',
-    'background:var(--night-sheet)', 'color:var(--night-text)',
-    'border:1px solid var(--night-border)',
-    'box-shadow:0 8px 28px rgba(0,0,0,0.45)',
-    'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
-    'font-size:13px', 'max-width:min(92vw,420px)',
-  ].join(';')
-
-  const label = document.createElement('span')
-  label.textContent = 'A new version is ready.'
-  label.style.cssText = 'flex:1;line-height:1.3'
-
-  const refresh = document.createElement('button')
-  refresh.type = 'button'
-  refresh.textContent = 'Refresh'
-  refresh.style.cssText = [
-    'border:none', 'cursor:pointer', 'border-radius:8px',
-    'padding:6px 14px', 'min-height:48px', 'font:inherit', 'font-weight:700', 'color:#fff',
-    'background:var(--ui-moss)',
-  ].join(';')
-  refresh.addEventListener('click', () => reload())
-
-  const dismiss = document.createElement('button')
-  dismiss.type = 'button'
-  dismiss.setAttribute('aria-label', 'Dismiss')
-  dismiss.textContent = '✕'
-  dismiss.style.cssText = [
-    'border:none', 'cursor:pointer', 'background:transparent',
-    'color:var(--night-text-muted)', 'min-width:48px', 'min-height:48px', 'font:inherit', 'font-size:15px', 'padding:2px 4px',
-  ].join(';')
-  dismiss.addEventListener('click', () => toast.remove())
-
-  toast.append(label, refresh, dismiss)
-  document.body.appendChild(toast)
-}
-
-const registerServiceWorker = () => {
-  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
-  idle(() => {
-    const updateSW = registerSW({
-      onNeedRefresh() {
-        showUpdateToast(() => updateSW(true))
-      },
-    })
-  })
-}
-if (document.readyState === 'complete') registerServiceWorker()
-else window.addEventListener('load', registerServiceWorker, { once: true })
+import { installAppUpdates } from './utils/appUpdates.js'
+installAppUpdates(registerSW)
 
 // After a GitHub Pages deploy, hashed chunk filenames change and the old ones are
 // deleted. A stale tab's next lazy import fails, so reload once to fetch a fresh
