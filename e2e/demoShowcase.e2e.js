@@ -1,10 +1,11 @@
-import { test, expect, openGame, press } from './helpers.js';
+import { test, expect, openGame } from './helpers.js';
 
 for (const phone of [false, true]) {
   test(`opens the main DEMO directly into playable highlights${phone ? ' @phone' : ''}`, async ({ page, errors }) => {
     await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1024, height: 700 });
     await openGame(page);
-    await press(page, /^\s*demo\b/i);
+    // The visible triangle is aria-hidden; target the accessible name, not raw text.
+    await page.getByRole('button', { name: 'Demo', exact: true }).click({ timeout: 45000 });
     const card = page.getByRole('region', { name: 'WORM practice', exact: true });
     await expect(card).toBeVisible({ timeout: 180000 });
     await expect(card).toContainText('Grow, ride, restore');
