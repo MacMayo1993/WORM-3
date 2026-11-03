@@ -106,8 +106,8 @@ export function TunnelInteriorView({ worm, size }) {
         // Show the room through the open entrance before the lens crosses the
         // shell. A phase-boundary fade exposed a dark backing for a few frames.
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
-        const active = inTraversal;
         const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
+        const active = inTraversal || !!tunnel;
         syncInteriorPortals(portals, tunnel, size, expansion);
 
         // Refresh on cube, layout, equipped styles, or a temporary view changing.

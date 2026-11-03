@@ -84,10 +84,17 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       tunnelState.activeTunnelId = 'next-tunnel';
       tunnelState.occupiedTunnelIds = new Set([id]);
       frame(); checkFloor(tunnelRiderDockWidth(size));
+      expect(ribbon.material.uniforms.uRiddenCore.value).toBe(1);
+      // Keep the floor under the tail even after the camera returns outside.
+      tunnelState.active = false;
+      frame();
+      expect(ribbon.material.uniforms.uRiddenCore.value).toBe(1);
+      tunnelState.active = true;
       expect(ribbon.parent.visible).toBe(true);
       const fixed = positions.array.slice();
       tunnelState.occupiedTunnelIds.clear();
       frame();
+      expect(ribbon.material.uniforms.uRiddenCore.value).toBe(0);
       // This route is now an alternate outcome, not part of the worm's body.
       // It must remain visible while another route is occupied.
       expect(ribbon.parent.visible).toBe(true);

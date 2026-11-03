@@ -18,6 +18,7 @@ import {
   blendTunnelPosesInto,
   tunnelExitPoseInto,
   tunnelEntryPoseInto,
+  tunnelEmergencePoseInto,
   CORE_ROOM_MARGIN,
 } from '../worm/tunnelCameraRails.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
@@ -28,6 +29,8 @@ import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { coreZoomLimit, CORE_HALF, CORE_STICKER_OFFSET } from '../3d/antipodalCore.js';
 import { tunnelTraversalT, tunnelCoreScale, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
+import { createExteriorPortals } from '../3d/exteriorPortals.js';
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
@@ -149,7 +152,7 @@ describe('tunnel camera phase transitions', () => {
         tunnelEntryPoseInto(out, tunnel, i / 1000, size, start);
         if (Math.abs(out.cam.y - entry.y) < 0.1) {
           checked = true;
-          expect(Math.hypot(out.cam.x - entry.x, out.cam.z - entry.z)).toBeLessThan(1e-6);
+          expect(Math.hypot(out.cam.x - entry.x, out.cam.z - entry.z)).toBeLessThan(.315);
         }
       }
       expect(checked).toBe(true);
@@ -242,7 +245,7 @@ describe('tunnelCamPoseInto', () => {
           sawOutside = true;
           lateral.subVectors(pose.cam, entry);
           lateral.addScaledVector(normal, -lateral.dot(normal));
-          expect(lateral.length()).toBeLessThan(1e-6);
+          expect(lateral.length()).toBeLessThan(.315);
         }
         expect(sawOutside).toBe(true);
       }
@@ -479,5 +482,53 @@ describe('exterior portal framing', () => {
       expect(portalDist(size)).toBeLessThan(1);
       expect(portalUp(size)).toBeGreaterThan(0);
     }
+  });
+});
+
+
+describe('continuous surface emergence', () => {
+  it.each([2, 3, 5, 15])('threads the outer bore on every exit face at size %s', size => {
+    const pose = makeTunnelCamPose(), end = makeTunnelCamPose(), next = makeTunnelCamPose();
+    const surface = makeTunnelCamPose(), mouth = new THREE.Vector3(), closest = new THREE.Vector3();
+    const segment = new THREE.Line3();
+    const portals = createExteriorPortals();
+    try {
+      for (const [face, normal] of Object.entries(FACE_NORMALS)) for (const raised of [false, true]) {
+        const n = size - 1;
+        const exit = { x: n, y: n, z: n, dirKey: face };
+        exit[face[1].toLowerCase()] = face[0] === 'P' ? n : 0;
+        const entry = { x: 0, y: n, z: 0, dirKey: 'PY' };
+        const tunnel = { entry, exit, padHeight: raised ? WORM_PAD_HEIGHT : 0,
+          padExpansion: raised ? wormRaisedAmount(size) : 0 };
+        getTunnelWorldPosInto(mouth, tunnel, 1, size);
+        const forward = new THREE.Vector3(Math.abs(normal.y) < .9 ? 0 : 1, Math.abs(normal.y) < .9 ? 1 : 0, 0);
+        surface.cam.copy(mouth).addScaledVector(normal, 2).addScaledVector(forward, -2.4);
+        surface.look.copy(mouth); surface.up.copy(normal);
+        portals.update(tunnel, size, tunnel.padExpansion);
+        const bore = portals.uniforms.uExteriorPoints.value;
+        const wall = (size - 1) / 2 * cubeExpansionScale(size, tunnel.padExpansion) + .51;
+        const high = mouth.dot(normal) + .03;
+        let crossings = 0;
+        for (const phase of ['exiting', 'windout']) for (let i = 0; i <= 300; i++) {
+          tunnelEmergencePoseInto(pose, tunnel, phase, i / 300, size, surface, 1);
+          expect(pose.cam.toArray().every(Number.isFinite)).toBe(true);
+          const height = pose.cam.dot(normal);
+          if (Math.abs(height - wall) > .06 && Math.abs(height - high) > .06) continue;
+          let gap = Infinity;
+          for (let j = 9; j < 17; j++) {
+            segment.set(bore[j], bore[j + 1]).closestPointToPoint(pose.cam, true, closest);
+            gap = Math.min(gap, closest.distanceTo(pose.cam));
+          }
+          expect(gap, `${size} ${face} ${raised} ${phase} ${i}`).toBeLessThan(.325);
+          crossings++;
+        }
+        expect(crossings).toBeGreaterThan(0);
+        tunnelEmergencePoseInto(end, tunnel, 'exiting', 1, size, surface);
+        tunnelEmergencePoseInto(next, tunnel, 'windout', 0, size, surface);
+        for (const key of ['cam', 'look', 'up']) expect(end[key].distanceTo(next[key])).toBeLessThan(1e-9);
+        tunnelEmergencePoseInto(end, tunnel, 'windout', 1, size, surface);
+        expect(end.cam.distanceTo(surface.cam)).toBeLessThan(1e-9);
+      }
+    } finally { portals.dispose(); }
   });
 });

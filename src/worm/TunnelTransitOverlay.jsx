@@ -4,7 +4,7 @@
 //
 // A traversal runs through five phases and three different camera regimes —
 // outside watching the dive, inside riding the ribbon, outside again watching
-// the exit. Each cut is motivated, but together they lose the thread: the HUD
+// the exit. Abrupt changes used to lose the thread: the HUD
 // says EXITING while the picture is just a wall of tiles, so the player stops
 // believing they are still inside a wormhole.
 //
@@ -46,20 +46,6 @@ export default function TunnelTransitOverlay() {
     wormPhase === 'tunnel' || wormPhase === 'exiting' || wormPhase === 'windout'
   );
 
-  // The exit is a cut (WormChaseCamera's windout): the lens follows the head up
-  // the tube, then cuts outside as the worm pops out of the hole. A bloom in the
-  // exit tile's colour marks it, as the punch marks the dive in.
-  const exitCutRef = useRef(0);
-  const exitRef = useRef(null);
-  // The camera calls this in the frame it cuts (tunnelProgressBridge.js), so the
-  // bloom's first frame is the cut's frame, not one or two frames after it.
-  useEffect(() => {
-    tunnelState.onExitCut = () => {
-      exitCutRef.current = 1;
-      if (exitRef.current) exitRef.current.style.opacity = String(prefersReducedMotion() ? 0 : 0.55);
-    };
-    return () => { tunnelState.onExitCut = null; };
-  }, []);
   const vignetteRef = useRef(null);
   const fringeRef = useRef(null);
   const seamRef = useRef(null);
@@ -80,17 +66,11 @@ export default function TunnelTransitOverlay() {
       ampRef.current += (target - ampRef.current) * (1 - Math.exp(-dt * (target > ampRef.current ? FADE_IN : FADE_OUT)));
       const amp = ampRef.current;
 
-      // Faster than the overlay's own release: a flash, not a fade.
-      exitCutRef.current = Math.max(0, exitCutRef.current - dt / 0.35);
-      if (exitRef.current) {
-        const cut = exitCutRef.current;
-        exitRef.current.style.opacity = String(reduced ? 0 : cut * cut * 0.55);
-      }
       if (amp < 0.004) {
         if (vignetteRef.current) vignetteRef.current.style.opacity = '0';
         if (fringeRef.current) fringeRef.current.style.opacity = '0';
         if (seamRef.current) seamRef.current.style.opacity = '0';
-        if (!isActive && exitCutRef.current <= 0) { rafRef.current = null; return; }
+        if (!isActive) { rafRef.current = null; return; }
       } else {
         const t = tunnelState.t ?? 0;
         // Where the LENS is (it trails the head by most of a cubie): the crossing
@@ -169,16 +149,7 @@ export default function TunnelTransitOverlay() {
           mixBlendMode: 'screen',
         }}
       />
-      {/* The exit cut's bloom: the exit tile's colour washing in from the rim
-          as the shot jumps from inside the tube to the worm popping out. */}
-      <div
-        ref={exitRef}
-        style={{
-          ...base,
-          background: `radial-gradient(ellipse at 50% 50%, ${exitColor}00 20%, ${exitColor}66 62%, ${exitColor}cc 100%)`,
-          mixBlendMode: 'screen',
-        }}
-      />
+
     </>
   );
 }

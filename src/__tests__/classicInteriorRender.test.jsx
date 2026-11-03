@@ -46,7 +46,7 @@ it.each(['crawling', 'tunnel'])('refreshes Classic interiors from %s without cha
     const coreLayout0 = coreLayout(3), map = buildManifoldGridMap(cubies, 3);
     const checkAppearance = classic => {
       const palette = classic ? RUBIKS_FACE_COLORS : resolveColors(settings);
-      expect(scene.getObjectByName('tunnel-interior').visible).toBe(worm.phase.current === 'tunnel');
+      expect(scene.getObjectByName('tunnel-interior').visible).toBe(true); // an occupied mouth stays open
       expect(walls.children.reduce((n, m) => n + m.count, 0)).toBe(54);
       for (const mesh of walls.children) {
         for (const key of mesh.userData.tileKeys) {

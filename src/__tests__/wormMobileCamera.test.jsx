@@ -51,8 +51,8 @@ function makeWorm(size, dirKey = 'PZ') {
 function render(worm, size, key = 'run', arrivalElapsed) {
   act(() => root.render(<WormChaseCamera key={key} worm={worm} size={size} arrivalElapsed={arrivalElapsed} />));
 }
-function tick() {
-  scene.frame({}, 1 / 60);
+function tick(delta = 1 / 60) {
+  scene.frame({}, delta);
   scene.camera.updateMatrixWorld(true);
 }
 function expectCentered(worm, size) {
@@ -426,7 +426,7 @@ it.each(['PY', 'NX'])('keeps Mega centered at a tunnel mouth and after a %s exit
   for (let i = 0; i < 60; i++) { tick(); expectCentered(worm, size); }
 });
 
-it.each([3, 5, 15])('enters a raised wormhole promptly on a %s cube in phone and desktop views', size => {
+it.each([3, 5, 15])('enters a raised wormhole with a readable head silhouette on a %s cube', size => {
   for (const mobile of [true, false]) {
     scene.mobile = mobile;
     const worm = makeWorm(size, 'PY');
@@ -453,15 +453,19 @@ it.each([3, 5, 15])('enters a raised wormhole promptly on a %s cube in phone and
       const height = scene.camera.position.clone().sub(mouth).dot(normal);
       expect(height).toBeLessThanOrEqual(previousHeight + 1e-8);
       previousHeight = height;
+      if (entering && progress < .3) {
+        // The old .18-unit trail put the lens into the head at the mouth.
+        expect(scene.camera.position.distanceTo(worm.headInterpPos.current)).toBeGreaterThan(.5);
+      }
       if (height < 0 && crossedAt === null) {
         crossedAt = time;
         // The camera enters the mouth, rather than cutting through its tile.
         const lateral = scene.camera.position.clone().sub(mouth).addScaledVector(normal, -height);
-        expect(lateral.length()).toBeLessThan(.01);
+        expect(lateral.length()).toBeLessThan(.325 - .01);
       }
     }
     expect(crossedAt).not.toBeNull();
-    expect(crossedAt).toBeLessThan(1.4);
+    expect(crossedAt).toBeLessThan(2.6);
   }
 });
 
@@ -650,68 +654,64 @@ it.each(['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'])('frames the arrival face-first out
   expect(scene.camera.position.distanceTo(settled)).toBeLessThan(0.2);
 });
 
-// The exit used to fly the lens out of the mouth ahead of the worm (through its
-// head), park it looking back at the hole, swing it half a turn in windout and
-// snap it again on the first crawling frame. Now the lens trails the head up the
-// arm, cuts once as windout starts to the chase crawling resumes from, and the
-// hand-back is still.
-it.each([3, 5, 15])('leaves a raised wormhole with one cut onto the chase it resumes on a %s cube', size => {
-  for (const mobile of [true, false]) {
+// Exit framing is one moving shot across the exit arm, mouth and windout.
+// Regress the previous multi-unit jump at the first windout frame.
+it.each([3, 5, 15].flatMap(size => [30, 60, 120].map(fps => [size, fps])))('leaves a raised wormhole continuously on a %s cube at %s Hz', (size, fps) => {
+  for (const mobile of [true, false]) for (const exitFace of ['NY', 'PX', 'PY']) {
     scene.mobile = mobile;
     const worm = makeWorm(size, 'PY');
-    const tunnel = { entry: tileOnFace(size, 'PY'), exit: tileOnFace(size, 'NY'),
+    const tunnel = { entry: tileOnFace(size, 'PY'), exit: tileOnFace(size, exitFace),
       padExpansion: wormRaisedAmount(size), padHeight: WORM_PAD_HEIGHT };
-    render(worm, size, `exit-${mobile}`); tick();
+    if (exitFace === 'PY') tunnel.exit.x = 0;
+    render(worm, size, `exit-${mobile}-${exitFace}`); tick(1 / fps);
     useGameStore.setState({ wormGamePhase: 'active' });
     worm.activeTunnel.current = tunnel;
     const lens = () => ({ cam: scene.camera.position.clone(), quat: scene.camera.quaternion.clone() });
-    const step = (a, b) => ({ move: a.cam.distanceTo(b.cam), turn: a.quat.angleTo(b.quat) * 180 / Math.PI });
-    worm.phase.current = 'exiting';
-    let previous = null;
-    const armFrames = Math.round(tunnelArmSeconds(tunnel) * 60);
-    let speed = null;
-    for (let frame = 0; frame <= armFrames; frame++) {
-      worm.tunnelProgress.current = frame / armFrames;
-      getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT('exiting', frame / armFrames), size);
-      tick();
-      const now = lens();
-      // The lens keeps pace with the head (fast on a long 15×15 arm), smoothly.
-      if (previous && frame > 1) {
-        const { move } = step(previous, now);
-        if (speed !== null) expect(Math.abs(move - speed)).toBeLessThan(0.03);
-        speed = move;
+    worm.phase.current = 'tunnel';
+    for (let frame = 0; frame <= 60; frame++) {
+      const p = .5 + .5 * frame / 60;
+      worm.tunnelProgress.current = p;
+      getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT('tunnel', p), size);
+      tick(1 / fps);
+    }
+    let previous = lens(), startWindout = null, endWindout = null;
+    for (const phase of ['exiting', 'windout']) {
+      worm.phase.current = phase;
+      if (phase === 'windout') worm.currentNormal.current.copy(FACE_NORMALS[exitFace]);
+      const frames = Math.round((phase === 'exiting' ? tunnelArmSeconds(tunnel) : tunnelHandoffSeconds(tunnel)) * fps);
+      for (let frame = 0; frame <= frames; frame++) {
+        const p = frame / frames;
+        worm.tunnelProgress.current = p;
+        if (phase === 'exiting') getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT(phase, p), size);
+        else getWindWorldPosInto(worm.headInterpPos.current, tunnel, 'exit', 1 - p, size);
+        tick(1 / fps);
+        const now = lens();
+        if (previous) {
+          expect(now.cam.distanceTo(previous.cam)).toBeLessThan(.22 * 60 / fps);
+          // Quaternion smoothing keeps the emerging head in view without a cut.
+          expect(now.quat.angleTo(previous.quat) * 180 / Math.PI, `${mobile} ${exitFace} ${phase} ${p}`).toBeLessThan(16 * 60 / fps);
+        }
+        const ndc = worm.headInterpPos.current.clone().project(scene.camera);
+        expect(Math.max(Math.abs(ndc.x), Math.abs(ndc.y))).toBeLessThan(.95);
+        if (phase === 'windout' && frame === 0) {
+          expect(now.cam.distanceTo(previous.cam)).toBeLessThan(1e-7);
+          startWindout = now;
+        }
+        previous = now;
       }
-      previous = now;
+      if (phase === 'windout') endWindout = lens();
     }
-    worm.phase.current = 'windout';
-    worm.currentNormal.current.copy(FACE_NORMALS.NY);
-    const shots = [], windFrames = Math.round(tunnelHandoffSeconds(tunnel) * 60);
-    for (let frame = 0; frame <= windFrames; frame++) {
-      worm.tunnelProgress.current = frame / windFrames;
-      getWindWorldPosInto(worm.headInterpPos.current, tunnel, 'exit', frame / windFrames, size);
-      tick();
-      shots.push(lens());
-    }
-    // One cut, then a held shot: it only tilts as the lens relaxes from the
-    // tunnel's wide angle (and phones re-centre on the coiling head).
-    for (let i = 1; i < shots.length; i++) {
-      const { move, turn } = step(shots[i - 1], shots[i]);
-      expect(move).toBeLessThan(1e-6);
-      if (!mobile) expect(turn).toBeLessThan(0.2);
-    }
+    expect(endWindout.cam.distanceTo(startWindout.cam)).toBeGreaterThan(.5);
     worm.phase.current = 'crawling';
     worm.pos.current = tunnel.exit;
-    previous = shots.at(-1);
-    for (let frame = 0; frame < 60; frame++) {
-      tick();
-      const now = lens(), { move, turn } = step(previous, now);
-      expect(move).toBeLessThan(0.05);
-      expect(turn).toBeLessThan(1.5);
+    for (let frame = 0; frame < 2 * fps; frame++) {
+      tick(1 / fps); const now = lens();
+      expect(now.cam.distanceTo(previous.cam)).toBeLessThan(.07 * 60 / fps);
+      expect(now.quat.angleTo(previous.quat) * 180 / Math.PI).toBeLessThan(6 * 60 / fps);
       previous = now;
     }
   }
 });
-
 
 it.each([false, true])('lets players inspect and reset the victory cube with reduced motion=%s', still => {
   vi.mocked(prefersReducedMotion).mockReturnValue(still);

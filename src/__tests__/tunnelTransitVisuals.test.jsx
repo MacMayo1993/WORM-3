@@ -36,21 +36,15 @@ it('suppresses the crossing pulse for reduced motion and cancels RAF on unmount'
   act(() => root.render(null));
   expect(vi.getTimerCount()).toBe(0);
 });
-it('marks the exit cut with a bloom in the exit colour that clears on its own', () => {
+it('keeps a continuous, unobstructed overlay across the exit handoff', () => {
   act(() => root.render(<TunnelTransitOverlay />)); frame(100);
-  const bloom = () => Number(host.children[3].style.opacity);
-  expect(bloom()).toBe(0);
   act(() => useGameStore.setState({ wormPhase: 'exiting' })); frame(100);
-  expect(bloom()).toBe(0);
-  // The chase camera calls this in the frame it cuts; the bloom lands in that
-  // frame, before the store has heard about windout.
-  act(() => tunnelState.onExitCut());
-  expect(bloom()).toBeGreaterThan(0.5);
+  const before = Number(host.children[0].style.opacity);
   act(() => useGameStore.setState({ wormPhase: 'windout' })); frame(32);
-  expect(bloom()).toBeGreaterThan(0.3);
-  expect(host.children[3].style.background).toContain('62, 219, 255');
-  act(() => useGameStore.setState({ wormPhase: 'crawling' })); frame(600);
-  expect(bloom()).toBe(0);
+  expect(host.children).toHaveLength(3);
+  expect(Math.abs(Number(host.children[0].style.opacity) - before)).toBeLessThan(.02);
+  act(() => useGameStore.setState({ wormPhase: 'crawling' })); frame(2000);
+  expect([...host.children].every(el => Number(el.style.opacity) === 0)).toBe(true);
 });
 
 it('blooms the identification beat when the lens reaches the centre, not when the head does', () => {
