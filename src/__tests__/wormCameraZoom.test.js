@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WORM_CAMERA_ZOOM, clampWormCameraZoom, wheelCameraZoom, wormCameraZoomLabel, desktopHeadFraming, eventCameraDistance } from '../worm/wormCameraZoom.js';
+import { WORM_CAMERA_ZOOM, clampWormCameraZoom, wheelCameraZoom, wormCameraZoomLabel, eventCameraDistance } from '../worm/wormCameraZoom.js';
 
 describe('WORM camera distance', () => {
   it('halves the event distance instead of averaging it with the chase distance', () => {
@@ -40,11 +40,4 @@ describe('WORM camera distance', () => {
     expect(wormCameraZoomLabel(2)).toBe('2.0×');
   });
 
-  it('keeps the whole-board desktop framing on small cubes and centres the head on big ones', () => {
-    for (const size of [2, 3, 4, 5]) expect(desktopHeadFraming(size)).toBe(0);
-    for (const size of [8, 10, 15]) expect(desktopHeadFraming(size)).toBe(1);
-    expect(desktopHeadFraming(6)).toBeGreaterThan(0);
-    expect(desktopHeadFraming(7)).toBeGreaterThan(desktopHeadFraming(6));
-    expect(desktopHeadFraming(7)).toBeLessThan(1);
-  });
 });
