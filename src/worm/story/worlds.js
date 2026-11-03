@@ -126,7 +126,7 @@ export const STORY_WORLDS = {
   97: world('Inside-Out Deck', 'bioluminescence', 'cave', 'circleInversion', 'branches'),
   98: world('Echo Chamber', 'mondrian', 'stadium', 'opConcentric', 'diagonals', { visualMode: 'lego' }),
   99: world('Twin Strike', 'cyberpunk', 'shanghai', 'holographic', 'diamonds'),
-  100: world('The Center Mirror', 'eclipse', 'nebula', 'mirrorFacets', 'orbit', { farSide: true }),
+  100: world('The Center Mirror', 'eclipse', 'desert', 'mirrorFacets', 'orbit', { farSide: true }),
 
   // Chapter 11 · The Mega Decks
   101: world('Cargo Hold', 'standard', 'stadium', 'galaxy', 'lanes'),
