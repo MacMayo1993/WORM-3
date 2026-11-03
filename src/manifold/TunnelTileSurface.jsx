@@ -81,7 +81,6 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       ${tunnelEnergyGLSL}
       void main() {
         clearTunnelCamera(vTunnelCameraPoint);
-        if (tunnelRiddenUnderside(vTunnelCameraPoint, vUv.x)) discard;
         float core = uRideMode > 0.5 ? uRideCore : 0.5;
         if (uTileSide < 0.5 ? vUv.y >= core : vUv.y < core) discard;
         if (vUv.y > uGrowT * 0.5 && vUv.y < 1.0 - uGrowT * 0.5) discard;

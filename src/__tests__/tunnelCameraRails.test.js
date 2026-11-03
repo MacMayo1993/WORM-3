@@ -18,6 +18,7 @@ import {
   blendTunnelPosesInto,
   tunnelExitPoseInto,
   tunnelEntryPoseInto,
+  windupPoseInto,
   tunnelEmergencePoseInto,
   CORE_ROOM_MARGIN,
 } from '../worm/tunnelCameraRails.js';
@@ -25,7 +26,7 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 import { tunnelBoreRadiusAt as tubeRadiusAt } from '../utils/tunnelPath.js';
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
-import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
+import { getTunnelWorldPosInto, getTunnelWorldPosSmoothInto } from '../worm/wormLogic.js';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { coreZoomLimit, CORE_HALF, CORE_STICKER_OFFSET } from '../3d/antipodalCore.js';
 import { tunnelTraversalT, tunnelCoreScale, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
@@ -87,10 +88,11 @@ describe('diveEase', () => {
 });
 
 describe('tunnel camera phase transitions', () => {
-  it('starts diving immediately and joins the follow rail during the first quarter', () => {
+  it('starts a measured dive and leaves time to watch the worm thread the entrance', () => {
     expect(diveProgress(0)).toBe(0);
     expect(diveProgress(.01)).toBeGreaterThan(0);
-    expect(diveProgress(.16)).toBe(1);
+    expect(diveProgress(.16)).toBeLessThan(0.35);
+    expect(diveProgress(.4)).toBe(1);
   });
 
   it('blends opposite up vectors as rotations, without collapsing the view', () => {
@@ -431,7 +433,9 @@ describe('tunnelCamPoseInto', () => {
           rel.copy(pose.cam).sub(center);
           if (Math.max(Math.abs(rel.x), Math.abs(rel.y), Math.abs(rel.z)) >= room - CORE_ROOM_MARGIN) continue;
           inside++;
-          if (pose.lift > 0.25) raised++;
+          // Tile-sized holes require a proportionally smaller shot. The body
+          // shrinks to the same lane; an absolute 0.25 lift would cross its wall.
+          if (pose.lift > Math.min(0.25, coreOpeningRadius(size, zoom) * 0.6)) raised++;
         }
         expect(inside, JSON.stringify({ size, tunnel })).toBeGreaterThan(0);
         expect(raised / inside, JSON.stringify({ size, tunnel })).toBeGreaterThan(0.5);
@@ -530,5 +534,38 @@ describe('continuous surface emergence', () => {
         expect(end.cam.distanceTo(surface.cam)).toBeLessThan(1e-9);
       }
     } finally { portals.dispose(); }
+  });
+});
+
+
+describe('readable entrance reveal', () => {
+  it.each([3, 5, 15])('shows the worm threading the mouth before following inside at size %s', size => {
+    const start = makeTunnelCamPose(), pose = makeTunnelCamPose();
+    const mouth = new THREE.Vector3(), head = new THREE.Vector3(), line = new THREE.Line3();
+    const hit = new THREE.Vector3(), forward = new THREE.Vector3(), plane = new THREE.Plane();
+    for (const [face, normal] of Object.entries(FACE_NORMALS)) {
+      const n = size - 1, m = Math.floor(size / 2);
+      const entry = { x: m, y: m, z: m, dirKey: face };
+      entry[face[1].toLowerCase()] = face[0] === 'P' ? n : 0;
+      const opposite = (face[0] === 'P' ? 'N' : 'P') + face[1];
+      const exit = { ...entry, dirKey: opposite };
+      exit[face[1].toLowerCase()] = face[0] === 'P' ? 0 : n;
+      const tunnel = { entry, exit };
+      getTunnelWorldPosInto(mouth, tunnel, 0, size);
+      forward.set(Math.abs(normal.y) < .9 ? 0 : 1, Math.abs(normal.y) < .9 ? 1 : 0, 0);
+      windupPoseInto(start, mouth, normal, forward, size);
+      plane.setFromNormalAndCoplanarPoint(normal, mouth);
+      for (const p of [.05, .1, .15, .2]) {
+        tunnelEntryPoseInto(pose, tunnel, p, size, start);
+        getTunnelWorldPosSmoothInto(head, tunnel, tunnelTraversalT('entering', p), size);
+        expect(plane.distanceToPoint(pose.cam)).toBeGreaterThan(.45);
+        expect(plane.distanceToPoint(head)).toBeLessThan(-.04);
+        line.set(pose.cam, head);
+        expect(plane.intersectLine(line, hit)).not.toBeNull();
+        expect(hit.distanceTo(mouth)).toBeLessThan(.315);
+      }
+      tunnelEntryPoseInto(pose, tunnel, 1, size, start);
+      expect(plane.distanceToPoint(pose.cam)).toBeLessThan(0);
+    }
   });
 });

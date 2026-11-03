@@ -1,3 +1,6 @@
+import { tunnelApertureProfileInto } from './tunnelApertureFit.js';
+import { tunnelCoreClipUniforms } from '../../manifold/tunnelCoreClip.js';
+import { tunnelState } from '../tunnelProgressBridge.js';
 import { advanceTunnelBodyClearance, tunnelBodyCameraKeep } from './tunnelBodyClearance.js';
 import { WormPointLight } from '../WormLighting.jsx';
 import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
@@ -210,6 +213,7 @@ export function WormBody({ worm, size }) {
     const characterTimeRef = useRef(0);
     const tunnelStroke = useRef({ side: 0, lift: 0, scale: 1, bank: 0 });
     const rideProfile = useRef(makeTunnelBodyProfile());
+    const apertureProfile = useRef(makeTunnelBodyProfile());
     const rideFit = useRef({ scale: 1, side: 0, lift: 0, shift: 0 });
     const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false, pulses: [], count: worm.tailLength.current });
     const elementalBodyRef = useRef({ active: false, color: new THREE.Color() });
@@ -297,7 +301,11 @@ export function WormBody({ worm, size }) {
         worm.wiggleHeadPosition = _isWiggle ? wiggleHeadRef.current : null;
         const _isPrism = isPrismRef.current;
         const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS;
-        fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
+        tunnelApertureProfileInto(apertureProfile.current, _headPathPoint, _bodyHeadPos,
+            tunnelCoreClipUniforms.uTunnelCoreCenter.value, tunnelCoreClipUniforms.uTunnelCoreHalf.value,
+            size, tunnelState.coreZoom ?? 1);
+        fitTunnelBodyInto(rideFit.current, apertureProfile.current,
+            headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
         worm.tunnelHeadScale *= rideFit.current.scale;
         worm.tunnelHeadShift = rideFit.current.shift;
         // Portal arrival (StoryArrival): the head pops out of a portal on its own
@@ -729,7 +737,10 @@ export function WormBody({ worm, size }) {
                 // scale is in book units, BOOK_BELLY of which make its bead radius.
                 const footprint = isMobi ? 1.45 : _isBook ? BOOK_BELLY : 1;
                 const radius = Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * footprint;
-                const fit = fitTunnelBodyInto(rideFit.current, rideProfile.current, radius,
+                tunnelApertureProfileInto(apertureProfile.current, rideProfile.current, _wormDummy.position,
+                    tunnelCoreClipUniforms.uTunnelCoreCenter.value, tunnelCoreClipUniforms.uTunnelCoreHalf.value,
+                    size, tunnelState.coreZoom ?? 1);
+                const fit = fitTunnelBodyInto(rideFit.current, apertureProfile.current, radius,
                     stroke.side, stroke.lift, _wormDummy.scale.y * (_isBook ? BOOK_BELLY : 1));
                 _wormDummy.scale.multiplyScalar(fit.scale);
                 _wormDummy.position.addScaledVector(_bodyCloneNormal, fit.shift);

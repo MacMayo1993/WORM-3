@@ -13,23 +13,33 @@ export const exteriorPortalGLSL = `
 uniform float uExteriorOpen;
 uniform float uExteriorRadius;
 uniform vec3 uExteriorPoints[${SAMPLES * 2}];
+uniform vec3 uExteriorNormals[2];
+float exteriorPlaneDistance(vec3 point, vec3 start, vec3 end, vec3 normal) {
+  // Only the mouth's own face can open. A corner throat used to drill through
+  // the neighboring perpendicular face as well as its intended sticker.
+  vec3 wall = abs(point);
+  float depth = dot(wall, abs(normal));
+  if (depth + 0.00001 < max(wall.x, max(wall.y, wall.z))) return 1000.0;
+  vec3 edge = end - start;
+  float axial = dot(edge, normal);
+  if (abs(axial) < 0.00000001) return 1000.0;
+  float t = dot(point - start, normal) / axial;
+  if (t < 0.0 || t > 1.0) return 1000.0;
+  // Slice in the face plane, not perpendicular to the curve: oblique routes
+  // must not stretch a circular mouth into a neighboring tile.
+  return length(point - (start + t * edge)) - uExteriorRadius;
+}
 float portalDistance(vec3 point) {
   if (uExteriorOpen < 0.5) return 1000.0;
-  // These materials also cover raised pads, buildings and energy effects.
-  // Clip only inside either bore, regardless of the fragment's orientation.
-  float distanceSq = 1000000.0;
+  float gap = 1000.0;
   for (int i = 0; i < ${SAMPLES - 1}; i++) {
-    vec3 edge = uExteriorPoints[i + 1] - uExteriorPoints[i];
-    vec3 offset = point - uExteriorPoints[i];
-    vec3 radial = offset - edge * clamp(dot(offset, edge) / max(dot(edge, edge), 0.000001), 0.0, 1.0);
-    distanceSq = min(distanceSq, dot(radial, radial));
+    gap = min(gap, exteriorPlaneDistance(point, uExteriorPoints[i],
+      uExteriorPoints[i + 1], uExteriorNormals[0]));
     // WebGL1 array indices must contain constants/loop symbols directly.
-    edge = uExteriorPoints[i + ${SAMPLES + 1}] - uExteriorPoints[i + ${SAMPLES}];
-    offset = point - uExteriorPoints[i + ${SAMPLES}];
-    radial = offset - edge * clamp(dot(offset, edge) / max(dot(edge, edge), 0.000001), 0.0, 1.0);
-    distanceSq = min(distanceSq, dot(radial, radial));
+    gap = min(gap, exteriorPlaneDistance(point, uExteriorPoints[i + ${SAMPLES}],
+      uExteriorPoints[i + ${SAMPLES + 1}], uExteriorNormals[1]));
   }
-  return sqrt(distanceSq) - uExteriorRadius;
+  return gap;
 }`;
 
 // A program is keyed by its source, never by uniform values, so a copy patched
@@ -38,6 +48,7 @@ float portalDistance(vec3 point) {
 // unpatched copies were warming programs the cube never uses, and the first flip
 // of a run linked two dozen programs in one frame.
 const warmupUniforms = { uExteriorOpen: { value: 0 }, uExteriorRadius: { value: INTERIOR_PORTAL_RADIUS },
+  uExteriorNormals: { value: [new THREE.Vector3(), new THREE.Vector3()] },
   uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
 export function exteriorPortalWarmupMaterial(source) {
   const material = source.clone();
@@ -47,6 +58,7 @@ export function exteriorPortalWarmupMaterial(source) {
 
 export function createExteriorPortals() {
   const uniforms = { uExteriorOpen: { value: 0 }, uExteriorRadius: { value: INTERIOR_PORTAL_RADIUS },
+    uExteriorNormals: { value: [new THREE.Vector3(), new THREE.Vector3()] },
     uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
   const path = makeTunnelPath(), center = new THREE.Vector3(), axis = new THREE.Vector3();
   const materials = new Map(), owned = new Set(), originals = new Map();
@@ -106,6 +118,7 @@ export function createExteriorPortals() {
       if (fall) {
         if (snapshot?.fall === fall) return;
         snapshot = { fall };
+        uniforms.uExteriorNormals.value.forEach(normal => normal.copy(fall.normal));
         // A single, tile-sized bore follows the actual inward fall. Duplicate
         // it into both shader slots so no unrelated exit tile opens up.
         for (let side = 0; side < 2; side++) for (let i = 0; i < SAMPLES; i++) {
@@ -119,6 +132,8 @@ export function createExteriorPortals() {
         && snapshot.padHeight === tunnel.padHeight && snapshot.padExpansion === tunnel.padExpansion) return;
       snapshot = { tunnel, size, expansion, padHeight: tunnel.padHeight, padExpansion: tunnel.padExpansion };
       buildTunnelPathForTunnel(path, tunnel, size, expansion);
+      uniforms.uExteriorNormals.value[0].copy(path.nStart);
+      uniforms.uExteriorNormals.value[1].copy(path.nEnd);
       for (let side = 0; side < 2; side++) {
         const mouthArc = side === 0 ? 0 : path.total;
         const innerArc = interiorPortalFrameInto(center, axis, path, side, size / 2 - 1.1);

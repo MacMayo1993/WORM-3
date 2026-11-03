@@ -36,26 +36,16 @@ export function tunnelCameraClearRadius(lift = 0) {
 // Using the rider's published position also keeps mirror captures from moving
 // this opening to their own probe camera.
 //
-// Every band stops at the core shell, except those occupied by the head or
-// recorded tail (uRiddenCore): the lens rides raised above it through the mirror room, so it
-// carries on across the room and into the reflections instead of vanishing
-// with the worm on it. Other routes would only clutter the room.
+// Every visual band stops at the displayed core shell, including the occupied
+// route and recorded tail. Only the worm crosses the uncluttered mirror room;
+// its simulation path and camera route remain continuous behind this clip.
 export const tunnelCameraClearanceGLSL = `
   ${tunnelCoreClipGLSL}
   ${cautionOpeningGLSL}
-  uniform float uCameraClearance, uCameraClearRadius, uRiddenCore;
+  uniform float uCameraClearance, uCameraClearRadius;
   uniform vec3 uCameraAhead, uTunnelCameraPosition;
   bool tunnelCoreHides(vec3 worldPoint) {
-    return uRiddenCore < 0.5 && outsideTunnelCore(worldPoint) < 0.5;
-  }
-  // Inside the core the ridden band makes its half-twist, so the lens, which
-  // banks round the route far more gently, sees part of it from underneath, and
-  // from there the floor would hide the worm riding on top. Seen from below it
-  // keeps only its edges (across is 0 to 1 over the band's width): an outline
-  // of the twist with the worm in view through it. Its floor is its front face.
-  bool tunnelRiddenUnderside(vec3 worldPoint, float across) {
-    return uRiddenCore > 0.5 && !gl_FrontFacing && outsideTunnelCore(worldPoint) < 0.5
-      && min(across, 1.0 - across) > 0.1;
+    return outsideTunnelCore(worldPoint) < 0.5;
   }
   float tunnelCameraVisibility(vec3 worldPoint) {
     if (tunnelCoreHides(worldPoint) || insideCautionOpening(worldPoint)) return 0.0;

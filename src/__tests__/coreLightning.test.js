@@ -51,31 +51,29 @@ describe('core lightning seams', () => {
 });
 
 describe('the ridden band and the core opening', () => {
-  it('runs through the mirror room as a track a little wider than the lane, never wider than the opening', () => {
-    // At the full width of a swollen opening the ridden band was half a unit
-    // across in the mirror room and filled the raised lens edge-on.
+  it('keeps the exterior approach narrower than its actual tile-sized opening', () => {
+    // Interior fragments are clipped, but the visible arms must meet their
+    // smaller holes without covering adjacent stickers.
     for (const size of [2, 3, 5, 10, 15]) {
       expect(coreRiddenBandWidth(size, 1)).toBeCloseTo(coreOpeningBandWidth(size, 1), 10);
       for (let zoom = 1; zoom <= CORE_ZOOM_MAX; zoom += 0.25) {
         const width = coreRiddenBandWidth(size, zoom);
         expect(width).toBeLessThanOrEqual(coreOpeningBandWidth(size, zoom) + 1e-12);
-        expect(width).toBeGreaterThanOrEqual(tunnelRiderDockWidth(size));
+        expect(width).toBeGreaterThan(0);
         expect(width).toBeLessThanOrEqual(Math.max(RIDDEN_TRACK_WIDTH, tunnelRiderDockWidth(size) * 1.5) + 1e-12);
       }
       expect(coreRiddenBandWidth(size, CORE_ZOOM_MAX)).toBeLessThan(0.3);
     }
   });
 
-  it('fills the opening as the core swells, leaving a rim, and never narrows below its tile', () => {
+  it('fills the opening as the core swells while always leaving a rim', () => {
     for (const size of [2, 3, 5, 10, 15]) {
-      expect(coreOpeningBandWidth(size, 1)).toBeCloseTo(tunnelRiderDockWidth(size), 10);
+      expect(coreOpeningBandWidth(size, 1)).toBeCloseTo(coreOpeningRadius(size, 1) * 1.7, 10);
       for (let zoom = 1; zoom <= CORE_ZOOM_MAX; zoom += 0.25) {
         const width = coreOpeningBandWidth(size, zoom);
-        expect(width).toBeGreaterThanOrEqual(tunnelRiderDockWidth(size));
-        if (zoom >= 1.5) {
-          expect(width).toBeLessThan(2 * coreOpeningRadius(size, zoom));
-          expect(width).toBeGreaterThan(1.5 * coreOpeningRadius(size, zoom));
-        }
+        expect(width).toBeGreaterThan(0);
+        expect(width).toBeLessThan(2 * coreOpeningRadius(size, zoom));
+        expect(width).toBeGreaterThan(1.5 * coreOpeningRadius(size, zoom));
       }
     }
   });

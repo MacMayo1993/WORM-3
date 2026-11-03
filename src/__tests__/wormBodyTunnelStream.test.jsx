@@ -1,3 +1,7 @@
+import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { coreOpeningRadius } from '../3d/corePassage.js';
+import { CORE_HALF } from '../3d/antipodalCore.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
 import { makeWiggleSweep, wiggleOffset } from '../worm/healerWorm/wiggleSweep.js';
@@ -14,8 +18,8 @@ import { liveCubies } from '../worm/liveCubies.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
-import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
-import { tunnelTraversalT } from '../utils/tunnelPath.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideWidthAt } from '../utils/tunnelRide.js';
+import { tunnelRiderDockWidth, tunnelTraversalT } from '../utils/tunnelPath.js';
 import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
@@ -810,4 +814,79 @@ it('does not carry exit culling into an ordinary jump in crawling phase', () => 
   worm.jumpLift = () => 0;
   render();
   expect(scaleNear(point)).toBeCloseTo(radius, 6);
+});
+
+
+it.each([3, 15])('fits rendered head and tail through tile-sized apertures on size %i without changing history', size => {
+  const clip = tunnelCoreClipUniforms, oldHalf = clip.uTunnelCoreHalf.value;
+  const oldCenter = clip.uTunnelCoreCenter.value.clone(), oldZoom = tunnelState.coreZoom;
+  const sample = makeTunnelRideFrame(), matrix = new THREE.Matrix4(), actual = new THREE.Vector3(), scale = new THREE.Vector3();
+  const mid = Math.floor(size / 2);
+  act(() => root.render(<Harness worm={worm} size={size} />));
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+  try {
+    for (const corner of [false, true]) for (const zoom of [1, 6]) {
+      const tunnel = corner
+        ? { entry: { x: 0, y: size - 1, z: 0, dirKey: 'PY' }, exit: { x: size - 1, y: 0, z: size - 1, dirKey: 'PZ' } }
+        : { entry: { x: mid, y: mid, z: size - 1, dirKey: 'PZ' }, exit: { x: mid, y: mid, z: 0, dirKey: 'NZ' } };
+      const path = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, size);
+      tunnelState.coreZoom = zoom;
+      clip.uTunnelCoreHalf.value = CORE_HALF * zoom + .002;
+      clip.uTunnelCoreCenter.value.copy(path.midA).multiplyScalar(1 - zoom);
+      const half = clip.uTunnelCoreHalf.value, center = clip.uTunnelCoreCenter.value;
+      const signed = (arc, wall = half) => {
+        tunnelRideFrameInto(sample, path, arc);
+        return Math.max(Math.abs(sample.center.x - center.x), Math.abs(sample.center.y - center.y), Math.abs(sample.center.z - center.z)) - wall;
+      };
+      const crossings = [];
+      for (const wall of [half, CORE_HALF * .9 * zoom]) {
+      let previous = signed(0, wall);
+      for (let i = 1; i <= 600; i++) {
+        const current = signed(path.total * i / 600, wall);
+        if (previous * current < 0) {
+          let lo = path.total * (i - 1) / 600, hi = path.total * i / 600;
+          const sign = signed(lo, wall);
+          for (let j = 0; j < 35; j++) {
+            const middle = (lo + hi) / 2;
+            if (signed(middle, wall) * sign > 0) lo = middle; else hi = middle;
+          }
+          crossings.push((lo + hi) / 2);
+        }
+        previous = current;
+      }
+      }
+      expect(crossings.length).toBeGreaterThanOrEqual(1);
+      for (const arc of crossings) {
+        shReset(sim.stepHistory); sim.phase = 'tunnel'; sim.tailLength = 12;
+        // Populate an actual curved route immediately behind the shell crossing.
+        for (let j = 200; j >= 0; j--) {
+          const behind = Math.max(0, arc - j * .001);
+          tunnelRideFrameInto(sample, path, behind);
+          const profile = { rideWeight: 1, rideWidth: tunnelRideWidthAt(path, behind, tunnelRiderDockWidth(size)),
+            rideClearance: sample.center.distanceTo(sample.floor) };
+          shPush(sim.stepHistory, sample.center, sample.normal, -1, -1, -1, true, profile);
+        }
+        tunnelRideFrameInto(sample, path, arc);
+        const routeCenter = sample.center.clone();
+        sim.headInterpPos.copy(sample.center); sim.currentNormal.copy(sample.normal);
+        Object.assign(sim.tunnelRide, { rideWeight: 1, rideWidth: tunnelRideWidthAt(path, arc, tunnelRiderDockWidth(size)),
+          rideClearance: sample.center.distanceTo(sample.floor) });
+        const original = { ...sim.tunnelRide }, history = JSON.stringify(sim.stepHistory);
+        renderPoints(); mesh.getMatrixAt(0, matrix);
+        actual.setFromMatrixPosition(matrix); scale.setFromMatrixScale(matrix);
+        expect(actual.distanceTo(routeCenter) + scale.x * 1.1).toBeLessThan(coreOpeningRadius(size, zoom));
+        expect(sim.tunnelRide).toEqual(original);
+        expect(JSON.stringify(sim.stepHistory)).toBe(history);
+        expect(mesh.count).toBe(12);
+        // Every nearby body instance is fitted too, not just the head/face.
+        for (let j = 1; j < mesh.count; j++) {
+          mesh.getMatrixAt(j, matrix); actual.setFromMatrixPosition(matrix); scale.setFromMatrixScale(matrix);
+          const wallDistance = Math.abs(Math.max(Math.abs(actual.x - center.x), Math.abs(actual.y - center.y), Math.abs(actual.z - center.z)) - half);
+          if (wallDistance < .015) expect(scale.x).toBeLessThan(coreOpeningRadius(size, zoom) * .5);
+        }
+      }
+    }
+  } finally {
+    clip.uTunnelCoreHalf.value = oldHalf; clip.uTunnelCoreCenter.value.copy(oldCenter); tunnelState.coreZoom = oldZoom;
+  }
 });
