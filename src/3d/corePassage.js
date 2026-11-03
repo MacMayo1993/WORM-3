@@ -1,23 +1,22 @@
 import * as THREE from 'three';
 import { buildTunnelPathForTunnel } from '../worm/wormLogic.js';
-import { makeTunnelPath, TUNNEL_MINI_FACE_R, tunnelRiderDockWidth } from '../utils/tunnelPath.js';
+import { makeTunnelPath, TUNNEL_MINI_FACE_R, tunnelDockWidth, tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { CORE_ZOOM_MAX } from './antipodalCore.js';
 
 // Retain both docks and the centre even when the arms are very unequal.
 // Extra shoulder samples keep the opening on the actual curved ride at 1–6x zoom.
 const LEG_SAMPLES = [0, 24, 8, 8, 24];
 export const CORE_PASSAGE_POINTS = 65;
-// The active aperture grows with the occupied lane; small boards retain their gauge.
-export const coreOpeningRadius = (size, zoom = 1) => tunnelRiderDockWidth(size) * zoom * .45;
+// Bound the aperture diameter by the actual sticker width, including at zoom.
+// Oblique exits stay centred on the route even when it crosses a tile seam.
+export const coreOpeningRadius = (size, zoom = 1) => tunnelDockWidth(size) * zoom * .45;
 // The ridden band plugs into that opening as the core swells: it widens with the
 // hole (leaving a rim) instead of arriving as a sliver of the unzoomed tile, and
-// never narrows below its own tile's width. Width only — the route never moves.
-export const coreOpeningBandWidth = (size, zoom = 1) => Math.max(tunnelRiderDockWidth(size), coreOpeningRadius(size, zoom) * 2 * .85);
-// The band being ridden runs on through the mirror room as the track under the
-// worm, so it widens with the opening only up to a little more than the worm's
-// lane: at the full width of a 6x zoom's opening it was half a unit across, and
-// the raised ride lens, which corkscrews round the route more gently than the
-// band makes its half-twist, saw it edge-on as a sheet filling the frame.
+// stays within the aperture. Width only — the route never moves.
+export const coreOpeningBandWidth = (size, zoom = 1) => coreOpeningRadius(size, zoom) * 2 * .85;
+// Keep the exterior arms near the occupied route modestly wide as the core
+// opens. Their sampled center section remains for rider alignment but is clipped
+// from the mirror room, including reflections.
 export const RIDDEN_TRACK_WIDTH = 0.18;
 export const coreRiddenBandWidth = (size, zoom = 1) =>
   Math.min(Math.max(RIDDEN_TRACK_WIDTH, tunnelRiderDockWidth(size) * 1.5), coreOpeningBandWidth(size, zoom));
@@ -88,9 +87,8 @@ export function updateCorePassage(passage, tunnel, size, expansion) {
   }
 }
 
-// A bounded sight corridor follows the actual head, rather than requiring the
-// lens, opening and a bent route to be collinear. Only the wall between lens
-// and head is opened; the room behind it and distant mirrors stay intact.
+// Retain the live lens/head frame for passage inspection. Visibility is handled
+// by the camera rails through the tile-sized opening, not a second sight bore.
 export function updateCoreSightline(passage, camera, head, size) {
   const u = passage.uniforms;
   u.uSightRadius.value = head ? tunnelRiderDockWidth(size) * 0.55 : 0;
@@ -126,12 +124,9 @@ float portalDistance(vec3 point) {
     }
   }
   float bore = sqrt(distanceSq) - uPassageRadius;
-  vec3 sight = uSightEnd - uSightStart;
-  float sightLengthSq = dot(sight, sight);
-  if (uSightRadius > 0.0 && sightLengthSq > 0.00000001) {
-    float t = clamp(dot(point - uSightStart, sight) / sightLengthSq, 0.0, 1.0);
-    bore = min(bore, length(point - (uSightStart + t * sight)) - uSightRadius);
-  }
+  // A following lens must use the ridden aperture. The previous independent
+  // sight cylinder punched a second opening and widened oblique holes across
+  // neighboring tiles even after the route's radius had been reduced.
   return bore;
 }
 `;

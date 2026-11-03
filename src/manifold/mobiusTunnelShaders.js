@@ -68,7 +68,6 @@ export const fragmentShader = `
   ${tunnelEnergyGLSL}
   void main() {
     clearTunnelCamera(vWorldPos);
-    if (tunnelRiddenUnderside(vWorldPos, vUv.x)) discard;
     float leftFront = uGrowT * 0.5, rightFront = 1.0 - leftFront;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
     float core = uRideMode > 0.5 ? uRideCore : 0.5;

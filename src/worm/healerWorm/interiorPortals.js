@@ -34,9 +34,15 @@ float portalDistance(vec3 point) {
   float gap = 1000.0;
   for (int i = 0; i < 2; i++) {
     vec3 offset = point - uInteriorCenters[i];
-    float along = dot(offset, uInteriorAxes[i]);
-    float radial = length(offset - along * uInteriorAxes[i]);
-    float wallDepth = dot(offset, uInteriorNormals[i]);
+    vec3 normal = uInteriorNormals[i];
+    vec3 wall = abs(point);
+    if (dot(wall, abs(normal)) + 0.00001 < max(wall.x, max(wall.y, wall.z))) continue;
+    float wallDepth = dot(offset, normal);
+    // The wall aperture is circular in its own plane, even when the route
+    // crosses it obliquely. The tube's tangent must not widen the cutout.
+    float axial = dot(uInteriorAxes[i], normal);
+    vec3 crossingOffset = offset - uInteriorAxes[i] * wallDepth / max(abs(axial), 0.00001) * sign(axial);
+    float radial = length(crossingOffset);
     gap = min(gap, max(radial - ${INTERIOR_PORTAL_RADIUS}, abs(wallDepth) - 0.12));
   }
   return gap;

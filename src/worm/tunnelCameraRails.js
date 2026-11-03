@@ -43,9 +43,15 @@ export const portalUp = (size) => 1.3 + size * 0.32;
 // the whole coil, a little behind the landing heading, and with that heading as
 // screen-up so the pitch down from the chase needs no roll.
 const WINDUP_CAM_LIFT = 0.45;
-const WINDUP_CAM_BACK = 0.5;
+const WINDUP_CAM_BACK = 0.85;
+const WINDUP_CAM_SIDE = 0.6;
+const _windupSide = new THREE.Vector3();
 export function windupPoseInto(out, mouth, normal, heading, size) {
-  out.cam.copy(mouth).addScaledVector(normal, portalDist(size) + WINDUP_CAM_LIFT).addScaledVector(heading, -WINDUP_CAM_BACK);
+  // Watch from beside the approaching body, not directly over its spine.
+  // The entry dive converges this offset onto the real aperture before crossing.
+  _windupSide.crossVectors(heading, normal).normalize();
+  out.cam.copy(mouth).addScaledVector(normal, portalDist(size) + WINDUP_CAM_LIFT)
+    .addScaledVector(heading, -WINDUP_CAM_BACK).addScaledVector(_windupSide, WINDUP_CAM_SIDE);
   out.look.copy(mouth);
   out.up.copy(heading);
   return out;
@@ -90,8 +96,11 @@ export const diveEase = (p) => {
   return c * c * c * (c * (c * 6 - 15) + 10);
 };
 
-/** The share of the entry arm the dive takes to land on the follow rail (under 0.6s). */
-export const DIVE_SPAN = 0.16;
+/** Keep the entrance in view while the head threads it, then follow the tail.
+ * The old 0.16 arm beat landed inside in half a second, so the player only saw
+ * the worm disappear under the lens. This deliberate approach takes 1.3–1.5s,
+ * preserving the worm's timing and matching the readable exit reveal. */
+export const DIVE_SPAN = 0.4;
 export const diveProgress = (tp) => diveEase(tp / DIVE_SPAN);
 
 /**
@@ -183,8 +192,10 @@ const climb = x => WALL_CLIMB * (x <= 0 ? 0 : x < WALL_EASE ? x * x / (2 * WALL_
 // Blend width of the smooth minimum between the lift limits.
 const LIFT_BLEND = 0.12;
 const smin = (a, b, k = LIFT_BLEND) => {
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.min(a, b) - h * h * k * 0.25;
+  const width = Math.min(k, Math.max(0, Math.min(a, b)));
+  if (width < 1e-9) return Math.min(a, b);
+  const h = Math.max(width - Math.abs(a - b), 0) / width;
+  return Math.min(a, b) - h * h * width * 0.25;
 };
 
 const _room = {

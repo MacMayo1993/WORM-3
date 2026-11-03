@@ -10,7 +10,6 @@ import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { addMirrorSubject, removeMirrorSubject, warmMirrorPrograms } from '../3d/mirrorSubjects.js';
 import { burrowPair } from '../worm/burrowBridge.js';
 import * as THREE from 'three';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
@@ -31,7 +30,6 @@ import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
 import { makeTunnelEnergyUniforms, tunnelEnergySeed } from './tunnelEnergy.js';
-import { tunnelRiderDockWidth } from '../utils/tunnelPath.js';
 import { coreRiddenBandWidth } from '../3d/corePassage.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
@@ -292,12 +290,12 @@ const MobiusTunnel = ({
   const styled = style1 !== 'solid' || style2 !== 'solid';
   const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
-  // The band being ridden is reflected by the core's mirror room (mirrorSubjects.js).
+  // Warm the on-screen band once, without registering it in the mirror room.
+  // Reflecting even exterior arms would fill the otherwise clear center.
   const rootRef = useRef();
-  const mirrored = useRef({ ridden: false, warmed: false });
+  const warmed = useRef(false);
   const gl = useThree(s => s.gl);
   const scene = useThree(s => s.scene);
-  useEffect(() => () => { if (rootRef.current) removeMirrorSubject(rootRef.current); }, []);
   const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(WORM_IDLE_OPACITY);
@@ -332,8 +330,6 @@ const MobiusTunnel = ({
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
     uCameraClearance: { value: 0 },
-    // 1 while this is the band being ridden: it carries on through the core's mirror room.
-    uRiddenCore:  { value: 0 },
     ...tunnelCameraUniforms,
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
@@ -359,7 +355,6 @@ const MobiusTunnel = ({
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
-    uRiddenCore: uniforms.uRiddenCore,
     ...tunnelCameraUniforms,
     uGrowT: uniforms.uGrowT,
     uTime: uniforms.uTime,
@@ -396,27 +391,16 @@ const MobiusTunnel = ({
     }
     syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
-    // All active connections remain in the interior highway. The shader clears
-    // only fragments near the lens instead of removing whole alternate routes.
+    // Keep exterior connections visible. Every band is clipped at the core
+    // shell; the local lens clearance applies only to the remaining arms.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
-    uniforms.uRiddenCore.value = wormMode && occupied ? 1 : 0;
-    const mirror = mirrored.current, root = rootRef.current;
-    if (root && wormMode) {
-      // Link the variants a ride draws the band with when it appears (with its
-      // own programs), not in the frame the worm dives in: on screen (desktop's
-      // AO composer, which the surface draws through, is off for the ride) and in
-      // the mirror room's capture.
-      if (!mirror.warmed) {
-        mirror.warmed = true;
-        gl.compile?.(root, _state.camera, scene);
-        warmMirrorPrograms(gl, scene, [root]);
-      }
-      const ridden = occupied;
-      if (ridden !== mirror.ridden) {
-        mirror.ridden = ridden;
-        if (ridden) addMirrorSubject(root); else removeMirrorSubject(root);
-      }
+    const root = rootRef.current;
+    if (root && wormMode && !warmed.current) {
+      // The ride disables desktop AO, so link its on-screen variant before
+      // the worm enters. Bands never join the mirror capture's subject layer.
+      warmed.current = true;
+      gl.compile?.(root, _state.camera, scene);
     }
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
     if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
@@ -464,8 +448,8 @@ const MobiusTunnel = ({
 
     // Unoccupied bands follow the enlarged core. Occupied bands keep their route
     // until the last body segment clears; the one being ridden widens with the
-    // opening it dives into, up to the track width it carries on at through the
-    // mirror room (coreRiddenBandWidth).
+    // opening it dives into, capped to a modest exterior approach width.
+    // The sampled crossing remains for alignment but is not drawn in the core.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
     // Keep the last ridden gauge beneath the trailing body. Switching straight
     // to the tiny resting dock when the head finishes made the floor collapse
@@ -473,7 +457,7 @@ const MobiusTunnel = ({
     if (isActive && wormMode) occupiedGaugeRef.current = coreRiddenBandWidth(state.size, tunnelState.coreZoom ?? 1);
     else if (!occupied) occupiedGaugeRef.current = 0;
     const dockW = occupied && wormMode
-      ? Math.max(tunnelRiderDockWidth(state.size), occupiedGaugeRef.current)
+      ? (occupiedGaugeRef.current || coreRiddenBandWidth(state.size, 1))
       : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 

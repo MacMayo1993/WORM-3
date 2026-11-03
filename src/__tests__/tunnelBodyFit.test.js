@@ -1,3 +1,4 @@
+import { tunnelApertureProfileInto } from '../worm/healerWorm/tunnelApertureFit.js';
 import { coreOpeningRadius } from '../3d/corePassage.js';
 import { expect, it } from 'vitest';
 import * as THREE from 'three';
@@ -48,10 +49,13 @@ it('retains the tail gauge independently of the head and clears reused surface s
   expect(untouched).toEqual({ scale: 1, side: 0.04, lift: 0.01, shift: 0 });
 });
 
-it('fits the complete seated head and its face through the occupied aperture even without core zoom', () => {
+it('fits the complete seated rendered head and face through the aperture without changing the gameplay gauge', () => {
   for (const size of [2,3,6,15]) for (const radius of [.092,.16,.22]) {
     const width=tunnelRiderDockWidth(size);
-    const fit=fitTunnelBodyInto({}, {rideWeight:1,rideWidth:width,rideClearance:0},radius,.07,.014);
+    const original = {rideWeight:1,rideWidth:width,rideClearance:0};
+    const profile = tunnelApertureProfileInto({}, original, new THREE.Vector3(.2145,0,0), new THREE.Vector3(), .2145, size, 1);
+    const fit=fitTunnelBodyInto({}, profile,radius,.07,.014);
+    expect(original.rideWidth).toBe(width);
     expect(Math.hypot(fit.shift + radius*fit.scale*1.1 + fit.lift,fit.side)).toBeLessThan(coreOpeningRadius(size));
   }
 });
