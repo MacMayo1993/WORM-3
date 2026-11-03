@@ -19,3 +19,24 @@
   .worm-demo-actions { grid-column: 2; grid-row: 1 / span 5; align-items: center; }
   .worm-demo-card p, .worm-demo-detail { margin: 0; }
 }
+
+/* Challenges leave the cube open. The live strip has no paragraphs or action
+   rows; opening its help is an explicit, paused state. */
+.worm-challenge-card { pointer-events: auto; border: 1px solid var(--hud-border); border-radius: 12px; background: var(--hud-text); color: var(--hud-raised); font-family: var(--ui-font); }
+.worm-challenge-strip { display: flex; align-items: center; gap: 8px; padding: 4px 8px; min-height: 48px; box-sizing: border-box; }
+.worm-challenge-strip > div { flex: 1; min-width: 0; }
+.worm-challenge-strip strong { display: block; font: 800 12px/1.3 var(--heading-font); }
+.worm-challenge-strip span { display: block; font-size: 12px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.worm-challenge-strip > button { flex-shrink: 0; width: 44px; height: 44px; padding: 0; }
+.worm-challenge-card button { min-height: 44px; border: 1px solid #a6b99a; border-radius: 9px; background: var(--hud-ink); color: var(--hud-raised); font: 800 13px/1.2 var(--ui-font); cursor: pointer; }
+.worm-challenge-card button:focus-visible { outline: 3px solid #ffe58a; outline-offset: 2px; }
+.worm-challenge-card button:disabled { opacity: .6; cursor: default; }
+.worm-challenge-details { padding: 0 10px 10px; }
+.worm-challenge-details p { margin: 4px 0 8px; font-size: 13px; line-height: 1.4; }
+.worm-challenge-details small { display: block; margin-bottom: 8px; font-size: 12px; }
+.worm-challenge-actions { display: flex; gap: 6px; }
+.worm-challenge-actions button { flex: 1; min-width: 0; padding: 6px; }
+@media (max-height: 520px) and (min-width: 600px) {
+  .worm-challenge-card.is-expanded { display: grid; grid-template-columns: 1fr 1fr; }
+  .worm-challenge-details { padding-top: 6px; }
+}

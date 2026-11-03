@@ -19,6 +19,8 @@
   padding: 4px 6px; gap: 0;
 }
 .worm-hud-row { min-width: 0; }
+/* These challenges only need length and pause; don't stretch an empty dock. */
+.worm-instrument[data-course="challenges"]:is([data-lesson="body-jump"], [data-lesson="surround"]) .worm-hud-bar { align-self: flex-end; }
 .worm-hud-reserve { flex: 1; min-width: 0; }
 /* Reserve almost the entire bar for the six orb families. */
 .worm-hud-stats { gap: 4px; margin-left: 0; flex-direction: column-reverse; width: 48px; }

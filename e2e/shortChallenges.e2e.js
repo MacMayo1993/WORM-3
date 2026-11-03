@@ -16,29 +16,39 @@ for (const phone of [false, true]) {
     const card = page.getByRole('region', { name: 'WORM short challenges', exact: true });
     await expect(card).toBeVisible({ timeout: 180000 });
     await expect(card).toContainText('Grow, ride, restore');
-    await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
-    await expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+    await expect(card.getByRole('button', { name: 'Start challenge', exact: true })).toBeEnabled();
+    await expect(card.getByRole('button', { name: 'Next challenge', exact: true })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Start challenge', exact: true }).click();
+    await expect(card.locator('.worm-challenge-details')).toHaveCount(0);
+    expect((await card.boundingBox()).height).toBeLessThanOrEqual(70);
+    await card.getByRole('button', { name: 'Challenge options', exact: true }).click();
+    await expect(card).toContainText('Clock pauses during help');
     // Use the suite's software-WebGL action budget: CI can take over 15 seconds
     // to acknowledge this click even after the second challenge has rendered.
-    await card.getByRole('button', { name: 'Skip Exercise', exact: true }).click();
+    await card.getByRole('button', { name: 'Skip challenge', exact: true }).click();
     await expect(card).toContainText('Cross your own route');
-    await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
+    await expect(card.getByRole('button', { name: 'Start challenge', exact: true })).toBeEnabled();
+    await card.getByRole('button', { name: 'Start challenge', exact: true }).click();
+    await expect(card.locator('.worm-challenge-details')).toHaveCount(0);
+    expect((await card.boundingBox()).height).toBeLessThanOrEqual(70);
     await page.screenshot({ path: `/tmp/worm-challenges-${phone ? 'phone' : 'desktop'}.png` });
     expect(errors).toEqual([]);
   });
 }
 
-test('opens the short cube pack through Teach and displays its linked-pair objective', async ({ page, errors }) => {
+test('opens a cube challenge directly with folded, optional guidance', async ({ page, errors }) => {
   await openGame(page, { unlock: true });
   await press(page, /^\s*play\b/i);
   await page.getByRole('button', { name: 'Show TEACH mode', exact: true }).click();
   await page.getByRole('button', { name: 'Learn to solve', exact: true }).click();
   await page.getByRole('button', { name: 'Cube puzzle campaigns', exact: true }).click();
   await page.getByRole('button', { name: 'Play Short Challenges: 0 of 6 complete', exact: true }).click();
-  await page.getByRole('button', { name: 'Play level 502: Two ends, one action', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  const objective = page.getByRole('complementary', { name: 'Story objective', exact: true });
-  await expect(objective).toContainText('Restore the two linked centre tiles with one flip.');
+  await page.getByRole('button', { name: 'Play level 512: Hidden partners', exact: true }).click();
+  const objective = page.getByRole('complementary', { name: 'Challenge objective', exact: true });
+  await expect(objective.locator('.story-objective-content')).toHaveCount(0);
+  expect((await objective.boundingBox()).height).toBeLessThanOrEqual(55);
+  await objective.getByRole('button', { name: /Challenge 2\/6/ }).click();
+  await expect(objective).toContainText('Restore all six faces. Aim for 5 moves.');
   await expect(objective).toContainText('Linked pair');
   await objective.getByText('Read the cube', { exact: true }).click();
   await expect(objective).toContainText('These two tile identities stay linked when layers turn.');

@@ -5,11 +5,11 @@ import { wormPracticeLessons, wormDemoLesson } from '../../game/wormDemoLessons.
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import '../ui/arcadeTheme.css';
 import './wormDemoLesson.css';
-import { ActionCue } from '../ui/ActionCue.jsx';
+import WormChallengeCard from './WormChallengeCard.jsx';
 
 export default function WormDemoLessonCard({ onRetry }) {
   const s = useGameStore(useShallow(s => ({ demoWormCourse: s.demoWormCourse, demoWormLessonIndex: s.demoWormLessonIndex, complete: s.demoWormComplete, started: s.demoWormStarted, prepared: s.demoWormPrepared, start: s.startWormDemoLesson,
-    progress: s.demoWormProgress, alive: s.wormAlive, paused: s.wormPauseMenuOpen,
+    attempt: s.demoWormAttempt, progress: s.demoWormProgress, alive: s.wormAlive, paused: s.wormPauseMenuOpen,
     details: s.wormDeathDetails, phase: s.wormGamePhase, finished: s.demoWormFinished,
     retry: s.restartWormDemoLesson, next: s.nextWormDemoLesson, skip: s.skipWormDemoLesson })));
   const lesson = wormDemoLesson(s);
@@ -24,7 +24,7 @@ export default function WormDemoLessonCard({ onRetry }) {
   const cause = s.details?.cause || s.details?.reason;
   // One line per way a run can end (killWormSim reasons), each naming the rule
   // that ended it and the move that avoids it.
-  const advice = cause === 'lightning' ? 'Lightning struck you. Move off the marked tile, or jump.' : cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
+  const advice = cause === 'challenge-timeout' ? 'Time is up. Plan a shorter route and try again.' : cause === 'lightning' ? 'Lightning struck you. Move off the marked tile, or jump.' : cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
     : cause === 'slice-rotation' || cause === 'rotation' ? 'The turning layer caught you. Move clear of its lights.'
     : cause === 'self-collision' || cause === 'self' ? 'You ran into your own body. Steer around it, or press JUMP to hop over it.'
     : cause === 'caution-fall' ? 'The caution-tape timer ran out. Press left, right or jump during the one-second cue to escape.'
@@ -34,12 +34,12 @@ export default function WormDemoLessonCard({ onRetry }) {
   const index = s.demoWormLessonIndex ?? 0;
   const last = index === lessons.length - 1;
   const nextLabel = last ? challenges ? 'Finish challenges' : 'Next: Flip Cube' : 'Next';
+  if (challenges) return <WormChallengeCard key={`${index}:${s.attempt}`} lesson={lesson} state={s} index={index} count={lessons.length} advice={advice} />;
   return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label={challenges ? "WORM short challenges" : "WORM practice"}>
     <div className="worm-demo-heading"><strong>{lesson.title}</strong><span>{(s.demoWormLessonIndex ?? 0) + 1}/{lessons.length}</span></div>
     <div className="worm-demo-track" role="progressbar" aria-label="WORM practice progress" aria-valuemin={0} aria-valuemax={lessons.length} aria-valuenow={(s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)}>
       <div style={{ width: `${((s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)) / lessons.length * 100}%` }} />
     </div>
-    {challenges && <div className="action-cue-row"><ActionCue kind={s.complete ? 'complete' : dead ? 'danger' : lesson.cue} /></div>}
     <p role="status" aria-live="polite">{s.complete ? lesson.success : dead ? advice : lesson.instruction}</p>
     {s.complete && <div className="worm-demo-detail">{lesson.preview ? 'Demonstration complete. Tap Next to practice the rescue.' : `Goal reached. Keep practicing or tap ${nextLabel}.`}</div>}
     {s.progress && !s.complete && !dead && <div className="worm-demo-detail">{s.progress}</div>}

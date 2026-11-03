@@ -12,18 +12,19 @@ import { makeCubies } from '../game/cubeState.js';
 import { puzzleMode } from '../progression/model.js';
 
 describe('short geometry challenges', () => {
-  it.each(SHORT_CHALLENGE_LEVELS)('$name has an exact, playable short solution using its enabled actions', level => {
+  it.each(SHORT_CHALLENGE_LEVELS)('$name needs planning and has a replayable solution within its target', level => {
     const size = level.cubeSize;
     let board = buildLevelStartState(level, size, { random: () => { throw Error('No random staging'); } });
     expect(checkRubiksWin(board, size)).toBe(false);
-    const line = solveLine(board, size, { maxMoves: level.par });
-    expect(line?.cost).toBe(level.par);
-    expect(line.cost).toBeLessThanOrEqual(3);
-    if (!level.features.rotations) expect(line.turns).toHaveLength(0);
-    if (!level.features.flips) expect(line.flips).toHaveLength(0);
-    for (const move of line.turns) board = rotateSliceCubies(board, size, move.axis, move.sliceIndex, move.dir);
-    for (const tile of line.flips) board = flipStickerPair(board, size, tile.x, tile.y, tile.z, tile.dirKey, buildManifoldGridMap(board, size));
+    // None can be cleared by the old pack's 1–3 action shortcuts. Later boards
+    // must also resist four-action solves; avoid exponential optimal-par claims.
+    expect(solveLine(board, size, { maxMoves: level.id < 513 ? 3 : 4 })).toBeNull();
+    for (const tile of [...level.flipSequence].reverse()) board = flipStickerPair(board, size, tile.x, tile.y, tile.z, tile.dirKey, buildManifoldGridMap(board, size));
+    for (const move of [...level.scrambleSequence].reverse()) board = rotateSliceCubies(board, size, move.axis, move.sliceIndex, -move.dir);
     expect(checkRubiksWin(board, size)).toBe(true);
+    expect(level.par).toBe(level.scrambleSequence.length + level.flipSequence.length);
+    expect(level.par).toBeGreaterThanOrEqual(4);
+    expect(level.par).toBeLessThanOrEqual(9);
   });
 
   it('registers independent selectable challenges without colliding with campaign saves', () => {
@@ -35,12 +36,8 @@ describe('short geometry challenges', () => {
     expect(puzzleMode({ currentLevel: 501, activePackId: 'short-challenges' })).toBe('cube');
   });
 
-  it('focuses an actually flipped pair in the authored puzzles', () => {
-    for (const level of SHORT_CHALLENGE_LEVELS.filter(l => l.actionFocus)) {
-      const board = buildLevelStartState(level, 3), map = buildManifoldGridMap(board, 3);
-      expect(map.get(level.actionFocus)?.sticker.flips, level.name).toBe(1);
-      expect(actionPair(board, 3, map, level.actionFocus, 8)?.ids).toHaveLength(2);
-    }
+  it('does not give away the answer or reuse the tutorial boards’ completion records', () => {
+    expect(SHORT_CHALLENGE_LEVELS.every(level => level.id > 506 && level.actionFocus === null)).toBe(true);
   });
 });
 
