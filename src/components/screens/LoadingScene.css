@@ -578,3 +578,15 @@
     display: none;
   }
 }
+
+/* The ceiling exit's lower edge is the shaft's emission curve (FALL.cut).
+   Match the canvas even before its first frame, with the same centre. */
+.wl-well:first-child::before {
+  top: calc(50% - var(--wl-cube) * 0.209);
+  bottom: calc(50% - var(--wl-cube) * 0.209);
+}
+.wl-well:first-child::after {
+  top: calc(50% - var(--wl-cube) * 0.191);
+  bottom: calc(50% - var(--wl-cube) * 0.191);
+  background: radial-gradient(ellipse 85% 85% at 50% 28%, #101729 0 14%, #2f3a44 34%, #8f9486 66%, #d9d3bf 100%);
+}
