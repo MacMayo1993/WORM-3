@@ -1,6 +1,6 @@
 // One curriculum shared by entry, progression and the progress display.
 export const DEMO_STEPS = [
-  { id: 'worm-traversal', label: 'WORM Practice', num: 1 },
+  { id: 'worm-traversal', label: 'Play WORM', num: 1 },
   { id: 'baby-cube', label: 'First Twist', num: 2 },
   { id: 'twin-paradox', label: 'Meet the Twins', num: 3 },
   { id: 'flip-gateway', label: 'Through the Middle', num: 4 },

@@ -1,3 +1,4 @@
+import { getNextSurfacePosition } from './wormLogic.js';
 import { ElementalAbilityEffects } from './healerWorm/ElementalAbilityEffects.jsx';
 import { StoryArrival } from './healerWorm/StoryArrival.jsx';
 import { arrivalSeconds, skipArrivalTo, storyArrivalPose } from './healerWorm/storyArrival.js';
@@ -150,6 +151,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
     const glowCharacter = useGameStore(s => s.wormCharacter === 'glow');
     const demoMode = useGameStore(s => s.demoMode);
+    const demoCombat = useGameStore(s => s.demoMode && !s.demoWormFinished &&
+        ['combat', 'combat-elements'].includes(wormDemoLesson(s).practiceId ?? wormDemoLesson(s).id));
     const storyBriefing = useGameStore(s => !!s.wormStoryLevel && !s.wormStoryStarted);
     const combatMode = useGameStore(s => s.wormCombatMode);
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
@@ -263,12 +266,21 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // same things that hold the rest of the sim: pause, tunnels, turns, freeze beats.
     const runStorm = (store, delta) => {
         const storm = stormRef.current;
-        if (stormRunRef.current !== store.wormRunId) {
-            stormRunRef.current = store.wormRunId;
+        const demo = wormDemoActive(store);
+        const attempt = demo ? `${store.wormRunId}:${store.demoWormLessonIndex}:${store.demoWormAttempt}` : store.wormRunId;
+        if (stormRunRef.current !== attempt) {
+            stormRunRef.current = attempt;
             clearStorm(storm);
             stormLastTRef.current = 0;
         }
-        const demo = wormDemoActive(store);
+        const lesson = wormDemoLesson(store);
+        const demoStorm = demo && store.demoWormStarted && !store.demoWormFinished &&
+            ['lightning', 'fusion'].includes(lesson.practiceId ?? lesson.id);
+        const recordStormOutcome = id => {
+            const now = useGameStore.getState();
+            if (demoStorm && `${now.wormRunId}:${now.demoWormLessonIndex}:${now.demoWormAttempt}` === attempt)
+                useGameStore.setState({ demoWormHazardCleared: `fusion:${id}` });
+        };
         const element = worm.elementalType.current, partner = worm.elementalPair?.current ?? null;
         const lightning = (element === 'lightning' || partner === 'lightning') && wormBuffs.elementalT > 0;
         // A fused storm plays by its fusion's rule (elementalFusion.js):
@@ -299,12 +311,23 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const crowdedAt = key => worm.powerups.current.some(o => tileKeyOf(o) === key) ||
             worm.specials.current.some(o => tileKeyOf(o) === key) || bombsRef.current.some(b => tileKeyOf(b.tile) === key);
         const fired = tickStorm(storm, Math.min(delta, 0.1), {
-            spawning: lightning && !demo,
+            spawning: lightning && (!demo || demoStorm),
             rng,
             telegraph: fusion === 'cryostorm' ? STORM.telegraph * 2 : STORM.telegraph,
             pick: r => {
                 const body = bodyKeys();
                 const head = worm.pos.current;
+                // Current's laboratory marks the lane ahead rather than random
+                // distant ground. Keep straight at momentum to meet this real,
+                // fully telegraphed bolt; steering away still avoids the effect.
+                if (demoStorm && fusion === 'current') {
+                    let tile = head, heading = worm.moveDir.current;
+                    const steps = Math.max(1, Math.floor((store.wormSpeed || 2) * 1.25 * STORM.telegraph));
+                    for (let i = 0; i < steps; i++) {
+                        tile = getNextSurfacePosition(tile, heading, size); heading = tile.moveDir;
+                    }
+                    return tile;
+                }
                 const avoid = collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, STORM.headSafeTiles);
                 for (const orb of worm.powerups.current) avoid.add(tileKeyOf(orb));
                 for (const orb of worm.specials.current) avoid.add(tileKeyOf(orb));
@@ -333,6 +356,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 worm.staticT.current = FUSION.staticBurstT;
                 worm.feel('boost');
                 if (combatBridge.current) afflictEnemies(combatBridge.current, reach, 'stun', 1.4);
+                recordStormOutcome('lightning-air');
                 continue;
             }
             // Static: a strike near the head discharges into the worm as speed. No harm, no flip.
@@ -348,6 +372,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 worm.feel('heal');
                 for (const k of reach) worm.addPatch(tileOf(k), 'frost');
                 if (combatBridge.current) afflictEnemies(combatBridge.current, collectManifoldRing(spot.tile.x, spot.tile.y, spot.tile.z, spot.tile.dirKey, size, 2), 'freeze', 4);
+                recordStormOutcome('cryostorm');
                 continue;
             }
             worm.feel('cut');
@@ -363,11 +388,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 const bomb = bombsRef.current.find(b => near.has(tileKeyOf(b.tile)));
                 if (bomb) putOutBomb(bomb, store);
                 worm.feel('boost');
+                recordStormOutcome('current');
             }
             // Grounded: a strike on the body goes into the ground and a pad springs up there.
             if (hit?.type === 'cut' && fusion === 'grounded') {
                 hit = null; spared = true;
                 worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL });
+                recordStormOutcome('grounded');
             }
             // The storm belongs to the pickup owner. Never cut or kill that worm,
             // including a mark that lands after the elemental timer runs out.
@@ -385,14 +412,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 }
                 blastApiRef.current?.spawn(flames);
                 if (combatBridge.current) afflictEnemies(combatBridge.current, keys, 'burn', 3);
+                recordStormOutcome('firestorm');
             }
             // Plasma: the struck tile keeps burning.
-            if (fusion === 'plasma' && !hit && !crowdedAt(key)) worm.addPatch(spot.tile, 'fire', { ttl: FUSION.plasmaTtl });
+            if (fusion === 'plasma' && !hit && !crowdedAt(key)) {
+                worm.addPatch(spot.tile, 'fire', { ttl: FUSION.plasmaTtl });
+                recordStormOutcome('plasma');
+            }
             // Nothing on the tile to hurt: it flips, like any flip, but charged. An orb or a
             // bomb sitting there is left whole, and a struck worm takes the bolt instead.
             const crowded = crowdedAt(key);
             if (hit || spared || crowded) continue;
-            if (fusion === 'grounded') { worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL }); continue; }
+            if (fusion === 'grounded') { worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL }); recordStormOutcome('grounded'); continue; }
             if (thunder && (chargeSpringPad(patches, key) || (worm.bouncePads?.current && chargeSpringPad(worm.bouncePads.current, key)))) continue;
             worm.strikeTile(spot.tile);
             // Conductor: the bolt forks through the wet ground to a second tile two away.
@@ -406,7 +437,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     const fork = tileOf(options[Math.floor(rng() * options.length)]);
                     addStormFlash(storm, fork);
                     if (combatBridge.current) strikeEnemies(combatBridge.current, springSlamTiles(fork, size));
-                    worm.strikeTile(fork);
+                    if (worm.strikeTile(fork)) recordStormOutcome('conductor');
                 }
             }
         }
@@ -495,11 +526,51 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     if (stormRef.current === null) stormRef.current = makeStorm();
     const stormRunRef = useRef(null);
     const stormLastTRef = useRef(0);
+    const stormAttempt = useGameStore(s => wormDemoActive(s)
+        ? `${s.wormRunId}:${s.demoWormLessonIndex}:${s.demoWormAttempt}` : s.wormRunId);
+    useEffect(() => {
+        clearStorm(stormRef.current); stormLastTRef.current = 0; stormRunRef.current = stormAttempt;
+    }, [stormAttempt]);
     const slamTilesRef = useRef({ id: '', keys: new Set() }); // the tiles Spring's last landing covers
     // Bumped whenever the live bomb set gains or loses a member, so <HealerBombs>
     // can notice the change without serialising the id list every frame.
     const bombMembershipRef = useRef(0);
     const demoHazardAttemptRef = useRef(null);
+
+    // Reset immediately when the store changes attempts, even while paused.
+    // Preparing the new hazard is separate: its target is only valid after the
+    // crawler has staged the new board on its next frame.
+    useEffect(() => {
+        const identity = s => wormDemoActive(s)
+            ? `${s.wormRunId}:${s.demoWormLessonIndex}:${s.demoWormAttempt}` : null;
+        const clear = () => {
+            demoHazardAttemptRef.current = null;
+            bombsRef.current = []; bombMembershipRef.current++;
+            blastApiRef.current?.clear();
+            autoTimerRef.current = 0; pendingRotRef.current = null; warningProgressRef.current = 0;
+            inverseQueueRef.current = []; turnWatchRef.current = null;
+            resetRotationClock();
+        };
+        return useGameStore.subscribe(identity, (next, previous) => {
+            if (next !== previous && (next !== null || previous !== null)) clear();
+        });
+    }, []);
+
+    const prepareDemoHazards = store => {
+        if (!wormDemoActive(store) || !store.demoWormPrepared) return;
+        const attempt = `${store.wormRunId}:${store.demoWormLessonIndex}:${store.demoWormAttempt}`;
+        if (demoHazardAttemptRef.current === attempt) return;
+        const lesson = wormDemoLesson(store), id = lesson.practiceId ?? lesson.id;
+        // A bomb must not bind to the previous lesson's target while staging.
+        if (id === 'bomb' && !store.demoWormTarget) return;
+        demoHazardAttemptRef.current = attempt;
+        if (id === 'bomb') {
+            bombsRef.current.push({ id: bombSeqRef.current++, tile: store.demoWormTarget, fuse: 25, maxFuse: 25 });
+            bombMembershipRef.current++;
+        }
+        if (id === 'rotation' || (id === 'signature-showcase' && lesson.character === 'book'))
+            inverseQueueRef.current = [{ axis: 'col', sliceIndex: 0, dir: 1 }];
+    };
 
     useEffect(() => subscribeBombRotations(useGameStore, bombsRef), []);
 
@@ -666,6 +737,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
 
         const store = useGameStore.getState();
+        prepareDemoHazards(store);
         if (store.wormJumpRescueActive || worm.jumpRescueHeld?.current) {
             rotationClock.held = true;
             return;
@@ -802,23 +874,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         if ((worm.elementalFocusT?.current ?? 0) > 0) { rotationClock.held = true; return; }
 
         const demo = wormDemoActive(store);
-        const practiceLesson = wormDemoLesson(store).id;
-        if (demo) {
-            const attempt = `${store.wormRunId}:${store.demoWormLessonIndex}:${store.demoWormAttempt}`;
-            if (demoHazardAttemptRef.current !== attempt) {
-                demoHazardAttemptRef.current = attempt;
-                bombsRef.current = []; bombMembershipRef.current++;
-                blastApiRef.current?.clear();
-                autoTimerRef.current = 0; pendingRotRef.current = null; warningProgressRef.current = 0;
-                resetRotationClock();
-                if (practiceLesson === 'bomb' && store.demoWormTarget) {
-                    bombsRef.current.push({ id: bombSeqRef.current++, tile: store.demoWormTarget, fuse: 25, maxFuse: 25 });
-                    bombMembershipRef.current++;
-                }
-                if (practiceLesson === 'rotation') inverseQueueRef.current = [{ axis: 'col', sliceIndex: 0, dir: 1 }];
-            }
-            if (!['bomb', 'rotation'].includes(practiceLesson)) { rotationClock.held = true; return; }
-        }
+        const currentLesson = wormDemoLesson(store);
+        const practiceLesson = currentLesson.practiceId ?? currentLesson.id;
+        const demoRotation = practiceLesson === 'rotation' ||
+            (practiceLesson === 'signature-showcase' && currentLesson.character === 'book');
+        if (demo && practiceLesson !== 'bomb' && !demoRotation) { rotationClock.held = true; return; }
 
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
         {
@@ -985,7 +1045,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // Encounters hold slices, but never hold Story bomb supply or fuses.
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
 
-        if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
+        if (demo && (!demoRotation || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         if (holdsRotationTimer(worm.signature.current)) { rotationClock.held = true; return; }
         rotationClock.held = false;
         // Ice's Cold Snap slows the slice-turn clock (warning included) while Ice is up.
@@ -1110,7 +1170,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <WormLighting><PickupMaterialProvider>
             <WormChaseCamera worm={worm} size={size} arrivalElapsed={spawnTimerRef} />
             <DemoPracticeTargets size={size} />
-            {!demoMode && (combatMode || enemiesEnabled) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
+            {(demoCombat || (!demoMode && (combatMode || enemiesEnabled))) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />

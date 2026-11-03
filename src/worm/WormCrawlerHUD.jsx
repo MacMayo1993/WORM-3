@@ -1425,6 +1425,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const storyStarted = useGameStore(s => s.wormStoryStarted);
     const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex, demoWormCourse: lessonCourse });
     const lessonId = lesson.practiceId ?? lesson.id;
+    const demoRotation = lessonId === 'rotation' || (lessonId === 'signature-showcase' && lesson.character === 'book');
     const previewLesson = demoLesson && lesson.preview;
     const controlsEnabled = wormAlive && (!demoLesson || (practiceRunning && !previewLesson)) && (!storyId || storyStarted);
     const trayRef = useRef(null);
@@ -1528,7 +1529,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const questsMinimized = settings?.wormQuestsMinimized ?? false;
     const toggleQuests = () => useGameStore.getState().setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }));
     const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
-    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lessonId === 'rotation');
+    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || demoRotation);
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
@@ -1554,7 +1555,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {phase === 'crawling' && <FreePlayProgress />}
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
-                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal', 'collect-heal', 'rotation'].includes(lessonId)) && (
+                        {wormAlive && phase === 'crawling' && (!demoLesson || demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && (
                             <div className="worm-hud-reserve">
                                 {showRotationTint && <RotationCountdownHUD />}
                                 <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
@@ -1608,7 +1609,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         {/* Portal Combat keeps the character's ability beside Fire: Spring's slam
                             stuns and Glow's trail burns, so touch players need it as much as Q. */}
                         {combatMode ? <div className="worm-ambient-actions"><SignatureButton compact /><CombatFireButton /></div>
-                            : demoLesson ? lessonId === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
+                            : demoLesson ? ['combat', 'combat-elements'].includes(lessonId) ? <div className="worm-ambient-actions"><SignatureButton compact /><CombatFireButton /></div> : ['signature', 'signature-showcase'].includes(lessonId) && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
                                 {jumpRescue && <JumpRescueCue caution={cautionRescue} pit={pitRescue} watching={previewLesson} />}

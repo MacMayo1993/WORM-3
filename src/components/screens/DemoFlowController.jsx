@@ -1,6 +1,7 @@
 import DemoDialog from './DemoDialog.jsx';
 import DemoProgressBar from './DemoProgressBar.jsx';
-import { WORM_DEMO_LESSON_COUNT } from '../../game/wormDemoState.js';
+import { wormPracticeCount } from '../../game/wormDemoState.js';
+import { wormPracticeLessons } from '../../game/wormDemoLessons.js';
 import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
 import { useDemoTarget } from './useDemoTarget.js';
 import React from 'react';
@@ -31,7 +32,7 @@ const STEP_COMPLETE_NOTE = {
   'flip-gateway': 'Each pair can flip six times before it wears out and turns grey. Tapping a pair home spends a flip; Undo takes one back for free.',
   // Practice isolates each mechanic, so it never shows how a full run is put
   // together — or the enemies that live runs send through the portals.
-  'worm-traversal': 'Full runs start scrambled. Warned layer turns undo the scramble while new tunnels open on a timer; after the last turn, heal every tunnel to win. Enemies can also come through portals: steer to aim, hold Fire.',
+  'worm-traversal': 'These are real gameplay scenes with staged starting positions. Full runs start scrambled and combine them: survive the warned layer turns that undo the scramble, hold Fire to defend against portal enemies, and heal every tunnel to win. The scene picker also opens every ordered fusion and power-up.',
 };
 
 const DEMO_SHELL_STYLE_ID = 'worm3-demo-shell-style';
@@ -973,7 +974,8 @@ const VIEW_SHOWCASE_SEQUENCE = [
 // Next Step button, so the win registers before the next stage arrives.
 const DemoStepComplete = ({ step, onDismiss }) => {
   ensureDemoShellStyle();
-  const completedExercises = useGameStore(s => s.demoWormCompleted.length);
+  const completedExercises = useGameStore(s => wormPracticeLessons(s).filter(lesson => s.demoWormCompleted.includes(lesson.id)).length);
+  const exerciseCount = useGameStore(s => wormPracticeCount(s));
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   const handleDismiss = () => onDismiss?.();
@@ -985,7 +987,7 @@ const DemoStepComplete = ({ step, onDismiss }) => {
         <p className="demo-complete-check">✓</p>
         <p className="demo-beat-sub">Demo {info.num} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
-        {step === 'worm-traversal' && <p className="demo-complete-note">{completedExercises} of {WORM_DEMO_LESSON_COUNT} exercises completed. Replay practice whenever you like.</p>}
+        {step === 'worm-traversal' && <p className="demo-complete-note">{completedExercises} of {exerciseCount} scenes completed. Explore more scenes whenever you like.</p>}
         {STEP_COMPLETE_NOTE[step] && (
           <p className="demo-complete-note">{STEP_COMPLETE_NOTE[step]}</p>
         )}

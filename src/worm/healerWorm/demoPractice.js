@@ -3,12 +3,19 @@ import { getAllSurfaceTiles } from './surfaceTiles.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { getWormholeHealRing, getNextSurfacePosition } from '../wormLogic.js';
+import { getWormholeHealRing, getNextSurfacePosition, buildTunnelLookup } from '../wormLogic.js';
 import { ttReset, ttAt } from '../circularBuffers.js';
 import { resetWormSim, tileKey } from './wormSim.js';
 import { BODY_BALL_SPACING, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from './constants.js';
 import { BODY_JUMP_PATH, seedPracticeBody, trackPracticeBodyJump } from './bodyJumpPractice.js';
 import { bodyCoverageCount } from './bodyCoverage.js';
+import { stageDemoSignature, readDemoSignature } from './demoSignatures.js';
+import { readDemoCombat } from '../combat/demoCombat.js';
+import { SPECIAL_TYPES } from './specialDefs.js';
+import { isViewPower } from './viewPowerups.js';
+import { getFusion } from './elementalFusion.js';
+import { readFusionPractice } from './demoFusionPractice.js';
+import { EXPLODE_AMOUNT } from '../wormExpansion.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 
 export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COLORS[face]) {
@@ -17,7 +24,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   const c = Math.floor(size / 2);
   const ring = ['surround', 'bomb'].includes(lessonId);
   const caution = ['caution-fall', 'caution-rescue'].includes(lessonId);
-  const portal = caution || ['tunnel', 'heal', 'collect-heal'].includes(lessonId);
+  const portal = caution || ['tunnel', 'heal', 'collect-heal', 'tunnel-collapse', 'core-pass'].includes(lessonId);
   const target = { x: c, y: ring ? c : Math.min(size - 2, 3), z: size - 1, dirKey: 'PZ' };
   if (lessonId === 'collect-heal') target.y = size - 2;
   // Start within the live two-tile jump aim window. One deliberate press can
@@ -36,6 +43,16 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   let cubies = makeCubies(size);
   if (portal || lessonId === 'surround') {
     cubies = flipStickerPair(cubies, size, target.x, target.y, target.z, target.dirKey, buildManifoldGridMap(cubies, size));
+  }
+  if (lessonId === 'core-pass') {
+    sim.tailLength = 200;
+    // The live exit advances one floor cell before handing controls back. Put a
+    // second entrance inside that exit's two-cell jump window, not behind it.
+    cubies = flipStickerPair(cubies, size, c, size - 1, 0, 'NZ', buildManifoldGridMap(cubies, size));
+  }
+  if (lessonId === 'tunnel-collapse') {
+    const lookup = buildTunnelLookup(cubies, size, buildManifoldGridMap(cubies, size));
+    for (const { tunnelKey } of lookup.values()) sim.tunnelUseCounts.set(tunnelKey, 2);
   }
   const inventory = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   if (lessonId === 'heal') {
@@ -66,28 +83,71 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     route.delete(tileKey(sim.pos));
     sim.powerups = [...route.values()].map(tile => makeGrowthOrb(tile));
   }
-  if (lessonId === 'magnet' || lessonId === 'signature') {
+  if (['magnet', 'signature', 'water'].includes(lessonId)) {
     sim.powerups = [-1, 1].map(dx => makeGrowthOrb({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ' }));
   }
-  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning', 'air'].includes(lessonId)) {
+  if (SPECIAL_TYPES.includes(lessonId)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lessonId, id: `demo-${lessonId}`, ttl: 9999, maxTtl: 9999 }];
   }
+  if (lessonId === 'lightning') {
+    // All three are off the approach lane: only the real chain discharge can
+    // collect the entire group without steering toward them individually.
+    sim.powerups = [-1, 1, 2].map(dx => makeGrowthOrb({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ' }));
+  }
+  const fusion = lessonId === 'fusion' ? getFusion(lesson.fusionBase ?? 'water', lesson.fusionCatalyst ?? 'ice') : null;
+  if (fusion) {
+    // The camera reveal freezes travel, so these consecutive pickups remain in
+    // reach in either order. No preloaded themes or fabricated fusion credit.
+    const route = [sim.pos];
+    let heading = sim.moveDir;
+    for (let i = 0; i < 6; i++) {
+      const next = getNextSurfacePosition(route.at(-1), heading, size);
+      heading = next.moveDir; route.push(next);
+    }
+    // Earth automatically launches from its first spring. Give that real leap
+    // room to land before claiming the catalyst, so its new pad is usable.
+    const catalystStep = fusion.base === 'grass' ? 6 : 2;
+    sim.specials = [fusion.base, fusion.catalyst].map((type, i) => ({
+      ...route[i === 0 ? 1 : catalystStep], type,
+      id: `demo-fusion-${i}-${type}`, ttl: 9999, maxTtl: 9999,
+    }));
+  }
+  const fusionOrb = fusion?.id === 'steam' ? makeGrowthOrb({ x: c + 1, y: 1, z: size - 1, dirKey: 'PZ' }) : null;
+  if (fusionOrb) sim.powerups.push(fusionOrb);
   const marked = ring || portal || lessonId === 'body-jump' ? { ...target, ring } : null;
-  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
+  const practice = { cubies, inventory, fusion, fusionOrb, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
+  practice.cubies = stageDemoSignature(sim, size, lesson, practice, cubies, inventory, orbColor);
+  return practice;
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
 // jump, pickup, tunnel, ring or hazard lesson.
 export function readWormPractice(sim, practice, lesson, state, size, delta) {
   const lessonId = lesson.practiceId ?? lesson.id;
+  const signature = readDemoSignature(sim, practice, lesson, state, delta);
+  if (signature) return signature;
+  practice.sawSelfPass ||= sim.selfPassPending;
   practice.sawAirJump ||= sim.isJumping && sim.elementalT > 0 && sim.elementalType === 'air' && !sim.rocketActive;
   practice.sawJump ||= sim.isJumping;
   practice.sawBoost ||= sim.boostActiveT > 0;
   practice.sawRocket ||= sim.rocketActive;
   practice.sawShower ||= sim.orbShowerT > 0;
   if (sim.elementalType === lessonId && sim.elementalFocusT <= 0) practice.elementTime += Math.min(delta, 0.05);
+  practice.sawFlameDash ||= sim.elementalAbilities.fireDashT > 0;
+  practice.sawDrift ||= sim.elementalAbilities.driftT > 0;
+  practice.sawSpring ||= sim.isJumping && sim.springLaunch && sim.bouncePads.size > 0;
+  practice.sawExpansion ||= sim.expansionAmount >= EXPLODE_AMOUNT;
+  practice.sawView ||= isViewPower(lessonId) && sim.viewPower === lessonId && sim.viewPowerT > 0;
+  practice.sawChain ||= sim.elementalAbilities.events.some(event => event.kind === 'lightning' && event.tiles.length >= 5);
   let done = false, progress = '';
+  if (isViewPower(lessonId)) {
+    done = practice.sawView && sim.viewPowerT === 0 && sim.viewPower === null && sim.alive;
+    progress = !practice.sawView ? 'Collect the cube-look pickup ahead'
+      : sim.viewPowerT > 0 ? `${Math.ceil(sim.viewPowerT)}s of this cube look — steer across its faces` : 'Your previous cube look is restored';
+  }
   switch (lessonId) {
+    case 'combat':
+    case 'combat-elements': return readDemoCombat(sim.combat, lessonId);
     case 'steer': done = !!state.demoWormSteered; break;
     case 'orbs': done = state.wormSessionOrbs >= DEMO_ORB_GOAL; progress = `${Math.min(DEMO_ORB_GOAL, state.wormSessionOrbs)} / ${DEMO_ORB_GOAL} orbs — watch your tail grow`; break;
     case 'orb-shower':
@@ -128,6 +188,19 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
         : sim.cautionRescue ? 'LEFT, RIGHT or JUMP — save the worm now'
           : 'Keep straight until the caution-tape cue appears';
       break;
+    case 'tunnel-collapse':
+      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.pitTiles.size === 2 && sim.voidTunnelKeys.size === 1 && sim.alive;
+      progress = state.wormTunnelCount === 0 ? 'This tunnel has two previous rides. Jump onto the pad for its third'
+        : sim.pitTiles.size ? 'Both mouths have collapsed into pits — stay clear'
+          : 'Third ride: keep moving until your whole tail clears; the tunnel collapses behind you';
+      break;
+    case 'core-pass':
+      done = practice.sawSelfPass && !sim.selfPassPending && state.wormTunnelCount >= 2 && sim.phase === 'crawling' && sim.alive;
+      progress = practice.sawSelfPass ? 'Passing your own tail inside the Core — ride out safely'
+        : state.wormTunnelCount > 0 && sim.phase === 'crawling' ? 'Head out, tail inside — press Jump now toward the next pad ahead'
+          : state.wormTunnelCount > 0 ? 'As soon as your head exits, press Jump again toward the next pad to pass your tail'
+            : 'Your practice tail is extra long. Jump onto the pad to enter the Core';
+      break;
     case 'tunnel':
     case 'heal':
     case 'collect-heal':
@@ -146,15 +219,36 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       done = lessonId === 'surround' ? sim.healed > 0 && sim.healPauseT <= 0 : state.demoWormHazardCleared === 'bomb';
       break;
     }
+    case 'spring':
+      done = practice.sawSpring && !sim.isJumping && sim.alive && sim.phase === 'crawling';
+      progress = practice.sawSpring ? 'Bounce launched — land safely; the trampoline stays for another visit' : 'Touch the trampoline ahead to launch';
+      break;
+    case 'explode':
+      done = practice.sawExpansion && sim.explodeT === 0 && sim.expansionAmount === 0 && sim.alive;
+      progress = practice.sawExpansion ? (sim.explodeT > 0 ? `${Math.ceil(sim.explodeT)}s — steer over the open gaps` : 'Wait for the cube to settle closed') : 'Collect Explode to open the cube';
+      break;
+    case 'fusion': return readFusionPractice(sim, practice, state);
     case 'rocket': done = practice.sawRocket && !sim.rocketActive && !sim.isJumping; break;
     case 'magnet': done = sim.magnetT > 0 && state.wormSessionOrbs >= 2; break;
-    case 'water': done = practice.elementTime >= 3 && sim.waterMomentum > 0.75; break;
-    case 'fire': done = practice.elementTime >= 3 && [...sim.elementalPatches.values()].some(p => p.type === 'fire'); break;
+    case 'water':
+      done = sim.elementalType === 'water' && sim.waterMomentum >= 0.8 && state.wormSessionOrbs >= 2;
+      progress = `${Math.min(2, state.wormSessionOrbs)} / 2 side-lane orbs swept up at full momentum`;
+      break;
+    case 'fire':
+      done = practice.sawFlameDash && sim.elementalAbilities.fireDashT <= 0 && sim.alive;
+      progress = practice.sawFlameDash ? 'Flame dash fired — finish the burst' : 'Collect Fire, then press Boost to spend your charged flame dash';
+      break;
     // Height alone cannot distinguish a normal jump from consuming a spring.
     case 'grass': done = sim.elementalType === 'grass' && sim.isJumping && !!practice.grassLaunch; break;
-    case 'ice': done = sim.elementalType === 'ice' && sim.isJumping; break;
+    case 'ice':
+      done = practice.sawDrift && sim.elementalAbilities.driftT <= 0 && sim.alive;
+      progress = practice.sawDrift ? 'Drift burst earned — keep moving' : 'Collect Ice, then turn on the ground: finish the slide for a speed burst';
+      break;
     case 'air': done = practice.sawAirJump && !sim.isJumping && sim.phase === 'crawling' && sim.alive; break;
-    case 'lightning': done = practice.elementTime >= 4; break;
+    case 'lightning':
+      done = practice.sawChain && state.wormSessionOrbs >= 3 && sim.alive;
+      progress = `${Math.min(3, state.wormSessionOrbs)} / 3 orbs — collect Lightning to chain across the side lanes`;
+      break;
     case 'signature': done = sim.signature.seq > 0 && (sim.signature.glowTrail?.path.count ?? 0) >= 2; break;
     case 'rotation': done = state.rotationEpoch > practice.rotationEpoch; break;
   }

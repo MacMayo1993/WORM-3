@@ -23,7 +23,7 @@ export const STEP_COPY = {
   'flip-gateway': 'Flipping is how my ship travels: every tile is a door. Send nine tile pairs through the middle, then bring them back home. Start with the face in front of you.',
   'view-showcase': 'There is more to my ship than its surface. Use Next to explore different views of the same cube, all the way in to the Core at its centre.',
   'make-it-yours': 'It’s your ship now too, so make it yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
-  'worm-traversal': 'The crash tore doors open all over my ship. Let’s practice repairs: steer, collect orbs to grow, and jump onto raised flip pads. Complete each practice exercise, then explore Flip Cube and the other modes.',
+  'worm-traversal': 'Take the controls and repair my ship. Collect your own healing energy, ride through the Core, fight a portal enemy, and fuse elemental powers. Play the highlights in order or choose any scene from the picker. Then try Flip Cube, Chaos and Random.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
   // tiles out in twin pairs, and taps heal.

@@ -18,7 +18,7 @@ import { PAIRS, pairPoint } from '../components/intro/introTopology.js';
 import { Vector3 } from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
-import { WORM_DEMO_LESSON_COUNT } from '../game/wormDemoState.js';
+import { wormPracticeCount } from '../game/wormDemoState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { newWormDemo } from '../game/wormDemoState.js';
 import { CONTROL_TOUR_KEYS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
@@ -85,7 +85,7 @@ describe('short demo and retry', () => {
     act(() => result.current.advanceDemoStep('worm-traversal'));
     expect(useGameStore.getState().demoStep).toBe('worm-traversal');
     expect(result.current.demoCelebrationStep).toBeNull();
-    act(() => useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSON_COUNT - 1, demoWormComplete: true }));
+    act(() => useGameStore.setState({ demoWormLessonIndex: wormPracticeCount(useGameStore.getState()) - 1, demoWormComplete: true }));
     act(() => useGameStore.getState().nextWormDemoLesson());
     expect(result.current.demoCelebrationStep).toBe('worm-traversal');
     act(() => result.current.dismissDemoCelebration());
@@ -164,7 +164,7 @@ describe('required curriculum', () => {
     setRotatedCubies: cubies => store().setRotatedCubies(cubies),
     startAnimatedShuffle: (moves, done) => { rotate(moves); done?.(); },
   };
-  it.each(['handleStartDemo', 'handleDemoReplay'])('%s finishes Mobi’s introduction before initializing WORM', action => {
+  it.each(['handleStartDemo', 'handleDemoReplay'])('%s opens directly on a paused playable highlight', action => {
     const armSceneGate = vi.fn();
     const { result, unmount } = renderHook(() => useDemoMode({ ...live, armSceneGate }));
     try {
@@ -172,35 +172,22 @@ describe('required curriculum', () => {
         demoWormCompleted: ['rotation'], wormHealerMode: true, wormPauseMenuOpen: true }));
       const run = store().wormRunId;
       act(() => result.current[action]());
-      expect(store()).toMatchObject({ demoMode: true, demoStep: 'worm-traversal', demoWormLessonIndex: 0,
-        demoWormComplete: false, demoWormFinished: false, demoWormCompleted: [], wormPauseMenuOpen: false, wormHealerMode: false });
-      expect(result.current.demoColdOpenVisible).toBe(true);
-      act(() => vi.advanceTimersByTime(60000));
-      expect(store().wormHealerMode).toBe(false);
-      expect(store().wormRunId).toBe(run);
-      expect(armSceneGate).not.toHaveBeenCalled();
-      act(() => result.current.handleDemoColdOpenContinue());
+      expect(store()).toMatchObject({ demoMode: true, demoStep: 'worm-traversal', demoWormCourse: 'showcase', demoWormLessonIndex: 0,
+        demoWormComplete: false, demoWormFinished: false, demoWormCompleted: [], wormPauseMenuOpen: false,
+        wormHealerMode: true, wormRunId: run + 1, wormPaused: true, demoWormStarted: false });
       expect(result.current.demoColdOpenVisible).toBe(false);
-      expect(result.current.demoStepIntroVisible).toBe(true);
-      act(() => vi.advanceTimersByTime(60000));
-      expect(store().wormHealerMode).toBe(false);
-      expect(store().wormRunId).toBe(run);
-      act(() => result.current.handleDemoStepContinue());
       expect(result.current.demoStepIntroVisible).toBe(false);
-      expect(store()).toMatchObject({ wormHealerMode: true, wormRunId: run + 1, wormPaused: true,
-        demoWormStarted: false, demoWormFinished: false, demoWormLessonIndex: 0 });
       expect(armSceneGate).toHaveBeenCalledTimes(1);
       expect(armSceneGate).toHaveBeenCalledWith('Worm Mode', expect.objectContaining({ eager: true }));
     } finally { unmount(); }
   });
-  it('can leave Mobi’s introduction without ever starting a WORM run', () => {
+  it('can leave the opening scene before playing without leaving WORM active', () => {
     const { result, unmount } = renderHook(() => useDemoMode(live));
     try {
-      const run = store().wormRunId;
       act(() => result.current.handleStartDemo());
       act(() => result.current.handleExitDemo());
       act(() => vi.advanceTimersByTime(60000));
-      expect(store()).toMatchObject({ demoMode: false, wormHealerMode: false, wormRunId: run, showMainMenu: true });
+      expect(store()).toMatchObject({ demoMode: false, wormHealerMode: false, showMainMenu: true });
       expect(result.current.demoColdOpenVisible).toBe(false);
       expect(result.current.demoStepIntroVisible).toBe(false);
     } finally { unmount(); }
@@ -222,11 +209,10 @@ describe('required curriculum', () => {
     const flip = (x, y) => act(() => store().setRotatedCubies(flipStickerPair(store().cubies, store().size, x, y, store().size - 1, 'PZ', buildManifoldGridMap(store().cubies, store().size))));
     try {
       act(() => result.current.handleStartDemo());
-      act(() => result.current.handleDemoColdOpenContinue());
-      enter('worm-traversal');
+      expect(store().demoStep).toBe('worm-traversal'); seen.push('worm-traversal');
       // Physics outcomes for each exercise are covered in wormDemoPractice;
       // this boundary starts at the last achieved goal, then uses the real Next.
-      act(() => useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSON_COUNT - 1, demoWormComplete: true }));
+      act(() => useGameStore.setState({ demoWormLessonIndex: wormPracticeCount(useGameStore.getState()) - 1, demoWormComplete: true }));
       act(() => store().nextWormDemoLesson());
       celebrate('worm-traversal');
       enter('baby-cube');
