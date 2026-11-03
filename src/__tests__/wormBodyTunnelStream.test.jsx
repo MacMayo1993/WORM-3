@@ -735,3 +735,79 @@ it('clears pickup presentation on retry while retaining the equipped skin materi
   expect(worm.pickupHeadScale).toBe(1);
   expect(mesh.count).toBeLessThanOrEqual(sim.tailLength);
 });
+
+// Read the production instance nearest a fixed world point, rather than relying
+// on instance indices: culling compacts the rendered instance buffer.
+function scaleNear(point) {
+  const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), scale = new THREE.Vector3();
+  let nearest = Infinity, radius = 0;
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, matrix); position.setFromMatrixPosition(matrix);
+    const distance = position.distanceTo(point);
+    if (distance < nearest) {
+      nearest = distance; scale.setFromMatrixScale(matrix); radius = scale.x;
+    }
+  }
+  return nearest < 1e-4 ? radius : 0;
+}
+
+function prepareClearanceExit() {
+  shReset(sim.stepHistory);
+  sim.activeTunnel = route;
+  for (const phase of ['entering', 'tunnel', 'exiting', 'windout']) traverse(phase);
+  const points = renderPoints();
+  const point = points[8].clone(), radius = scaleNear(point);
+  const camera = new THREE.PerspectiveCamera();
+  // A real lens just above a trailing bead. Below-camera exemption keeps this
+  // bead visible except inside the smooth contact zone.
+  camera.position.copy(point).add(new THREE.Vector3(0, 0.15, 0));
+  camera.lookAt(point.clone().add(new THREE.Vector3(0, 0, -1)));
+  const render = (delta = 1 / 60) => act(() => frame({ camera }, delta));
+  render(1);
+  return { point, radius, camera, render };
+}
+
+function leaveClearanceExit() {
+  sim.phase = 'crawling'; sim.activeTunnel = null;
+  sim.headInterpPos.addScaledVector(sim.currentNormal, -WORM_LIFT);
+}
+
+it('restores real camera-obscured body instances smoothly through windout to crawling', () => {
+  const { point, radius, render } = prepareClearanceExit();
+  const before = scaleNear(point);
+  expect(before).toBeGreaterThan(radius * 0.1);
+  expect(before).toBeLessThan(radius * 0.9);
+  leaveClearanceExit(); render();
+  const handoff = scaleNear(point);
+  expect(handoff).toBeGreaterThan(before);
+  expect(handoff - before).toBeLessThan(radius * 0.27);
+  render(1);
+  expect(scaleNear(point)).toBeCloseTo(radius, 6);
+});
+
+it.each(['wormPaused', 'wormAlive'])('holds real body clearance while %s freezes animation', key => {
+  const { point, render } = prepareClearanceExit();
+  leaveClearanceExit(); render();
+  const before = scaleNear(point);
+  useGameStore.setState({ [key]: key === 'wormPaused' });
+  render(1);
+  expect(scaleNear(point)).toBeCloseTo(before, 7);
+});
+
+it('clears the camera handoff on a new run', () => {
+  const { point, radius, render } = prepareClearanceExit();
+  leaveClearanceExit(); render();
+  expect(scaleNear(point)).toBeLessThan(radius * 0.9);
+  act(() => useGameStore.setState({ wormRunId: (useGameStore.getState().wormRunId ?? 0) + 1 }));
+  render();
+  expect(scaleNear(point)).toBeCloseTo(radius, 6);
+});
+
+it('does not carry exit culling into an ordinary jump in crawling phase', () => {
+  const { point, radius, render } = prepareClearanceExit();
+  leaveClearanceExit();
+  sim.isJumping = true;
+  worm.jumpLift = () => 0;
+  render();
+  expect(scaleNear(point)).toBeCloseTo(radius, 6);
+});

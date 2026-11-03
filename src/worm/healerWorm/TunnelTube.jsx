@@ -13,9 +13,10 @@ import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getTunnelWorldPosInto } from '../wormLogic.js';
+import { buildTunnelPathForTunnel } from '../wormLogic.js';
 import { diveProgress } from '../tunnelCameraRails.js';
-import { tunnelBoreRadiusAt, tunnelTraversalT } from '../../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelBoreRadiusAt, tunnelTraversalT, tunnelPathArcToT, tunnelPathTToArc } from '../../utils/tunnelPath.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideSampleArc } from '../../utils/tunnelRide.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
@@ -42,20 +43,16 @@ const OP_ENTER = 0.20;
 const OP_LERP_IN = 6;
 const OP_LERP_OUT = 9;
 
-const _c0 = new THREE.Vector3();
-const _c1 = new THREE.Vector3();
-const _tan = new THREE.Vector3();
-const _prevTan = new THREE.Vector3();
-const _nrm = new THREE.Vector3();
-const _bin = new THREE.Vector3();
-const _q = new THREE.Quaternion();
-const _tmp = new THREE.Vector3();
+const _frame = makeTunnelRideFrame();
 
 const vertexShader = `
+  attribute float aDistance;
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vWorldPoint;
   void main() {
     vUv = uv;
+    vDistance = aDistance;
     vWorldPoint = (modelMatrix * vec4(position, 1.0)).xyz;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
@@ -75,6 +72,7 @@ const fragmentShader = `
   uniform float uHead;
   uniform float uDirection;
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vWorldPoint;
   ${tunnelFinishGLSL}
   ${tunnelCoreClipGLSL}
@@ -83,7 +81,7 @@ const fragmentShader = `
     if (outsideTunnelCore(vWorldPoint) < 0.5) discard;
     float y = vUv.y;
     float angle = vUv.x * 6.2831853;
-    float twist = angle - y * 3.14159265;
+    float twist = angle; // The shared physical frame already carries the half-turn.
     float coreDistance = abs(y - 0.5);
     float mouth = smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.92, 1.0, y));
 
@@ -94,20 +92,19 @@ const fragmentShader = `
     vec3 laneColor = mix(uColorA, uColorB, 0.5 + 0.5 * sin(twist));
     vec3 hot = mix(laneColor, vec3(0.94, 0.98, 1.0), 0.65);
     float panel = 0.5 + 0.5 * cos(twist * 2.0);
-    float flow = 0.5 + 0.5 * sin(y * 12.5663706 - uTime * 0.65);
+    float flow = 0.5 + 0.5 * sin(vDistance * 2.0 - uTime * 0.65 * uDirection);
     // Travelling light gives the anchored arches depth without moving the
     // physical route. Reverse visits carry the stream toward their own exit.
-    float stream = pow(0.5 + 0.5 * cos(y * 25.132741 - uTime * 3.2 * uDirection), 6.0);
+    float stream = pow(0.5 + 0.5 * cos(vDistance * 4.0 - uTime * 2.2 * uDirection), 6.0);
 
-    // Eight slow depth stations and two continuous guide rails. All sharp
+    // Fixed world-distance depth stations and two quiet guide rails. All sharp
     // features are filtered in screen space, including the twisting rails.
-    float hoop = tunnelLine(y * 8.0, 0.03);
+    float hoop = tunnelLine(vDistance / 0.65, 0.025);
     float rail = tunnelLine(twist / 3.14159265, 0.025);
-    float spiral = tunnelLine(vUv.x * 2.0 - y * 3.0 + uTime * 0.16, 0.02);
     float railHalo = 0.5 + 0.5 * cos(twist * 2.0);
     railHalo *= railHalo;
-    float nearHead = exp(-pow((y - uHead) / 0.22, 2.0));
-    float arrival = exp(-pow((y - uHead - 0.08) / 0.09, 2.0));
+    float nearHead = exp(-pow((vDistance - uHead) / 0.8, 2.0));
+    float arrival = exp(-pow((vDistance - uHead - 0.35 * uDirection) / 0.3, 2.0));
 
     vec3 col = base * (0.48 + panel * 0.14 + flow * 0.04 + nearHead * 0.10);
     col += hot * hoop * (0.32 + nearHead * 0.12);
@@ -115,16 +112,15 @@ const fragmentShader = `
     col += hot * hoop * stream * 0.18;
     col += laneColor * railHalo * 0.08;
     col += hot * arrival * hoop * 0.20;
-    col += hot * spiral * 0.22;
 
     // Keep illumination continuous through the half-twist; no dark midpoint
     // dip or white wash hiding the worm during the camera's orientation change.
     float seam = 1.0 - smoothstep(0.0, 0.14, coreDistance);
     col += hot * seam * railHalo * 0.08;
     float coreWindow = smoothstep(0.10, 0.24, coreDistance);
-    // Depth stations carry the route; keep the moving spiral subordinate so
+    // Depth stations carry the route; leave the space between them open so
     // the worm and the mirrored room remain the focal points without bloom.
-    float wall = (hoop * 0.17 + rail * 0.07 + spiral * 0.025) * coreWindow;
+    float wall = (hoop * 0.20 + rail * 0.055) * coreWindow;
     float alpha = wall * mouth * uOpacity;
     if (alpha < 0.008) discard;
     gl_FragColor = vec4(col, alpha);
@@ -135,6 +131,7 @@ const fragmentShader = `
 function createTubeGeometry() {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(VERT_COUNT * 3), 3));
+  geo.setAttribute('aDistance', new THREE.BufferAttribute(new Float32Array(VERT_COUNT), 1));
   geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(VERT_COUNT * 2), 2));
 
   const idx = [];
@@ -172,6 +169,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
   const builtForRef = useRef(null);
 
   const geo = useMemo(() => createTubeGeometry(), []);
+  const path = useMemo(() => makeTunnelPath(), []);
   const uniforms = useMemo(() => ({
     ...tunnelCoreClipUniforms,
     uColorA:  { value: new THREE.Color('#00aaff') },
@@ -192,39 +190,13 @@ function TunnelTubeSlot({ slot, worm, size }) {
     const pos = geo.attributes.position.array;
     const uv = geo.attributes.uv.array;
 
-    // Seed the transported frame with any vector not parallel to the first tangent.
-    getTunnelWorldPosInto(_c0, tunnel, 0, size);
-    getTunnelWorldPosInto(_c1, tunnel, 1 / RINGS, size);
-    _prevTan.subVectors(_c1, _c0);
-    if (_prevTan.lengthSq() < 1e-8) _prevTan.set(0, 0, 1);
-    _prevTan.normalize();
-    _tmp.set(0, 1, 0);
-    if (Math.abs(_tmp.dot(_prevTan)) > 0.95) _tmp.set(1, 0, 0);
-    _nrm.crossVectors(_prevTan, _tmp).normalize();
-
+    // Build once per changed route, then use the exact rounded rider frames.
+    // Dock-aware arc samples retain the tiny core crossing on large boards.
+    buildTunnelPathForTunnel(path, tunnel, size);
     for (let i = 0; i <= RINGS; i++) {
-      const t = i / RINGS;
-      getTunnelWorldPosInto(_c0, tunnel, t, size);
-      getTunnelWorldPosInto(_c1, tunnel, Math.min(1, t + 1 / RINGS), size);
-      _tan.subVectors(_c1, _c0);
-      if (_tan.lengthSq() < 1e-8) _tan.copy(_prevTan);
-      else _tan.normalize();
-
-      // Parallel transport: carry the previous normal through the rotation that
-      // takes the previous tangent onto this one. Rebuilding the frame from a
-      // fixed up-vector instead would flip it where the path turns at the core.
-      _q.setFromUnitVectors(_prevTan, _tan);
-      _nrm.applyQuaternion(_q);
-      // Re-orthogonalise against drift.
-      _nrm.addScaledVector(_tan, -_nrm.dot(_tan));
-      if (_nrm.lengthSq() < 1e-8) {
-        _tmp.set(0, 1, 0);
-        if (Math.abs(_tmp.dot(_tan)) > 0.95) _tmp.set(1, 0, 0);
-        _nrm.crossVectors(_tan, _tmp);
-      }
-      _nrm.normalize();
-      _bin.crossVectors(_tan, _nrm).normalize();
-      _prevTan.copy(_tan);
+      const arc = tunnelRideSampleArc(path, i, RINGS);
+      const t = tunnelPathArcToT(path, arc);
+      tunnelRideFrameInto(_frame, path, arc);
 
       const r = tunnelBoreRadiusAt(t);
       for (let j = 0; j <= SIDES; j++) {
@@ -232,13 +204,15 @@ function TunnelTubeSlot({ slot, worm, size }) {
         const ca = Math.cos(a) * r;
         const sa = Math.sin(a) * r;
         const vi = i * (SIDES + 1) + j;
-        pos[vi * 3]     = _c0.x + _nrm.x * ca + _bin.x * sa;
-        pos[vi * 3 + 1] = _c0.y + _nrm.y * ca + _bin.y * sa;
-        pos[vi * 3 + 2] = _c0.z + _nrm.z * ca + _bin.z * sa;
+        pos[vi * 3]     = _frame.center.x + _frame.normal.x * ca + _frame.right.x * sa;
+        pos[vi * 3 + 1] = _frame.center.y + _frame.normal.y * ca + _frame.right.y * sa;
+        pos[vi * 3 + 2] = _frame.center.z + _frame.normal.z * ca + _frame.right.z * sa;
+        geo.attributes.aDistance.array[vi] = arc;
         uv[vi * 2]      = j / SIDES;
         uv[vi * 2 + 1]  = t;
       }
     }
+    geo.attributes.aDistance.needsUpdate = true;
     geo.attributes.position.needsUpdate = true;
     geo.attributes.uv.needsUpdate = true;
   };
@@ -270,7 +244,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     }
     meshRef.current.visible = true;
 
-    const key = `${size}:${wormExpansion.amount}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
+    const key = `${size}:${tunnel.padExpansion ?? wormExpansion.amount}:${tunnel.padHeight ?? 0}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
     if (builtForRef.current !== key) {
       const st = useGameStore.getState();
       const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
@@ -284,14 +258,14 @@ function TunnelTubeSlot({ slot, worm, size }) {
     // of per-phase progress onto the 0→1 tunnel parameter.
     const tp = worm.tunnelProgress.current ?? 0;
     const headProgress = tunnelTraversalT(phase, tp);
-    uniforms.uHead.value = tunnelTubeHeadProgress(slot, headProgress);
+    uniforms.uHead.value = tunnelPathTToArc(path, tunnelTubeHeadProgress(slot, headProgress));
     uniforms.uDirection.value = tunnelTubeHeadProgress(slot, 0) === 1 ? -1 : 1;
   });
 
   return (
     // Positions are written in world space, so culling against the stale
     // bounding sphere would pop the tube out of view.
-    <mesh ref={meshRef} geometry={geo} frustumCulled={false} renderOrder={2}>
+    <mesh name="tunnel-depth-arches" ref={meshRef} geometry={geo} frustumCulled={false} renderOrder={2}>
       <shaderMaterial
         uniforms={uniforms}
         extensions={{ derivatives: true }}

@@ -8,7 +8,7 @@ import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { buildTunnelPathForTunnel, getTunnelWorldPosSmoothInto } from '../worm/wormLogic.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
-import { makeTunnelPath, tunnelPathTToArc, tunnelRiderDockWidth, tunnelGaugeAt, tunnelArmFractionAt } from '../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelPathTToArc, tunnelGaugeAt, tunnelArmFractionAt } from '../utils/tunnelPath.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideSampleArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import { coreRiddenBandWidth } from '../3d/corePassage.js';
 
@@ -49,7 +49,7 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       const ride = makeTunnelRideFrame(), actual = new THREE.Vector3(), expected = new THREE.Vector3();
       // The ridden band widens with the swollen core's opening, up to the track
       // width it runs on at through the mirror room; a tail-occupied one keeps
-      // its tile width. Neither moves off the route.
+      // its last ridden width. Neither moves off the route.
       const checkFloor = (dockWidth = coreRiddenBandWidth(size, tunnelState.coreZoom)) => {
         let maxError = 0;
         for (let i = 0; i <= segments; i++) {
@@ -81,18 +81,22 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       }
       // The head can leave this tunnel while its recorded tail still rides it.
       tunnelState.coreZoom = 6;
+      frame(); checkFloor();
+      const retainedWidth = coreRiddenBandWidth(size, 6);
       tunnelState.activeTunnelId = 'next-tunnel';
       tunnelState.occupiedTunnelIds = new Set([id]);
-      frame(); checkFloor(tunnelRiderDockWidth(size));
+      frame(); checkFloor(retainedWidth);
       expect(ribbon.material.uniforms.uRiddenCore.value).toBe(1);
       // Keep the floor under the tail even after the camera returns outside.
       tunnelState.active = false;
-      frame();
+      tunnelState.coreZoom = 1;
+      frame(); checkFloor(retainedWidth);
       expect(ribbon.material.uniforms.uRiddenCore.value).toBe(1);
       tunnelState.active = true;
       expect(ribbon.parent.visible).toBe(true);
       const fixed = positions.array.slice();
       tunnelState.occupiedTunnelIds.clear();
+      tunnelState.coreZoom = 6;
       frame();
       expect(ribbon.material.uniforms.uRiddenCore.value).toBe(0);
       // This route is now an alternate outcome, not part of the worm's body.

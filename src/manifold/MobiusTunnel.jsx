@@ -304,6 +304,7 @@ const MobiusTunnel = ({
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastGaugeRef     = useRef(-1);
+  const occupiedGaugeRef = useRef(0);
   const lastDockARef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastDockBRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
@@ -466,8 +467,14 @@ const MobiusTunnel = ({
     // opening it dives into, up to the track width it carries on at through the
     // mirror room (coreRiddenBandWidth).
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = isActive && wormMode ? coreRiddenBandWidth(state.size, tunnelState.coreZoom ?? 1)
-      : occupied && wormMode ? tunnelRiderDockWidth(state.size) : tunnelDockWidth(state.size) * coreZoom;
+    // Keep the last ridden gauge beneath the trailing body. Switching straight
+    // to the tiny resting dock when the head finishes made the floor collapse
+    // underneath the tail, even though its route and occupancy were retained.
+    if (isActive && wormMode) occupiedGaugeRef.current = coreRiddenBandWidth(state.size, tunnelState.coreZoom ?? 1);
+    else if (!occupied) occupiedGaugeRef.current = 0;
+    const dockW = occupied && wormMode
+      ? Math.max(tunnelRiderDockWidth(state.size), occupiedGaugeRef.current)
+      : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||
