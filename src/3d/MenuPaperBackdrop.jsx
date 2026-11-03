@@ -8,12 +8,12 @@ import { menuLeanInto } from '../components/menus/menuPointer.js';
 import { lightSweepAt } from '../components/menus/menuLightSweep.js';
 import { DIVE_TOTAL } from '../components/menus/menuDiveLeap.js';
 import { PAPER_FX as FX, carouselPaperLayoutInto, paintDoodles, paperTintInto } from '../components/menus/carouselPaper.js';
-import { INTRO_PAPER_SHADER } from '../components/intro/introPaper.js';
+import { INTRO_PAPER_SHADER, introPaperTintInto } from '../components/intro/introPaper.js';
 
 // The paper's numbers live in PAPER_GRID, which the loading screen also draws its
 // 2D-canvas copy of this sheet from: tune them there and both stay one paper.
 //
-// The opening washes the sheet in the cube's sticker colours. The mode carousel (`carousel`) compiles a
+// The opening cycles the sheet through all six cube sticker colours. The mode carousel (`carousel`) compiles a
 // second program on the same shader (CAROUSEL) that makes the paper answer the
 // screen: it glows in the presented mode's colour, dips round the cube, ripples
 // when a swipe turns it, swirls into the PLAY dive, slides against the
@@ -24,6 +24,9 @@ const fragmentShader = `varying vec2 paperUv;
         uniform float aspect;
         uniform float time;
         uniform float motion;
+        #ifdef OPENING
+        uniform vec3 uOpeningTint;
+        #endif
         #ifdef CAROUSEL
         uniform vec3 uCube;       // cube centre (x, y) and radius, in paper heights
         uniform vec3 uTint;
@@ -175,7 +178,7 @@ function createDoodleCanvas() {
 // A screen-aligned backdrop INSIDE the existing WebGL scene. The transparent
 // carousel overlay never paints over the live cube. Grid density uses the
 // viewport aspect, so it is stable on high-DPR phones too.
-export default function MenuPaperBackdrop({ carousel = false, opening = false }) {
+export default function MenuPaperBackdrop({ carousel = false, opening = false, openingTime = 0 }) {
   const size = useThree(state => state.size);
   const reducedMotion = useRef(true);
   const doodles = useMemo(() => {
@@ -193,6 +196,7 @@ export default function MenuPaperBackdrop({ carousel = false, opening = false })
     aspect: { value: 1 },
     time: { value: 0 },
     motion: { value: 0 },
+    ...(opening ? { uOpeningTint: { value: introPaperTintInto(new THREE.Color(), 0) } } : {}),
     ...(carousel ? {
       uCube: { value: new THREE.Vector3(0.5, 0.5, 0.25) },
       uTint: { value: new THREE.Color().setStyle('#2fa84f', THREE.LinearSRGBColorSpace) },
@@ -210,7 +214,7 @@ export default function MenuPaperBackdrop({ carousel = false, opening = false })
       // Starts a few squares onto the page, so the worm is there from the first look.
       uWormT: { value: 8 / FX.wormSpeed },
     } : {}),
-  }), [carousel, doodles]);
+  }), [carousel, opening, doodles]);
   uniforms.aspect.value = size.width / Math.max(size.height, 1);
   const defines = useMemo(() => (carousel ? { CAROUSEL: 1 } : opening ? { OPENING: 1 } : {}), [carousel, opening]);
   const state = useMemo(() => ({ face: null, lean: { x: 0, y: 0 }, leanTarget: { x: 0, y: 0 }, layout: {}, cube: { x: 0.5, y: 0.5, r: 0.25 } }), []);
@@ -232,6 +236,7 @@ export default function MenuPaperBackdrop({ carousel = false, opening = false })
     const reduced = reducedMotion.current || prefersReducedMotion();
     const dt = Math.min(delta, 0.05);
     if (!reduced && !document.hidden) uniforms.time.value += dt;
+    if (opening) introPaperTintInto(uniforms.uOpeningTint.value, openingTime, reduced);
     if (!carousel || !isCarouselActive()) return;
     const u = uniforms;
     const aspect = u.aspect.value;
