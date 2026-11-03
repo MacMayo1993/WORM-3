@@ -43,7 +43,7 @@ export const NON_EUCLIDEAN_STYLE_KEYS = [
 // that makes them lie; the rest are line-art illusions. See impossibleShaders.js.
 export const IMPOSSIBLE_STYLE_KEYS = [
   'impossibleTriangle', 'endlessStairs', 'impossibleFork',
-  'neckerFlip', 'mobiusBand', 'interlockingWings',
+  'neckerFlip', 'mirrorFacets', 'interlockingWings',
   'impossibleCube', 'cubeTriangle', 'perpetualFall',
   'schroderStairs', 'amesRoom', 'rubinVase',
 ];

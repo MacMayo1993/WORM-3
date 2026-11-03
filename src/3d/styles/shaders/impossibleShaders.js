@@ -6,7 +6,7 @@
 //   endlessStairs       a staircase that climbs forever, likewise real
 //   impossibleFork      the two-or-three-pronged blivet, in line only
 //   neckerFlip          the bistable cube, committing to each reading in turn
-//   mobiusBand          one surface, one edge, and a walker who returns mirrored
+//   mirrorFacets        mirrored diamond facets that read as a peak or a hollow
 //   interlockingWings   a regular division of the plane with no gaps and no overlaps
 //   impossibleCube      Escher's crate: an honest frame with one crossing put back wrong
 //   cubeTriangle        Reutersvärd's nine cubes, closed by the camera like the tribar
@@ -314,84 +314,34 @@ export const impossibleShaders = {
     }
   `,
 
-  // Möbius Band — the band is defined exactly: take the ring of radius R, and at
-  // angle θ turn its cross-section by θ/2. After one lap the cross-section has
-  // turned by π, which maps the rectangle onto itself with its faces exchanged,
-  // so the surface closes up with one side and one edge. The walker follows the
-  // centre line at a fixed offset and needs two laps — 4π — to come home, which
-  // is the shortest honest proof that the band has no other side to be on.
-  mobiusBand: `
+  // Mirror Facets — a diamond cut into opposing planes. Reversing the light
+  // across the inset makes the same outline read as a peak or a hollow.
+  // Analytic 2D masks only: no ray marching, sampled normals, or clock updates.
+  mirrorFacets: `
     uniform vec3 baseColor;
-    uniform float time;
     varying vec2 vUv;
 
-    const float MB_R = 1.0;      // ring radius
-    const float MB_W = 0.42;     // half width of the band
-    const float MB_T = 0.045;    // half thickness
-
-    float mbMap(vec3 p) {
-      float th = atan(p.y, p.x);
-      float r = length(p.xy) - MB_R;
-      float c = cos(th * 0.5), s = sin(th * 0.5);
-      vec2 q = vec2(c * r + s * p.z, -s * r + c * p.z);   // untwist by θ/2
-      vec2 d = abs(q) - vec2(MB_W, MB_T);
-      return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
-    }
-
-    vec3 mbNormal(vec3 p) {
-      vec2 e = vec2(0.0025, 0.0);
-      return normalize(vec3(
-        mbMap(p + e.xyy) - mbMap(p - e.xyy),
-        mbMap(p + e.yxy) - mbMap(p - e.yxy),
-        mbMap(p + e.yyx) - mbMap(p - e.yyx)));
-    }
-
     void main() {
-      vec2 uv = (vUv - 0.5) * 3.4;
+      vec2 p = (vUv - 0.5) * 2.0;
+      float diamond = abs(p.x) + abs(p.y);
+      float aa = max(fwidth(diamond), 0.003);
+      float horizontal = smoothstep(-aa, aa, abs(p.x) - abs(p.y));
+      float lightX = mix(0.56, 0.94, smoothstep(-aa, aa, p.x));
+      float lightY = mix(0.68, 1.08, smoothstep(-aa, aa, p.y));
+      float facet = mix(lightY, lightX, horizontal);
+      float inset = 1.0 - smoothstep(0.52 - aa, 0.52 + aa, diamond);
+      float body = 1.0 - smoothstep(0.86 - aa, 0.86 + aa, diamond);
 
-      // Looking down on the ring from in front and above.
-      vec3 fwd = normalize(vec3(0.0, 0.80, -0.60));
-      vec3 rgt = vec3(1.0, 0.0, 0.0);
-      vec3 up  = cross(rgt, fwd);
-      vec3 ro = vec3(0.0, 0.0, 0.0) + rgt * uv.x + up * uv.y - fwd * 4.0;
+      vec3 col = baseColor * (0.65 + 0.10 * (p.y + 1.0));
+      vec3 cut = baseColor * mix(facet, 1.60 - facet, inset);
+      col = mix(col, cut, body);
 
-      float t = 0.0;
-      float hit = 0.0;
-      for (int i = 0; i < 56; i++) {
-        vec3 pos = ro + fwd * t;
-        float d = mbMap(pos);
-        if (d < 0.004) { hit = 1.0; break; }
-        if (t > 8.0) break;
-        t += max(d * 0.45, 0.006);     // the twist makes mbMap an over-estimate
-      }
-
-      vec3 col = baseColor * (0.11 - 0.04 * length(vUv - 0.5));
-
-      if (hit > 0.5) {
-        vec3 pos = ro + fwd * t;
-        vec3 n = mbNormal(pos);
-        float lam = 0.35 + 0.65 * max(dot(n, normalize(vec3(0.4, -0.5, 0.75))), 0.0);
-        // Ribs across the band: a single family of lines that returns to itself
-        // only after twice round.
-        float th = atan(pos.y, pos.x);
-        float rib = 0.5 + 0.5 * sin(th * 24.0);
-        col = baseColor * (0.30 + 0.85 * lam) * (0.86 + 0.20 * rib);
-        col *= 1.0 - 0.25 * smoothstep(3.0, 6.0, t);
-      }
-
-      // The walker, on the double cover: A runs to 4π before it repeats.
-      float A = time * 0.55;
-      vec3 rad = vec3(cos(A), sin(A), 0.0);
-      vec3 M = rad * (MB_R + MB_W * 0.62 * cos(A * 0.5)) + vec3(0.0, 0.0, MB_W * 0.62 * sin(A * 0.5));
-      // Project M to screen space against the camera basis directly. Going
-      // through (M - ro) would fold this fragment's own uv into the result — ro
-      // already carries it — and detach the glow from the band.
-      vec2 ms = vec2(dot(M, rgt), dot(M, up));
-      float mt = dot(M - ro, fwd);
-      float ring = length(uv - ms);
-      // Drawn only where it is in front of whatever the ray already found.
-      float vis = (hit < 0.5 || mt < t + 0.06) ? 1.0 : 0.0;
-      col += mix(baseColor, vec3(1.0), 0.75) * smoothstep(0.13, 0.02, ring) * 0.9 * vis;
+      // Narrow polished bevels keep the silhouette legible at small tile sizes.
+      float outerBevel = 1.0 - smoothstep(0.012, 0.012 + aa, abs(diamond - 0.86));
+      float innerBevel = 1.0 - smoothstep(0.009, 0.009 + aa, abs(diamond - 0.52));
+      vec3 silver = mix(baseColor, vec3(1.0), 0.42);
+      col = mix(col, silver, outerBevel * 0.65);
+      col = mix(col, silver, innerBevel * 0.40);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }

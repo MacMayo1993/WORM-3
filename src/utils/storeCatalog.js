@@ -115,7 +115,7 @@ const TILE_PRICES = {
   // Impossible objects — the tribar and endless staircase ray-cast a real solid
   // per fragment, the priciest of the set.
   impossibleTriangle: 225, endlessStairs: 250, impossibleFork: 150,
-  neckerFlip: 150, mobiusBand: 225, interlockingWings: 175,
+  neckerFlip: 150, mirrorFacets: 225, interlockingWings: 175,
   impossibleCube: 200, cubeTriangle: 200, perpetualFall: 250,
   schroderStairs: 150, amesRoom: 225, rubinVase: 150,
   // Surreal — full painted scenes with their own weather.

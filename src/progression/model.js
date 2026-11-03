@@ -1,6 +1,7 @@
 import { sanitizeChestWallet } from '../economy/chests.js';
 import { sanitizeStoryProgress } from '../worm/story/levels.js';
 import { ACHIEVEMENT_BY_ID } from './achievements.js';
+import { migrateTileItem } from '../utils/tileStyleMigration.js';
 // Permanent XP is independent of the spendable wallet and of any one run.
 export const PLAYER_SAVE_KEY = 'worm3_player_progress_v1';
 export const MAX_PLAYER_LEVEL = 50;
@@ -58,7 +59,7 @@ export function sanitizeProgress(raw) {
   p.challenges = (Array.isArray(raw.challenges) ? raw.challenges : []).filter(r => record(r) && typeof r.key === 'string' && r.key.length <= 100)
     .slice(-64).map(r => ({ key: r.key, times: Math.min(3, count(r.times)), guided: r.guided === true }));
   for (let level = 5; level <= MAX_PLAYER_LEVEL; level += 5) {
-    if (level <= levelProgress(p.xp).level && typeof raw.claimedRewards?.[level] === 'string') p.claimedRewards[level] = raw.claimedRewards[level];
+    if (level <= levelProgress(p.xp).level && typeof raw.claimedRewards?.[level] === 'string') p.claimedRewards[level] = migrateTileItem(raw.claimedRewards[level]);
   }
   return p;
 }
@@ -67,7 +68,7 @@ export function readPlayerSave(storage) {
     storage ??= globalThis.localStorage;
     const raw = JSON.parse(storage.getItem(PLAYER_SAVE_KEY));
     if (raw?.version !== 1 || !record(raw.progress) || !Number.isSafeInteger(raw.points) || raw.points < 0 || !Array.isArray(raw.ownedItems)) return null;
-    return { progress: sanitizeProgress(raw.progress), points: raw.points, ownedItems: [...new Set(raw.ownedItems.filter(id => typeof id === 'string'))], chestWallet: sanitizeChestWallet(raw.chestWallet), legacyCharacters: raw.chestWallet == null };
+    return { progress: sanitizeProgress(raw.progress), points: raw.points, ownedItems: [...new Set(raw.ownedItems.filter(id => typeof id === 'string').map(migrateTileItem))], chestWallet: sanitizeChestWallet(raw.chestWallet), legacyCharacters: raw.chestWallet == null };
   } catch { return null; }
 }
 export function savePlayerState(state, storage) {

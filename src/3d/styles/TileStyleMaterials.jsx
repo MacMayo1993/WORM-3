@@ -1,4 +1,5 @@
 import { prefersReducedMotion } from '../../utils/device.js';
+import { migrateTileStyle } from '../../utils/tileStyleMigration.js';
 import { bindDefaultTileStyleIdentity } from '../tileStyleIdentity.js';
 import { livingSurfaceShaders } from './shaders/livingSurfaceShaders.js';
 import { LIVING_SURFACE_KEYS } from '../../utils/livingSurfaceCatalog.js';
@@ -280,7 +281,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   }
 
   // Validate inputs
-  const safeStyle = style || 'solid';
+  const safeStyle = migrateTileStyle(style) || 'solid';
   const safeColorHex = colorHex || '#888888';
 
   // For antipodal styles the cache key must encode which antiColor is baked into

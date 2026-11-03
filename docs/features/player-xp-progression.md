@@ -25,7 +25,7 @@ and behavior as their Store counterparts; ranks are display titles.
 | 15 | Choose your next look | Flower hat, Emerald skin, Crystal Growth, Tropical palette | 150 |
 | 20 | Living Geometry | Cymatics, Compass, Toxic skin, Bioluminescence palette | 150 |
 | 25 | Choose your next look | Wizard hat, Bubble skin, Paradox Weave, Aurora palette | 150 |
-| 30 | Front & Back | Möbius Band, RP² Geodesics, Sunset skin, Eclipse palette | 150 |
+| 30 | Front & Back | Mirror Facets, RP² Geodesics, Sunset skin, Eclipse palette | 150 |
 | 35 | Choose your next look | Halo, Ice skin, Hyperbolic Weave, Arctic palette | 150 |
 | 40 | Beyond the Surface | Orb Chamber, Painted Window, Galaxy skin, Deep Sea palette | 150 |
 | 45 | Choose your next look | Crown, Gold skin, Stellar Lensing, Gemstone palette | 150 |
