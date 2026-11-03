@@ -29,7 +29,7 @@ const EXPECTED_KEYS = [
   'demoWormCourse', 'demoWormLessonIndex', 'demoWormStarted', 'demoWormPrepared', 'demoWormAttempt',
   'demoWormComplete', 'demoWormFinished', 'demoWormCompleted', 'demoWormSkipped', 'demoSkipped', 'demoWormProgress',
   'demoWormTarget', 'demoWormHazardCleared',
-  'startWormDemoLesson', 'restartWormDemoLesson', 'nextWormDemoLesson', 'skipWormDemoLesson', 'finishWormDemo',
+  'selectWormDemoScene', 'startWormDemoLesson', 'restartWormDemoLesson', 'nextWormDemoLesson', 'skipWormDemoLesson', 'finishWormDemo',
   'achievedWins', 'activeBet', 'activePackId', 'addDisparityDeath',
   'addDisparityDeathsBulk', 'addDisparityEliminatedFace', 'addDisparityEliminatedFacesBulk', 'addDisparityParityScore',
   'addToHistory', 'animState', 'autoRotateEnabled', 'beginDisparityRound',

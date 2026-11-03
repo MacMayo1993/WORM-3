@@ -74,7 +74,7 @@ export function makeCombat(size, portal) {
     wave: 0, waveSpawned: 0, wavesCleared: 0, intermission: 0, endReason: null,
     element: null, elementT: 0, score: 0, combo: 0, bestCombo: 0, lastKill: -Infinity,
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
-    kills: 0, shotsFired: 0, shotsHit: 0, lightHits: 0, slamHits: 0, slamSeen: 0, dropsCollected: 0, seq: 0,
+    kills: 0, shotsFired: 0, shotsHit: 0, elementalHits: 0, elementalHitsByType: {}, lightHits: 0, slamHits: 0, slamSeen: 0, dropsCollected: 0, seq: 0,
     enemies: [], dying: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
     muzzle: null, portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
 }
@@ -160,6 +160,11 @@ function damageEnemy(c, enemy, amount) {
 function hitEnemy(c, shot, enemy, player) {
   if (!c.enemies.includes(enemy)) return;
   shot.life = 0; c.shotsHit++;
+  if (shot.element) {
+    c.elementalHits++;
+    c.elementalHitsByType ??= {};
+    c.elementalHitsByType[shot.element] = (c.elementalHitsByType[shot.element] || 0) + 1;
+  }
   burst(c,enemy.tile,'impact');
   // Keep the impact tile for chaining even if the first target dies.
   const impact = { ...enemy.tile };
@@ -291,7 +296,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   c.held = false; c.time += dt;
   if (c.muzzle) { c.muzzle.life -= dt; if (c.muzzle.life <= 0) c.muzzle = null; }
   c.portalOpen = player.portalOpen;
-  if (!c.ambient && !c.portalOpen && player.canFinish) {
+  if (!c.ambient && !c.practice && !c.portalOpen && player.canFinish) {
     finishCombat(c,'sealed'); return;
   }
   c.elementT = Math.max(0,c.elementT-dt);
@@ -316,7 +321,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   if (c.fireRequested || c.fireHeld) fire(c);
   c.fireRequested = false;
   const wave = WAVES[c.wave];
-  if (!c.ambient && c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
+  if (!c.ambient && !c.practice && c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
     c.spawnTimer -= dt;
     if (c.spawnTimer <= 0) {
       c.enemies.push(makeEnemy(c,wave.enemies[c.waveSpawned++]));
@@ -399,7 +404,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   c.arcs = c.arcs.filter(arc => arc.life > 0);
   for (const b of c.bursts) b.life -= dt;
   c.bursts = c.bursts.filter(b => b.life > 0);
-  if (!c.ambient && c.health > 0 && c.intermission === 0 && c.waveSpawned === wave.enemies.length && c.enemies.length === 0) {
+  if (!c.ambient && !c.practice && c.health > 0 && c.intermission === 0 && c.waveSpawned === wave.enemies.length && c.enemies.length === 0) {
     c.wavesCleared++;
     if (c.wave === WAVES.length-1) finishCombat(c,'waves');
     else c.intermission = 4;

@@ -17,6 +17,7 @@ import { withPersistenceBatch } from '../utils/persistenceBatch.js';
 import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
 import { makeCombat, stepCombat, combatBridge } from './combat/portalCombat.js';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
+import { makeDemoCombat, isDemoCombatLesson } from './combat/demoCombat.js';
 import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.js';
 import { tunnelReadout } from './healerWorm/tunnelReadout.js';
 import { tunnelEntryRule } from './healerWorm/padEntry.js';
@@ -296,7 +297,7 @@ export function useWormCrawler(size, cubies) {
                 if (p?.runId === s.wormRunId && s.wormStoryStarted && !s.wormStoryResult && s.wormAlive && !s.wormPaused)
                     recordStoryMechanic(p, key, id);
             },
-            allowDemoSignature: () => wormDemoLesson(useGameStore.getState()).id === 'signature',
+            allowDemoSignature: () => ['signature', 'signature-showcase'].includes(wormDemoLesson(useGameStore.getState()).practiceId ?? wormDemoLesson(useGameStore.getState()).id),
             isPaused: () => !!useGameStore.getState().wormPaused || document.hidden,
             isJumpRescueEnabled: () => {
                 const s = useGameStore.getState();
@@ -595,12 +596,17 @@ export function useWormCrawler(size, cubies) {
             if (deathMenuTimer.current) { clearTimeout(deathMenuTimer.current); deathMenuTimer.current = null; }
             const practice = stageWormPractice(sim, sizeRef.current, lesson, ctxRef.current.getOrbColor);
             demoPracticeRef.current = { ...practice, attempt, rotationEpoch: state.rotationEpoch };
+            // Reset the bridge on every lesson, including retries and skips.
+            sim.combat = isDemoCombatLesson(lesson.practiceId ?? lesson.id)
+                ? makeDemoCombat(sizeRef.current, sim.pos, lesson) : null;
+            combatBridge.current = sim.combat;
             resetWormBuffs(); resetWormSegments(); resetWormPress();
             // A lesson/retry resets the sim without remounting this hook. Clear
             // the same expansion used by cubies, pickups and tunnel anchors too;
             // the reset sim has no remaining timer to close the old visual pose.
             wormExpansion.amount = 0;
             useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,
+                wormCharacter: lesson.character ?? 'glow',
                 exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormRunBestCombo: 0, wormRunBests: null, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},

@@ -285,12 +285,17 @@ it('meets the caution tape on a grounded tunnel approach and can retry the jump 
   until(() => state().wormTunnelCount > 0);
   expect(worm.activeTunnel.current.padHeight).toBe(WORM_PAD_HEIGHT);
 });
-it.each(['rocket', 'magnet', 'water', 'fire', 'lightning'])('stages and completes the actual %s pickup effect', id => {
+it.each(['rocket', 'magnet', 'water', 'lightning'])('stages and completes the actual %s pickup effect', id => {
   lesson(id); expect(state().wormSpecials[0].type).toBe(id);
   until(() => state().demoWormComplete, 800);
 });
-it('teaches ice jumping and a real nature spring consumption', () => {
-  lesson('ice'); until(() => state().wormElementalTheme === 'ice'); frames(35); input('jump'); until(() => state().demoWormComplete);
+it('teaches a real flame dash, ice drift and nature spring consumption', () => {
+  lesson('fire'); until(() => state().wormElementalTheme === 'fire'); frames(35);
+  expect(state().demoWormComplete).toBe(false); input('boost'); until(() => state().demoWormComplete);
+  lesson('ice'); until(() => state().wormElementalTheme === 'ice'); frames(35);
+  expect(state().demoWormComplete).toBe(false);
+  until(() => worm.interpT.current > 0.25 && worm.interpT.current < 0.7);
+  input('turnLeft'); until(() => state().demoWormComplete);
   lesson('grass'); until(() => state().wormElementalTheme === 'grass'); frames(35);
   input('jump'); until(() => state().demoWormComplete);
   expect(worm.jumpSpan.current).toBeGreaterThan(2); // Earth now grants a spring immediately on pickup.
@@ -401,4 +406,53 @@ it('showcases the full Orb Shower, freezes its countdown on pause, and clears it
   expect(wormBuffs.orbShowerT).toBe(0);
   expect(state().wormPowerups).toHaveLength(0);
   expect(state().demoWormComplete).toBe(false);
+});
+
+it('collects its own healing budget, jumps onto the pad and pays the real tunnel toll', () => {
+  lesson('collect-heal');
+  expect(Object.values(state().wormOrbInventory).reduce((sum, n) => sum + n, 0)).toBe(0);
+  expect(state().wormPowerups).toHaveLength(2);
+  until(() => state().wormSessionOrbs === 2);
+  expect(state().demoWormComplete).toBe(false);
+  expect(Object.values(state().wormOrbInventory).reduce((sum, n) => sum + n, 0)).toBe(6);
+  input('jump');
+  until(() => state().demoWormComplete, 1600);
+  expect(state().wormHealedCount).toBe(1);
+  expect(state().wormTunnelCount).toBe(1);
+  expect(Object.values(state().wormOrbInventory).reduce((sum, n) => sum + n, 0)).toBe(2);
+});
+
+it('takes a worn tunnel for its third ride and waits for actual collapse into two pits', () => {
+  lesson('tunnel-collapse');
+  expect([...worm.tunnelUseCountsRef.current.values()]).toEqual([2]);
+  input('jump'); until(() => state().wormTunnelCount === 1);
+  expect(state().demoWormComplete).toBe(false);
+  act(() => state().setWormPaused(true));
+  const phase = state().wormPhase, distance = worm.stepHistory.current.distance;
+  frames(40);
+  expect(state().wormPhase).toBe(phase);
+  expect(worm.stepHistory.current.distance).toBe(distance);
+  expect(state().demoWormComplete).toBe(false);
+  act(() => state().setWormPaused(false));
+  until(() => state().demoWormComplete, 1600);
+  expect(state().wormPitGrids.length).toBe(2);
+  expect(worm.voidTunnelKeysRef.current.size).toBe(1);
+  expect(state().wormAlive).toBe(true);
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  expect(state().wormPitGrids.length).toBe(0);
+  expect([...worm.tunnelUseCountsRef.current.values()]).toEqual([2]);
+});
+
+it('dives through the next Core tunnel while the real outgoing tail remains inside', () => {
+  lesson('core-pass');
+  input('jump'); until(() => state().wormTunnelCount === 1);
+  until(() => state().wormPhase === 'crawling');
+  expect(worm.tunnelPassages.current.length).toBeGreaterThan(0);
+  expect(state().demoWormComplete).toBe(false);
+  input('jump'); until(() => state().wormTunnelCount === 2);
+  expect(state().demoWormComplete).toBe(false);
+  until(() => state().demoWormComplete, 1600);
+  expect(state().wormAlive).toBe(true);
+  expect(state().wormPhase).toBe('crawling');
+  expect(worm.tunnelPassages.current.length).toBeGreaterThan(0);
 });

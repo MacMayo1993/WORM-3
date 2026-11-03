@@ -470,7 +470,7 @@ function startHazardLesson(id) {
   const index = WORM_DEMO_LESSONS.findIndex(l => l.id === id), lesson = WORM_DEMO_LESSONS[index];
   const practice = { ...stageWormPractice(sim, 3, lesson), rotationEpoch: 0 };
   act(() => useGameStore.setState({ ...newWormDemo(), demoMode: true, demoStep: 'worm-traversal',
-    demoWormLessonIndex: index, demoWormTarget: practice.target, cubies: practice.cubies, rotationEpoch: 0 }));
+    demoWormLessonIndex: index, demoWormPrepared: true, demoWormTarget: practice.target, cubies: practice.cubies, rotationEpoch: 0 }));
   act(() => useGameStore.setState({ wormPaused: false }));
   return { practice, lesson, result: () => readWormPractice(sim, practice, lesson, useGameStore.getState(), 3, 0.1) };
 }
@@ -634,5 +634,65 @@ it.each([71, 82, 97, 103, 106, 115])('warns and dispatches both story layers in 
     expect(layers).toContain(anchor);
     expect(dir).toBe(move.sliceDirs?.[layers.indexOf(anchor)] ?? move.dir);
     expect(resolveSliceHits.mock.lastCall.slice(1)).toEqual([move.axis, layers, size]);
+  }
+});
+
+it('runs Book demo on the real countdown, holds it, and completes only after it resumes', () => {
+  const { result } = startHazardLesson('signature-book');
+  tick(); result();
+  const initial = rotationClock.secondsLeft;
+  tick(); expect(rotationClock.secondsLeft).toBeLessThan(initial); result();
+  expect(result().done).toBe(false);
+  sim.signature.character = 'book'; sim.signature.seq = 1; sim.signature.active = 5;
+  const heldAt = rotationClock.secondsLeft;
+  for (let i = 0; i < 15; i++) { tick(); expect(result().done).toBe(false); }
+  expect(rotationClock.held).toBe(true);
+  expect(rotationClock.secondsLeft).toBe(heldAt);
+  expect(rotate).not.toHaveBeenCalled();
+  sim.signature.active = 0; tick();
+  expect(rotationClock.held).toBe(false);
+  expect(rotationClock.secondsLeft).toBeLessThan(heldAt);
+  expect(result().done).toBe(true);
+});
+
+it.each(['bomb', 'rotation'])('clears %s hazards immediately when selecting a fresh paused scene', id => {
+  startHazardLesson(id); tick(id === 'rotation' ? 85 : 1);
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const clear = vi.fn(); props.blastApiRef.current = { clear };
+  if (id === 'bomb') expect(props.bombsRef.current).toHaveLength(1);
+  else { expect(rotationClock.armed).toBe(true); expect(rotationClock.warning).toBeGreaterThan(0); }
+  const index = WORM_DEMO_LESSONS.findIndex(l => l.id === 'rocket');
+  act(() => useGameStore.getState().selectWormDemoScene('practice', index));
+  // No frame or Try it required: the old renderer data is already gone.
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(props.bombsRef.current).toHaveLength(0); expect(clear).toHaveBeenCalledOnce();
+  expect(rotationClock.armed).toBe(false); expect(rotationClock.warning).toBe(0);
+  tick(150);
+  expect(props.bombsRef.current).toHaveLength(0); expect(rotate).not.toHaveBeenCalled();
+});
+
+it.each(['bomb', 'rotation'])('clears %s on paused Retry and stages only fresh prepared hazards', id => {
+  startHazardLesson(id); tick(id === 'rotation' ? 85 : 1);
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  act(() => useGameStore.getState().restartWormDemoLesson());
+  expect(props.bombsRef.current).toHaveLength(0);
+  expect(rotationClock.armed).toBe(false); expect(rotationClock.warning).toBe(0);
+  tick(20); expect(props.bombsRef.current).toHaveLength(0);
+  expect(rotationClock.armed).toBe(false);
+  // The mock crawler does not stage boards: publish its fresh target/ready
+  // transaction explicitly, exactly as the real hook does on its first frame.
+  const target = { x: 0, y: 1, z: 2, dirKey: 'PZ' };
+  act(() => useGameStore.setState({ demoWormPrepared: true, demoWormTarget: target }));
+  tick();
+  if (id === 'bomb') {
+    expect(props.bombsRef.current).toHaveLength(1);
+    expect(props.bombsRef.current[0].tile).toEqual(target);
+    expect(props.bombsRef.current[0].fuse).toBe(25);
+  }
+  expect(rotationClock.armed).toBe(false);
+  act(() => useGameStore.getState().startWormDemoLesson()); tick();
+  if (id === 'rotation') {
+    expect(rotationClock.armed).toBe(true);
+    expect(rotationClock.secondsLeft).toBeGreaterThan(9);
   }
 });

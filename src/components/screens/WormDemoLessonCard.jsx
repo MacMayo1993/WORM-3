@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { wormPracticeLessons, wormDemoLesson } from '../../game/wormDemoLessons.js';
+import { wormPracticeLessons, wormDemoLesson, WORM_DEMO_LESSONS, WORM_SHOWCASE_LESSONS } from '../../game/wormDemoLessons.js';
+import { demoChapter } from '../../game/wormDemoCatalog.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import '../ui/arcadeTheme.css';
 import './wormDemoLesson.css';
@@ -16,6 +17,8 @@ export default function WormDemoLessonCard({ onRetry }) {
   const lessons = wormPracticeLessons(s);
   const challenges = s.demoWormCourse === 'challenges';
   const retryRef = useRef(null), nextRef = useRef(null);
+  const pickerWasPaused = useRef(true);
+  const groups = Object.groupBy ? Object.groupBy(WORM_DEMO_LESSONS, demoChapter) : WORM_DEMO_LESSONS.reduce((out, item) => { (out[demoChapter(item)] ??= []).push(item); return out; }, {});
   useEffect(() => {
     if (s.alive === false && !s.paused) (s.complete && lesson.preview ? nextRef : retryRef).current?.focus();
   }, [s.alive, s.paused, s.complete, lesson.preview]);
@@ -35,11 +38,29 @@ export default function WormDemoLessonCard({ onRetry }) {
   const last = index === lessons.length - 1;
   const nextLabel = last ? challenges ? 'Finish challenges' : 'Next: Flip Cube' : 'Next';
   return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label={challenges ? "WORM short challenges" : "WORM practice"}>
+    {!challenges && <div className="worm-demo-scene-bar">
+      <span className="worm-demo-live">{!s.started ? 'READY TO PLAY' : s.complete ? 'SCENE CLEAR' : dead ? 'RETRY READY' : 'LIVE GAMEPLAY'}</span>
+      <select aria-label="Choose demo scene" value={`${s.demoWormCourse}:${index}`}
+        onFocus={() => { pickerWasPaused.current = useGameStore.getState().wormPaused; useGameStore.getState().setWormPaused(true); }}
+        onBlur={() => { if (!pickerWasPaused.current) useGameStore.getState().setWormPaused(false); }}
+        onChange={event => {
+          const [course, scene] = event.target.value.split(':');
+          pickerWasPaused.current = true;
+          useGameStore.getState().selectWormDemoScene(course, Number(scene));
+        }}>
+        <optgroup label="Playable highlights">
+          {WORM_SHOWCASE_LESSONS.map((item, i) => <option key={item.id} value={`showcase:${i}`}>{i + 1}. {item.title}</option>)}
+        </optgroup>
+        {Object.entries(groups).map(([chapter, items]) => <optgroup key={chapter} label={chapter}>
+          {items.map(item => <option key={item.id} value={`practice:${WORM_DEMO_LESSONS.indexOf(item)}`}>{item.title}</option>)}
+        </optgroup>)}
+      </select>
+    </div>}
     <div className="worm-demo-heading"><strong>{lesson.title}</strong><span>{(s.demoWormLessonIndex ?? 0) + 1}/{lessons.length}</span></div>
     <div className="worm-demo-track" role="progressbar" aria-label="WORM practice progress" aria-valuemin={0} aria-valuemax={lessons.length} aria-valuenow={(s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)}>
       <div style={{ width: `${((s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)) / lessons.length * 100}%` }} />
     </div>
-    {challenges && <div className="action-cue-row"><ActionCue kind={s.complete ? 'complete' : dead ? 'danger' : lesson.cue} /></div>}
+    {<div className="action-cue-row"><ActionCue kind={s.complete ? 'complete' : dead ? 'danger' : lesson.cue} /></div>}
     <p role="status" aria-live="polite">{s.complete ? lesson.success : dead ? advice : lesson.instruction}</p>
     {s.complete && <div className="worm-demo-detail">{lesson.preview ? 'Demonstration complete. Tap Next to practice the rescue.' : `Goal reached. Keep practicing or tap ${nextLabel}.`}</div>}
     {s.progress && !s.complete && !dead && <div className="worm-demo-detail">{s.progress}</div>}

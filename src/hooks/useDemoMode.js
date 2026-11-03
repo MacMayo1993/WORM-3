@@ -505,22 +505,20 @@ export function useDemoMode({
     tourCompletedRef.current = false;
     preDemoSettingsRef.current = { ...store.settings };
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
-    // The introduction owns the screen. Tear down any prior run, but leave
-    // WORM unmounted until the player finishes both Mobi briefing screens.
+    // Open directly on a staged, paused playable scene. The compact mission
+    // card teaches the first action; no two-screen briefing blocks the demo.
     cancelShuffle();
     cancelDisparityRun();
     store.clearLevel();
     store.clearDisparityGame();
     store.setRandomMode(false);
     const challenges = course === 'challenges';
-    store.startDemo(challenges ? 'challenges' : 'practice');
+    store.startDemo(challenges ? 'challenges' : 'showcase');
     applyDemoSettings();
-    setDemoColdOpenVisible(!challenges);
+    setDemoColdOpenVisible(false);
     setDemoStepIntroVisible(false);
-    if (challenges) {
-      armSceneGate?.('Worm challenges', { eager: true, holdMs: 0, z: 10600 });
-      applyDemoStepConfig('worm-traversal');
-    }
+    armSceneGate?.(challenges ? 'Worm challenges' : 'Worm Mode', { eager: true, holdMs: 0, z: 10600 });
+    applyDemoStepConfig('worm-traversal');
   }, [clearDemoWatchTimers, applyDemoSettings, cancelShuffle, cancelDisparityRun, armSceneGate, applyDemoStepConfig]);
 
   // Cold open dismissed → drop into the first step's intro.
@@ -760,11 +758,14 @@ export function useDemoMode({
   const handleDemoReplay = useCallback(() => {
     const store = useGameStore.getState();
     cleanupAllDemoState(store);
-    store.startDemo();
+    store.startDemo('showcase');
     applyDemoSettings();
     tourCompletedRef.current = false;
-    setDemoColdOpenVisible(true);
-  }, [cleanupAllDemoState, applyDemoSettings]);
+    setDemoColdOpenVisible(false);
+    setDemoStepIntroVisible(false);
+    armSceneGate?.('Worm Mode', { eager: true, holdMs: 0, z: 10600 });
+    applyDemoStepConfig('worm-traversal');
+  }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig, armSceneGate]);
 
   const handleDemoFreeplay = useCallback(() => {
     const store = useGameStore.getState();
@@ -1067,7 +1068,7 @@ export function useDemoMode({
     if (!demoMode || demoStep !== 'worm-traversal' || !demoWormFinished) return;
     useGameStore.getState().setWormPaused(true);
     if (useGameStore.getState().demoWormCourse === 'challenges') { handleExitDemo(); return; }
-    if (useGameStore.getState().demoWormSkipped.length) {
+    if (useGameStore.getState().demoSkipped || useGameStore.getState().demoWormSkipped.length) {
       advanceDemoStepRef.current?.('worm-traversal', { skipped: true });
       return;
     }
