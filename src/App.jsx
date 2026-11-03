@@ -132,7 +132,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <directionalLight position={[6, 12, 8]} intensity={2.4} color="#fff4de" />
       <directionalLight position={[-8, 4, -6]} intensity={0.9} color="#dfe9ff" />
       <pointLight position={[-6, 2, 8]} intensity={1.2} color="#ffffff" />
-      <MenuPaperBackdrop />
+      <MenuPaperBackdrop opening />
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
     </>
