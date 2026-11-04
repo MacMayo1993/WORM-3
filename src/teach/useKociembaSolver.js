@@ -30,7 +30,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { cubiesToKociembaString } from '../game/kociembaAdapter.js';
+import { cubiesToKociembaString, isSolvedKociembaString } from '../game/kociembaAdapter.js';
 import { reorientToHome } from '../game/cubeReorient.js';
 import { parseAlgorithm } from './algorithms.js';
 
@@ -176,10 +176,11 @@ export function useKociembaSolver(cubies, size) {
       // their true identity, so a flipped cube still yields a solvable position.
       const cubeStr = cubiesToKociembaString(cubiesHome, { ignoreFlips: true });
       if (!cubeStr) throw new Error('Cannot solve: cube has non-flip sticker damage (manifold / chaos recolour). Reset to a clean state first.');
-      const sol = await kociembaSolve(cubeStr);
+      // A solved cube must not be searched: kociemba answers it with a 13-move
+      // identity, which the panel then offered as a plan for a finished cube.
+      const sol = isSolvedKociembaString(cubeStr) ? '' : await kociembaSolve(cubeStr);
       if (sid !== solveIdRef.current) return; // a newer solve started while kociemba was computing
       const trimmed = (sol || '').trim();
-      // Filter identity moves (kociemba can return no-ops for solved cube)
       const kociembaMoves = trimmed ? parseAlgorithm(trimmed, 3) : [];
       const parsed = [...reorientMoves, ...kociembaMoves];
       setSolutionStr(trimmed);

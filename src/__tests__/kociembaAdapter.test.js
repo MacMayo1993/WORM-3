@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { cubiesToKociembaString, isAdmissible } from '../game/kociembaAdapter.js';
+import { cubiesToKociembaString, isAdmissible, isSolvedKociembaString } from '../game/kociembaAdapter.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const SOLVED = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
@@ -134,5 +134,18 @@ describe('cubiesToKociembaString — antipodal flip tolerance', () => {
     cubies[0][0][0].stickers.NX.curr = 1; // L-face tile (orig 2) painted red(1)
     expect(isAdmissible(cubies)).toBe(false);
     expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBeNull();
+  });
+});
+
+describe('isSolvedKociembaString', () => {
+  // kociemba answers a solved cube with a 13-move identity, so the solver must
+  // recognise one before searching rather than offer that plan.
+  it('recognises the solved state and nothing else', () => {
+    expect(isSolvedKociembaString(SOLVED)).toBe(true);
+    expect(isSolvedKociembaString(cubiesToKociembaString(makeCubies(3)))).toBe(true);
+    const turned = rotateSliceCubies(makeCubies(3), 3, 'col', 2, 1);
+    expect(isSolvedKociembaString(cubiesToKociembaString(turned))).toBe(false);
+    expect(isSolvedKociembaString(null)).toBe(false);
+    expect(isSolvedKociembaString(SOLVED.slice(1))).toBe(false);
   });
 });
