@@ -6,7 +6,7 @@ import { makeHealBeat, stepHealBeat } from './healBeat.js';
 import { runStart } from './healerWorm/runStart.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
-import { clampWormCameraZoom, wheelCameraZoom, desktopHeadFraming } from './wormCameraZoom.js';
+import { clampWormCameraZoom, wheelCameraZoom } from './wormCameraZoom.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -182,9 +182,9 @@ const frameDirection = new THREE.Vector3();
 const frameCorrection = new THREE.Quaternion();
 
 // Correct aim after position/roll smoothing, so neither lag moves the subject
-// around the screen. Mobile anchors the visible head at (0, 0); desktop retains
-// its whole-board composition above center. Rotating the existing frame keeps
-// the smoothed horizon and never changes the lens or tunnel clearance.
+// around the screen. Surface play anchors the visible head at (0, 0) on
+// both desktop and mobile; overview/event shots can still pass their own target.
+// Rotating the existing frame keeps the smoothed horizon and never changes the lens or tunnel clearance.
 export function frameSurfaceCamera(camera, portraitFactor, head = null, anchorY = null) {
     if (head) frameDirection.subVectors(head, camera.position);
     else frameDirection.copy(camera.position).negate();
@@ -199,7 +199,6 @@ export function frameSurfaceCamera(camera, portraitFactor, head = null, anchorY 
     camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 }
 
-const _desktopAim = new THREE.Vector3();
 // Windout's shot: the chase crawling resumes from, at the tile the head lands on.
 const _windoutHeadEnd = new THREE.Vector3();
 const _surfaceExit = makeTunnelCamPose();
@@ -360,14 +359,12 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         }
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
-        if (mobile) {
-            // Match the body's rendered anchor, including jump lift and rocket
-            // flight. Tunnel handoffs already contain their own surface lift.
-            bodyPathHeadInto(_mobileHeadWorld, worm, phase !== 'crawling' && !!worm.activeTunnel.current);
-            rocketOrbitInto(_mobileHeadWorld, size, rocketOrbitT(
-                worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current
-            ));
-        }
+        // Match the rendered anchor on both devices, including jump and rocket
+        // lift. Tunnel handoffs already contain their own surface lift.
+        bodyPathHeadInto(_mobileHeadWorld, worm, phase !== 'crawling' && !!worm.activeTunnel.current);
+        rocketOrbitInto(_mobileHeadWorld, size, rocketOrbitT(
+            worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current
+        ));
 
         // A layer slice is staged as a comic-book freeze frame while ThunkEffect
         // plays WORM'D. Rather than merely holding wherever the smoothed chase lens
@@ -640,11 +637,8 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             _camTargetCam.copy(_camWormWorld)
                 .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 + REVEAL_LIFT * pull))
                 .addScaledVector(_camForward, -(camBack * rakeTuck) * (1 + REVEAL_BACK * pull));
-            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead);
-            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
-            // Centre the spawning worm first; ease out to the chase aim as the pull expires.
-            _camTargetLook.lerp(_camWormWorld, pull * 0.8);
-            if (mobile) _camTargetLook.copy(_mobileHeadWorld);
+            // Keep the same subject through briefing, countdown and live play.
+            _camTargetLook.copy(_mobileHeadWorld);
             if (arriving && !reduced) {
                 // Show the face from in front, then arc over the surface into chase.
                 // Both endpoints stay outside the face; no chord through the cube.
@@ -686,7 +680,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
 
             camera.position.copy(camPosRef.current);
             aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, revealA);
-            if (mobile) {
+            if (mobile || !arriving || reduced || arrival.settle === 1) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
             }
@@ -930,14 +924,12 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
             if (mobile) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
-            } else if (!mobile && !rocketLift && !healFocusActive) {
-                const headWeight = desktopHeadFraming(size);
-                if (headWeight > 0) {
-                    bodyPathHeadInto(_desktopAim, worm, false);
-                    _desktopAim.multiplyScalar(headWeight); // between the cube's centre and the head
-                    frameSurfaceCamera(camera, portraitFactor, _desktopAim,
-                        THREE.MathUtils.lerp(0.06, 0.12, portraitFactor) * (1 - headWeight));
-                } else frameSurfaceCamera(camera, portraitFactor);
+            } else if (!rocketLift && !healFocusActive) {
+                // Aim at the visible player, not the cube's buried centre. The
+                // old small-board overview pitched into the face and snapped away
+                // from the countdown shot on a fresh Story run.
+                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
+                lookAtRef.current.copy(_mobileHeadWorld);
             }
             if (!healFocusActive) {
                 bodyPathHeadInto(_mobileHeadWorld, worm, false);

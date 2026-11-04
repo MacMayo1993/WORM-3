@@ -76,7 +76,7 @@ beforeEach(() => {
   scene.mobile = true;
   scene.size = { width: 412, height: 915 };
   scene.camera = new PerspectiveCamera(70, 412 / 915, 0.1, 200);
-  useGameStore.setState({ wormGamePhase: 'countdown', wormAlive: true, wormCameraHorizon: 'face',
+  useGameStore.setState({ wormGamePhase: 'countdown', wormAlive: true, wormCameraHorizon: 'face', wormCameraZoom: 1.2,
     wormDeathDetails: null, wormStoryLevel: null, wormStoryStarted: false, wormStoryReady: false,
     wormStoryResult: null, wormCombatMode: false, demoMode: false });
 });
@@ -469,28 +469,41 @@ it.each([3, 5, 15])('enters a raised wormhole with a readable head silhouette on
   }
 });
 
-it('retains whole-board framing on desktop', () => {
+it.each([2, 3, 4, 5, 6, 7, 8, 10, 15])('centres the desktop player on a %s cube from countdown into live play', size => {
   scene.mobile = false;
   scene.size = { width: 1440, height: 900 };
   scene.camera.aspect = 1440 / 900; scene.camera.updateProjectionMatrix();
-  const worm = makeWorm(5);
-  render(worm, 5); tick();
-  useGameStore.setState({ wormGamePhase: 'active' });
-  tick();
-  const origin = new Vector3().project(scene.camera);
-  expect(origin.x).toBeCloseTo(0, 6);
-  expect(origin.y).toBeCloseTo(0.06, 6);
+  for (const dirKey of Object.keys(FACE_NORMALS)) {
+    const worm = makeWorm(size, dirKey);
+    worm.tailLength.current = BASE_TAIL_LENGTH;
+    useGameStore.setState({ wormGamePhase: 'countdown', wormCameraZoom: 1.2 });
+    render(worm, size, dirKey);
+    for (let i = 0; i < 200; i++) { tick(); expectCentered(worm, size); }
+    const before = scene.camera.quaternion.clone();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    tick(); expectCentered(worm, size);
+    expect(before.angleTo(scene.camera.quaternion)).toBeLessThan(0.02);
+    for (let i = 0; i < 60; i++) {
+      worm.headInterpPos.current.addScaledVector(new Vector3().fromArray(DIR_FORWARD[dirKey].up), 0.003);
+      tick(); expectCentered(worm, size);
+    }
+  }
 });
 
-it.each([8, 10, 15])('centres the head on a %s cube on desktop, where the cube centre lies far below the surface', size => {
+it.each(['face', 'level'])('keeps the saved %s horizon and zoom when starting desktop Story', horizon => {
   scene.mobile = false;
   scene.size = { width: 1440, height: 900 };
-  scene.camera.aspect = 1440 / 900; scene.camera.updateProjectionMatrix();
-  const worm = makeWorm(size);
-  render(worm, size); tick();
+  scene.camera.aspect = 1.6; scene.camera.updateProjectionMatrix();
+  const worm = makeWorm(6);
+  useGameStore.setState({ wormCameraHorizon: horizon, wormCameraZoom: 1.65,
+    wormStoryLevel: 1, wormStoryReady: true, wormStoryStarted: false, wormGamePhase: 'active' });
+  render(worm, 6); tick(); expectCentered(worm, 6);
+  useGameStore.setState({ wormStoryStarted: true, wormGamePhase: 'countdown' });
+  for (let i = 0; i < 200; i++) tick();
   useGameStore.setState({ wormGamePhase: 'active' });
-  for (let i = 0; i < 60; i++) tick();
-  expectCentered(worm, size);
+  tick(); expectCentered(worm, 6);
+  expect(useGameStore.getState().wormCameraHorizon).toBe(horizon);
+  expect(useGameStore.getState().wormCameraZoom).toBe(1.65);
 });
 
 it.each([true, false])('stands the chase camera further back as the player zooms out (mobile=%s)', mobile => {
