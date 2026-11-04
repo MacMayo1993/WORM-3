@@ -50,7 +50,7 @@ const TASKS = [
   ['kills', n => `defeat ${count(n, 'enemy', 'enemies')}`],
 ];
 
-export function storyGoalText(level) {
+export function storyGoalText(level, character = null) {
   const m = level.mechanics ?? {};
   const primary = PRIMARY[level.kind]?.(level.target) ?? `Heal ${count(level.target, 'tunnel pair')}`;
   const tasks = [];
@@ -59,7 +59,8 @@ export function storyGoalText(level) {
   if (level.orbs) tasks.push(`collect ${count(level.orbs, 'orb')}`);
   if (level.colors && level.kind !== 'orbs') tasks.push(`collect all ${level.colors} colors`);
   if (level.rotations) tasks.push(`survive ${count(level.rotations, 'layer turn')}`);
-  for (const [key, phrase] of TASKS) if (m[key]) tasks.push(phrase(m[key], level));
+  for (const [key, phrase] of TASKS) if (m[key]) tasks.push(key === 'signatures' && character === 'prism'
+    ? `collect ${count(m[key], 'different orb color')} for Spectrum` : phrase(m[key], level));
 
   const notes = [];
   if (TAIL_KINDS.includes(level.kind)) notes.push('Clear your tail to finish.');
@@ -68,6 +69,7 @@ export function storyGoalText(level) {
   if (m.multiHeals) notes.push(`For a double heal, heal two different pairs within ${STORY_DOUBLE_HEAL_WINDOW} seconds of surface time. Tunnel travel pauses the clock; overlapping paid rides also count.`);
   if (m.selfPasses || m.multiHeals) notes.push('Missed a chain? Retry doors open after the last pair and your tail clear.');
   if ((m.ringHeals || m.signatures) && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnel deposits seal only after the surround and ability tasks.');
+  if (m.signatures && character === 'mobi') notes.push('Your own tunnel can heal before the ability task is complete, after the surround task.');
   if (level.rotateEvery && (level.kind === 'rotation' || level.rotations)) notes.push(`Turns come every ${level.rotateEvery} seconds.`);
   if (level.tip) notes.push(level.tip);
   return `${sentence(tasks)}.${notes.length ? ` ${notes.join(' ')}` : ''}`;

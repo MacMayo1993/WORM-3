@@ -8,7 +8,7 @@ export function storyHudSnapshot(previous, level, metrics, runId, outcome) {
   const hint = metrics.powerHint || '';
   const old = previous?.checklist;
   // Each attempt deals its own elements, which the goal labels name.
-  const sameRun = old?.runId === runId && old?.levelId === level.id && old?.elementOrder === metrics.elementOrder;
+  const sameRun = old?.runId === runId && old?.levelId === level.id && old?.elementOrder === metrics.elementOrder && old?.character === metrics.character;
   const sameGoals = sameRun && old.goals.every(goal =>
     goal.value === Math.min(goal.target, Math.max(0, metrics[goal.key] ?? 0)));
   const goals = sameGoals ? old.goals : storyChecklist(level, metrics);
@@ -24,7 +24,7 @@ export function storyHudSnapshot(previous, level, metrics, runId, outcome) {
   return {
     tailClear: metrics.tailClear,
     progress: storyProgressText(level, metrics),
-    checklist: { runId, levelId: level.id, elementOrder: metrics.elementOrder, goals, seconds, hint, settling, settlingHint, starGoals, canFinish,
+    checklist: { runId, levelId: level.id, character: metrics.character, elementOrder: metrics.elementOrder, goals, seconds, hint, settling, settlingHint, starGoals, canFinish,
       // Retain the qualified inputs alongside the displayed rating. Copy them
       // so later simulation updates cannot change the result being offered.
       finishMetrics: canFinish ? { ...metrics } : null },

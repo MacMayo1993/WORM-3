@@ -41,7 +41,7 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
   const traversalTrial = !!ctx.isStoryTunnelTrial?.();
   return { key, pos: { ...pos }, distance, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
     // Funding alone does not satisfy story objectives that gate tunnel healing.
-    healingAllowed: ctx.allowTunnelHeal?.() !== false,
+    healingAllowed: ctx.allowTunnelHeal?.(resolved.tunnel) !== false,
     locked: isParityLocked(sim, pos, ctx), lockSeconds: Math.ceil(sim.signature.mobiTunnel?.reentryT ?? 0),
     voided: sim.voidTunnelKeys.has(resolved.tunnelKey), uses: sim.tunnelUseCounts.get(resolved.tunnelKey) ?? 0,
     ...healingNeed({ deposited, inventory: ctx.getOrbInventory(), faceId: sticker.curr, tailLength: sim.tailLength, isPrism }),

@@ -78,8 +78,11 @@ export function updateMastery(sim, p, level, delta) {
     if (p.airJump) { p.elements.add('air'); p.airJump = false; }
   }
   const sig = sim.signature;
+  // Spectrum is passive: build its reserve with different freshly collected colors.
+  // Credit lives in mechanics too, so healing gates and the HUD agree.
+  if (sig.character === 'prism') p.mechanics.signatures = p.colors.size;
   // Inch increments seq when charging; only its successful launch earns credit.
-  if (sig.seq > (p.signatureSeq ?? 0) && (sig.character !== 'inch' || sig.active > 0)) {
+  if (sig.character !== 'prism' && sig.seq > (p.signatureSeq ?? 0) && (sig.character !== 'inch' || sig.active > 0)) {
     add(p, 'signatures'); p.signatureSeq = sig.seq;
   }
   p.elementTimes ??= {};
@@ -405,4 +408,12 @@ function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = fals
     }
   }
   return true;
+}
+
+// Keep the surround prerequisite, but let Mobi retire its own door so another
+// activation is possible. Unrelated tunnels still wait for all ability credit.
+export function canStoryTunnelHeal(mechanics, counts, ownedTunnel, tunnel) {
+  return (counts?.ringHeals ?? 0) >= (mechanics?.ringHeals ?? 0) &&
+    ((!!ownedTunnel && ownedTunnel.pairId === tunnel?.pairId) ||
+      (counts?.signatures ?? 0) >= (mechanics?.signatures ?? 0));
 }

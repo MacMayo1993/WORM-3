@@ -81,11 +81,13 @@ export function createWormSkinMaterial(options = {}) {
   material.userData.wormContour = contour;
 
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = { value: 0 };
-    shader.uniforms.uAmp = { value: 0 };
-    shader.uniforms.uFreq = { value: 1 };
-    shader.uniforms.uSpeed = { value: 1 };
-    shader.uniforms.uStyle = { value: 0 };
+    const bump = material.userData.skinDisplacement || {};
+    const enabled = material.userData.skinDisplacementEnabled !== false;
+    shader.uniforms.uTime = { value: material.userData.skinTime ?? 0 };
+    shader.uniforms.uAmp = { value: enabled ? bump.amp ?? 0 : 0 };
+    shader.uniforms.uFreq = { value: bump.freq ?? 1 };
+    shader.uniforms.uSpeed = { value: bump.speed ?? 1 };
+    shader.uniforms.uStyle = { value: enabled ? BUMP_STYLES[bump.style] ?? 0 : 0 };
     shader.uniforms.uSeed = { value: material.userData.seed ?? 0 };
     shader.uniforms.uEmissiveTint = { value: material.userData.emissiveTint ?? 1 };
 
@@ -144,15 +146,24 @@ export function applySkinMaterialProfile(material, fx, seed = 0) {
   material.userData.seed = seed;
   material.userData.pulse = fx.pulse ? { base: material.emissiveIntensity, amp: fx.pulse.amp, speed: fx.pulse.speed } : null;
 
-  const bump = fx.bump || { style: 'none' };
+  // Keep the recipe before the first draw and across shader recompilation.
+  // Previews apply profiles only on selection changes, not on every frame.
+  material.userData.skinDisplacement = { ...(fx.bump || { style: 'none' }) };
+  setWormSkinDisplacementEnabled(material, material.userData.skinDisplacementEnabled !== false);
   const shader = material.userData.shader;
-  if (shader) {
-    shader.uniforms.uStyle.value = BUMP_STYLES[bump.style] ?? 0;
-    shader.uniforms.uAmp.value = bump.amp ?? 0;
-    shader.uniforms.uFreq.value = bump.freq ?? 1;
-    shader.uniforms.uSpeed.value = bump.speed ?? 1;
-    shader.uniforms.uSeed.value = seed;
-  }
+  if (shader) shader.uniforms.uSeed.value = seed;
+}
+
+/** Character geometry can opt out without losing the equipped skin recipe. */
+export function setWormSkinDisplacementEnabled(material, enabled) {
+  material.userData.skinDisplacementEnabled = enabled;
+  const bump = material.userData.skinDisplacement || {};
+  const shader = material.userData.shader;
+  if (!shader) return;
+  shader.uniforms.uStyle.value = enabled ? BUMP_STYLES[bump.style] ?? 0 : 0;
+  shader.uniforms.uAmp.value = enabled ? bump.amp ?? 0 : 0;
+  shader.uniforms.uFreq.value = bump.freq ?? 1;
+  shader.uniforms.uSpeed.value = bump.speed ?? 1;
 }
 
 /**
@@ -160,6 +171,7 @@ export function applySkinMaterialProfile(material, fx, seed = 0) {
  * time-based displacement and emissive pulsing.
  */
 export function updateWormSkinMaterialTime(material, elapsed) {
+  material.userData.skinTime = elapsed;
   const shader = material.userData.shader;
   if (shader) shader.uniforms.uTime.value = elapsed;
   const pulse = material.userData.pulse;

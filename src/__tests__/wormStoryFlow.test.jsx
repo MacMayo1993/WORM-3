@@ -587,3 +587,45 @@ it('allows a surround in Chapter 10 level 1 without disabling the remaining cros
   expect(ringAllowed).toBe(true);
   expect(state().wormStoryChecklist.goals.find(goal => goal.key === 'uniqueTunnels')).toMatchObject({ target: 6, done: false });
 });
+
+it('Prism earns level 79 Spectrum credit from real distinct-color pickups and resets on retry', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'prism', playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 78 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(79); frame();
+  const goal = () => state().wormStoryChecklist.goals.find(g => g.key === 'signatures');
+  expect(goal()).toMatchObject({ value: 0, target: 3, label: 'Collect different orb colors for Spectrum' });
+  // Pressing a passive ability cannot give free objective credit.
+  act(() => worm.queueTurn('signature')); frame(); expect(goal().value).toBe(0);
+  const collected = new Set();
+  while (!goal().done) {
+    const orb = state().wormPowerups.find(p => !collected.has(orbCreditFace(state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr)));
+    expect(orb).toBeTruthy();
+    collected.add(orbCreditFace(state().cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].curr));
+    seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+    frame();
+  }
+  expect(goal()).toMatchObject({ value: 3, done: true });
+  expect(state().wormStoryResult).toBeNull();
+  begin(79); frame(); expect(goal()).toMatchObject({ value: 0, done: false });
+});
+
+it('Mobi can retire its own Story tunnel before the repeated-use quota, without opening unrelated heals', () => {
+  const steps = vi.spyOn(wormSimulation, 'stepWormSim');
+  const metrics = vi.spyOn(storyRuntime, 'storyMetrics');
+  act(() => useGameStore.setState({ wormCharacter: 'mobi', playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 78 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(79); frame();
+  const [sim, practice] = metrics.mock.calls.at(-1);
+  const ctx = steps.mock.calls.at(-1)[3];
+  act(() => worm.queueTurn('signature')); frame();
+  const owned = sim.signature.mobiTunnel;
+  expect(owned).toBeTruthy();
+  expect(practice.mechanics.signatures).toBe(1);
+  expect(ctx.allowTunnelHeal({ pairId: owned.pairId })).toBe(false);
+  practice.mechanics.ringHeals = storyLevel(79).mechanics.ringHeals;
+  expect(ctx.allowTunnelHeal({ pairId: owned.pairId })).toBe(true);
+  expect(ctx.allowTunnelHeal({ pairId: 'unrelated' })).toBe(false);
+  expect(state().wormStoryResult).toBeNull();
+});

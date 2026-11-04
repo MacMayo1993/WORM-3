@@ -1,3 +1,4 @@
+import { storyGoalText } from '../../worm/story/goalText.js';
 import ActionLegend, { ActionCue } from '../ui/ActionCue.jsx';
 import { WORM_SHORT_CHALLENGES } from '../../game/wormShortChallenges.js';
 import StoryStarRequirements from '../../worm/story/StoryStarRequirements.jsx';
@@ -29,7 +30,9 @@ const FreePlaySetup = React.lazy(() => import('./WormModeSetupWizard.jsx'));
 export default function WormEntryScreen({ onComplete, onCancel, onChallenges, initialSettings, initialPage = 'story' }) {
   const [page, setPage] = useState(initialPage === 'choice' ? 'story' : initialPage);
   const progress = useGameStore(s => s.playerProgress);
+  const wormCharacter = useGameStore(s => s.wormCharacter);
   const wormSkin = useGameStore(s => s.wormSkin);
+  const ownedItems = useGameStore(s => s.ownedItems);
   const [selected, setSelected] = useState(() => nextStoryLevel(progress).id);
   const root = useRef(null);
   const chapterTabs = useRef(null);
@@ -78,7 +81,7 @@ export default function WormEntryScreen({ onComplete, onCancel, onChallenges, in
   const levelStars = storyStars(progress, level.id), finale = isChapterFinale(level.id);
   const totalStars = WORM_STORY_CHAPTERS.reduce((n, item) => n + item.levels.reduce((m, l) => m + storyStars(progress, l.id), 0), 0);
   const totalMax = WORM_STORY_CHAPTERS.reduce((n, item) => n + item.levels.length * 3, 0);
-  const nextWorm = nextCharacterUnlock(progress);
+  const nextWorm = nextCharacterUnlock(progress, ownedItems);
   const clock = `${Math.floor(level.limit / 60)}:${String(level.limit % 60).padStart(2, '0')}`;
   return <div ref={root} className="mode-wizard worm-entry worm-levels" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT,
@@ -147,8 +150,8 @@ export default function WormEntryScreen({ onComplete, onCancel, onChallenges, in
           <StoryWorldPreview levelId={level.id} />
           <h3 className="worm-stage-heading">Mission</h3>
           <StoryMobiNote levelId={level.id} />
-          <p className="worm-stage-goal">{level.goal}</p>
-          <ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
+          <p className="worm-stage-goal">{storyGoalText(level, wormCharacter)}</p>
+          <ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level, { character: wormCharacter }).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
           <div className="worm-level-reward"><span className="worm-stage-chest" aria-hidden="true"><svg viewBox="0 0 32 28"><path d="M3 12h26v13H3z" /><path d="M3 12V9a6 6 0 0 1 6-6h14a6 6 0 0 1 6 6v3" /><path d="M13 10h6v6h-6z" /></svg></span>
             <span><small>{levelStars ? 'First clear · claimed' : 'First clear reward'}</small><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></span></div>
           <StoryRewardChoices level={level} />

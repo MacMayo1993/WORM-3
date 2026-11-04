@@ -961,7 +961,7 @@ export default function WORM3() {
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
     const replay = !!chapterLevel && storyStars(useGameStore.getState().playerProgress, chapterLevel.id) > 0;
-    launchWithMobi(chapterLevel ? storyLaunchLines(chapterLevel, { replay }) : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
+    launchWithMobi(chapterLevel ? storyLaunchLines(chapterLevel, { replay, character: useGameStore.getState().wormCharacter }) : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
       vibrate([50, 30, 100]);
       // A 15×15 shell contains 1,178 rendered cubelets. Start it in the lighter
       // effects tier immediately instead of waiting for the frame monitor to

@@ -1,0 +1,13 @@
+// Display metadata shared by character selection and the simulation. Keep this module
+// free of simulation/renderer imports so menus do not load the game to show an ability.
+import { BOOK_XP_MULTIPLIER, BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, GLOW_TRAIL_LINGER_SECONDS, MOBI_REENTRY_SECONDS, SPRING_COOLDOWN, WIGGLE_DURATION } from './characterAbilities.js';
+
+export const SIGNATURES = {
+  classic: { name: 'Orb Call', short: 'Orb Call', cooldown: CLASSIC_ORB_CALL_COOLDOWN, duration: CLASSIC_ORB_CALL_SECONDS, color: '#a6eb9b', hint: `Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds.` },
+  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: `Stop the clocks for ${BOOK_PAUSE_SECONDS} seconds: layer turns wait, and so does a Story level's timer. Movement and hazards continue. Earn ${Math.round((BOOK_XP_MULTIPLIER - 1) * 100)}% more XP.` },
+  prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel. You still spend the required number of orbs; no ability button is needed.' },
+  wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs and any dropped orbs it crosses. Steering locks until finished.' },
+  inch: { name: 'Spring Loaded', short: 'Spring', cooldown: SPRING_COOLDOWN, duration: 0, color: '#c6ec86', hint: 'Tap to coil and leap about four tiles; hold to stay coiled and see where you will land, then release to leap. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Landing must be clear; you can still jump once more in the air.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: `Glow for ${GLOW_TRAIL_SECONDS} seconds: your head passes through your own body anywhere. The trail you paint stays ${GLOW_TRAIL_LINGER_SECONDS} seconds more; your head still slips through your body where it lies on the light, and enemies that run into it are burned and thrown back. Other hazards still hurt you.` },
+  mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: `Open a tunnel beneath you on an unflipped tile without spending orbs. No re-entry for ${MOBI_REENTRY_SECONDS} seconds. Heal it before creating another.` },
+};

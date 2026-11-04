@@ -89,6 +89,44 @@ describe('signature input and lifecycle', () => {
     resetWormSim(sim, SIZE, { orbCount: 0 });
     expect(sim.signatureRequested).toBe(false); expect(sim.signature.cooldown).toBe(0);
   });
+  it.each(['healPauseT', 'cutFocusT', 'elementalFocusT'])('does not buffer an ability pressed during %s', field => {
+    const { sim, ctx } = world('glow');
+    sim[field] = 0.2;
+    activate(sim, ctx);
+    expect(sim.signatureRequested).toBe(false);
+    run(sim, ctx, 0.5);
+    expect(sim.signature.seq).toBe(0);
+    expect(sim.signature.cooldown).toBe(0);
+    activate(sim, ctx);
+    expect(sim.signature.seq).toBe(1);
+  });
+
+  it.each(['classic', 'book', 'inch', 'glow', 'wiggle', 'mobi'])('does not bank %s during a raised-platform flight', character => {
+    const { sim, ctx, cubies } = world(character, { getTunnelEntry: () => 'pad' });
+    cubies[sim.pos.x][sim.pos.y][sim.pos.z].stickers[sim.pos.dirKey].flips = 1;
+    startJump(sim, ctx, SIZE, { allowDive: false });
+    expect(sim.padFlight).not.toBeNull();
+    expect(signatureAvailability(sim, SIZE, ctx).reason).toBe('Wait for a clear surface');
+    activate(sim, ctx);
+    expect(sim.signatureRequested).toBe(false);
+    for (let i = 0; i < 100 && sim.padFlight; i++) step(sim, ctx);
+    expect(sim.padFlight).toBeNull();
+    step(sim, ctx);
+    expect(sim.signature.seq).toBe(0);
+    expect(sim.signature.cooldown).toBe(0);
+  });
+
+  it.each(Object.keys(SIGNATURES))('fully clears %s ability state on retry', character => {
+    const { sim } = world(character);
+    Object.assign(sim.signature, { character, active: 3, cooldown: 12, charge: 0.2, held: true,
+      sweep: {}, mobiTunnel: {}, glowTrail: {}, slam: {}, slamT: 0.5, readyT: 0.8 });
+    sim.signatureRequested = true;
+    resetWormSim(sim, SIZE, { orbCount: 0 });
+    expect(sim.signatureRequested).toBe(false);
+    expect(sim.signature).toMatchObject({ character: null, active: 0, cooldown: 0, charge: 0,
+      held: false, sweep: null, mobiTunnel: null, glowTrail: null, slam: null, slamT: 0, readyT: 0 });
+  });
+
   it('freezes active and cooldown clocks during pause and tunnel transit', () => {
     const { sim, ctx } = world('glow'); activate(sim, ctx);
     const { active, cooldown } = sim.signature;

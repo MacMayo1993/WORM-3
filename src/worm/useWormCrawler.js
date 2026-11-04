@@ -9,7 +9,7 @@ import { orbsCarried } from './healerWorm/economy.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
 import { shouldFinishStory } from './story/starGoals.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
-import { offerStoryBonus, offerStoryPower, recordStoryMechanic } from './story/mastery.js';
+import { offerStoryBonus, offerStoryPower, recordStoryMechanic, canStoryTunnelHeal } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
 import { stageStory, storyMetrics, replenishStoryTunnel, replenishStoryOrbs } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
@@ -279,10 +279,10 @@ export function useWormCrawler(size, cubies) {
                 return !(level?.mechanics?.signatures && simRef.current.healed >= level.target - 1 &&
                     (p?.mechanics.signatures ?? 0) < level.mechanics.signatures);
             },
-            allowTunnelHeal: () => {
+            allowTunnelHeal: tunnel => {
                 const m = storyLevel(useGameStore.getState().wormStoryLevel)?.mechanics;
                 const counts = storyPracticeRef.current?.mechanics;
-                return (counts?.ringHeals ?? 0) >= (m?.ringHeals ?? 0) && (counts?.signatures ?? 0) >= (m?.signatures ?? 0);
+                return canStoryTunnelHeal(m, counts, simRef.current.signature.mobiTunnel, tunnel);
             },
             // A skill moment (skillMoments.js): a callout in the HUD and a bright sting.
             onSkill: (kind) => {

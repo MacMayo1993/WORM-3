@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { setWormSkinDisplacementEnabled } from './wormSkinMaterial.js';
 
 // Six broad polished faces, bright bevels and pointed ends. The old subdivided
 // icosphere read as another round bead at gameplay scale. Keep this non-indexed
@@ -84,6 +85,8 @@ export function createCharacterGeometry(character) {
 
 export function applyCharacterFinish(material, character) {
   const prism = character === 'prism', inch = character === 'inch';
+  // Persist this override even when the first shader has not compiled yet.
+  setWormSkinDisplacementEnabled(material, !prism);
   material.vertexColors = prism || inch || character === 'wiggle' || character === 'classic' || character === 'glow';
   if (character === 'wiggle') {
     material.roughness = Math.max(0.32, material.roughness);
@@ -103,8 +106,6 @@ export function applyCharacterFinish(material, character) {
       material.flatShading = true;
       material.emissive.set(0xffffff);
       // Skin bumps/ripples must not soften the authored crystal planes.
-      const shader = material.userData.shader;
-      if (shader) { shader.uniforms.uStyle.value = 0; shader.uniforms.uAmp.value = 0; }
       // Opaque crystal avoids a transmission render pass on mobile.
       material.transmission = 0;
     }
