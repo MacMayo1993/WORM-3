@@ -40,6 +40,8 @@ it('collects real orbs, jumps onto the pad, and waits for the tail to clear befo
   act(() => state().nextWormDemoLesson()); expect(state().demoWormLessonIndex).toBe(0);
   act(() => state().startWormDemoLesson());
   until(() => state().wormSessionOrbs === 2);
+  // Scripted practice has a fixed budget, not random replacement food.
+  expect(state().wormPowerups).toHaveLength(0);
   expect(state().demoWormComplete).toBe(false);
   act(() => worm.queueTurn('jump'));
   until(() => state().wormTunnelCount > 0);

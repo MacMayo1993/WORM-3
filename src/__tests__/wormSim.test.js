@@ -1112,6 +1112,18 @@ describe('orb pickup', () => {
     expect(sim.powerups).toHaveLength(0);
   });
 
+  it('consumes fixed-budget orbs without random replacements', () => {
+    const sim = makeSim();
+    const cubies = makeCubies(SIZE);
+    const ctx = makeCtx({ isDemoLesson: () => true, getCubies: () => cubies });
+    sim.powerups = [{ x: 1, y: 2, z: 2, dirKey: 'PZ', type: 'apple', respawn: false }];
+    run(sim, ctx, 1.1);
+    expect(sim.tailLength).toBe(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH);
+    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+    expect(eventsOf(ctx, 'powerups').at(-1).args[0]).toEqual([]);
+    expect(sim.powerups).toHaveLength(0);
+  });
+
   it('grows the tail and reports the pickup when crawling over an orb', () => {
     const cubies = makeCubies(SIZE);
     const sim = makeSim();
