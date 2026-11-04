@@ -20,7 +20,7 @@ import * as THREE from 'three';
 import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_TILE, TUNNEL_CORE_STICKER_OFFSET, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { rubiksFinish } from './rubiksPiece.js';
-import { bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_COAT } from './cubeViewStyles.js';
+import { bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_COAT, CHROME_TILE_FINISH } from './cubeViewStyles.js';
 
 /** Half-width of the core, where the tunnels dock. */
 export const CORE_HALF = TUNNEL_MINI_FACE_R;
@@ -193,20 +193,23 @@ export function interiorExposure({ explosionT = 0, visualMode = 'classic', hollo
 // ── Materials ────────────────────────────────────────────────────────────────
 
 /**
- * Glossy core stickers that also glow a little in their own colour, so the
+ * Core stickers use the shared chrome finish, or plain plastic during Classic.
+ * Both glow a little in their own colour, so the
  * miniature stays readable deep inside the cube where the studio rig barely
  * reaches. `glow` is a shared uniform ({ value }).
  */
-export function createCoreStickerMaterial(glow, performanceMode = false) {
+export function createCoreStickerMaterial(glow, performanceMode = false, chrome = false) {
   const { Material, sticker } = rubiksFinish(performanceMode);
-  const material = new Material({ ...sticker, envMapIntensity: 0.3 });
+  const material = chrome
+    ? new THREE.MeshStandardMaterial(CHROME_TILE_FINISH)
+    : new Material({ ...sticker, envMapIntensity: 0.3 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCoreGlow = glow;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uCoreGlow;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * uCoreGlow;');
   };
-  material.customProgramCacheKey = () => 'antipodal-core-sticker';
+  material.customProgramCacheKey = () => `antipodal-core-sticker${chrome ? '-chrome' : ''}`;
   return material;
 }
 

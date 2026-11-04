@@ -42,15 +42,15 @@ and lets it crawl `--crawl` ms first, so a long body rides through the core; `--
 the flip, so the route bends or skews through the core instead of running straight down a diameter; `--profile` takes a
 CPU profile of the crawl after the ride.
 
-### Chrome interior material regression
+### Central anticube chrome material regression
 
 ```bash
 CHROMIUM=/path/to/chrome SCREENSHOT=/tmp/interior-chrome.png node scripts/perf-worm/interior-chrome.mjs
 ```
 
-Renders the production chrome interior batches in real WebGL using an offline
-studio environment. Checks one draw for all 54 tiles, visible highlights and
-seams, and that the actual portal-cutout shader opens and restores the wall.
+Renders the restored outer wall batches and central anticube chrome in real WebGL
+using an offline studio environment. Checks six wall draws and one chrome core
+draw for 54 tiles each, and verifies both actual portal-cutout shaders open.
 The optional screenshot is a material inspection, not a full gameplay scene.
 Software-rendered timings are not phone performance measurements.
 

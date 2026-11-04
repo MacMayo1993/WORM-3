@@ -45,7 +45,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     expect(interiorTile(scene, '0-1-1-NX').visible).toBe(true);
     const wall = interiorTile(scene, '0-1-1-NX'), pose = new THREE.Matrix4();
     wall.getMatrixAt(wall.userData.tileKeys.indexOf('0-1-1-NX'), pose);
-    // The polished wall must be in front of the existing 0.018-inset backs.
+    // The patterned wall must be in front of the existing 0.018-inset backs.
     expect(Math.abs(pose.elements[12])).toBeLessThan(1.5);
     expect(Math.abs(pose.elements[12])).toBeCloseTo(1.44);
     expect(tunnelCoreClipUniforms.uTunnelCoreHalf.value).toBeCloseTo(CORE_HALF + .002);
@@ -59,10 +59,10 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     }
     const body = scene.getObjectByName('antipodal-core-body').material;
     const sticker = scene.getObjectByName('antipodal-core-stickers').material;
-    const styled = scene.getObjectByName('antipodal-core-style-5-checkerboard').material;
+    expect(scene.getObjectByName('antipodal-core-style-5-checkerboard')).toBeUndefined();
+    expect(sticker).toMatchObject(CHROME_TILE_FINISH);
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(1);
     expect(body.userData.portalCutout).toBe(sticker.userData.portalCutout);
-    expect(styled.uniforms.uPassagePoints).toBe(body.userData.portalCutout.uPassagePoints);
     const room = scene.getObjectByName('anticube-mirror-room');
     const mirrors = scene.getObjectByName('anticube-mirror-tiles');
     expect(room.visible).toBe(true);
@@ -79,8 +79,8 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     await act(async () => useGameStore.setState({ cubies: recoloured }));
     expect(Array.from(mirrors.instanceColor.array)).not.toEqual(tints);
     const inner = interiorTile(scene, '0-1-1-NX').material;
-    expect(inner.isMeshStandardMaterial).toBe(true);
-    expect(inner).toMatchObject(CHROME_TILE_FINISH);
+    expect(inner.isShaderMaterial).toBe(true);
+    expect(inner.metalness).toBeUndefined();
     for (const mesh of interior.children.filter(mesh => mesh.material?.isMeshBasicMaterial)) {
       expect(mesh.material.userData.portalCutout).toBe(inner.userData.portalCutout);
     }
