@@ -141,6 +141,10 @@
 
 .wl-label {
   margin: 0;
+  /* Keep the live status readable through the blue and red paper stops. */
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fffcf1;
   font-family: var(--wl-heading-font);
   font-size: clamp(13px, 1.9vw, 16px);
   letter-spacing: 0.14em;

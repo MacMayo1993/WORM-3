@@ -5,14 +5,14 @@
  *
  * Three full-screen 2D canvases (NOT WebGL: the app's single R3F canvas owns the
  * only WebGL context):
- *  - the paper: the opening's cream graph paper line for line — the same squares
+ *  - the paper: the opening's six-color graph paper — the same squares
  *    and breathing waves MenuPaperBackdrop's shader bends (utils/paperGrid.js) —
  *    dragged down into the mouth on the floor;
  *  - the portals, behind the cube: the spinning funnel in the paper (grid
  *    swirling in, sticker confetti falling through, a worm riding the vortex
  *    out of the throat and back), the same tunnel through the portal hanging
- *    above, and the far halves of their lips. Both are seen from above, as the
- *    cube is; the exit rim stays behind the emerging cube, while the entrance
+ *    above, and the far halves of their lips. The ceiling tunnel recedes upward
+ *    from its shallow exit; its rim stays behind the emerging cube, while the entrance
  *    rim covers it as it sinks into the floor;
  *  - the floor portal's near lip and both glowing cut lines, over the cube.
  *
@@ -32,7 +32,7 @@
 import React, { useEffect, useRef } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import { PAPER_GRID as P, paperRgb, paperShiftX, paperShiftY } from '../../utils/paperGrid.js';
+import { PAPER_GRID as P, paperShiftX, paperShiftY } from '../../utils/paperGrid.js';
 import {
   MOTE_COUNT,
   THROAT,
@@ -50,6 +50,7 @@ import {
   spinAngle,
   wormPose
 } from './loadingWormhole.js';
+import { introPaperTintInto } from '../intro/introPaper.js';
 import { KICK, TILT } from './loadingPlay.js';
 
 const TAU = Math.PI * 2;
@@ -86,17 +87,23 @@ function eachSample(start, end, fineStart, fineEnd, visit) {
 }
 
 // ── The paper ────────────────────────────────────────────────────────────────
-function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr, pad = 0) {
+const paperTint = { r: 0, g: 0, b: 0 };
+function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr, pad = 0, colorTime = t) {
   ctx.save();
   ctx.globalAlpha = opacity;
   // The shader's highlight is measured in uv, so its falloff stretches with the screen.
-  ctx.translate(W * P.highlight[0], H * (1 - P.highlight[1]));
+  ctx.translate(W * 0.5, H * 0.45);
   ctx.scale(W, H);
-  const paper = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-  paper.addColorStop(0, paperRgb(P.paperCentre));
-  paper.addColorStop(1, paperRgb(P.paperEdge));
+  const paper = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 0.65);
+  introPaperTintInto(paperTint, colorTime, !motion);
+  const color = [paperTint.r * 255, paperTint.g * 255, paperTint.b * 255];
+  // Same dominant hue and 20–40% white light pool as the opening shader.
+  for (let i = 0; i <= 8; i++) {
+    const u = i / 8;
+    paper.addColorStop(u, rgba(shade(color, 0.4 - 0.2 * u * u * (3 - 2 * u)), 1));
+  }
   ctx.fillStyle = paper;
-  ctx.fillRect(-P.highlight[0] - pad / W, P.highlight[1] - 1 - pad / H, 1 + (2 * pad) / W, 1 + (2 * pad) / H);
+  ctx.fillRect(-0.5 - pad / W, -0.45 - pad / H, 1 + (2 * pad) / W, 1 + (2 * pad) / H);
   ctx.restore();
   if (!well) return;
 
@@ -533,7 +540,7 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       if (key !== paperKey || now - paperAt >= PAPER_INTERVAL) {
         paper.setTransform(dpr, 0, 0, dpr, PAPER_PAD * dpr, PAPER_PAD * dpr);
         paper.clearRect(-PAPER_PAD, -PAPER_PAD, W + 2 * PAPER_PAD, H + 2 * PAPER_PAD);
-        drawPaper(paper, W, H, t, reduced ? 0 : 1, lens, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr, PAPER_PAD);
+        drawPaper(paper, W, H, t, reduced ? 0 : 1, lens, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr, PAPER_PAD, (now - mountedAt) / 1000);
         paperAt = now;
         paperKey = key;
       }
@@ -548,7 +555,12 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       if (top) {
         drawHalo(ctx, top, pulse);
         drawKickRing(ctx, top, kickSince, play?.kicks ?? 0);
+        // The ceiling tunnel recedes UP from its exit, not down like the floor.
+        ctx.save();
+        ctx.translate(0, top.cy * 2);
+        ctx.scale(1, -1);
         drawFunnel(ctx, top, t, spin, pulse, false, boost);
+        ctx.restore();
         drawRim(ctx, top, spin, pulse, 'back');
         drawRim(ctx, top, spin, pulse, 'front');
       }
@@ -576,7 +588,10 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       // in every animation frame. Cube and canvases translate by the same amount.
       top = measure(topRef, rect);
       well = measure(wellRef, rect);
-      cubePx = 0;
+      cubePx = fallRef?.current?.offsetHeight ?? 0;
+      // Match the exit ellipse to the shaft cut: no tunnel wall hangs below
+      // the emission edge and covers the emerging cube. Keep the floor deep.
+      if (top && cubePx) top.b = cubePx * FALL.cut;
       const nextDpr = Math.min(2, window.devicePixelRatio || 1);
       if (W === rect.width && H === rect.height && dpr === nextDpr) {
         paperKey = null;

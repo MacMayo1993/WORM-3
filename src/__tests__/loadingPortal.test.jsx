@@ -2,9 +2,12 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LoadingPortal from '../components/screens/LoadingPortal.jsx';
+import { introPaperTintInto } from '../components/intro/introPaper.js';
+import { FALL } from '../components/screens/loadingWormhole.js';
 import { RUBIKS_FACE_COLORS } from '../utils/constants.js';
 
-vi.mock('../utils/device.js', () => ({ prefersReducedMotion: () => false }));
+const motion = vi.hoisted(() => ({ reduced: false }));
+vi.mock('../utils/device.js', () => ({ prefersReducedMotion: () => motion.reduced }));
 
 // Record painted rim segments on each actual canvas, so depth ordering and
 // first-frame mouth geometry are checked without relying on CSS source strings.
@@ -12,13 +15,18 @@ function context() {
   let path = [];
   const fills = [];
   const noop = () => {};
-  const gradient = () => ({ addColorStop: noop });
+  const gradients = [];
+  const gradient = () => {
+    const stops = [];
+    gradients.push(stops);
+    return { addColorStop: (...stop) => stops.push(stop) };
+  };
   const ctx = {
-    fills,
+    fills, gradients,
     beginPath: () => { path = []; },
     ellipse: (...args) => path.push(args),
     fill: () => fills.push({ style: ctx.fillStyle, path: [...path] }),
-    save: noop, restore: noop, translate: noop, scale: noop, rotate: noop,
+    save: noop, restore: noop, translate: noop, scale: vi.fn(), rotate: noop,
     setTransform: noop, clearRect: noop, fillRect: noop, rect: noop, roundRect: noop,
     clip: noop, moveTo: noop, lineTo: noop, closePath: noop, stroke: noop, arc: noop,
     createRadialGradient: gradient, createLinearGradient: gradient
@@ -32,6 +40,8 @@ const ref = current => ({ current });
 const rimFills = ctx => ctx.fills.filter(fill => Object.values(RUBIKS_FACE_COLORS).includes(fill.style));
 
 beforeEach(() => {
+  motion.reduced = false;
+  vi.spyOn(performance, 'now').mockReturnValue(0);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div');
   document.body.append(host);
@@ -79,7 +89,35 @@ describe('loading portal drawing', () => {
     expect(front.every(fill => fill.path[0][1] === 516)).toBe(true);
     // No spring from zero width that disagrees with the fixed CSS shaft clip.
     expect(back.every(fill => fill.path[0][2] === 104.5)).toBe(true);
+    // The exit edge and emission clip coincide, without a low-hanging wall.
+    expect(back.filter(fill => fill.path[0][1] === 236).every(fill => fill.path[0][3] === 80 * FALL.cut * 1.045)).toBe(true);
+    expect(contexts.get(canvases[1]).scale).toHaveBeenCalledWith(1, -1);
     expect([...canvases].every(canvas => canvas.classList.contains('wl-ready'))).toBe(true);
+  });
+
+  it('paints all six opening hues using real time, independent of dive speed', () => {
+    const paper = contexts.get(host.querySelector('canvas'));
+    const tint = {};
+    for (const seconds of [0, 1.625, 2, 4, 6, 8, 10, 12]) {
+      paper.gradients.length = 0;
+      animation.currentTime = seconds * 7000; // hold-to-dive must not accelerate colors
+      act(() => raf(seconds * 1000));
+      introPaperTintInto(tint, seconds);
+      const expected = [tint.r, tint.g, tint.b].map(v => Math.round((v + (1 - v) * 0.4) * 255));
+      expect(paper.gradients[0][0]).toEqual([0, `rgba(${expected.join(',')},1)`]);
+    }
+  });
+
+  it('rests on white paper without scheduling an animation frame for reduced motion', () => {
+    motion.reduced = true;
+    requestAnimationFrame.mockClear();
+    const paper = contexts.get(host.querySelector('canvas'));
+    paper.gradients.length = 0;
+    act(() => root.render(<LoadingPortal />));
+    const tint = introPaperTintInto({}, 0, true);
+    const expected = [tint.r, tint.g, tint.b].map(v => Math.round((v + (1 - v) * 0.4) * 255));
+    expect(paper.gradients[0][0]).toEqual([0, `rgba(${expected.join(',')},1)`]);
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
 
   it('does not force layout reads or redraw the paper on every startup frame', () => {
