@@ -83,11 +83,11 @@ export function StoryRewardChoices({ level, previewsReady = true }) {
 }
 
 export function StoryObjectiveCard({ compact = false }) {
-  const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, started: s.wormStoryStarted,
+  const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, character: s.wormCharacter, started: s.wormStoryStarted,
     result: s.wormStoryResult, checklist: s.wormStoryChecklist, runId: s.wormRunId, alive: s.wormAlive, paused: s.wormPaused })));
   const level = storyLevel(state.id);
   const live = state.started && state.checklist?.runId === state.runId && state.checklist.levelId === level?.id ? state.checklist : null;
-  const goals = live?.goals ?? (level ? storyChecklist(level) : []);
+  const goals = live?.goals ?? (level ? storyChecklist(level, { character: state.character }) : []);
   const previous = useRef(null);
   const [celebration, setCelebration] = useState(null);
   const [expandedRun, setExpandedRun] = useState(null);

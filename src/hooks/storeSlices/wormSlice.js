@@ -77,9 +77,12 @@ export const createWormSlice = (set, get) => ({
     set({ wormHat: id });
   },
   wormCharacter: persistedState.wormCharacter ?? 'classic',
-  setWormCharacter: (id) => {
+  setWormCharacter: (id, { persist = true } = {}) => {
     if (!WORM_CHARACTERS.some(c => c.id === id) || (!get().ownedItems.includes(`character_${id}`) && !get().demoMode)) return false;
-    try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
+    // Scripted showcases are temporary, including when the browser reloads mid-demo.
+    if (persist) {
+      try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
+    }
     set({ wormCharacter: id });
   },
   // Nothing writes this any more: the painted route is parked (see

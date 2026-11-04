@@ -6,6 +6,8 @@ import { newProgress } from '../progression/model.js';
 import WormEntryScreen from '../components/screens/WormEntryScreen.jsx';
 import WormProfile from '../components/screens/WormProfile.jsx';
 import { feel } from '../utils/feel.js';
+import { WORM_CHARACTERS } from '../worm/wormCharacterData.js';
+import { SIGNATURES } from '../worm/healerWorm/signatures.js';
 
 vi.mock('../worm/story/StoryWorldPreview.jsx', () => ({ default: () => null }));
 vi.mock('../utils/feel.js', () => ({ feel: vi.fn(), resumeFeel: vi.fn() }));
@@ -157,12 +159,12 @@ it('shows equipment in the category rail and returns focus when finishing custom
   expect(preview()).toBe('classic/royal/none');
 });
 
-it('shuffles into owned pieces only, with one cue, and shows stats as sticker strips', () => {
+it('shuffles into owned pieces only, with one cue, and shows real ability facts', () => {
   act(() => useGameStore.setState({ wormAccessories: { face: 'none', neck: 'none', body: 'none', tail: 'none' }, demoMode: false,
     ownedItems: ['character_classic', 'character_book', 'skin_slime', 'skin_royal', 'hat_crown', 'accessory_seedSatchel'] }));
   act(() => root.render(<WormProfile defaultExpanded />));
-  expect(host.querySelector('.worm-profile-stats dd').getAttribute('aria-label')).toBe('3 of 5');
-  expect(host.querySelectorAll('.worm-profile-stats dd i[data-lit="true"]')).toHaveLength(3 + 3 + 3 + 1);
+  expect(host.querySelector('.worm-profile-stats')).toBeNull();
+  expect(host.querySelector('.worm-profile-facts').textContent).toContain('25 seconds');
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
   vi.clearAllMocks(); click('Shuffle ⚄');
   random.mockRestore();
@@ -170,4 +172,28 @@ it('shuffles into owned pieces only, with one cue, and shows stats as sticker st
   expect(state()).toMatchObject({ wormCharacter: 'book', wormSkin: 'royal', wormHat: 'crown' });
   expect(state().wormAccessories).toEqual({ face: 'none', neck: 'none', body: 'seedSatchel', tail: 'none' });
   expect(host.querySelector('.worm-profile-type').textContent).toBe('Sage');
+});
+
+it.each(WORM_CHARACTERS)('shows $label rules from the live ability catalog, without cosmetic ratings', character => {
+  act(() => useGameStore.setState({ wormCharacter: character.id, demoMode: true }));
+  act(() => root.render(<WormProfile defaultExpanded />));
+  expect(character.ability).toBe(SIGNATURES[character.id]);
+  expect(character.stats).toBeUndefined();
+  expect(host.querySelector('.worm-profile-ability').textContent).toBe(character.special);
+  const facts = host.querySelector('.worm-profile-facts').textContent;
+  expect(facts).toContain(character.ability.passive ? 'Always active' : 'Ability button');
+  expect(facts).toContain(character.ability.passive ? 'None needed' :
+    character.ability.cooldown ? `${character.ability.cooldown} seconds` : 'Heal your tunnel');
+  expect(host.querySelector('.worm-profile-note').textContent).toContain('Story levels');
+  expect(host.querySelector('.worm-profile-note').textContent).not.toContain('Store');
+});
+
+it('describes unlock requirements accessibly and separates cosmetics from gameplay', () => {
+  act(() => root.render(<WormProfile defaultExpanded />));
+  const locked = button('MOBI, locked');
+  expect(document.getElementById(locked.getAttribute('aria-describedby').split(' ')[0]).textContent).toBe('Clear 60 Story levels');
+  expect(locked.textContent).toContain('Create Wormhole');
+  click('Color');
+  expect(host.querySelector('.worm-profile-note').textContent).toContain('not your abilities');
+  expect(host.querySelector('.worm-profile-note').textContent).toContain('Store');
 });

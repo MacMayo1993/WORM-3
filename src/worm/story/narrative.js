@@ -1,3 +1,4 @@
+import { storyGoalText } from './goalText.js';
 // Mobi's story, kept outside campaign.js so tuning a level never rewrites it.
 // MOBI (Multi-Oriented Block Intelligence) is a ferry pilot from the Projective
 // Plane, where every spot has a twin straight through the middle. Two clans of
@@ -880,5 +881,5 @@ export const storyBriefingText = id => storyNarrative(id)?.briefing.join(' ') ??
 // Mobi's launch dialogue: the story first, then the literal mission card. A level
 // already cleared has heard its story: a replay gets the mission card alone (the
 // story stays in the map and in the clear card's field notes).
-export const storyLaunchLines = (level, { replay = false } = {}) => replay ? [level.goal]
-  : [...(storyNarrative(level.id)?.briefing ?? [level.subtitle].filter(Boolean)), level.goal];
+export const storyLaunchLines = (level, { replay = false, character = null } = {}) => replay ? [storyGoalText(level, character)]
+  : [...(storyNarrative(level.id)?.briefing ?? [level.subtitle].filter(Boolean)), storyGoalText(level, character)];

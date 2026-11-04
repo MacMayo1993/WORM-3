@@ -241,7 +241,7 @@ export function useDemoMode({
       // demo exits.
       if (config.wormCharacter) {
         if (preDemoWormCharacterRef.current == null) preDemoWormCharacterRef.current = store.wormCharacter;
-        store.setWormCharacter(config.wormCharacter);
+        store.setWormCharacter(config.wormCharacter, { persist: false });
       }
       if (config.wormSkin) {
         if (preDemoWormSkinRef.current == null) preDemoWormSkinRef.current = store.wormSkin;

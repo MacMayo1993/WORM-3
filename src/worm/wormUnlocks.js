@@ -6,7 +6,7 @@
 //
 // Ownership still lives in `ownedItems` as `character_<id>` so every reader
 // (profile picker, equip guard, saves) keeps one check. This module decides
-// which of those ids a save is entitled to. Pure: no React, no store.
+// which new ids progress earns, preserving earlier ownership. Pure: no React, no store.
 import { WORM_CHARACTERS } from './wormCharacterData.js';
 
 export const WORM_LEVELS_PER_UNLOCK = 10;
@@ -38,9 +38,9 @@ export function earnedCharacterItems(progress) {
 }
 
 /** The next worm to earn and how many more levels it needs, or null when all are earned. */
-export function nextCharacterUnlock(progress) {
+export function nextCharacterUnlock(progress, ownedItems = []) {
   const done = wormLevelsCompleted(progress);
-  const index = WORM_UNLOCK_ORDER.findIndex((_, i) => i * WORM_LEVELS_PER_UNLOCK > done);
+  const index = WORM_UNLOCK_ORDER.findIndex((id, i) => i * WORM_LEVELS_PER_UNLOCK > done && !ownedItems.includes(CHARACTER_PREFIX + id));
   if (index < 0) return null;
   const character = WORM_CHARACTERS.find(c => c.id === WORM_UNLOCK_ORDER[index]);
   const levels = index * WORM_LEVELS_PER_UNLOCK;
@@ -48,12 +48,12 @@ export function nextCharacterUnlock(progress) {
 }
 
 /**
- * Rebuild a save's worm ownership from its progress: drops every character it
- * holds and grants exactly the earned ones. Used when a save loads, so worms
- * bought, rolled or granted under the old rules are re-locked to progress.
+ * Reconcile progress on load without revoking existing ownership. Earlier
+ * releases sold and rolled characters; those purchases and rewards remain valid.
+ * New players still earn characters exclusively by clearing levels.
  */
 export function syncCharacterUnlocks(ownedItems, progress) {
-  return [...ownedItems.filter(id => !id.startsWith(CHARACTER_PREFIX)), ...earnedCharacterItems(progress)];
+  return grantCharacterUnlocks(ownedItems, progress);
 }
 
 /** Add any newly earned worms without taking anything away (after a level is cleared). */

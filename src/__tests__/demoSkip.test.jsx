@@ -181,3 +181,25 @@ it('launches short challenges directly and restores the player on finish without
   wait(60000);
   expect(state().demoMode).toBe(false);
 });
+
+
+it('keeps the saved character during a temporary showcase and restores it on exit', async () => {
+  useGameStore.setState({ demoMode: false, demoStep: null,
+    ownedItems: [...state().ownedItems, 'character_book'] });
+  state().setWormCharacter('book');
+  draw(<Harness />);
+  act(() => demo.handleStartDemo('challenges'));
+  expect(state().wormCharacter).toBe('glow');
+  expect(localStorage.getItem('worm3_character')).toBe('book');
+  // A fresh loader sees the player's choice even if the browser was closed
+  // before cleanup could restore the temporary in-memory showcase character.
+  vi.resetModules();
+  const { persistedState: reloaded } = await import('../hooks/storeSlices/persistedState.js');
+  expect(reloaded.wormCharacter).toBe('book');
+  act(() => useGameStore.setState({ demoWormFinished: true }));
+  expect(state().wormCharacter).toBe('book');
+  expect(localStorage.getItem('worm3_character')).toBe('book');
+  // An intentional later selection still persists normally.
+  act(() => state().setWormCharacter('classic'));
+  expect(localStorage.getItem('worm3_character')).toBe('classic');
+});

@@ -1,4 +1,5 @@
 // Central balance values shared by simulation, rewards and character descriptions.
+export const WIGGLE_DURATION = 2.4;
 export const BOOK_XP_MULTIPLIER = 1.25;
 export const BOOK_PAUSE_SECONDS = 5;
 // Classic is the baseline crawler: one modest active and no passive. It used to also

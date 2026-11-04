@@ -1022,7 +1022,7 @@ function bodyStillRiding(sim) {
 function otherHealRiding(sim, ctx, tunnelKey, passage = null) {
     const diving = sim.phase === 'windup' || sim.phase === 'tunnel' || sim.phase === 'exiting';
     if (diving && sim.currentTunnelKey !== tunnelKey &&
-        (sim.willHeal || (ctx.isStoryTunnelTrial?.() && ctx.allowTunnelHeal?.() !== false))) return true;
+        (sim.willHeal || (ctx.isStoryTunnelTrial?.() && ctx.allowTunnelHeal?.(sim.activeTunnel) !== false))) return true;
     for (const other of sim.tunnelPassages) {
         if (other !== passage && other.heal && other.tunnelKey !== tunnelKey) return true;
     }
@@ -1127,7 +1127,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
     const postDepositProgress = ctx.getHealingProgress()?.[stableKey];
-    sim.willHeal = isHealReady(postDepositProgress?.deposited) && ctx.allowTunnelHeal?.() !== false;
+    sim.willHeal = isHealReady(postDepositProgress?.deposited) && ctx.allowTunnelHeal?.(tunnel) !== false;
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
@@ -2488,7 +2488,7 @@ const PHASE_HANDLERS = {
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
-                const didHeal = (isHealReady(exitProgress?.deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
+                const didHeal = (isHealReady(exitProgress?.deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.(exitedTunnel) !== false;
                 if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,
@@ -2565,6 +2565,10 @@ const PHASE_HANDLERS = {
  * active phase handler (firing enter()/exit() exactly once per transition).
  */
 export function stepWormSim(sim, delta, size, ctx) {
+    // Signature presses belong to this frame. A flight or cinematic freeze must
+    // not bank an unavailable ability and spend it later after control returns.
+    const signatureRequested = sim.signatureRequested;
+    sim.signatureRequested = false;
     sim.jumpRescueHeld = false;
     if (!sim.alive) return;
     sim.bodyGait.enabled = ctx.getCharacter?.() === 'inch';
@@ -2658,8 +2662,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
     tickExpansion(sim, size, delta, ctx);
-    if (sim.signatureRequested) {
-        sim.signatureRequested = false;
+    if (signatureRequested) {
         activateSignature(sim, size, ctx);
     }
     if (sim.signature.mobiOpening) {

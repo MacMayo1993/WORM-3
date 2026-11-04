@@ -4,7 +4,6 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormCharacter } from '../../worm/wormCharacterData.js';
 import { characterUnlockLevels, WORM_UNLOCK_ORDER } from '../../worm/wormUnlocks.js';
 import { WORM_SKINS, WORM_HATS, getSkin, getHat } from '../../worm/wormCosmeticsData.js';
-import { RUBIKS_CLASSIC } from '../../utils/constants.js';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { wormMenuFeedback } from './wormMenuFeedback.js';
 import './wormProfile.css';
@@ -19,25 +18,12 @@ const CATEGORIES = [
     title: `${slot[0].toUpperCase() + slot.slice(1)} pieces`, items: [{ id: 'none', label: 'None' }, ...WORM_ACCESSORIES.filter(item => item.slot === slot)] }))
 ];
 
-// Stats are shown as a strip of five cube stickers, lit in one of the cube's
-// face colours, so the character sheet reads as part of the same toy.
-const STATS = [
-  { key: 'speed', label: 'Speed', color: RUBIKS_CLASSIC.orange },
-  { key: 'healing', label: 'Healing', color: RUBIKS_CLASSIC.green },
-  { key: 'agility', label: 'Agility', color: RUBIKS_CLASSIC.blue },
-  { key: 'glow', label: 'Glow', color: RUBIKS_CLASSIC.yellow }
-];
-const statStickers = value => Math.max(1, Math.min(5, Math.round((value ?? 0) / 20)));
-
-function StatStickers({ stats }) {
-  return <dl className="worm-profile-stats">
-    {STATS.map(stat => {
-      const lit = statStickers(stats?.[stat.key]);
-      return <div key={stat.key} style={{ '--stat-color': stat.color }}>
-        <dt>{stat.label}</dt>
-        <dd aria-label={`${lit} of 5`}>{[0, 1, 2, 3, 4].map(i => <i key={i} data-lit={i < lit} />)}</dd>
-      </div>;
-    })}
+// These are rules read from the same definition as the simulation, not ratings.
+function AbilityFacts({ character }) {
+  const ability = character.ability;
+  return <dl className="worm-profile-facts" aria-label="Ability details">
+    <div><dt>Activation</dt><dd>{ability.passive ? 'Always active' : 'Ability button'}</dd></div>
+    <div><dt>Recharge</dt><dd>{ability.passive ? 'None needed' : ability.cooldown ? `${ability.cooldown} seconds` : 'Heal your tunnel'}</dd></div>
   </dl>;
 }
 
@@ -132,8 +118,8 @@ export default function WormProfile({ defaultExpanded = false }) {
               <span className="worm-profile-type">{character.type}</span>
               {identity}
             </div>
-            <StatStickers stats={character.stats} />
-            <p className="worm-profile-ability"><b>{character.special.split(' — ')[0]}</b>{character.special.includes(' — ') && <> — {character.special.split(' — ').slice(1).join(' — ')}</>}</p>
+            <AbilityFacts character={character} />
+            <p className="worm-profile-ability"><b>{character.ability.name}</b> — {character.ability.hint}</p>
             <div className="worm-profile-loadout" aria-label="Equipped pieces">
               {loadout.map(cat => <span key={cat.id}><i aria-hidden="true">{cat.icon}</i>{equippedLabel(cat)}</span>)}
             </div>
@@ -153,8 +139,9 @@ export default function WormProfile({ defaultExpanded = false }) {
             <div className={`worm-profile-options worm-profile-options-${category === 'skin' ? 'skin' : 'model'}`} role="group" aria-label={`${picker.label} options`} key={category}>
               {picker.items.map(item => {
                 const owned = isOwned(item), equipped = selected[category] === item.id;
+                const descriptionId = `${id}-option-${category}-${item.id}`;
                 return <button type="button" key={item.id} disabled={!owned} aria-pressed={equipped}
-                  aria-label={`${item.label}${owned ? '' : ', locked'}`} className="worm-profile-option"
+                  aria-label={`${item.label}${owned ? '' : ', locked'}`} aria-describedby={category === 'character' ? `${descriptionId} ${descriptionId}-ability` : descriptionId} className="worm-profile-option"
                   style={category === 'skin' ? { '--swatch-body': item.body, '--swatch-belly': item.belly, '--swatch-light': item.antenna } : undefined}
                   onClick={() => { if (owned) { wormMenuFeedback(); equip(category, item.id); setPop(value => value + 1); } }}>
                   <span aria-hidden="true" className="worm-profile-option-art">
@@ -168,11 +155,14 @@ export default function WormProfile({ defaultExpanded = false }) {
                     {!owned && <b className="worm-profile-lock">🔒</b>}
                   </span>
                   <strong>{item.label}</strong>
-                  <small>{!owned ? category === 'character' ? `Clear ${characterUnlockLevels(item.id)} levels` : 'In the Store' : equipped ? 'Equipped' : category === 'character' ? item.type : 'Equip'}</small>
+                  <small id={descriptionId}>{!owned ? category === 'character' ? `Clear ${characterUnlockLevels(item.id)} Story levels` : 'In the Store' : equipped ? 'Equipped' : category === 'character' ? item.type : 'Equip'}</small>
+                  {category === 'character' && <span id={`${descriptionId}-ability`} className="worm-profile-option-ability">{item.ability.name}{item.ability.passive ? ' · Passive' : ''}</span>}
                 </button>;
               })}
             </div>
-            <p className="worm-profile-note">Unlock more in the Store.</p>
+            <p className="worm-profile-note">{category === 'character'
+              ? 'Unlock more worms by clearing Story levels. Characters differ through their abilities, not speed or healing ratings.'
+              : 'Colors, hats and accessories change your look, not your abilities. Find more in the Store.'}</p>
           </div>
         </div>
       </div>}

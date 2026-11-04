@@ -3,7 +3,8 @@ import { shAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, DIR_FORWARD, FACE_NORMALS, WORM_LIFT } from './constants.js';
 import { wiggleBodyOffset } from '../wiggleBody.js';
 
-export const WIGGLE_DURATION = 2.4;
+import { WIGGLE_DURATION } from '../characterAbilities.js';
+export { WIGGLE_DURATION } from '../characterAbilities.js';
 // Equal speed legs, eased at each reversal: center, left, right, left, right, center.
 const TIMES = [0, 1 / 8, 3 / 8, 5 / 8, 7 / 8, 1];
 const OFFSETS = [0, -3, 3, -3, 3, 0];

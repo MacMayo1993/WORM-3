@@ -1,7 +1,7 @@
 /* wormProfile.css — the worm's dressing room, shared by the WORM path page and
  * the Free Play wizard. Arcade look: cream graph paper, deep-green ink, ivory
  * keys on a hard ledge; the worm itself stands on a scrambled face of the cube
- * (WormPreviewRenderer's stage). Stats are strips of cube stickers. Laid out by
+ * (WormPreviewRenderer's stage). Ability facts use readable text. Laid out by
  * the profile's own width (container queries), so one sheet serves both hosts.
  * Imported by the lazy WORM screens only, never by the initial route. */
 .worm-profile {
@@ -69,15 +69,12 @@
 @keyframes worm-profile-pop { 0% { opacity: .75; transform: scale(.35); } 100% { opacity: 0; transform: scale(1.35); } }
 
 .worm-profile-sheet { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.worm-profile-stats { display: grid; gap: 7px; margin: 0; }
-.worm-profile-stats > div { display: grid; grid-template-columns: 62px auto; align-items: center; justify-content: start; gap: 10px; }
-.worm-profile-stats dt { color: var(--wp-muted); font: 800 10.5px/1 var(--heading-font, system-ui); letter-spacing: .08em; text-transform: uppercase; }
-.worm-profile-stats dd { display: flex; gap: 3px; margin: 0; padding: 3px; border-radius: 7px; background: var(--wp-plastic); box-shadow: 0 2px 0 #050506, inset 0 1px 0 #ffffff24; }
-.worm-profile-stats dd i { width: 19px; height: 15px; border-radius: 3px; background: #34343a; box-shadow: inset 0 -2px 2px #0005; transition: background-color .25s; }
-.worm-profile-stats dd i[data-lit="true"] { background-color: var(--stat-color);
-  background-image: radial-gradient(120% 95% at 22% 12%, #ffffff9e 0 14%, #fff0 44%); box-shadow: inset 0 1px 0 #ffffffa0, inset 0 -2px 2px #0003; }
+.worm-profile-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.worm-profile-facts > div { min-width: 0; padding: 9px; border: 1px solid var(--wp-line-soft); border-radius: 9px; background: var(--wp-paper); }
+.worm-profile-facts dt { color: var(--wp-muted); font: 700 11px/1.4 var(--heading-font, system-ui); }
+.worm-profile-facts dd { margin: 3px 0 0; color: var(--wp-ink); font: 800 13px/1.4 var(--heading-font, system-ui); overflow-wrap: anywhere; }
 .worm-profile-ability { margin: 0; padding: 10px 12px; border: 2px solid var(--wp-line-soft); border-radius: 12px; background: var(--wp-card);
-  color: var(--wp-ink); font: 600 12px/1.45 var(--ui-font, system-ui); }
+  color: var(--wp-ink); font: 600 13px/1.55 var(--ui-font, system-ui); }
 .worm-profile-ability b { color: var(--wp-ink-strong); font: 800 12px/1.3 var(--heading-font, system-ui); letter-spacing: .03em; text-transform: uppercase; }
 .worm-profile-loadout { display: flex; flex-wrap: wrap; gap: 6px; }
 .worm-profile-loadout:empty { display: none; }
@@ -117,7 +114,8 @@
   background: radial-gradient(ellipse 60% 55% at 50% 60%, #ffffff 0, #fff0 70%), var(--wp-grid), var(--wp-paper); background-size: auto, 12px 12px, 12px 12px, auto; }
 .worm-profile-options-skin .worm-profile-option-art { height: 64px; }
 .worm-profile-option strong { font: 800 11.5px/1.25 var(--heading-font, system-ui); overflow-wrap: anywhere; text-align: center; }
-.worm-profile-option small { color: var(--wp-muted); font: 700 9.5px/1.2 var(--heading-font, system-ui); letter-spacing: .05em; text-transform: uppercase; }
+.worm-profile-option small { text-align: center; color: var(--wp-muted); font: 700 11px/1.4 var(--heading-font, system-ui); letter-spacing: .05em; text-transform: uppercase; }
+.worm-profile-option-ability { color: var(--wp-ink); font: 600 11px/1.4 var(--ui-font, system-ui); text-align: center; }
 /* The wizard pins every border to its soft line, so the chosen card is ringed with an outline. */
 .worm-profile .worm-profile-option[aria-pressed="true"] { outline: 2px solid var(--wp-ink-strong); outline-offset: -2px;
   background: color-mix(in srgb, var(--wp-accent) 11%, var(--wp-card)); box-shadow: 0 4px 0 var(--wp-ink-strong), inset 0 2px 0 #fff; }
@@ -163,8 +161,6 @@
 /* ── Narrower hosts ─────────────────────────────────────────────────────── */
 @container (max-width: 600px) {
   .worm-profile-hero { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 14px; gap: 12px; }
-  .worm-profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
-  .worm-profile-stats > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .worm-profile-closet { grid-template-columns: 84px minmax(0, 1fr); }
   .worm-profile-categories { padding: 10px 6px; }
   .worm-profile .worm-profile-categories button { flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 6px 3px; text-align: center; }
@@ -178,7 +174,6 @@
   .worm-profile-header { padding: 12px; gap: 8px; }
   .worm-profile :is(.worm-profile-edit, .worm-profile-shuffle) { padding: 8px 11px; }
   .worm-profile-summary { grid-template-columns: 88px minmax(0, 1fr); gap: 12px; padding: 0 12px 12px; }
-  .worm-profile-stats dd i { width: 15px; height: 13px; }
   .worm-profile-closet { grid-template-columns: 70px minmax(0, 1fr); }
   .worm-profile-categories small { display: none; }
   .worm-profile-categories i { width: 28px; height: 28px; font-size: 15px; }

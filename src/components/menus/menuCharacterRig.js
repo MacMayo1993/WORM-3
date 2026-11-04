@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents, characterSegmentPattern } from '../../worm/wormCharacterVisuals.js';
 import { createWormSkinMaterial, updateWormSkinMaterialTime, applyBioluminescence, applySkinMaterialProfile } from '../../worm/wormSkinMaterial.js';
-import { BUMP_STYLES, getSkinFX } from '../../worm/wormSkinFX.js';
+import { getSkinFX } from '../../worm/wormSkinFX.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi } from '../../worm/mobiModel.js';
 import { createMobiSegmentAssets, createMobiSegment, disposeMobiSegmentAssets, mobiTailSwayInto } from '../../worm/mobiSegments.js';
 import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js';
@@ -32,21 +32,6 @@ const _ink = new THREE.Color(), _white = new THREE.Color('#ffffff');
 /** The outline is the skin's own darkest colour, never a flat black. */
 export function menuWormInk(skin, out = new THREE.Color()) {
   return out.set(skin.belly).lerp(_ink.set('#14101c'), 0.72);
-}
-
-// Skin FX are uniforms on a program the material only gets on first compile:
-// set them then, or a bumpy skin renders smooth.
-function syncSkinBump(material, fx) {
-  if (material.userData.menuBumpSynced) return;
-  const shader = material.userData.shader;
-  if (!shader) return;
-  const bump = material.userData.menuNoBump ? { style: 'none' } : fx.bump || { style: 'none' };
-  shader.uniforms.uStyle.value = BUMP_STYLES[bump.style] ?? 0;
-  shader.uniforms.uAmp.value = bump.amp ?? 0;
-  shader.uniforms.uFreq.value = bump.freq ?? 1;
-  shader.uniforms.uSpeed.value = bump.speed ?? 1;
-  shader.uniforms.uSeed.value = material.userData.seed ?? 0;
-  material.userData.menuBumpSynced = true;
 }
 
 /**
@@ -125,7 +110,6 @@ export function createMenuCharacterRig(character, options = {}) {
     applyBioluminescence(material, skin.glow, character === 'glow');
     applyCharacterFinish(material, character);
     if (character === 'glow') material.userData.pulse = { ...MENU_GLOW };
-    if (character === 'prism') material.userData.menuNoBump = true;
     const body = new THREE.Mesh(geometry, material);
     body.scale.setScalar(radius * taper);
     holder.add(body);
@@ -267,7 +251,6 @@ export function createMenuCharacterRig(character, options = {}) {
         segment.holder.rotateX(reaction.pitch);
       }
       if (segment.material) {
-        syncSkinBump(segment.material, fx);
         updateWormSkinMaterialTime(segment.material, time);
         if (character === 'prism') prismColor(segment.material.color, i, time);
       }

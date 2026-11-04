@@ -119,7 +119,7 @@ export function storyFinishHint(level, metrics) {
 // count; long ones summarize and name the next unfinished task.
 export function storyProgressText(level, metrics) {
   const goals = storyChecklist(level, metrics);
-  const line = goal => `${goalDisplayValue(goal, goal.value)}/${goalDisplayValue(goal, goal.target)} ${PROGRESS_NOUNS[goal.key]}`;
+  const line = goal => `${goalDisplayValue(goal, goal.value)}/${goalDisplayValue(goal, goal.target)} ${goal.key === 'signatures' && metrics.character === 'prism' ? 'Spectrum colors collected' : PROGRESS_NOUNS[goal.key]}`;
   const clock = `${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
   if (goals.length > 4) {
     const next = goals.find(goal => !goal.done);
@@ -140,7 +140,7 @@ export function storyChecklist(level, metrics = {}) {
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
   const labels = { steamFusions: 'Make Steam: Fire → Water', quenchFusions: 'Make Quench: Water → Fire', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
     magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
-    signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
+    signatures: metrics.character === 'prism' ? 'Collect different orb colors for Spectrum' : 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
     bodyLength: 'Grow your worm (tiles)', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };

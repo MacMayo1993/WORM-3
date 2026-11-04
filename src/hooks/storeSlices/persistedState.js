@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS } from '../../utils/colorSchemes.js';
 import { migrateTileStyle, migrateTileItem } from '../../utils/tileStyleMigration.js';
 import { newChestWallet } from '../../economy/chests.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
-import { syncCharacterUnlocks } from '../../worm/wormUnlocks.js';
+import { syncCharacterUnlocks, WORM_UNLOCK_ORDER } from '../../worm/wormUnlocks.js';
 import { UNLOCK_ALL } from '../../utils/testUnlock.js';
 import { MODE_GATE_KEY, resolveModeGate } from '../../progression/modeUnlocks.js';
 import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
@@ -62,7 +62,8 @@ const loadPersistedState = () => {
     const tutorialDone = localStorage.getItem('worm3_tutorial_done') === '1';
     const firstFlipDone = localStorage.getItem('worm3_first_flip_done') === '1';
     const mobileHintShown = localStorage.getItem('worm3_mobile_hint_shown') === '1';
-    const parsedSettings = settings ? JSON.parse(settings) : null;
+    let parsedSettings = null;
+    try { parsedSettings = settings ? JSON.parse(settings) : null; } catch { /* Reset only damaged settings, not ownership or the selected character. */ }
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
@@ -102,8 +103,8 @@ const loadPersistedState = () => {
       if (Array.isArray(rawOwned)) storedOwned = rawOwned;
     } catch { /* corrupted owned-items entry — fall back to defaults */ }
     if (playerSave) storedOwned = playerSave.ownedItems;
-    // Worms come from clearing levels alone: whatever a save bought, rolled or
-    // was granted before, it holds exactly the worms its progress has earned.
+    // New worms come from clearing levels. Keep characters bought or awarded
+    // by earlier releases, then add any missing progress-earned unlocks.
     const ownedItems = DEV_FREE_ECONOMY
       ? [...ALL_ITEMS_OWNED]
       : ownedForProgress([...DEFAULT_OWNED, ...storedOwned], playerSave?.progress);
@@ -144,7 +145,7 @@ const loadPersistedState = () => {
       wormSkin: safeSkin,
       wormHat: safeHat,
       wormAccessories: safeAccessories(accessorySave, ownedItems),
-      wormCharacter: ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
+      wormCharacter: WORM_UNLOCK_ORDER.includes(wormCharacter) && ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
       wormShowTrail,
       wormCameraHorizon,
       wormCameraZoom,

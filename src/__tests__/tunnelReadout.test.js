@@ -1,3 +1,4 @@
+import { canStoryTunnelHeal } from '../worm/story/mastery.js';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { describe, it, expect } from 'vitest';
 import { healingNeed, tunnelAt, tunnelDanger, nearSignScale, SIGN_HIDE_DISTANCE, SIGN_FULL_DISTANCE } from '../worm/healerWorm/tunnelReadout.js';
@@ -70,4 +71,27 @@ it('shrinks a tunnel sign away as the camera nears it, and keeps far signs whole
   // The pad one tile ahead of the default chase camera (about 3.4 units away)
   // gets a small sign; its HUD card carries the full readout.
   expect(nearSignScale(3.4)).toBeLessThan(0.3);
+});
+
+
+it('shows Mobi owned-door healing permission without granting unrelated doors or skipping surrounds', () => {
+  const cubies = makeCubies(3), pos = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
+  cubies[1][2][2].stickers.PZ.curr = 4;
+  const sim = makeWormSim(3);
+  sim.tailLength = BASE_TAIL_LENGTH + 6;
+  sim.signature.mobiTunnel = { pairId: 'owned', stableKeys: [], reentryT: 0 };
+  const mechanics = { signatures: 3, ringHeals: 2 };
+  const counts = { signatures: 1, ringHeals: 2 };
+  let tunnel = { pairId: 'owned' };
+  const ctx = {
+    getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey: tunnel.pairId }),
+    getHealingProgress: () => ({}), isPrismCharacter: () => false,
+    getOrbColor: () => '#fff', getOrbInventory: () => ({ 4: 6 }),
+    allowTunnelHeal: target => canStoryTunnelHeal(mechanics, counts, sim.signature.mobiTunnel, target),
+  };
+  expect(tunnelAt(sim, ctx, pos)).toMatchObject({ ready: true, healingAllowed: true });
+  tunnel = { pairId: 'unrelated' };
+  expect(tunnelAt(sim, ctx, pos)).toMatchObject({ ready: true, healingAllowed: false });
+  tunnel = { pairId: 'owned' }; counts.ringHeals = 1;
+  expect(tunnelAt(sim, ctx, pos)).toMatchObject({ ready: true, healingAllowed: false });
 });

@@ -39,12 +39,19 @@ describe('worm unlocks', () => {
     expect(nextCharacterUnlock(firstN(60))).toBeNull();
   });
 
-  it('re-locks ownership to progress on load but only adds after a level', () => {
+  it('preserves legacy ownership on load and adds newly earned characters', () => {
     const owned = ['skin_royal', 'character_mobi', 'character_prism'];
-    expect(syncCharacterUnlocks(owned, firstN(12))).toEqual(['skin_royal', 'character_classic', 'character_inch']);
+    expect(syncCharacterUnlocks(owned, firstN(12))).toEqual([...owned, 'character_classic', 'character_inch']);
     expect(grantCharacterUnlocks(owned, firstN(12))).toEqual([...owned, 'character_classic', 'character_inch']);
     const same = ['character_classic'];
     expect(grantCharacterUnlocks(same, firstN(3))).toBe(same);
+  });
+
+  it('skips already-owned legacy characters in the next reward preview', () => {
+    expect(nextCharacterUnlock(firstN(3), ['character_inch', 'character_glow'])).toMatchObject({
+      character: { id: 'wiggle' }, levels: 30, remaining: 27,
+    });
+    expect(nextCharacterUnlock(firstN(3), WORM_UNLOCK_ORDER.map(id => `character_${id}`))).toBeNull();
   });
 
   it('never sells or rolls a worm, and every chest tier still has rewards', () => {

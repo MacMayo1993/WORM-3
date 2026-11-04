@@ -313,6 +313,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     : `Double heal: heal two different pairs within ${STORY_DOUBLE_HEAL_WINDOW}s of surface time.` : null;
   return {
     ...practice.mechanics,
+    character: sim.signature.character,
     elements: storyElementCount(practice.elements, level.mechanics?.elements, storyElementTypes(level, practice.elementOrder)),
     uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements, storyElementTypes(level, practice.elementOrder)),
     elementOrder: practice.elementOrder,
