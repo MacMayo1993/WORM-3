@@ -1,4 +1,4 @@
-import { makeInteriorTileBatches } from './interiorTileBatches.js';
+import { makeInteriorTileBatches, INTERIOR_TILE_INSET } from './interiorTileBatches.js';
 import { wormExpansion } from '../wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/TunnelInteriorView.jsx
@@ -17,8 +17,8 @@ import { prefersReducedMotion } from '../../utils/device.js';
 // During wormhole traversal shows the coloured back-sides of every sticker on
 // all 6 faces so the camera looks like it is inside the cube.
 
-// Keep the patterned antipodal walls readable behind the bright track and core.
-const DIM_STRENGTH = 0.48;
+// Leave the chrome highlights crisp while the bright track stays in front.
+const DIM_STRENGTH = 0.14;
 
 // Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
 // points INWARD (toward the cube centre) for each cube face direction.
@@ -71,6 +71,8 @@ export function TunnelInteriorView({ worm, size }) {
                     const [sx, sy, sz] = pos(a, b, n);
                     const wp = getStickerWorldPos(sx, sy, sz, dirKey, size, expansion);
                     if (!wp) continue;
+                    const axis = { X: 0, Y: 1, Z: 2 }[dirKey[1]];
+                    wp[axis] -= (dirKey[0] === 'P' ? 1 : -1) * INTERIOR_TILE_INSET;
                     layout.push({
                         sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz,
                     });
@@ -93,7 +95,7 @@ export function TunnelInteriorView({ worm, size }) {
     // thing the player is supposed to be looking at. Tinting rather than fading
     // keeps the antipodal colours readable, which is the point of this view.
     const dimGeo = useMemo(() => {
-        const half = (size - 1) / 2 * scale + SURFACE_OFFSET - 0.02;
+        const half = (size - 1) / 2 * scale + SURFACE_OFFSET - INTERIOR_TILE_INSET - 0.02;
         return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
     }, [size, scale]);
 

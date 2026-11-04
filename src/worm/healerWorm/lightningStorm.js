@@ -13,8 +13,8 @@
 export const STORM = Object.freeze({
   strikes: 6,          // marks per orb
   firstDelay: 1.0,     // seconds from the claim to the first mark
-  gapMin: 1.2,         // seconds between marks
-  gapMax: 1.9,
+  gapMin: 0.8,         // seconds between marks
+  gapMax: 1.25,
   telegraph: 1.4,      // seconds a mark charges before it strikes
   flash: 0.6,          // seconds a landed strike stays on screen
   bodyShare: 0.4,      // share of marks aimed at the worm's own body

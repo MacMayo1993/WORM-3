@@ -110,7 +110,7 @@ export const ELEMENTAL_DEFS = {
     // A bolt.
     iconPath: 'M13.6 1.8 4.2 13.4h5.4l-1.2 8.8 9.4-11.6h-5.4z',
     iconAccent: '',
-    description: 'Every four seconds, chain-collect up to three growth orbs and discharge into nearby enemies and bombs. Overcharge: each discharge charges the nearest tunnel within 3 tiles, which then pays 2 heal segments.',
+    description: 'Every 2.5 seconds, chain-collect up to five growth orbs, reaching 4 tiles with 3-tile hops, and discharge into enemies and bombs within 3 tiles. Overcharge: each discharge charges the nearest tunnel within 3 tiles, which then pays 2 heal segments.',
   },
 };
 

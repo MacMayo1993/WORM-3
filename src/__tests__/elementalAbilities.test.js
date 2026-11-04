@@ -73,17 +73,37 @@ describe('enemy-free elemental abilities', () => {
         expect(planted).toBe(6); expect(sim.elementalAbilities.gardenBudget).toBe(0);
         claim('water'); expect(growGarden(sim, size, ctx)).toBe(0); // fusion refresh cannot reset Earth budget
     });
-    it('Lightning chains at most three ripe orbs, preserves their identities and waits four seconds', () => {
+    it('Lightning chains at most five ripe orbs, preserves their identities and waits 2.5 seconds', () => {
         const { sim, ctx, claim } = fixture(); claim('lightning');
-        for (const x of [0, 1, 2, 3]) sim.powerups.push(makeGrowthOrb({ x, y: sim.pos.y, z: 4, dirKey: 'PZ' }));
+        for (const x of [0, 1, 2, 3, 4]) sim.powerups.push(makeGrowthOrb({ x, y: sim.pos.y, z: 4, dirKey: 'PZ' }));
         sim.powerups.unshift(makeGrowthOrb(sim.pos, { garden: { remaining: 1.5 } }));
-        expect(chainTargets(sim, size)).toHaveLength(3);
+        sim.powerups.push(makeGrowthOrb({ x: 4, y: 3, z: 4, dirKey: 'PZ' }));
+        expect(chainTargets(sim, size)).toHaveLength(5);
         const before = sim.tailLength; tick(sim, ctx, .02);
-        expect(ctx.onOrbPickup).toHaveBeenCalledTimes(3);
-        expect(sim.tailLength - before).toBe(3 * ORB_SEGMENT_GROWTH);
+        expect(ctx.onOrbPickup).toHaveBeenCalledTimes(5);
+        expect(sim.tailLength - before).toBe(5 * ORB_SEGMENT_GROWTH);
         expect(sim.powerups).toHaveLength(2);
-        expect(sim.elementalAbilities.lightningT).toBe(4);
+        expect(sim.elementalAbilities.lightningT).toBe(2.5);
         expect(sim.fusionBursts.at(-1)).toMatchObject({ kind: 'element-discharge', defuse: true });
+    });
+    it('Lightning respects its new cooldown and expiry even on an empty board', () => {
+        const { sim, ctx, claim } = fixture(); claim('lightning');
+        const collect = vi.fn();
+        tickElementalAbilities(sim, 0.01, size, ctx, collect);
+        expect(collect).toHaveBeenCalledTimes(1);
+        const burst = sim.fusionBursts.at(-1);
+        expect(burst.hit).toBe('kill'); expect(burst.defuse).toBe(true);
+        // Actual surface distance, including seams, not a world-space radius.
+        let tile = sim.pos, heading = sim.moveDir;
+        for (let i = 0; i < 3; i++) { tile = getNextSurfacePosition(tile, heading, size); heading = tile.moveDir; }
+        expect(burst.tiles).toContain(`${tile.x},${tile.y},${tile.z},${tile.dirKey}`);
+        tickElementalAbilities(sim, 2.49, size, ctx, collect);
+        expect(collect).toHaveBeenCalledTimes(1);
+        tickElementalAbilities(sim, 0.02, size, ctx, collect);
+        expect(collect).toHaveBeenCalledTimes(2);
+        sim.elementalT = 0;
+        tickElementalAbilities(sim, 3, size, ctx, collect);
+        expect(collect).toHaveBeenCalledTimes(2);
     });
     it('Ice gives one body-collision save, a finite phase window and drift acceleration', () => {
         const { sim, ctx, claim } = fixture(); claim('ice'); elementalDrift(sim);

@@ -9,7 +9,7 @@ import { ORB_SEGMENT_GROWTH } from './constants.js';
 
 export const ELEMENT_ABILITIES = Object.freeze({
     heatTiles: 6, fireDash: 0.75, fireBonus: 6, gardenBudget: 6,
-    gardenRipen: 1.5, lightningCooldown: 4, chainCount: 3,
+    gardenRipen: 1.5, lightningCooldown: 2.5, chainCount: 5, chainReach: 4, chainHop: 3, dischargeReach: 3,
     driftDuration: 0.55, icePhase: 1.2, pickupDuration: 1.1,
     // Core-loop powers: each element helps heal the cube with no enemies or bombs
     // on it (see elementalDefs.js for the player-facing copy).
@@ -144,7 +144,7 @@ export function chainTargets(sim, size) {
     const chosen = [], used = new Set();
     let origin = sim.pos;
     for (let i = 0; i < ELEMENT_ABILITIES.chainCount; i++) {
-        const near = collectManifoldRing(origin.x, origin.y, origin.z, origin.dirKey, size, i ? 2 : 3);
+        const near = collectManifoldRing(origin.x, origin.y, origin.z, origin.dirKey, size, i ? ELEMENT_ABILITIES.chainHop : ELEMENT_ABILITIES.chainReach);
         const target = sim.powerups.find(o => ripeOrb(o) && !used.has(o) && near.has(keyOf(o)));
         if (!target) break;
         chosen.push(target); used.add(target); origin = target;
@@ -190,7 +190,7 @@ export function tickElementalAbilities(sim, delta, size, ctx, collect) {
         {
             collect(sim, size, ctx, targets, 'lightning');
             a.chainPending = false; a.lightningT = ELEMENT_ABILITIES.lightningCooldown;
-            const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 2);
+            const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, ELEMENT_ABILITIES.dischargeReach);
             postFusionBurst(sim, { kind: 'element-discharge', tile: { ...sim.pos }, tiles: [...reach], defuse: true, hit: 'kill' });
             overchargeTunnel(sim, size, ctx);
         }

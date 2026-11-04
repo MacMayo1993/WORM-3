@@ -8,8 +8,7 @@ import { TunnelTube } from '../worm/healerWorm/TunnelTube.jsx';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
-import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
-import { FACE_COLORS } from '../utils/constants.js';
+import { CHROME_TILE_FINISH } from '../3d/cubeViewStyles.js';
 import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
 import { CORE_HALF } from '../3d/antipodalCore.js';
 import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
@@ -44,6 +43,11 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     await frame();
     expect(interior.visible).toBe(true);
     expect(interiorTile(scene, '0-1-1-NX').visible).toBe(true);
+    const wall = interiorTile(scene, '0-1-1-NX'), pose = new THREE.Matrix4();
+    wall.getMatrixAt(wall.userData.tileKeys.indexOf('0-1-1-NX'), pose);
+    // The polished wall must be in front of the existing 0.018-inset backs.
+    expect(Math.abs(pose.elements[12])).toBeLessThan(1.5);
+    expect(Math.abs(pose.elements[12])).toBeCloseTo(1.48);
     expect(tunnelCoreClipUniforms.uTunnelCoreHalf.value).toBeCloseTo(CORE_HALF + .002);
     worm.phase.current = 'tunnel';
     store.getState().camera.position.set(0, 0, 1);
@@ -75,10 +79,8 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     await act(async () => useGameStore.setState({ cubies: recoloured }));
     expect(Array.from(mirrors.instanceColor.array)).not.toEqual(tints);
     const inner = interiorTile(scene, '0-1-1-NX').material;
-    const cached = getTileStyleMaterial('checkerboard', FACE_COLORS[5], false, null, FACE_COLORS[2]);
-    expect(inner).not.toBe(cached);
-    expect(cached.userData.portalCutout).toBeUndefined();
-    expect(inner.uniforms.time).toBe(cached.uniforms.time);
+    expect(inner.isMeshStandardMaterial).toBe(true);
+    expect(inner).toMatchObject(CHROME_TILE_FINISH);
     for (const mesh of interior.children.filter(mesh => mesh.material?.isMeshBasicMaterial)) {
       expect(mesh.material.userData.portalCutout).toBe(inner.userData.portalCutout);
     }

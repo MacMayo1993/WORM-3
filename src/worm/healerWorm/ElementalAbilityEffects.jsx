@@ -13,17 +13,17 @@ import { prefersReducedMotion } from '../../utils/device.js';
 import { createAirSlipstream } from './airSlipstream.js';
 
 const UP = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
-const CAPACITY = 96, LINE_POINTS = 12 * 4 * 12;
-function instances(geometry) {
+const CAPACITY = 96, LINE_POINTS = 12 * (ELEMENT_ABILITIES.chainCount + 1) * 12;
+function instances(geometry, capacity = CAPACITY) {
     const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ transparent: true,
-        opacity: 0.85, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }), CAPACITY);
+        opacity: 0.85, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }), capacity);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; mesh.count = 0;
     // Its colour buffer from the start: setColorAt's first call would switch the
     // material to another program in the frame the first effect appears.
     ensureInstanceColor(mesh);
     return mesh;
 }
-// Three bounded instance batches, lightning lines and one wind ribbon mesh. Gameplay
+// Bounded instance batches, solid lightning cores and one wind ribbon mesh. Gameplay
 // owns event ages and bud maturity, so pause/capture never changes their outcome.
 export function ElementalAbilityEffects({ worm, size }) {
     const r = useMemo(() => {
@@ -35,23 +35,26 @@ export function ElementalAbilityEffects({ worm, size }) {
         const flames = instances(new THREE.ConeGeometry(0.1, 0.4, 5)),
             buds = instances(new THREE.IcosahedronGeometry(0.11, 1)),
             rings = instances(new THREE.RingGeometry(0.28, 0.32, 24));
-        return { flames, buds, rings, pools: [flames, buds, rings], bolts,
+        const cores = instances(new THREE.CylinderGeometry(1, 1, 1, 4), LINE_POINTS / 2);
+        return { flames, buds, rings, cores, uploads: [flames, buds, rings, cores], pools: [flames, buds, rings], bolts,
             wind: createAirSlipstream(),
             pose: new THREE.Object3D(), color: new THREE.Color(), p: new THREE.Vector3(), n: new THREE.Vector3(),
             frame: new THREE.Quaternion(),
             head: new THREE.Vector3(), q: new THREE.Vector3(), from: new THREE.Vector3(), to: new THREE.Vector3(), point: new THREE.Vector3(), last: new THREE.Vector3() };
     }, []);
     useEffect(() => () => {
-        for (const mesh of [r.flames, r.buds, r.rings, r.bolts, r.wind.mesh]) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose?.(); }
+        for (const mesh of [r.flames, r.buds, r.rings, r.bolts, r.wind.mesh, r.cores]) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose?.(); }
     }, [r]);
     const draw = () => {
         const meshes = r.pools;
         for (const m of meshes) m.count = 0;
         r.bolts.geometry.setDrawRange(0, 0);
+        r.cores.count = 0;
         r.wind.mesh.geometry.setDrawRange(0, 0);
         const a = worm.elementalAbilities?.current, store = useGameStore.getState();
         if (!a || !store.wormAlive || worm.phase.current !== 'crawling') return;
         const reduced = store.settings?.reducedMotion || prefersReducedMotion();
+        const gentle = reduced || store.settings?.reduceFlashing;
         const time = reduced ? 0 : a.visualTime;
         const active = type => (worm.elementalT?.current ?? 0) > 0 && (worm.elementalType.current === type || worm.elementalPair.current === type);
         const tilePose = (tile, out, height = 0.08) => {
@@ -154,6 +157,8 @@ export function ElementalAbilityEffects({ worm, size }) {
             tilePose(event.tiles[0], r.p);
             put(r.rings, r.p, r.n, reduced ? 1.5 : 1 + progress * 3, color);
             if (event.kind !== 'lightning') continue;
+            // A discharge still reads without food: a broad pulse signals the area discharge.
+            put(r.rings, r.p, r.n, reduced ? 2 : 1 + progress * 7, '#a78bfa');
             for (let i = 1; i < event.tiles.length; i++) {
                 tilePose(event.tiles[i - 1], r.from, 0.3); tilePose(event.tiles[i], r.to, 0.3);
                 r.last.copy(r.from);
@@ -164,7 +169,20 @@ export function ElementalAbilityEffects({ worm, size }) {
                     const extent = Math.max(Math.abs(r.point.x), Math.abs(r.point.y), Math.abs(r.point.z));
                     const shell = Math.min(r.from.length(), r.to.length(), size / 2 + 0.25);
                     if (extent > 0 && extent < shell) r.point.multiplyScalar(shell / extent);
-                    if (!reduced && j < 6) r.point.addScaledVector(r.n, Math.sin(j * 7 + event.id) * 0.08);
+                    if (!gentle && j < 6) r.point.addScaledVector(r.n, Math.sin(j * 7 + event.id) * 0.08);
+                    // Solid white cores give the chain physical width, including on phones.
+                    if (r.cores.count < r.cores.instanceMatrix.count) {
+                        r.q.subVectors(r.point, r.last);
+                        const length = r.q.length();
+                        if (length > 0.001) {
+                            r.pose.position.copy(r.last).addScaledVector(r.q, 0.5);
+                            r.pose.quaternion.setFromUnitVectors(UP, r.q.multiplyScalar(1 / length));
+                            const width = gentle ? 0.012 : 0.018 * (1 - progress * 0.5);
+                            r.pose.scale.set(width, length, width); r.pose.updateMatrix();
+                            r.cores.setMatrixAt(r.cores.count, r.pose.matrix);
+                            r.cores.setColorAt(r.cores.count++, r.color.set('#f0f9ff').multiplyScalar(gentle ? 0.3 : 1 - progress * 0.7));
+                        }
+                    }
                     positions.setXYZ(lineCount++, r.last.x, r.last.y, r.last.z);
                     positions.setXYZ(lineCount++, r.point.x, r.point.y, r.point.z); r.last.copy(r.point);
                 }
@@ -172,7 +190,7 @@ export function ElementalAbilityEffects({ worm, size }) {
         }
         r.bolts.geometry.setDrawRange(0, lineCount);
         if (lineCount) positions.needsUpdate = true;
-        for (const mesh of meshes) {
+        for (const mesh of r.uploads) {
             uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
             uploadInstancePrefix(mesh.instanceColor, mesh.count);
         }
@@ -182,8 +200,9 @@ export function ElementalAbilityEffects({ worm, size }) {
         // An empty pool still costs three.js a program selection per pass (two for a
         // transparent double-sided one), and the far-side window doubles the passes: hide it.
         for (const mesh of r.pools) mesh.visible = mesh.count > 0;
+        r.cores.visible = r.cores.count > 0;
         r.bolts.visible = r.bolts.geometry.drawRange.count > 0;
         r.wind.mesh.visible = r.wind.mesh.geometry.drawRange.count > 0;
     });
-    return <group name="elemental-ability-feedback"><primitive object={r.flames} /><primitive object={r.buds} /><primitive object={r.rings} /><primitive object={r.bolts} /><primitive object={r.wind.mesh} /></group>;
+    return <group name="elemental-ability-feedback"><primitive object={r.flames} /><primitive object={r.buds} /><primitive object={r.rings} /><primitive object={r.bolts} /><primitive object={r.wind.mesh} /><primitive object={r.cores} /></group>;
 }

@@ -49,12 +49,13 @@ it.each(['crawling', 'tunnel'])('refreshes Classic interiors from %s without cha
       expect(scene.getObjectByName('tunnel-interior').visible).toBe(true); // an occupied mouth stays open
       expect(walls.children.reduce((n, m) => n + m.count, 0)).toBe(54);
       for (const mesh of walls.children) {
-        for (const key of mesh.userData.tileKeys) {
+        for (const [index, key] of mesh.userData.tileKeys.entries()) {
           const [x, y, z, dir] = key.split('-');
           const face = ANTIPODAL_COLOR[cubies[x][y][z].stickers[dir].curr];
-          const style = classic ? 'solid' : settings.manifoldStyles[face];
-          expect(mesh.name).toBe(`tunnel-interior-batch-${face}-${style}`);
-          expect(mesh.material.uniforms.baseColor.value.getHexString()).toBe(palette[face].slice(1).toLowerCase());
+          const color = classic ? mesh.material.uniforms.baseColor.value : new THREE.Color().fromArray(mesh.instanceColor.array, index * 3);
+          if (classic) expect(mesh.name).toBe(`tunnel-interior-batch-${face}-solid`);
+          else expect(mesh.material.metalness).toBe(1);
+          expect(color.getHexString()).toBe(palette[face].slice(1).toLowerCase());
         }
       }
       for (const [i, cell] of coreLayout0.stickers.entries()) {
