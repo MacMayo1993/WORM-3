@@ -70,6 +70,8 @@ function VoidCore({ cubieRefs = null }) {
   const visualMode = useGameStore(s => s.visualMode);
   const wormViewPower = useGameStore(s => s.wormViewPower);
   const activeViewPower = wormMode ? wormViewPower : null;
+  // Chrome belongs to the outward-facing tiles of the central anticube.
+  const chromeCore = activeViewPower !== 'view-classic';
   const mode = getViewPowerDef(activeViewPower)?.view ?? visualMode;
 
   const { colors: faceColors, manifoldStyles } = useMemo(
@@ -105,6 +107,8 @@ function VoidCore({ cubieRefs = null }) {
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
+    chromeMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile, true), lightning, { haloOnly: true }),
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
     stickerMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile), lightning, { haloOnly: true }),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
   }), [glow, passage, lightning]);
@@ -145,6 +149,7 @@ function VoidCore({ cubieRefs = null }) {
   // keep the original single draw; patterned faces use the equipped shader.
   const appearances = useMemo(() => {
     const byColor = new Map();
+    if (chromeCore) return byColor;
     for (let id = 1; id <= 6; id++) {
       const style = mode === 'glass' ? 'glass' : manifoldStyles?.[id] || 'solid';
       if (style === 'solid') continue;
@@ -160,7 +165,7 @@ function VoidCore({ cubieRefs = null }) {
       byColor.set(id, { key, id, style, ...look });
     }
     return byColor;
-  }, [manifoldStyles, mode, faceColors, size, passage, looks]);
+  }, [chromeCore, manifoldStyles, mode, faceColors, size, passage, looks]);
   const styled = useMemo(() => {
     const groups = new Map(), slots = new Set();
     colors.ids.forEach((id, i) => {
@@ -420,7 +425,8 @@ function VoidCore({ cubieRefs = null }) {
           visible={styled.slots.size < layout.stickers.length}
           frustumCulled={false}
           ref={stickersRef}
-          args={[parts.sticker, parts.stickerMaterial, layout.stickers.length]}
+          args={[parts.sticker, null, layout.stickers.length]}
+          material={chromeCore ? parts.chromeMaterial : parts.stickerMaterial}
         />
         {styled.batches.map(batch => <instancedMesh key={`${size}-${batch.key}`}
           name={`antipodal-core-style-${batch.key}`} frustumCulled={false}

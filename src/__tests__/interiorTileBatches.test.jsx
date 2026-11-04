@@ -2,7 +2,6 @@ import { expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { makeInteriorPortals } from '../worm/healerWorm/interiorPortals.js';
-import { CHROME_TILE_FINISH } from '../3d/cubeViewStyles.js';
 import { ANTIPODAL_COLOR, RUBIKS_FACE_COLORS } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
@@ -18,20 +17,19 @@ function layoutFor(cubies) {
   return layout;
 }
 
-it.each([3, 10, 15])('renders every tile in one chrome batch on size %i, preserving each frame and physical pattern seed', size => {
+it.each([3, 10, 15])('renders every tile in six batches on size %i, preserving each frame and physical pattern seed', size => {
   const cubies = makeCubies(size), layout = layoutFor(cubies), portals = makeInteriorPortals();
   const batches = makeInteriorTileBatches(portals.uniforms);
   try {
     batches.sync(layout, cubies, { manifoldStyles: { 1: 'circuit', 2: 'checkerboard' } }, 9999);
-    expect(batches.group.children).toHaveLength(1);
+    expect(batches.group.children).toHaveLength(6);
     expect(batches.group.children.reduce((n, mesh) => n + mesh.count, 0)).toBe(6 * size * size);
     const byKey = new Map(layout.map(t => [`${t.sx}-${t.sy}-${t.sz}-${t.dirKey}`, t]));
     const actual = new THREE.Matrix4(), pose = new THREE.Object3D();
     for (const mesh of batches.group.children) {
       expect(mesh.isInstancedMesh).toBe(true);
-      expect(mesh.material.isMeshStandardMaterial).toBe(true);
-      expect(mesh.material).toMatchObject(CHROME_TILE_FINISH);
-      expect(mesh.geometry.type).toBe('ExtrudeGeometry');
+      expect(mesh.material.isShaderMaterial).toBe(true);
+      expect(mesh.geometry.type).toBe('PlaneGeometry');
       expect(mesh.material.userData.portalCutout).toBe(portals.uniforms);
       expect(mesh.boundingSphere.radius).toBeGreaterThan(0);
       mesh.userData.tileKeys.forEach((key, index) => {
@@ -60,9 +58,7 @@ it('refreshes healed/dead/missing tiles, reuses resident batches, and releases r
     const missing = layout[1]; delete cubies[missing.sx][missing.sy][missing.sz].stickers[missing.dirKey];
     batches.sync(layout, cubies, {}, 4);
     expect(batches.group.children.reduce((n, m) => n + m.count, 0)).toBe(53);
-    const mesh = batches.group.children[0], color = new THREE.Color();
-    mesh.getColorAt(mesh.userData.tileKeys.indexOf(`${t.sx}-${t.sy}-${t.sz}-${t.dirKey}`), color);
-    expect(color.getHexString()).toBe('555555');
+    expect(batches.group.children.some(m => m.material.uniforms.baseColor.value.getHexString() === '555555')).toBe(true);
     expect(original.every(m => batches.group.children.includes(m))).toBe(true);
     expect(materialDisposals.every(spy => spy.mock.calls.length === 0)).toBe(true);
     batches.dispose();
@@ -72,19 +68,16 @@ it('refreshes healed/dead/missing tiles, reuses resident batches, and releases r
   } finally { batches.dispose(); portals.dispose(); }
 });
 
-
-it('keeps antipodal palette and flips live through turns, and restores chrome after a Classic pickup', () => {
+it('keeps antipodal palette and flips live through turns, and restores equipped styles after a Classic pickup', () => {
   let cubies = makeCubies(3);
   const layout = layoutFor(cubies), portals = makeInteriorPortals(), batches = makeInteriorTileBatches(portals.uniforms);
   const settings = { colorScheme: 'cyberpunk', manifoldStyles: { 1: 'circuit', 2: 'lava' } };
-  const colors = resolveColors(settings), actual = new THREE.Color();
+  const colors = resolveColors(settings);
   const check = () => {
-    const mesh = batches.group.children[0];
-    expect(batches.group.children).toHaveLength(1);
-    for (const [index, key] of mesh.userData.tileKeys.entries()) {
+    expect(batches.group.children).toHaveLength(6);
+    for (const mesh of batches.group.children) for (const key of mesh.userData.tileKeys) {
       const [x, y, z, dir] = key.split('-'), sticker = cubies[x][y][z].stickers[dir];
-      mesh.getColorAt(index, actual);
-      expect(actual.getHexString()).toBe(new THREE.Color(colors[ANTIPODAL_COLOR[sticker.curr]]).getHexString());
+      expect(mesh.material.uniforms.baseColor.value.getHexString()).toBe(new THREE.Color(colors[ANTIPODAL_COLOR[sticker.curr]]).getHexString());
     }
   };
   try {
@@ -106,7 +99,7 @@ it('keeps antipodal palette and flips live through turns, and restores chrome af
   } finally { batches.dispose(); portals.dispose(); }
 });
 
-it('resizes and disposes the chrome allocation when the cube grows', () => {
+it('resizes and disposes the wall allocations when the cube grows', () => {
   const portals = makeInteriorPortals(), batches = makeInteriorTileBatches(portals.uniforms);
   try {
     const small = makeCubies(2), large = makeCubies(15);
@@ -114,7 +107,7 @@ it('resizes and disposes the chrome allocation when the cube grows', () => {
     const mesh = batches.group.children[0], disposed = vi.spyOn(mesh.material, 'dispose');
     batches.sync(layoutFor(large), large, {}, 9999);
     expect(disposed).toHaveBeenCalledOnce();
-    expect(batches.group.children).toHaveLength(1);
-    expect(batches.group.children[0].count).toBe(1350);
+    expect(batches.group.children).toHaveLength(6);
+    expect(batches.group.children.reduce((n, m) => n + m.count, 0)).toBe(1350);
   } finally { batches.dispose(); portals.dispose(); }
 });

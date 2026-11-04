@@ -42,7 +42,8 @@ it('keeps the core materials of every look it has worn across view-power swaps',
       .filter(mesh => mesh.name.startsWith('antipodal-core-style-')).map(mesh => mesh.material);
     const bodyMesh = body(), restBody = bodyMesh.material, restStyles = styled();
     const stickers = scene().getObjectByName('antipodal-core-stickers'), stickerMaterial = stickers.material;
-    expect(restStyles.length).toBeGreaterThan(0);
+    expect(restStyles).toHaveLength(0);
+    expect(stickerMaterial.metalness).toBe(1);
     const spies = [restBody, stickerMaterial, ...restStyles].map(material => vi.spyOn(material, 'dispose'));
 
     await act(async () => useGameStore.setState({ wormViewPower: 'view-glass' })); frame();
@@ -59,6 +60,14 @@ it('keeps the core materials of every look it has worn across view-power swaps',
     await act(async () => useGameStore.setState({ wormViewPower: 'view-glass' })); frame();
     expect(body().material).toBe(glassBody);
     await act(async () => useGameStore.setState({ wormViewPower: null })); frame();
+    await act(async () => useGameStore.setState({ wormViewPower: 'view-classic' })); frame();
+    const plainMaterial = stickers.material;
+    expect(plainMaterial.metalness).toBe(0);
+    spies.push(vi.spyOn(plainMaterial, 'dispose'));
+    await act(async () => useGameStore.setState({ wormViewPower: null })); frame();
+    expect(stickers.material).toBe(stickerMaterial);
+    await act(async () => useGameStore.setState({ wormViewPower: 'view-classic' })); frame();
+    expect(stickers.material).toBe(plainMaterial);
     spies.forEach(spy => expect(spy).not.toHaveBeenCalled());
 
     await act(async () => root.unmount());

@@ -7,8 +7,8 @@ import { makeInteriorTileBatches, INTERIOR_TILE_INSET } from '../worm/healerWorm
 import { updateTilePressVisual } from '../worm/tilePressVisual.js';
 import { createPlayStickerGeometry } from '../3d/rubiksPiece.js';
 
-// The chrome room stays visible while a recorded tail passage clears. Its
-// extruded backs must never replace depressed exterior tiles in the depth buffer.
+// The patterned outer walls stay visible while a recorded tail passage clears.
+// They must never replace depressed exterior tiles in the depth buffer.
 it.each([3, 10, 15])('keeps occupied exterior tiles ahead of the tunnel room on all faces (size %i)', size => {
   const cubies = makeCubies(size), portals = makeInteriorPortals();
   const tiles = makeInteriorTileBatches(portals.uniforms);

@@ -66,10 +66,8 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const back = scene.getObjectByName('sticker-antipodal-back');
     const inner = () => interiorTile(scene, '0-1-1-NX');
     expect(back.material).toBe(cached);
-    const innerColor = () => new THREE.Color().fromArray(inner().instanceColor.array, inner().userData.tileKeys.indexOf('0-1-1-NX') * 3);
-    expect(innerColor().getHexString()).toBe(cached.uniforms.baseColor.value.getHexString());
-    expect(inner().material.metalness).toBe(1);
-    expect(inner().material.roughness).toBe(0.06);
+    expect(inner().material.uniforms.baseColor.value).toEqual(cached.uniforms.baseColor.value);
+    expect(inner().material.uniforms.time).toBe(cached.uniforms.time);
     expect(inner().visible).toBe(true);
 
     tunnelState.active = true; tunnelState.activeTunnelId = 'a|b'; frame();
@@ -125,13 +123,13 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(disposed).toHaveBeenCalledOnce();
     expect(halves[0].geometry.attributes.position.version).toBe(version);
     expect(back.material).toBe(getTileStyleMaterial('wood', FACE_COLORS[2], false, null, FACE_COLORS[5]));
-    expect(innerColor().getHexString()).toBe(back.material.uniforms.baseColor.value.getHexString());
+    expect(inner().material.uniforms.baseColor.value).toEqual(back.material.uniforms.baseColor.value);
     expect(scene.getObjectByName('tunnel-styled-half-0').material.name).toBe('tunnel-tile-0-polkaDots');
 
     cubies = flipStickerPair(cubies, 3, 0, 1, 1, 'NX', buildManifoldGridMap(cubies, 3));
     await act(async () => { useGameStore.setState({ cubies }); root.render(draw('wood', 'polkaDots')); }); frame();
     expect(back.material.uniforms.baseColor.value.getHexString()).toBe(FACE_COLORS[5].slice(1).toLowerCase());
-    expect(innerColor().getHexString()).toBe(back.material.uniforms.baseColor.value.getHexString()); // Healing refreshes the current back during transit too.
+    expect(inner().material.uniforms.baseColor.value).toEqual(back.material.uniforms.baseColor.value); // Healing refreshes the current back during transit too.
 
     await act(async () => {
       useGameStore.setState({ wormHealerMode: false });

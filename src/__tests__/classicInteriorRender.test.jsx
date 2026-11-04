@@ -49,13 +49,12 @@ it.each(['crawling', 'tunnel'])('refreshes Classic interiors from %s without cha
       expect(scene.getObjectByName('tunnel-interior').visible).toBe(true); // an occupied mouth stays open
       expect(walls.children.reduce((n, m) => n + m.count, 0)).toBe(54);
       for (const mesh of walls.children) {
-        for (const [index, key] of mesh.userData.tileKeys.entries()) {
+        for (const key of mesh.userData.tileKeys) {
           const [x, y, z, dir] = key.split('-');
           const face = ANTIPODAL_COLOR[cubies[x][y][z].stickers[dir].curr];
-          const color = classic ? mesh.material.uniforms.baseColor.value : new THREE.Color().fromArray(mesh.instanceColor.array, index * 3);
-          if (classic) expect(mesh.name).toBe(`tunnel-interior-batch-${face}-solid`);
-          else expect(mesh.material.metalness).toBe(1);
-          expect(color.getHexString()).toBe(palette[face].slice(1).toLowerCase());
+          const style = classic ? 'solid' : settings.manifoldStyles[face];
+          expect(mesh.name).toBe(`tunnel-interior-batch-${face}-${style}`);
+          expect(mesh.material.uniforms.baseColor.value.getHexString()).toBe(palette[face].slice(1).toLowerCase());
         }
       }
       for (const [i, cell] of coreLayout0.stickers.entries()) {
@@ -76,11 +75,13 @@ it.each(['crawling', 'tunnel'])('refreshes Classic interiors from %s without cha
       }
       const styled = scene.getObjectByName('antipodal-core').getObjectsByProperty('isInstancedMesh', true)
         .filter(mesh => mesh.name.startsWith('antipodal-core-style-'));
-      expect(styled.length).toBe(classic ? 0 : 6);
-      expect(plainCore.visible).toBe(classic);
+      expect(styled.length).toBe(0);
+      expect(plainCore.material.metalness).toBe(classic ? 0 : 1);
+      expect(plainCore.visible).toBe(true);
     };
     checkAppearance(false);
     const oldWall = walls.children[0];
+    const chromeMaterial = plainCore.material;
     // Only the pickup changes: same cube, settings, layout, paused tunnel and visualMode.
     await set({ wormViewPower: 'view-classic' });
     checkAppearance(true);
@@ -94,6 +95,7 @@ it.each(['crawling', 'tunnel'])('refreshes Classic interiors from %s without cha
     expect(walls.children).toEqual(resident); // no rebuild on every frame
     await set({ wormViewPower: null });
     checkAppearance(false);
+    expect(plainCore.material).toBe(chromeMaterial); // retain programs across repeated pickups
     await set({ wormViewPower: 'view-classic' });
     checkAppearance(true);
     await set({ wormHealerMode: false });

@@ -17,8 +17,8 @@ import { prefersReducedMotion } from '../../utils/device.js';
 // During wormhole traversal shows the coloured back-sides of every sticker on
 // all 6 faces so the camera looks like it is inside the cube.
 
-// Leave the chrome highlights crisp while the bright track stays in front.
-const DIM_STRENGTH = 0.14;
+// Keep the patterned antipodal walls readable behind the bright track and chrome core.
+const DIM_STRENGTH = 0.48;
 
 // Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
 // points INWARD (toward the cube centre) for each cube face direction.
