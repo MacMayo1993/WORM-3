@@ -57,7 +57,7 @@ it('traps focus in the dialog and gives Escape one close action', () => {
 it('requires the exercise goal before Next and provides an explicit Skip Exercise', () => {
   render(<DemoWormControlHint />);
   expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
-  expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
+  expect(host.querySelector('[aria-label="WORM practice progress"]').getAttribute('aria-valuenow')).toBe('0');
   expect([...host.querySelectorAll('button')].find(b => b.textContent === 'Next').disabled).toBe(true);
   const skip = [...host.querySelectorAll('button')].find(b => b.textContent === 'Skip Exercise');
   expect(skip.disabled).toBe(false);
@@ -177,4 +177,22 @@ it('keeps step progress and both navigation actions inside Mobi’s active dialo
   expect([...bar.querySelectorAll('button')].map(button => button.textContent)).toEqual(['Skip Step', 'Exit Demo']);
   expect(bar.closest('[inert]')).toBeNull();
   expect(dialog.querySelector('.mobi-footer-actions').textContent).toContain('Skip Mobi');
+});
+
+it('combines demo navigation, instructions and pause at the top, leaving only game controls below', () => {
+  useGameStore.setState({ demoMode: true, demoStep: 'worm-traversal', demoWormCourse: 'showcase', demoWormStarted: true });
+  const skip = vi.fn(), exit = vi.fn();
+  render(<WormCrawlerHUD phase="crawling" wormAlive onDemoSkipStep={skip} onDemoExit={exit} />);
+  const card = host.querySelector('.worm-hud-top .worm-demo-card');
+  expect(card).not.toBeNull();
+  expect(card.querySelector('[aria-label="Demo progress"]')).not.toBeNull();
+  expect(card.querySelector('[aria-label="Choose demo scene"]')).not.toBeNull();
+  expect(card.querySelector('[aria-label="Pause"]')).not.toBeNull();
+  expect(card.querySelector('[role="status"]')).not.toBeNull();
+  expect(host.querySelector('.worm-hud-bottom .worm-demo-card')).toBeNull();
+  expect(host.querySelector('.worm-hud-top > .worm-hud-bar')).toBeNull();
+  act(() => [...card.querySelectorAll('button')].find(b => b.textContent === 'Skip Step').click());
+  act(() => [...card.querySelectorAll('button')].find(b => b.textContent === 'Exit Demo').click());
+  expect(skip).toHaveBeenCalledTimes(1);
+  expect(exit).toHaveBeenCalledTimes(1);
 });

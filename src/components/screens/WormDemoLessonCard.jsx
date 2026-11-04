@@ -6,9 +6,9 @@ import { demoChapter } from '../../game/wormDemoCatalog.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import '../ui/arcadeTheme.css';
 import './wormDemoLesson.css';
-import { ActionCue } from '../ui/ActionCue.jsx';
+import DemoProgressBar from './DemoProgressBar.jsx';
 
-export default function WormDemoLessonCard({ onRetry }) {
+export default function WormDemoLessonCard({ onRetry, onSkipStep, onExit, pauseControl, telemetry, length }) {
   const s = useGameStore(useShallow(s => ({ demoWormCourse: s.demoWormCourse, demoWormLessonIndex: s.demoWormLessonIndex, complete: s.demoWormComplete, started: s.demoWormStarted, prepared: s.demoWormPrepared, start: s.startWormDemoLesson,
     progress: s.demoWormProgress, alive: s.wormAlive, paused: s.wormPauseMenuOpen,
     details: s.wormDeathDetails, phase: s.wormGamePhase, finished: s.demoWormFinished,
@@ -22,7 +22,15 @@ export default function WormDemoLessonCard({ onRetry }) {
   useEffect(() => {
     if (s.alive === false && !s.paused) (s.complete && lesson.preview ? nextRef : retryRef).current?.focus();
   }, [s.alive, s.paused, s.complete, lesson.preview]);
-  if (s.paused || s.finished || !['active', 'finalHealing'].includes(s.phase ?? 'active')) return null;
+  if (s.paused) return null;
+  const navigation = <div className="worm-demo-navigation">
+    {!challenges && <DemoProgressBar currentStep="worm-traversal" inline onSkipStep={onSkipStep} onExit={onExit} />}
+    {pauseControl}
+  </div>;
+  // Arrival and completion still need a pause/exit door, even without a lesson.
+  if (s.finished || !['active', 'finalHealing'].includes(s.phase ?? 'active')) {
+    return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label="Demo controls">{navigation}</section>;
+  }
   const dead = s.alive === false;
   const cause = s.details?.cause || s.details?.reason;
   // One line per way a run can end (killWormSim reasons), each naming the rule
@@ -38,8 +46,8 @@ export default function WormDemoLessonCard({ onRetry }) {
   const last = index === lessons.length - 1;
   const nextLabel = last ? challenges ? 'Finish challenges' : 'Next: Flip Cube' : 'Next';
   return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label={challenges ? "WORM short challenges" : "WORM practice"}>
+    {navigation}
     {!challenges && <div className="worm-demo-scene-bar">
-      <span className="worm-demo-live">{!s.started ? 'READY TO PLAY' : s.complete ? 'SCENE CLEAR' : dead ? 'RETRY READY' : 'LIVE GAMEPLAY'}</span>
       <select aria-label="Choose demo scene" value={`${s.demoWormCourse}:${index}`}
         onFocus={() => { pickerWasPaused.current = useGameStore.getState().wormPaused; useGameStore.getState().setWormPaused(true); }}
         onBlur={() => { if (!pickerWasPaused.current) useGameStore.getState().setWormPaused(false); }}
@@ -56,14 +64,18 @@ export default function WormDemoLessonCard({ onRetry }) {
         </optgroup>)}
       </select>
     </div>}
-    <div className="worm-demo-heading"><strong>{lesson.title}</strong><span>{(s.demoWormLessonIndex ?? 0) + 1}/{lessons.length}</span></div>
+    <div className="worm-demo-heading">
+      {challenges ? <strong>{lesson.title}</strong> : <span className="worm-demo-live">{!s.started ? 'READY TO PLAY' : s.complete ? 'SCENE CLEAR' : dead ? 'RETRY READY' : 'LIVE GAMEPLAY'}</span>}
+      {length != null && <span className="worm-demo-length" aria-label={`Worm length: ${length} tiles`}>{length} tiles</span>}
+      <span>Scene {(s.demoWormLessonIndex ?? 0) + 1}/{lessons.length}</span>
+    </div>
     <div className="worm-demo-track" role="progressbar" aria-label="WORM practice progress" aria-valuemin={0} aria-valuemax={lessons.length} aria-valuenow={(s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)}>
       <div style={{ width: `${((s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)) / lessons.length * 100}%` }} />
     </div>
-    {<div className="action-cue-row"><ActionCue kind={s.complete ? 'complete' : dead ? 'danger' : lesson.cue} /></div>}
     <p role="status" aria-live="polite">{s.complete ? lesson.success : dead ? advice : lesson.instruction}</p>
     {s.complete && <div className="worm-demo-detail">{lesson.preview ? 'Demonstration complete. Tap Next to practice the rescue.' : `Goal reached. Keep practicing or tap ${nextLabel}.`}</div>}
     {s.progress && !s.complete && !dead && <div className="worm-demo-detail">{s.progress}</div>}
+    {telemetry && <div className="worm-demo-telemetry">{telemetry}</div>}
     <div className="worm-demo-actions">
       <button ref={retryRef} disabled={!dead && !s.started && !s.prepared} className={dead || !s.started ? 'arcade-primary' : 'arcade-key'} onClick={!s.started && !dead ? s.start : onRetry ?? s.retry}>{lesson.preview ? !s.started && !dead ? 'Watch it' : 'Replay' : dead ? 'Try again' : !s.started ? 'Try it' : 'Retry'}</button>
       <button ref={nextRef} disabled={!s.complete} className={s.complete ? 'arcade-primary' : 'arcade-key'} onClick={s.next}>{nextLabel}</button>

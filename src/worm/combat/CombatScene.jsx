@@ -42,7 +42,7 @@ const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.mat
 // Pooled rigs; shells and joints animate in place without React state. `slots`
 // maps each rig to one live or dissolving enemy by id (allocateEnemySlots), so a
 // defeated enemy crumbles in the rig it died in.
-function Crawler({ slot, slots }) {
+function Crawler({ slot, slots, allocatedCombat }) {
   const ref = useRef(), rig = useRef(), parts = useRef(), flecks = useRef(), body = useRef(), target = useRef(), shell = useRef();
   const accents = useRef(), armor = useRef(), status = useRef(), legs = useRef(), fins = useRef(), frost = useRef(), warning = useRef();
   const facing = useRef({ id: null, angle: 0 });
@@ -61,7 +61,10 @@ function Crawler({ slot, slots }) {
     });
   }, [dissolve]);
   useFrame((_,delta) => {
-    const c = combatBridge.current, e = slots.current[slot];
+    const c = combatBridge.current;
+    // The simulation may clear or replace the bridge after the priority -1
+    // allocator ran. Never pair an old slot with a different combat world.
+    const e = c && allocatedCombat.current === c ? slots.current[slot] : null;
     if (!ref.current) return;
     ref.current.visible = !!e;
     if (!e) return;
@@ -331,12 +334,16 @@ const skipHiddenRigs = node => { node?.children.forEach(skipMatrixWhileHidden); 
 
 function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
   const pool = maxEnemies + DISSOLVE_SLOTS;
-  const slots = useRef(null), assigned = useRef(new Map());
+  const slots = useRef(null), assigned = useRef(new Map()), allocatedCombat = useRef(null);
   if (!slots.current || slots.current.length !== pool) slots.current = Array(pool).fill(null);
   // Before the rigs read their slots this frame (lower priority runs first; a
   // negative priority never takes over rendering).
-  useFrame(() => { allocateEnemySlots(combatBridge.current, assigned.current, slots.current); }, -1);
-  return <group ref={skipHiddenRigs}><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:pool},(_,i)=><Crawler key={i} slot={i} slots={slots} />)}
+  useFrame(() => {
+    const c = combatBridge.current;
+    allocateEnemySlots(c, assigned.current, slots.current);
+    allocatedCombat.current = c;
+  }, -1);
+  return <group ref={skipHiddenRigs}><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:pool},(_,i)=><Crawler key={i} slot={i} slots={slots} allocatedCombat={allocatedCombat} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}
