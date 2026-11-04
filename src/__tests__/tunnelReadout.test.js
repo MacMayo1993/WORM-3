@@ -1,6 +1,8 @@
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { describe, it, expect } from 'vitest';
-import { healingNeed, tunnelDanger, nearSignScale, SIGN_HIDE_DISTANCE, SIGN_FULL_DISTANCE } from '../worm/healerWorm/tunnelReadout.js';
+import { healingNeed, tunnelAt, tunnelDanger, nearSignScale, SIGN_HIDE_DISTANCE, SIGN_FULL_DISTANCE } from '../worm/healerWorm/tunnelReadout.js';
+import { makeCubies } from '../game/cubeState.js';
+import { makeWormSim } from '../worm/healerWorm/wormSim.js';
 
 describe('tunnel requirement units', () => {
   it('reports two pickups for four missing segments', () => {
@@ -29,6 +31,29 @@ it('distinguishes the third safe trip from fatal re-entry, even when heal-ready'
   expect(tunnelDanger({ uses: 4, inTransit: true, collapsing: true })).toBe('collapsing');
   expect(tunnelDanger({ uses: 3, locked: true })).toBeNull();
   expect(tunnelDanger({ voided: true, ready: true })).toBe('collapsed');
+});
+
+it('distinguishes a funded tunnel from permission to heal in a gated story', () => {
+  const cubies = makeCubies(3);
+  const pos = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
+  cubies[1][2][2].stickers.PZ.curr = 4;
+  const sim = makeWormSim(3);
+  sim.tailLength = BASE_TAIL_LENGTH + 6;
+  let allowed = false;
+  const ctx = {
+    getCubies: () => cubies,
+    resolveTunnel: () => ({ tunnelKey: 'gated-tunnel' }),
+    getHealingProgress: () => ({}),
+    isPrismCharacter: () => false,
+    getOrbColor: () => '#fff',
+    getOrbInventory: () => ({ 4: 6 }),
+    allowTunnelHeal: () => allowed,
+  };
+  expect(tunnelAt(sim, ctx, pos)).toMatchObject({ ready: true, healingAllowed: false });
+  allowed = true;
+  expect(tunnelAt(sim, ctx, pos)).toMatchObject({ ready: true, healingAllowed: true });
+  delete ctx.allowTunnelHeal;
+  expect(tunnelAt(sim, ctx, pos).healingAllowed).toBe(true);
 });
 
 it('shrinks a tunnel sign away as the camera nears it, and keeps far signs whole', () => {

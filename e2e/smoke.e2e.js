@@ -62,6 +62,28 @@ test('starts a WORM free-play run', async ({ page }) => {
     expect(control.left).toBeGreaterThanOrEqual(0);
     expect(control.right).toBeLessThanOrEqual(640);
   }
+  await expect(page.getByRole('list', { name: 'Orbs picked up by color' })).toBeVisible();
+  await expect(page.getByRole('timer')).toBeVisible();
+  await expect(page.getByRole('timer')).toHaveAttribute('aria-label', /Rotation (in|held at) \d+\.\d seconds/);
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 700 });
+    const dock = await page.locator('.worm-hud-bar').boundingBox();
+    const parts = await page.locator('.worm-hud-bar .orb-slot, .worm-hud-bar .worm-rotation-clock, .worm-hud-bar button').evaluateAll(nodes => nodes.map(node => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, overflow: node.scrollWidth > node.clientWidth + 1 };
+    }));
+    expect(dock.x).toBeGreaterThanOrEqual(0);
+    expect(dock.x + dock.width).toBeLessThanOrEqual(width);
+    for (const part of parts) {
+      expect(part.left).toBeGreaterThanOrEqual(dock.x);
+      expect(part.right).toBeLessThanOrEqual(dock.x + dock.width + 1);
+      expect(part.overflow).toBe(false);
+    }
+    const counts = await page.locator('.orb-slot-count').allTextContents();
+    expect(counts).toHaveLength(6);
+    for (const count of counts) expect(count).toMatch(/^\d+$/);
+  }
+  await page.setViewportSize({ width: 640, height: 320 });
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForTimeout(5000);   // the run is live: the sim, camera and orbs get a few seconds to throw
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();

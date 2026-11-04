@@ -332,9 +332,8 @@
 .worm-pause-key:focus-visible { outline:none; }
 .worm-pause-key:focus-visible > svg { outline:3px solid #2774ad; outline-offset:3px; }
 
-/* Turn urgency belongs to the reserve's backing, not another telemetry row. */
+/* Stable six-color pickup rail. */
 .worm-hud-reserve { position:relative; isolation:isolate; border-radius:12px; }
-.worm-rotation-clock { position:absolute; inset:0; z-index:-1; border-radius:inherit; pointer-events:none; }
 .worm-rotation-clock[hidden] { display:none; }
 .worm-instrument .orb-reserve { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; }
 .worm-instrument .orb-reserve .orb-slot { display:grid; grid-template-columns:minmax(0,1fr); justify-items:center; gap:2px; padding:3px 1px; min-width:0; border-color:transparent; background:#fffff55c; }
@@ -517,3 +516,21 @@
 .worm-challenge-toast strong { overflow: hidden; font-size: 13px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .worm-challenge-toast > b { margin-left: auto; font-size: 13px; font-weight: 900; color: #0b5a2e; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .worm-challenge-toast { animation: none; } }
+
+/* One status dock: healing colors the existing pause bar, not another banner. */
+.worm-instrument .worm-hud-bar[data-traversal=heal] { background:#dcefd3 !important; border-color:#28713d !important; box-shadow:0 3px 0 #28713d; }
+.worm-instrument .worm-hud-bar[data-traversal=no-heal] { background:#f7d2d0 !important; border-color:#a52b37 !important; box-shadow:0 3px 0 #a52b37; }
+.worm-hud-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.worm-rotation-clock { position:static; inset:auto; z-index:auto; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:43px; min-height:40px; padding:2px 3px; box-sizing:border-box; border-radius:9px; background:#fffcf1; color:#26372d; font-variant-numeric:tabular-nums; }
+.worm-rotation-label,.worm-rotation-held { font:800 8px/1.1 var(--heading-font,system-ui); }
+.worm-rotation-clock strong { font:800 13px/1.1 var(--heading-font,system-ui); }
+.worm-rotation-held { display:none; }
+.worm-rotation-clock[data-held=true] .worm-rotation-held { display:block; }
+.worm-rotation-clock[data-urgent=true] { color:#8c1826; background:#ffe7dc; }
+.worm-instrument .worm-hud-stats { width:auto; flex-direction:row; margin-left:auto; }
+@media (max-width:360px) {
+  .worm-hud-row { gap:4px !important; }
+  .worm-rotation-clock { min-width:39px; padding-inline:1px; }
+}
+
+.worm-instrument[data-lesson] .worm-hud-reserve { display:flex; align-items:center; gap:5px; }

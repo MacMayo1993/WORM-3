@@ -16,6 +16,7 @@ import RotationCountdownHUD from './RotationCountdownHUD.jsx';
 import CaptureVisual from '../components/capture/CaptureVisual.jsx';
 import WormCountdownOverlay from './WormCountdownOverlay.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
+import { tunnelDanger } from './healerWorm/tunnelReadout.js';
 import SignatureButton from './SignatureButton.jsx';
 import { SIGNATURES } from './healerWorm/signatures.js';
 import JumpRescueCue from './JumpRescueCue.jsx';
@@ -252,7 +253,7 @@ const JumpIcon = ({ size = 20 }) => (
 );
 
 // ─── Zone 1: Status bar ──────────────────────────────────────────────────────
-// Inventory, length and pause share one row above the slim rotation clock.
+// Pickups, the rotation countdown and pause share one compact row.
 // NOTE: placement, padding and gap come from the .worm-hud-bar rule, not from
 // here, so the short- and wide-viewport media queries can compact/centre them.
 const HUD_BAR_STYLE = {
@@ -272,23 +273,6 @@ const HUD_ROW_STYLE = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-};
-
-const GLANCE_LABEL_STYLE = {
-    fontSize: 8,
-    fontWeight: 700,
-    letterSpacing: 0.4,
-    color: TEXT_MUTED,
-    textTransform: 'uppercase',
-    lineHeight: 1,
-    marginBottom: 3,
-};
-
-const GLANCE_VALUE_STYLE = {
-    fontSize: 16,
-    fontWeight: 800,
-    lineHeight: 1,
-    fontVariantNumeric: 'tabular-nums',
 };
 
 // ─── Zone 3: Thumb Tray ──────────────────────────────────────────────────────
@@ -1373,6 +1357,22 @@ function PauseKey({ label, icon, onClick, pressed }) {
     </button>;
 }
 
+function TraversalBar({ children }) {
+    const [need, setNeed] = useState(wormBuffs.tunnelNeeds);
+    const active = useGameStore(s => s.wormAlive && ['active', 'finalHealing'].includes(s.wormGamePhase));
+    useEffect(() => {
+        const id = setInterval(() => setNeed(wormBuffs.tunnelNeeds), 100);
+        return () => clearInterval(id);
+    }, []);
+    const status = active && need ? (need.ready && need.healingAllowed !== false && !tunnelDanger(need) ? 'heal' : 'no-heal') : undefined;
+    const description = status === 'heal' ? 'Tunnel will heal after your tail clears.'
+        : status ? (tunnelDanger(need) ? 'Dangerous tunnel. Pause for details.' : 'Tunnel will not heal. Pause for details.') : undefined;
+    return <div className="worm-hud-bar" data-traversal={status} style={HUD_BAR_STYLE} title={description}>
+        <span className="worm-hud-sr-only" role="status">{description}</span>
+        {children}
+    </div>;
+}
+
 function HudContext({ surface, demo, onInspect, onPowerInspect }) {
     const hasBuff = useGameStore(s => s.wormOrbShowerActive || s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme || !!s.wormViewPower);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
@@ -1380,11 +1380,11 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);
         return () => clearInterval(id);
     }, []);
-    const healing = hasTunnel && !demo;
     return <div className="worm-hud-context">
-        {healing ? <TunnelNeedsCard compact onInspect={onInspect} /> : surface && hasBuff ? <BuffStrip onInspect={onPowerInspect} /> : null}
+        {demo && hasTunnel ? <TunnelNeedsCard compact onInspect={onInspect} /> : null}
+        {!hasTunnel && surface && hasBuff ? <BuffStrip onInspect={onPowerInspect} /> : null}
         {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
-        <SpecialNotice suppressed={healing || hasBuff || !surface} />
+        <SpecialNotice suppressed={hasTunnel || hasBuff || !surface} />
         <MobiLineNotice />
         {!demo && <MobiFirstPad />}
         <FusionDiscoveryNotice />
@@ -1452,7 +1452,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
 
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormLengthTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormLengthTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbPickups, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? WORM_SPEED_OPTIONS[0].value,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -1464,7 +1464,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
             wormColor: s.wormColor ?? '#33ff66',
-            wormOrbInventory: s.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+            wormOrbPickups: s.wormOrbPickups ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
@@ -1529,7 +1529,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const questsMinimized = settings?.wormQuestsMinimized ?? false;
     const toggleQuests = () => useGameStore.getState().setSettings(s => ({ ...s, wormQuestsMinimized: !s.wormQuestsMinimized }));
     const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
-    const showRotationTint = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || demoRotation);
+    const showRotationCountdown = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || demoRotation);
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
@@ -1553,22 +1553,17 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {/* Hangs just under the dock (absolute), so showing it never moves the bar. */}
                 {wormAlive && phase === 'crawling' && <ComboMeter />}
                 {phase === 'crawling' && <FreePlayProgress />}
-                {!demoLesson && <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
+                {!demoLesson && <TraversalBar>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && (
                             <div className="worm-hud-reserve">
-                                {showRotationTint && <RotationCountdownHUD />}
-                                <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
+                                <OrbInventoryHUD orbPickups={wormOrbPickups} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                             </div>
                         )}
 
-                        {/* Length and pause stay visible throughout transit. */}
+                        {showRotationCountdown && <RotationCountdownHUD />}
+                        {/* Pause stays visible throughout transit. */}
                         <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                            <div title={TILE_GROWTH_HELP} aria-label={`Worm length: ${wormLengthTiles} tiles`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <span style={GLANCE_LABEL_STYLE}>TILES</span>
-                                <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormLengthTiles}</span>
-                            </div>
-
                             {showQuestToggle && <button type="button" className="worm-quest-toggle worm-hud-key"
                                 aria-label={questsMinimized ? 'Show quests' : 'Minimize quests'} aria-expanded={!questsMinimized}
                                 onClick={toggleQuests} title={questsMinimized ? 'Show quests' : 'Minimize quests'}>
@@ -1587,7 +1582,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                </div>}
+                </TraversalBar>}
                 {demoLesson && <WormDemoLessonCard
                     onSkipStep={onDemoSkipStep} onExit={onDemoExit}
                     pauseControl={<button onPointerDown={handlePause}
@@ -1595,12 +1590,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         disabled={!canPause} className="worm-hud-key" style={PAUSE_BTN_STYLE} aria-label="Pause"><PauseIcon /></button>}
                     length={wormLengthTiles}
                     telemetry={wormAlive && phase === 'crawling' && (demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && <div className="worm-hud-reserve">
-                            {showRotationTint && <RotationCountdownHUD />}
-                            <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
+                            {showRotationCountdown && <RotationCountdownHUD />}
+                            <OrbInventoryHUD orbPickups={wormOrbPickups} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                         </div>}
                 />}
                 <div className="worm-hud-status-row worm-hud-telemetry">
-                    {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
+                    {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={demoLesson} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
                 </div>
                 {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                 {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}

@@ -64,6 +64,7 @@ it('provides abundant orbs on every face and grows a long worm through twelve re
   expect(new Set(state().wormPowerups.map(p => p.dirKey)).size).toBe(6);
   until(() => state().demoWormComplete);
   expect(state().wormSessionOrbs).toBe(12); expect(state().wormBodyTiles).toBe(12); expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(36);
+  expect(Object.values(state().wormOrbPickups).reduce((a, b) => a + b, 0)).toBe(12);
   const pos = { ...worm.pos.current }; frames(20);
   expect(state().wormPaused).toBe(false); expect(worm.pos.current).not.toEqual(pos);
   expect(state().wormPowerups).toHaveLength(supply);

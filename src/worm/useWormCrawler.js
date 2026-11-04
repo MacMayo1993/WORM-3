@@ -467,6 +467,12 @@ export function useWormCrawler(size, cubies) {
                     wormOrbFlash: color
                         ? { color, combo: combo ?? 0, seq: (state.wormOrbFlash?.seq ?? 0) + 1 }
                         : state.wormOrbFlash,
+                    ...(!recovered && faceId ? {
+                        wormOrbPickups: {
+                            ...(state.wormOrbPickups ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
+                            [faceId]: (state.wormOrbPickups?.[faceId] ?? 0) + 1,
+                        },
+                    } : {}),
                     ...(faceId ? {
                         wormOrbInventory: {
                             ...(state.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
@@ -612,6 +618,7 @@ export function useWormCrawler(size, cubies) {
                 wormCharacter: lesson.character ?? 'glow',
                 exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
+                wormOrbPickups: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
                 wormSessionOrbs: 0, wormRunBestCombo: 0, wormRunBests: null, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 // A retry can interrupt a rescue or a tunnel ride. Reset the
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
@@ -878,6 +885,7 @@ export function useWormCrawler(size, cubies) {
             wormBodyTiles: 0,
             wormLengthTiles: segmentsToTiles(sim.tailLength),
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+            wormOrbPickups: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},
             wormHealedCount: 0,
             wormAlive: true,

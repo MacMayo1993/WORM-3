@@ -43,7 +43,7 @@ it('clears unavailable surface controls for every transit phase and restores the
     expect(host.querySelector('.worm-primary-actions')).toBeNull();
     expect(host.querySelector('.worm-signature-control')).toBeNull();
     expect(host.querySelector('.worm-mission-live')).toBeNull();
-    expect(host.querySelector('[aria-label="Tile reserve by face"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Orbs picked up by color"]')).toBeNull();
     expect(host.querySelector('.worm-rotation-clock')).toBeNull();
     expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(false);
   }
@@ -51,16 +51,16 @@ it('clears unavailable surface controls for every transit phase and restores the
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
   expect(host.querySelector('.worm-signature-control')).not.toBeNull();
   expect(host.textContent).toContain('Collect 3 face orbs');
-  expect(host.querySelector('[aria-label="Tile reserve by face"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Orbs picked up by color"]')).not.toBeNull();
   expect(host.querySelector('.worm-rotation-clock')).not.toBeNull();
 });
-it('replaces secondary context with one healing readout and keeps pause usable during transit', () => {
+it('folds healing into the top dock and keeps pause usable during transit', () => {
   renderPhase('crawling');
   wormBuffs.tunnelNeeds = { ready: true, inTransit: true, color: '#8094ef', savedFraction: 1, payableFraction: 0 };
   renderPhase('tunnel'); act(() => vi.advanceTimersByTime(110));
-  expect(host.querySelectorAll('.worm-tunnel-needs')).toHaveLength(1);
-  expect(host.querySelector('.worm-tunnel-safety-copy strong').textContent).toBe('Safe traversal');
-  expect(host.querySelector('.worm-tunnel-safety-copy small').textContent).toBe('Healing after tail clears');
+  expect(host.querySelectorAll('.worm-tunnel-needs')).toHaveLength(0);
+  expect(host.querySelector('.worm-hud-bar').dataset.traversal).toBe('heal');
+  expect(host.querySelector('[role="status"]').textContent).toContain('heal after your tail clears');
   expect(host.querySelector('.worm-hud-context .worm-buffs')).toBeNull();
   expect(host.querySelector('[aria-label="Healing energy deposited"]')).toBeNull();
   act(() => host.querySelector('[aria-label="Pause"]').click());
@@ -227,11 +227,12 @@ it('gives healing priority over power and spawn text while keeping emergency jum
   useGameStore.setState({ wormElementalTheme: 'water', wormSpecialNotice: { seq: 1, type: 'magnet', kind: 'spawn' }, wormJumpRescueActive: true });
   wormBuffs.tunnelNeeds = { ready: false, pickupsNeeded: 2, color: '#8094ef', savedFraction: 0, payableFraction: 0 };
   renderPhase('crawling');
-  expect(host.querySelector('.worm-tunnel-glance')).not.toBeNull();
+  expect(host.querySelector('.worm-tunnel-glance')).toBeNull();
+  expect(host.querySelector('.worm-hud-bar').dataset.traversal).toBe('no-heal');
   expect(host.querySelector('.worm-buffs')).toBeNull();
   expect(host.querySelector('.worm-special-notice')).toBeNull();
   expect(host.querySelector('.worm-jump-rescue-cue')).not.toBeNull();
-  expect(host.querySelector('.worm-hud-status-row').textContent).toContain('Need 2 orbs');
+  expect(host.querySelector('.worm-hud-bar').title).toContain('will not heal');
 });
 
 it('resumes a user pause when starting capture and restores the HUD afterward', () => {
@@ -247,7 +248,7 @@ it('resumes a user pause when starting capture and restores the HUD afterward', 
   expect(host.querySelector('[aria-label="Pause"]')).not.toBeNull();
 });
 
-it('keeps the reserve tint with hidden chrome while recording pickups and launch countdown', () => {
+it('keeps the rotation timer with hidden chrome while recording pickups and launch countdown', () => {
   useGameStore.setState({ captureMode: true, wormPhase: 'crawling', wormOrbFlash: null });
   rotationClock.secondsLeft = 1.7;
   rotationClock.total = 10;
@@ -257,8 +258,8 @@ it('keeps the reserve tint with hidden chrome while recording pickups and launch
   act(() => vi.advanceTimersByTime(32));
   const chrome = host.querySelector('.capture-chrome');
   expect(chrome.hidden).toBe(true);
-  const clock = host.querySelector('.worm-hud-reserve .worm-rotation-clock');
-  expect(clock.textContent).toBe('');
+  const clock = host.querySelector('.worm-hud-bar .worm-rotation-clock');
+  expect(clock.textContent).toContain('s');
   expect(clock.closest('.capture-chrome').hidden).toBe(true);
   expect(document.querySelector('.capture-rotation-clock')).toBeNull();
   act(() => useGameStore.setState({ wormOrbFlash: { color: '#ff9933', seq: 1 } }));
@@ -296,21 +297,24 @@ it('shows Orb Shower with a live ten-second countdown and removes it when rain e
   act(() => useGameStore.setState({ wormOrbShowerActive: false })); expect(chip()).toBeNull();
 });
 
-it('colors the orb reserve from green to red without a separate countdown row', () => {
+it('shows a simulation-driven rotation countdown inline, including urgency and holds', () => {
   Object.assign(rotationClock, { armed: true, total: 10, secondsLeft: 10, warning: 0, held: false });
   renderPhase('crawling');
   act(() => vi.advanceTimersByTime(20));
   const clock = host.querySelector('.worm-rotation-clock');
-  expect(clock.parentElement.classList.contains('worm-hud-reserve')).toBe(true);
+  expect(clock.parentElement.classList.contains('worm-hud-row')).toBe(true);
   expect(clock.closest('.worm-hud-bar')).not.toBeNull();
-  expect(clock.textContent).toBe('');
-  expect(clock.style.backgroundColor).toBe('rgb(53, 212, 53)');
+  expect(clock.textContent).toContain('s');
+  expect(clock.textContent).toContain('10.0s');
+  expect(clock.dataset.urgent).toBe('false');
   rotationClock.secondsLeft = 0;
   act(() => vi.advanceTimersByTime(20));
-  expect(clock.style.backgroundColor).toBe('rgb(212, 53, 53)');
+  expect(clock.textContent).toContain('0.0s');
+  expect(clock.dataset.urgent).toBe('true');
   rotationClock.held = true;
   act(() => vi.advanceTimersByTime(20));
-  expect(clock.style.opacity).toBe('0.16');
+  expect(clock.dataset.held).toBe('true');
+  expect(clock.getAttribute('aria-label')).toBe('Rotation held at 0.0 seconds');
   rotationClock.armed = false;
   act(() => vi.advanceTimersByTime(20));
   expect(clock.hidden).toBe(true);
@@ -347,12 +351,12 @@ it('minimizes the story row and keeps fractional tile goals exact when restored'
   expect(host.querySelector('.worm-story-live li').dataset.done).toBe('false');
 });
 
-it('shows physical tile length and reserve without changing the carried-orb count', () => {
-  useGameStore.setState({ wormBodyTiles: 4, wormLengthTiles: 1.98, wormOrbInventory: { 1: 12, 2: 2 } });
+it('shows integer pickup totals instead of tile growth without changing inventory', () => {
+  useGameStore.setState({ wormBodyTiles: 4, wormLengthTiles: 1.98, wormOrbInventory: { 1: 12, 2: 2 }, wormOrbPickups: { 1: 4, 2: 1 } });
   renderPhase('crawling');
-  expect(host.querySelector('[aria-label="Worm length: 1.98 tiles"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="Front: 1.08 tiles of growth"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="Left: 0.18 tiles of growth"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Worm length: 1.98 tiles"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Front: 4 orbs picked up"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Left: 1 orbs picked up"]')).not.toBeNull();
   expect(useGameStore.getState().wormBodyTiles).toBe(4);
 });
 
@@ -527,4 +531,21 @@ it('provides a clear interactive cube stage above Free Play victory results', ()
   expect(result.textContent).toContain('Pinch to zoom');
   expect(result.textContent).toContain('New game');
   expect(result.classList.contains('arcade-paper')).toBe(false);
+});
+
+it('colors the pause dock red for unfunded or dangerous tunnels and clears it on exit', () => {
+  wormBuffs.tunnelNeeds = { ready: false, inTransit: true };
+  renderPhase('tunnel');
+  const bar = host.querySelector('.worm-hud-bar');
+  expect(bar.dataset.traversal).toBe('no-heal');
+  wormBuffs.tunnelNeeds = { ready: true, inTransit: true, collapsing: true };
+  act(() => vi.advanceTimersByTime(110));
+  expect(bar.dataset.traversal).toBe('no-heal');
+  expect(bar.title).toContain('Dangerous');
+  wormBuffs.tunnelNeeds = { ready: true, inTransit: true, healingAllowed: false };
+  act(() => vi.advanceTimersByTime(110));
+  expect(bar.dataset.traversal).toBe('no-heal');
+  wormBuffs.tunnelNeeds = null;
+  act(() => vi.advanceTimersByTime(110));
+  expect(bar.dataset.traversal).toBeUndefined();
 });
