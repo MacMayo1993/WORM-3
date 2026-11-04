@@ -84,6 +84,7 @@ import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX 
 import ElementalAtmosphere from './ElementalAtmosphere.jsx';
 import { wormBuffs } from './wormBuffs.js';
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
+import { CorePassFX } from './healerWorm/CorePassFX.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { HealerBombs } from './healerWorm/HealerBombs.jsx';
 import { subscribeBombRotations } from './healerWorm/bombRotation.js';
@@ -1219,6 +1220,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <HealerBombs bombsRef={bombsRef} membershipRef={bombMembershipRef} blastApiRef={blastApiRef} size={size} hidden={wormInTunnel} />
             <TunnelHealProgress size={size} worm={worm} />
             <HealBurstSystem worm={worm} size={size} />
+            <CorePassFX worm={worm} />
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}

@@ -660,8 +660,33 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from, zoom = nu
   mouthShoulderInto(_mouthSide, out.cam, arc);
   out.cam.addScaledVector(_mouthSide, blend);
   out.lift = Math.max(out.lift, _mouthSide.length() * blend);
+  keepHeadInMouthSight(out.cam, tHead);
   out.look.copy(out.cam).add(_poseDir);
   return out;
+}
+
+// While the lens is still above the entry tile and the head below it, the line
+// between them must pass through the hole, not the tile round it. The approach's
+// sideways offset is eased out by the lens's own descent, which only holds while
+// the head is shallow; a ride whose throat runs quicker (a big cube's, see
+// tunnelThroatShare) takes the head deeper sooner, so the lens is drawn in over
+// the mouth just enough to keep the head in sight through it.
+export const ENTRY_SIGHT_RADIUS = 0.28;
+const _sightHead = new THREE.Vector3();
+const _sightHit = new THREE.Vector3();
+function keepHeadInMouthSight(cam, tHead) {
+  getTunnelArcPosSmoothInto(_sightHead, _camPath, tunnelPathTToArc(_camPath, tHead));
+  const n = _camPath.nStart, mouth = _camPath.vStart;
+  const above = _sightHit.subVectors(cam, mouth).dot(n);
+  const depth = -_sightHit.subVectors(_sightHead, mouth).dot(n);
+  if (!(above > 0) || !(depth > 0)) return;
+  // Where the sight line crosses the tile's plane, relative to the mouth.
+  _sightHit.subVectors(_sightHead, cam).multiplyScalar(above / (above + depth)).add(cam).sub(mouth);
+  _sightHit.addScaledVector(n, -_sightHit.dot(n));
+  const off = _sightHit.length();
+  if (off <= ENTRY_SIGHT_RADIUS) return;
+  // Moving the lens sideways by d moves the crossing by d · depth / (above + depth).
+  cam.addScaledVector(_sightHit, -((off - ENTRY_SIGHT_RADIUS) / off) * (above + depth) / depth);
 }
 
 /** The underlying exit-arm rail; emergence builds continuously on this pose. */
@@ -685,7 +710,7 @@ export function tunnelEmergencePoseInto(out, tunnel, phase, progress, size, surf
   const p = THREE.MathUtils.clamp(progress, 0, 1);
   const exitP = phase === 'windout' ? 1 : p;
   tunnelExitPoseInto(_emergeRide, tunnel, exitP, size, zoom);
-  const arm = tunnelArmSeconds(tunnel), handoff = tunnelHandoffSeconds(tunnel);
+  const arm = tunnelArmSeconds(tunnel, 'exit'), handoff = tunnelHandoffSeconds(tunnel);
   const elapsed = phase === 'windout' ? (1 - EXIT_REVEAL_START) * arm + p * handoff
     : (p - EXIT_REVEAL_START) * arm;
   const blend = diveEase(elapsed / ((1 - EXIT_REVEAL_START) * arm + handoff));

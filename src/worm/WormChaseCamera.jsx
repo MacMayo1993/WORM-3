@@ -240,6 +240,7 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const revealActiveRef = useRef(false);
     const cameraRunRef = useRef(null);
     const healBeatRef = useRef(makeHealBeat()); // the tunnel heal's lens punch (healBeat.js)
+    const corePassBeatRef = useRef(makeHealBeat()); // the same punch when the head meets its body in the Core (corePass.js)
     const surfaceNearRef = useRef(camera.near);
     const rocketShakeTime = useRef(0);          // clock for the rocket's camera rumble
     const fallCamera = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), direction: new THREE.Vector3() });
@@ -577,7 +578,10 @@ export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
         // A tunnel heal punches the lens in a touch as both mouths seal.
         const healKick = stepHealBeat(healBeatRef.current, worm.healBeatSeq?.current ?? 0, worm.healBeatTier?.current ?? 1, delta,
             { crawling: phase === 'crawling', live: !gameState.wormPaused, calm: rocketCalm || !!gameState.settings?.reducedMotion });
-        const targetFov = THREE.MathUtils.lerp(rideFov, closeFov, closeUp) + rocketFov - healKick;
+        // Passing yourself in the Core punches the ride's lens the same way.
+        const passKick = stepHealBeat(corePassBeatRef.current, worm.corePass?.current?.seq ?? 0, 2, delta,
+            { crawling: true, live: !gameState.wormPaused, calm: rocketCalm || !!gameState.settings?.reducedMotion });
+        const targetFov = THREE.MathUtils.lerp(rideFov, closeFov, closeUp) + rocketFov - healKick - passKick;
         const fovAlpha = enteredReveal ? 1 : 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
