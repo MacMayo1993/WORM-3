@@ -28,14 +28,14 @@ const counts = () => meshes.map(m => m.count);
 
 it('draws nothing while the sky is quiet', () => {
   frames[0]({ clock: { elapsedTime: 1 } });
-  expect(counts()).toEqual([0, 0, 0, 0, 0]);
+  expect(counts()).toEqual([0, 0, 0, 0, 0, 0, 0]);
 });
 
 it('draws a ring, a diamond and a disc on every marked tile, closing in as the charge builds', () => {
   storm.spots.push({ id: 1, tile: TILE, age: 0, delay: STORM.telegraph });
   storm.spots.push({ id: 2, tile: { ...TILE, x: 0 }, age: 0, delay: STORM.telegraph });
   frames[0]({ clock: { elapsedTime: 1 } });
-  expect(counts()).toEqual([2, 2, 2, 0, 0]);
+  expect(counts()).toEqual([2, 2, 2, 0, 0, 0, 0]);
   const early = new Matrix4(); meshes[RING].getMatrixAt(0, early);
   storm.spots[0].age = STORM.telegraph * 0.99;
   frames[0]({ clock: { elapsedTime: 1 } });
@@ -47,9 +47,9 @@ it('draws a ring, a diamond and a disc on every marked tile, closing in as the c
 it('shows a landed strike as a disc and a column of light, then lets it go', () => {
   storm.flashes.push({ id: 1, tile: TILE, age: 0 });
   frames[0]({ clock: { elapsedTime: 1 } });
-  expect(counts()).toEqual([0, 0, 1, 1, 0]);
+  expect(counts()).toEqual([0, 0, 1, 1, 0, 1, 1]);
   storm.flashes.length = 0; frames[0]({ clock: { elapsedTime: 1 } });
-  expect(counts()).toEqual([0, 0, 0, 0, 0]);
+  expect(counts()).toEqual([0, 0, 0, 0, 0, 0, 0]);
 });
 
 it('rings both mouths of every charged tunnel, standing off the raised tile', () => {
@@ -71,10 +71,10 @@ it('a mark rides the layer it stands on while that layer turns', () => {
   expect(turned.equals(rest)).toBe(false);
 });
 
-it('caps what it draws at the storm size', () => {
-  for (let i = 0; i < STORM.strikes + 4; i++) storm.spots.push({ id: i, tile: TILE, age: 0, delay: 1 });
+it('supports Plasma while capping refreshed storm overlap', () => {
+  for (let i = 0; i < STORM.strikes * 2 + 4; i++) storm.spots.push({ id: i, tile: TILE, age: 0, delay: 1 });
   frames[0]({ clock: { elapsedTime: 1 } });
-  expect(meshes[RING].count).toBe(STORM.strikes);
+  expect(meshes[RING].count).toBe(STORM.strikes * 2);
 });
 
 it('disposes every mesh, geometry and material on unmount', () => {
@@ -96,7 +96,7 @@ it('under reduced flashing, a strike swells and fades well below full white, and
       storm.flashes.push({ id: 1, tile: TILE, age: (STORM.flash * k) / 10 });
       frames[0]({ clock: { elapsedTime: 1 } });
       // Same meshes as a full strike: the warning reads the same way.
-      expect(counts()).toEqual([0, 0, 1, 1, 0]);
+      expect(counts()).toEqual([0, 0, 1, 1, 0, 1, 1]);
       disc.push(brightness(meshes[DISC])); column.push(brightness(meshes[COLUMN]));
     }
     // No full-white onset: it starts dark, peaks mid-flash, and stays under the cap.
@@ -111,4 +111,19 @@ it('under reduced flashing, a strike swells and fades well below full white, and
   } finally {
     useGameStore.setState({ settings: before });
   }
+});
+
+it('keeps reduced-motion impacts readable without a beam or bolt', () => {
+  const before = useGameStore.getState().settings;
+  useGameStore.setState({ settings: { ...before, reducedMotion: true } });
+  try {
+    storm.flashes.push({ id: 1, tile: TILE, age: 0.1 });
+    frames[0]({ clock: { elapsedTime: 1 } });
+    expect(counts()).toEqual([0, 0, 1, 0, 0, 0, 1]);
+    const first = new Matrix4(); meshes[6].getMatrixAt(0, first);
+    storm.flashes[0].age = 0.3;
+    frames[0]({ clock: { elapsedTime: 2 } });
+    const later = new Matrix4(); meshes[6].getMatrixAt(0, later);
+    expect(first.equals(later)).toBe(true);
+  } finally { useGameStore.setState({ settings: before }); }
 });

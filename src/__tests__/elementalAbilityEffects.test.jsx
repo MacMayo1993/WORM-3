@@ -31,7 +31,7 @@ it('batches readable fire, buds, shields and chain arcs, follows live tiles, and
         await act(async () => { store = root.render(<ElementalAbilityEffects worm={worm} size={5} />); });
         const frame = () => store.getState().advance(time += 1 / 60); frame();
         const group = store.getState().scene.getObjectByName('elemental-ability-feedback');
-        const [flames, buds, rings, bolts, wind] = group.children;
+        const [flames, buds, rings, bolts, wind, cores] = group.children;
         expect(flames.count).toBe(4); expect(buds.count).toBe(7); expect(rings.count).toBe(2);
         const snapshot = flames.instanceMatrix.array.slice(); frame();
         expect(flames.instanceMatrix.array).toEqual(snapshot); // paused/reduced motion is stable
@@ -42,8 +42,18 @@ it('batches readable fire, buds, shields and chain arcs, follows live tiles, and
         sim.elementalType = 'lightning'; sim.elementalPair = 'ice'; sim.elementalAbilities.iceShield = true;
         sim.elementalAbilities.events = [{ kind: 'lightning', id: 1, ttl: .5, tiles: [sim.pos, sim.powerups[1], sim.pos] }];
         frame(); expect(bolts.geometry.drawRange.count).toBe(24);
+        expect(cores.count).toBeGreaterThan(0);
+        expect([...cores.instanceMatrix.array].every(Number.isFinite)).toBe(true);
         expect([...bolts.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
         expect(rings.count).toBeGreaterThan(2);
+        sim.elementalAbilities.events = Array.from({ length: 12 }, (_, id) => ({
+            kind: 'lightning', id, ttl: .5,
+            tiles: [sim.pos, sim.powerups[1], sim.pos, sim.powerups[1], sim.pos, sim.powerups[1], sim.pos],
+        }));
+        frame();
+        expect(bolts.geometry.drawRange.count).toBe(864);
+        expect(cores.count).toBeLessThanOrEqual(cores.instanceMatrix.count);
+        expect(cores.count).toBeGreaterThan(0);
         sim.elementalType = 'air'; sim.elementalPair = null; sim.elementalAbilities.events = []; sim.powerups = [];
         frame(); expect(wind.geometry.drawRange.count).toBeGreaterThan(0); // visible as soon as Air is active, even grounded
         expect(buds.count).toBe(0); // no orbiting particles around the face

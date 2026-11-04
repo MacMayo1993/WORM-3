@@ -16,7 +16,7 @@ import { STORM } from './lightningStorm.js';
 //
 //   mark    a closing ring and a diamond on the tile that will be struck, a filling disc
 //           inside them. The marker is the warning, so it is readable without any flash.
-//   strike  a column of light down the tile's normal and a white disc, for STORM.flash.
+//   strike  a solid jagged bolt, soft column and expanding impact ring for STORM.flash.
 //   mouth   a crackling ring on each end of a charged tunnel.
 //
 // Settings → Scene → Lightning flashes, "Reduced": the mark never pulses faster
@@ -30,7 +30,7 @@ const MARK_COLOR = new THREE.Color('#a78bfa');
 const BOLT_COLOR = new THREE.Color('#ffffff');
 const CHARGE_COLOR = new THREE.Color('#8b9bff');
 const _color = new THREE.Color();
-const MAX_MARKS = STORM.strikes;
+const MAX_MARKS = STORM.strikes * 2; // Plasma and overlapping refreshed storms
 const MAX_MOUTHS = 16;
 
 function instances(geometry, count) {
@@ -46,6 +46,17 @@ function instances(geometry, count) {
     return mesh;
 }
 
+function boltGeometry() {
+    // A fixed angular silhouette, not a flickering noise shader. Four-sided tubing
+    // stays readable on mobile where WebGL line widths are only one pixel.
+    const path = new THREE.CurvePath();
+    const points = [[0, 0, 0], [0.18, 0.05, 0.5], [-0.12, 0, 0.9],
+        [0.22, -0.08, 1.4], [-0.08, 0.03, 1.9], [0.14, 0, 2.5], [0, 0, 3.2]];
+    for (let i = 1; i < points.length; i++) path.add(new THREE.LineCurve3(
+        new THREE.Vector3(...points[i - 1]), new THREE.Vector3(...points[i])));
+    return new THREE.TubeGeometry(path, 24, 0.035, 4, false);
+}
+
 export function LightningStrikes({ stormRef, worm, size }) {
     const r = useMemo(() => ({
         ring: instances(new THREE.RingGeometry(0.4, 0.45, 40), MAX_MARKS),
@@ -53,10 +64,12 @@ export function LightningStrikes({ stormRef, worm, size }) {
         disc: instances(new THREE.CircleGeometry(0.4, 32), MAX_MARKS * 2),
         // Unit radius and length, so scale sets the width and the height.
         column: instances(new THREE.CylinderGeometry(1, 1, 1, 8, 1, true), MAX_MARKS),
+        bolt: instances(boltGeometry(), MAX_MARKS),
+        impact: instances(new THREE.RingGeometry(0.4, 0.46, 32), MAX_MARKS),
         crackle: instances(new THREE.RingGeometry(0.3, 0.36, 24, 1), MAX_MOUTHS),
         pose: new THREE.Object3D(), normal: new THREE.Vector3(), axis: new THREE.Vector3(),
     }), []);
-    const meshes = useMemo(() => [r.ring, r.diamond, r.disc, r.column, r.crackle], [r]);
+    const meshes = useMemo(() => [r.ring, r.diamond, r.disc, r.column, r.crackle, r.bolt, r.impact], [r]);
     useEffect(() => () => {
         for (const mesh of meshes) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose(); }
     }, [meshes]);
@@ -114,7 +127,11 @@ export function LightningStrikes({ stormRef, worm, size }) {
             const swell = Math.sin(Math.PI * (1 - fade));
             const disc = reduced ? 0.35 * fade : gentle ? GENTLE_STRIKE.disc * swell : fade * fade;
             place(r.disc, flash.tile, BOLT_COLOR, disc, 1.5 - 0.5 * fade, 0.12);
-            if (!reduced) place(r.column, flash.tile, BOLT_COLOR, gentle ? GENTLE_STRIKE.column * swell : fade * fade, 0.06 + 0.1 * fade, 0, 0, 3.2);
+            place(r.impact, flash.tile, CHARGE_COLOR, reduced ? 0.2 * fade : gentle ? 0.12 * swell : 0.6 * fade, reduced ? 1.5 : 1 + (1 - fade) * 3, 0.14);
+            if (!reduced) {
+                place(r.column, flash.tile, CHARGE_COLOR, gentle ? GENTLE_STRIKE.column * swell : 0.18 * fade * fade, 0.16, 0, 0, 3.2);
+                place(r.bolt, flash.tile, BOLT_COLOR, gentle ? 0.12 * swell : fade * fade, 1, 0.12, flash.id * 2.4);
+            }
         }
         if (mouths?.length) {
             const lift = wormRaisedAmount(size) + 0.12;

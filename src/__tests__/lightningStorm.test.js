@@ -56,7 +56,7 @@ describe('storm schedule', () => {
     const storm = makeStorm(); beginStorm(storm);
     let calls = 0;
     const pick = () => (++calls < 4 ? null : tiles[0]);
-    run(storm, 2, { pick });
+    run(storm, STORM.firstDelay + 0.6, { pick });
     expect(storm.spawned).toBe(1);
     expect(calls).toBeLessThanOrEqual(5);
   });
