@@ -31,7 +31,8 @@ export function buildTurnGuideGeometry(size, axis, sliceIndex, reduced = false) 
     for (let i = 0; i < path.length; i++) {
       const [u,v,nu,nv] = path[i];
       for (const side of [-1,1]) {
-        const radial = plane === 0 ? 0 : side * 0.105;
+        // Wide enough for the wisps to wander; still clear of every face and corner.
+        const radial = plane === 0 ? 0 : side * 0.15;
         positions.push(...turnGuidePoint(axis, axial + (plane === 0 ? side * 0.21 : 0), u + radial * nu, v + radial * nv));
         uvs.push(lengths[i] / length, (side + 1) / 2);
       }

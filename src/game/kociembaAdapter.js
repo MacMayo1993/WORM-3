@@ -134,3 +134,18 @@ export function cubiesToKociembaString(cubies, opts = {}) {
 
   return str;
 }
+
+/**
+ * True when a facelet string is already solved: every face is one colour.
+ * Kociemba's search does not answer a solved cube with an empty maneuver; it
+ * returns a 13-move identity ("R L U2 R L' B2 U2 R2 F2 L2 D2 L2 F2") that the
+ * panel would offer to play on a cube with nothing left to do.
+ */
+export function isSolvedKociembaString(str) {
+  if (typeof str !== 'string' || str.length !== 54) return false;
+  for (let face = 0; face < 6; face++) {
+    const centre = str[face * 9 + 4];
+    for (let i = 0; i < 9; i++) if (str[face * 9 + i] !== centre) return false;
+  }
+  return true;
+}

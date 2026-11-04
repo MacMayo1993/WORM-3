@@ -56,8 +56,16 @@ it.each([false,true])('keeps two meshes, reverses without rebuilding, hides duri
     expect(track.material.uniforms.uDir.value).toBe(-1);
     await render({dir:-1,turning:true});await tick();
     expect(track.material.uniforms.uOpacity.value).toBe(0);
+    const uniforms=track.material.uniforms;
     await render({axis:'col',sliceIndex:1});await tick();
     expect(dispose).toHaveBeenCalledOnce();
+    // three keeps the uniforms object a program was first drawn with; a new one
+    // on the next move left the guide frozen invisible after the first turn.
+    expect(track.material.uniforms).toBe(uniforms);
+    expect(rim.material.uniforms).toBe(uniforms);
+    for(let i=0;i<30;i++)await tick();
+    expect(uniforms.uOpacity.value).toBe(1);
+    expect(uniforms.uLength.value).toBe(track.geometry.userData.trackLength);
     expect(templateDispose).not.toHaveBeenCalled();
   } finally {
     await act(async()=>root.unmount());expect(templateDispose).not.toHaveBeenCalled();templateDispose.mockRestore();delete globalThis.IS_REACT_ACT_ENVIRONMENT;
