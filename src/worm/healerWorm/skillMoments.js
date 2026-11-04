@@ -13,6 +13,7 @@ import { trackPracticeBodyJump } from './bodyJumpPractice.js';
 export const SKILL_CALLOUTS = {
   hop: 'Body hop!',
   pass: 'Self-pass!',
+  core: 'Core pass!',
   double: 'Double heal!',
   seam: 'Seam jump!',
 };

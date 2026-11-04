@@ -284,7 +284,7 @@ export function useWormCrawler(size, cubies) {
             // A skill moment (skillMoments.js): a callout in the HUD and a bright sting.
             onSkill: (kind) => {
                 if (!SKILL_CALLOUTS[kind]) return;
-                feedbackRef.current.emit('clutch');
+                feedbackRef.current.emit(kind === 'core' ? 'corePass' : 'clutch');
                 useGameStore.setState({ wormSkillCallout: { kind } });
             },
             onStoryMechanic: (key, id) => {
@@ -1038,6 +1038,7 @@ export function useWormCrawler(size, cubies) {
             healPauseT: f('healPauseT'),
             healFocusTile: f('healFocusTile'),
             healBeatSeq: f('healBeatSeq'),
+            corePass: f('corePass'),
             healBeatTier: f('healBeatTier'),
             cutFocusT: f('cutFocusT'),
             jumpRescueHeld: f('jumpRescueHeld'),

@@ -160,6 +160,29 @@ export const TUNNEL_THROAT_MAX_FRACTION = 0.55;
  */
 export const TUNNEL_THROAT_T_SHARE = 0.45;
 
+/**
+ * The most the shoulder may outrun the throat before it, as a ratio of paces.
+ *
+ * The floor above was set on small cubes, where the shoulder is about as long as
+ * the throat. On a big cube the shoulder runs six to twelve units while the
+ * throat stays 0.9, so 45% of the arm spent on the throat had the worm dawdle
+ * down the hole for the better part of two seconds and then streak down the
+ * shoulder up to eleven times faster. The throat now keeps its floor only while
+ * that leaves the shoulder within this ratio of its pace; past it, the throat is
+ * given just enough time to be this much slower, so it still reads as being
+ * sucked in, and the rest of the arm's time goes to the long run to the core.
+ */
+export const TUNNEL_THROAT_SLOWDOWN = 2;
+
+/** Share of an arm's time its throat takes, from the two legs' lengths. */
+export function tunnelThroatShare(throatLen, shoulderLen) {
+  const arm = throatLen + shoulderLen;
+  if (!(arm > 0)) return 0;
+  const even = throatLen / arm;
+  const slowed = TUNNEL_THROAT_SLOWDOWN * throatLen / (shoulderLen + TUNNEL_THROAT_SLOWDOWN * throatLen);
+  return Math.max(even, Math.min(TUNNEL_THROAT_T_SHARE, slowed));
+}
+
 // t landmarks of the traversal parameterisation, unchanged from when the path was
 // three legs: the entry arm owns [0, ARM_A_END], the core crossing (dock, centre,
 // dock) the span up to ARM_B_START, and the exit arm the rest. Phases, portal
@@ -355,15 +378,10 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
   path.armALen = path.legLen[0] + path.legLen[1];
   path.armBLen = path.legLen[4] + path.legLen[5];
 
-  // Split each arm's parameter span between its throat and its curved shoulder. By length
-  // the throat is the short one, so the floor is what usually decides — see
-  // TUNNEL_THROAT_T_SHARE.
-  const shareA = path.armALen > 0
-    ? Math.max(TUNNEL_THROAT_T_SHARE, path.legLen[0] / path.armALen)
-    : 0;
-  const shareB = path.armBLen > 0
-    ? Math.max(TUNNEL_THROAT_T_SHARE, path.legLen[5] / path.armBLen)
-    : 0;
+  // Split each arm's parameter span between its throat and its curved shoulder: the
+  // throat a little slower than its shoulder, never far slower (tunnelThroatShare).
+  const shareA = tunnelThroatShare(path.legLen[0], path.legLen[1]);
+  const shareB = tunnelThroatShare(path.legLen[5], path.legLen[4]);
   path.legT[0] = path.legLen[0] > 0 ? ARM_A_END * shareA : 0;
   path.legT[1] = ARM_A_END - path.legT[0];
   // The crossing's span is shared between its two halves by length, so the

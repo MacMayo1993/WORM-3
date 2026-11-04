@@ -99,10 +99,14 @@ import {
 import { SURVIVAL_TICK_INTERVAL } from '../../utils/economyConstants.js';
 import { isViewPower, VIEW_POWER_DURATION } from './viewPowerups.js';
 import { isElementalType, ELEMENTAL_TYPES } from './specialDefs.js';
+import { tunnelRideTiming } from './tunnelTiming.js';
+import { makeCorePass, resetCorePass, watchCorePass, corePassRate } from './corePass.js';
 import {
     WORM_LIFT,
     TUNNEL_CROSSING_SECONDS,
     tunnelArmSeconds,
+    tunnelCrossingSeconds,
+    defaultTunnelArmSeconds,
     tunnelHandoffSeconds,
     FACE_NORMALS,
     DIR_FORWARD,
@@ -384,6 +388,7 @@ export function makeWormSim(size) {
         // The head dived while part of the body was still riding another tunnel:
         // the worm passes itself in the Core. Credited once it is safely crawling.
         selfPassPending: false,
+        corePass: makeCorePass(), // the head meeting that riding body in the Core (corePass.js)
         assistedJump: false,      // this jump answered a rescue prompt: not a skill moment
         healFired: false,
         pendingHealBurst: null,
@@ -543,6 +548,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
     sim.selfPassPending = false;
+    resetCorePass(sim.corePass, 0);
+    sim.corePass.seq = 0;
     sim.assistedJump = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
@@ -1127,9 +1134,13 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     // The pad coil leaves along the heading the worm arrived with and, on exit,
     // runs backwards into the heading it will crawl away on.
     const exitForward = DIR_FORWARD[tunnel.exit.dirKey]?.[sim.moveDir];
-    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT,
+    const rideTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT,
         entryHeading: landingHeading ?? DIR_FORWARD[tunnel.entry.dirKey]?.[sim.moveDir],
         exitHeading: exitForward && exitForward.map(v => -v) } : tunnel;
+    // Split the ride's seconds by the distances the player sees (tunnelTiming.js).
+    Object.assign(rideTunnel, tunnelRideTiming(rideTunnel, size, sim.expansionAmount,
+        defaultTunnelArmSeconds(rideTunnel), TUNNEL_CROSSING_SECONDS));
+    sim.activeTunnel = rideTunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -1138,6 +1149,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     ttFilterInPlace(sim.tileTrail, k => k !== exitTileKey);
     sim.tunnelProgress = 0;
     sim.selfPassPending = bodyStillRiding(sim);
+    resetCorePass(sim.corePass, sim.stepHistory.distance);
     // Raised landings loop around the rim before diving; keep the existing history.
     // Also discard jumps queued before the entry committed, retaining exit steering.
     sim.pendingTurns = sim.pendingTurns.filter(action => action !== 'jump');
@@ -1878,6 +1890,12 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
 // Same dispatch structure as the pre-extraction hook: enter() fires exactly once
 // per transition, update() runs every tick; update returning true ends the tick.
 
+// A ride phase that summed to within float error of its end has ended: give it
+// exactly 1, so its last sample (the dock or the mouth) is recorded and the next
+// phase does not count the gap. Sums of delta / seconds land at 0.9999999 as
+// often as at 1.
+const phaseDone = progress => (progress >= 1 - 1e-9 ? Math.max(1, progress) : progress);
+
 const PHASE_HANDLERS = {
     crawling: {
         // enter() fires once when transitioning back from 'exiting'/'windout'.
@@ -1898,7 +1916,8 @@ const PHASE_HANDLERS = {
             if (sim.selfPassPending) {
                 sim.selfPassPending = false;
                 ctx.onStoryMechanic?.('selfPasses');
-                ctx.onSkill?.('pass');
+                // A pass already called out at the meeting in the Core is not called twice.
+                if (!sim.corePass.met) ctx.onSkill?.('pass');
             }
             sim.onFlippedTile = false;
             sim.lastFlipped = false;
@@ -2373,7 +2392,7 @@ const PHASE_HANDLERS = {
     windup: {
         update(sim, size, _ctx, delta) {
             const handoff = tunnelHandoffSeconds(sim.activeTunnel);
-            const nextProgress = sim.tunnelProgress + delta / handoff;
+            const nextProgress = phaseDone(sim.tunnelProgress + delta / handoff);
             advanceTunnelHead(sim, 'windup', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1 - 1e-9) {
@@ -2396,7 +2415,7 @@ const PHASE_HANDLERS = {
             ctx.onPhase('entering');
         },
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel);
+            const nextProgress = phaseDone(sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel));
             advanceTunnelHead(sim, 'entering', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1 - 1e-9) {
@@ -2414,10 +2433,19 @@ const PHASE_HANDLERS = {
         },
         update(sim, size, ctx, delta) {
             const collapsing = sim.pendingVoidKill?.tunnelKey === sim.currentTunnelKey;
+            // Meeting your own body in the Core slows the crossing for a beat (corePass.js).
+            const rate = corePassRate(sim.corePass, delta);
             const nextProgress = Math.min(collapsing ? 0.5 : 1,
-                sim.tunnelProgress + delta / TUNNEL_CROSSING_SECONDS);
+                phaseDone(sim.tunnelProgress + delta * rate / tunnelCrossingSeconds(sim.activeTunnel)));
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
+            if (sim.selfPassPending && !collapsing && watchCorePass(sim.corePass, sim.stepHistory, sim.headInterpPos, sim.tailLength)) {
+                // The pass charges the ride's tunnel, so its next ride pays part of its toll.
+                if (!sim.willHeal && sim.currentTunnelKey && !sim.voidTunnelKeys.has(sim.currentTunnelKey))
+                    sim.chargedTunnels.add(sim.currentTunnelKey);
+                sim.corePass.charged = !sim.willHeal;
+                ctx.onSkill?.('core');
+            }
             if (collapsing && nextProgress >= 0.5) {
                 const { tunnelKey, traversals } = sim.pendingVoidKill;
                 sim.pendingVoidKill = null;
@@ -2446,7 +2474,7 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel);
+            const nextProgress = phaseDone(sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel, 'exit'));
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1 - 1e-9) {
@@ -2498,7 +2526,7 @@ const PHASE_HANDLERS = {
             ctx.onPhase('windout');
         },
         update(sim, size, ctx, delta, STEP_SEC) {
-            const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
+            const nextProgress = phaseDone(sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel));
             advanceTunnelHead(sim, 'windout', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1 - 1e-9) {

@@ -129,7 +129,12 @@ export const TUNNEL_HANDOFF_SECONDS = 0.2;
 // runs at landing pace and the camera can swing over the mouth without a snap.
 export const TUNNEL_ORBIT_SECONDS = 0.8;
 export const tunnelHandoffSeconds = tunnel => tunnel?.padHeight > 0 ? TUNNEL_ORBIT_SECONDS : TUNNEL_HANDOFF_SECONDS;
-export const tunnelArmSeconds = tunnel => TUNNEL_ARM_SECONDS - tunnelHandoffSeconds(tunnel);
+// A ride's own split of its seconds (tunnelTiming.js), carried on the active
+// tunnel; a tunnel without one takes the fixed budgets.
+export const defaultTunnelArmSeconds = tunnel => TUNNEL_ARM_SECONDS - tunnelHandoffSeconds(tunnel);
+export const tunnelArmSeconds = (tunnel, side = 'entry') =>
+    (side === 'exit' ? tunnel?.exitArmSeconds : tunnel?.armSeconds) ?? defaultTunnelArmSeconds(tunnel);
+export const tunnelCrossingSeconds = tunnel => tunnel?.crossingSeconds ?? TUNNEL_CROSSING_SECONDS;
 // Preserve the phase parameter for camera/face consumers: surface=0, mouth=1.
 export const windoutHeadS = (progress) => 1 - Math.min(1, Math.max(0, progress));
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel

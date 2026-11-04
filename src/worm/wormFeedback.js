@@ -20,6 +20,8 @@ export const WORM_HAPTICS = {
   combo: [10, 18, 10, 18, 26],
   gust: [10, 30, 8],
   clutch: [14, 26, 22],
+  // Passing yourself in the Core: two knocks that meet, then a long one.
+  corePass: [18, 30, 18, 30, 46],
 };
 
 const thump = (freq = 130, gain = 0.24) => tone({ freq, freqTo: 55, dur: 0.10, gain });
@@ -103,6 +105,15 @@ const WORM_SFX = {
     tone({ freq: 1175, dur: 0.18, gain: 0.1, when: 0.09 });
     noise({ dur: 0.12, type: 'highpass', freq: 4200, gain: 0.05, when: 0.05 });
   },
+  // The head meeting its own body in the Core: two voices, one falling and one
+  // rising, cross on the same note (the worm meeting itself), then ring out a fifth.
+  corePass() {
+    tone({ freq: 1318.5, freqTo: 659.25, dur: 0.22, type: 'triangle', gain: 0.17 });
+    tone({ freq: 329.63, freqTo: 659.25, dur: 0.22, type: 'triangle', gain: 0.17 });
+    tone({ freq: 659.25, dur: 0.5, gain: 0.12, when: 0.22 });
+    tone({ freq: 987.77, dur: 0.55, gain: 0.09, when: 0.26 });
+    noise({ dur: 0.3, type: 'highpass', freq: 5000, gain: 0.05, when: 0.2 });
+  },
   // Air's gale on landing: a breath of wind, nothing that sounds like a pickup.
   gust() {
     noise({ dur: 0.38, type: 'bandpass', freq: 900, q: 0.6, gain: 0.14 });
@@ -126,7 +137,7 @@ const WORM_SFX = {
 };
 const vocabulary = { sfx: WORM_SFX, haptics: WORM_HAPTICS };
 const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, seal: 4, collapse: 3, elementFusion: 3, dive: 3, exit: 3, rumble: 0,
-  enemyDown: 3, shotHit: 2, orb: 2, combo: 2, clutch: 3, gust: 1, shot: 1, recharge: 0 };
+  enemyDown: 3, shotHit: 2, orb: 2, combo: 2, clutch: 3, corePass: 3, gust: 1, shot: 1, recharge: 0 };
 
 /** Per-run arbitration. Uses the game clock: no timers or catch-up buzzes. */
 export function createWormFeedback(dispatch = feel, stop = stopFeel) {

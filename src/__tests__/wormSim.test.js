@@ -38,6 +38,9 @@ import {
   SURFACE_JUMP_HEIGHT,
   BODY_BALL_SPACING,
   TUNNEL_ORBIT_SECONDS,
+  tunnelArmSeconds,
+  tunnelCrossingSeconds,
+  tunnelHandoffSeconds,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies, healSticker } from '../game/cubeState.js';
 import * as THREE from 'three';
@@ -885,7 +888,7 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
-  it.each([30, 60, 120].flatMap(hz => [false, true].map(raised => [hz, raised])))('takes 4 seconds in, 2 through the center and 4 out at %s Hz (raised: %s)', (hz, raised) => {
+  it.each([30, 60, 120].flatMap(hz => [false, true].map(raised => [hz, raised])))('takes its balanced ten seconds at %s Hz (raised: %s)', (hz, raised) => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
     if (raised) { tunnel.padHeight = WORM_PAD_HEIGHT; tunnel.padExpansion = WORM_PIECE_POP; }
     const sim = makeSim();
@@ -894,6 +897,7 @@ describe('flipped tiles and tunnel traversal', () => {
       resolveTunnel: () => ({ tunnel, tunnelKey }),
     });
     expect(runUntil(sim, ctx, () => sim.phase === 'windup')).toBe(true);
+    const ride = sim.activeTunnel;
     const path = buildTunnelCenterlineInto(makeTunnelCenterline(), sim.activeTunnel, SIZE);
     const elapsed = {};
     for (let frame = 0; frame < hz * 11 && sim.phase !== 'crawling'; frame++) {
@@ -904,9 +908,10 @@ describe('flipped tiles and tunnel traversal', () => {
       if (before === 'tunnel' && sim.phase === 'exiting') expect(sim.headInterpPos.distanceTo(path.midB)).toBeLessThan(1e-8);
     }
     expect(sim.phase).toBe('crawling');
-    expect(elapsed.windup + elapsed.entering).toBeCloseTo(4, 6);
-    expect(elapsed.tunnel).toBeCloseTo(2, 6);
-    expect(elapsed.exiting + elapsed.windout).toBeCloseTo(4, 6);
+    // The ride splits its ten seconds by the distances it covers (tunnelTiming.js).
+    expect(elapsed.windup + elapsed.entering).toBeCloseTo(tunnelHandoffSeconds(ride) + tunnelArmSeconds(ride), 6);
+    expect(elapsed.tunnel).toBeCloseTo(tunnelCrossingSeconds(ride), 6);
+    expect(elapsed.exiting + elapsed.windout).toBeCloseTo(tunnelHandoffSeconds(ride) + tunnelArmSeconds(ride, 'exit'), 6);
     expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeCloseTo(10, 6);
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
     // Raised pads spend the orbit time on the landing coil; crawl entries hand off faster.
@@ -919,6 +924,7 @@ describe('flipped tiles and tunnel traversal', () => {
     const sim = makeSim(); let paused = false;
     const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey }), isPaused: () => paused });
     expect(runUntil(sim, ctx, () => sim.phase === 'entering')).toBe(true);
+    const ride = sim.activeTunnel;
     const elapsed = {};
     while (['entering', 'tunnel', 'exiting'].includes(sim.phase)) {
       const phase = sim.phase, progress = sim.tunnelProgress;
@@ -932,7 +938,7 @@ describe('flipped tiles and tunnel traversal', () => {
       expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeLessThan(10.1);
     }
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.tunnel).toBeCloseTo(2, 6);
+    expect(elapsed.tunnel).toBeCloseTo(tunnelCrossingSeconds(ride), 6);
   });
 
   it('resumes crawling with a long tail inside and heals only after it clears', () => {
