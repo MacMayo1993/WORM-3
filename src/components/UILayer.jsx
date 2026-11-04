@@ -122,7 +122,7 @@ export default function UILayer({
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped, speedThresholdSec, chaosPreview, onBetBack, onChaosReplay,
-    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormChallenges, onWormRetry, onWormNewGame, onWormStoryNext,
+    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormChallenges, onWormRetry, onWormNewGame, onWormStoryNext, onDemoSkipStep, onDemoExit,
     onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
     onDemo,
@@ -307,7 +307,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
 
         {/* The next briefing replaces the completed run, including its result card. */}
-        {wormHealerMode && !showMobiIntro && !showWormModeWizard && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
+        {wormHealerMode && !showMobiIntro && !showWormModeWizard && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} onDemoSkipStep={onDemoSkipStep} onDemoExit={onDemoExit} /></Suspense>}
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
         <CaptureVisual behindHud><TunnelTransitOverlay /></CaptureVisual>

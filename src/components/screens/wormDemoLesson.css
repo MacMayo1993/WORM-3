@@ -13,23 +13,47 @@
 .worm-instrument[data-lesson="ice"] .worm-jump,
 .worm-instrument[data-lesson="boost"] .worm-boost,
 .worm-instrument[data-lesson="signature"] .worm-signature-control button { outline: 2px solid var(--arcade-focus); outline-offset: 3px; }
-@media (max-height: 520px) and (min-width: 600px) {
-  .worm-demo-card { display: grid; grid-template-columns: 1fr 230px; gap: 4px 12px; padding: 6px 10px; }
-  .worm-demo-heading, .worm-demo-track, .worm-demo-card p, .worm-demo-detail, .worm-demo-card .action-cue-row { grid-column: 1; }
-  .worm-demo-actions { grid-column: 2; grid-row: 1 / span 5; align-items: center; }
-  .worm-demo-card p, .worm-demo-detail { margin: 0; }
-}
-
 /* The scene picker is native: keyboard, touch and screen-reader navigation work
    without another full-screen overlay sitting between the player and the cube. */
 .worm-demo-scene-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
 .worm-demo-live { flex-shrink: 0; font: 800 9px/1.2 var(--heading-font); letter-spacing: .08em; color: #41582f; }
 .worm-demo-scene-bar select { min-width: 0; width: 100%; min-height: 36px; border: 1px solid var(--arcade-line-soft); border-radius: 8px; background: #fffdf5; color: #26331f; font: 700 12px var(--ui-font); padding: 5px; }
 .worm-demo-scene-bar select:focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 2px; }
-@media (max-height: 520px) and (min-width: 600px) {
-  .worm-demo-scene-bar { grid-column: 1; margin: 0; }
-  .worm-demo-actions { grid-row: 1 / span 7; }
+
+/* One top dock owns navigation, the current instruction and its actions.
+   Keep the thumb tray exclusively for playing, with no teaching card over it. */
+.worm-demo-card { box-sizing: border-box; max-height: min(44dvh, 360px); overflow-y: auto; overscroll-behavior: contain; padding: 6px 10px; }
+.worm-demo-navigation { position: sticky; top: -6px; z-index: 2; display: flex; align-items: center; gap: 6px; background: var(--arcade-paper, #faf7ee); }
+.worm-demo-navigation:empty { display: none; }
+.worm-demo-navigation .demo-toolbar { position: static; transform: none; margin: 0; padding: 0; border: 0; box-shadow: none; background: none; width: auto; flex: 1; min-width: 0; }
+.worm-demo-navigation .demo-toolbar > button { padding-inline: 8px; }
+.worm-demo-navigation .demo-toolbar--progress { pointer-events: none; }
+.worm-demo-navigation > button { flex-shrink: 0; }
+.worm-demo-scene-bar { margin: 4px 0; }
+.worm-demo-scene-bar select { min-height: 44px; font-size: 14px; font-weight: 800; }
+.worm-demo-heading { font-size: 15px; }
+.worm-demo-live { font-size: 10px; }
+.worm-demo-card p { font-size: 14px; line-height: 1.35; margin: 5px 0; }
+.worm-demo-actions { gap: 6px; padding: 0; }
+.worm-demo-actions button { min-height: 44px; font-size: 11px; }
+.worm-demo-telemetry { display: flex; align-items: center; gap: 6px; margin-block: 3px; }
+.worm-demo-length { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--arcade-muted); }
+.worm-demo-telemetry .orb-reserve .orb-slot { padding-block: 0; }
+.worm-demo-telemetry .orb-sample { width: 16px; }
+/* Short landscape screens use the width rather than piling rows over the game.
+   Overflow remains available at larger text sizes; no instructions are clipped. */
+@media (min-width: 600px) {
+  .worm-hud-top:has(.worm-demo-card) { max-width: 900px; }
+  .worm-demo-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, .9fr); gap: 3px 12px; max-height: 45dvh; }
+  .worm-demo-navigation { grid-column: 2; grid-row: 1; }
+  .worm-demo-scene-bar { grid-column: 1; grid-row: 1; margin: 0; }
+  .worm-demo-heading, .worm-demo-track, .worm-demo-card p, .worm-demo-detail { grid-column: 1; margin-block: 0; }
+  .worm-demo-telemetry { grid-column: 2; grid-row: 2 / span 2; margin: 0; }
+  .worm-demo-actions { grid-column: 2; grid-row: 4 / span 3; align-self: start; }
 }
-/* Long recipe explanations stay inside the card instead of pushing the thumb
-   controls off a short screen or covering the entire playfield at large text. */
-.worm-demo-card { max-height: min(40dvh, 340px); overflow-y: auto; overscroll-behavior: contain; }
+/* Small phones need a two-line progress caption so 1 / 11 never slips under
+   Skip Step. Keep every action's touch target rather than shrinking the keys. */
+@media (max-width: 360px) {
+  .worm-demo-navigation .demo-toolbar-caption { flex-direction: column; align-items: flex-start; gap: 0; font-size: 10px; line-height: 1.15; }
+  .worm-demo-navigation .demo-toolbar-track { margin-top: 3px; }
+}

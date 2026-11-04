@@ -1656,6 +1656,8 @@ export default function WORM3() {
               onWormRetry: handleWormRetry,
               onWormNewGame: handleWormNewGame,
               onWormStoryNext: handleWormStoryNext,
+              onDemoSkipStep: () => handleDemoSkipStep(demoStep),
+              onDemoExit: handleExitDemo,
               onFaceRotate: handleFaceRotate,
               onTileRotation: handleTileRotation,
               onTileFaceRotation: handleTileFaceRotation,
@@ -1675,7 +1677,7 @@ export default function WORM3() {
         !demoStepIntroVisible && !demoCoachCopy && !demoForecastVisible &&
         (demoCelebrationStep || showDemoResults || demoStep === 'end') &&
         <DemoProgressBar currentStep={demoStep} />}
-      {demoMode && !shortChallengeCourse && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
+      {demoMode && !shortChallengeCourse && demoStep !== 'worm-traversal' && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
         !demoForecastVisible && !demoCelebrationStep && !demoChromeQuiet && !showDemoResults &&
         <DemoProgressBar currentStep={demoStep} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}

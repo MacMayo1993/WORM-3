@@ -1,3 +1,4 @@
+import useDemoPlayfield from './useDemoPlayfield.js';
 import { storyArrivalPose } from './healerWorm/storyArrival.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
 import { victoryViewport, victoryView, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
@@ -208,6 +209,7 @@ const TUNNEL_HANDOFF_GLIDE = 1.6;
 
 export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
     const { camera, gl, size: viewportSize } = useThree();
+    useDemoPlayfield();
     const mobile = useIsMobile();
     const platformFrame = useRef(makePlatformFrame());
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));

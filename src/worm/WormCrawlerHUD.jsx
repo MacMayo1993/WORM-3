@@ -1394,7 +1394,7 @@ function HudContext({ surface, demo, onInspect, onPowerInspect }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame, onStoryNext }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame, onStoryNext, onDemoSkipStep, onDemoExit }) {
     const showCutawayLens = useGameStore(s => s.showCutawayLens && !inspectionSuspended(s));
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
@@ -1553,7 +1553,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {/* Hangs just under the dock (absolute), so showing it never moves the bar. */}
                 {wormAlive && phase === 'crawling' && <ComboMeter />}
                 {phase === 'crawling' && <FreePlayProgress />}
-                <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
+                {!demoLesson && <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && (
                             <div className="worm-hud-reserve">
@@ -1587,7 +1587,18 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                </div>
+                </div>}
+                {demoLesson && <WormDemoLessonCard
+                    onSkipStep={onDemoSkipStep} onExit={onDemoExit}
+                    pauseControl={<button onPointerDown={handlePause}
+                        onClick={e => { if (e.detail === 0) handlePause(); }}
+                        disabled={!canPause} className="worm-hud-key" style={PAUSE_BTN_STYLE} aria-label="Pause"><PauseIcon /></button>}
+                    length={wormLengthTiles}
+                    telemetry={wormAlive && phase === 'crawling' && (demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && <div className="worm-hud-reserve">
+                            {showRotationTint && <RotationCountdownHUD />}
+                            <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
+                        </div>}
+                />}
                 <div className="worm-hud-status-row worm-hud-telemetry">
                     {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
                 </div>
@@ -1600,7 +1611,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {!combatMode && !demoLesson && storyId && !storyStarted && <div className="worm-story-briefing">
                     <StoryObjectiveCard /><StoryStartButton />
                 </div>}
-                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : null}
+                {combatMode && <CombatCard onRetry={onRetry} onHome={onHome} />}
                 {phase === 'crawling' && (!storyId || storyStarted) && <div style={THUMB_TRAY_STYLE}>
                     <SteerKey side="left" wormAlive={controlsEnabled && (!jumpRescue || cautionRescue)} wormColor={wormColor} vars={steerVars} rescue={cautionRescue} />
 
