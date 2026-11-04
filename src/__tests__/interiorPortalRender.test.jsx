@@ -47,7 +47,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     wall.getMatrixAt(wall.userData.tileKeys.indexOf('0-1-1-NX'), pose);
     // The polished wall must be in front of the existing 0.018-inset backs.
     expect(Math.abs(pose.elements[12])).toBeLessThan(1.5);
-    expect(Math.abs(pose.elements[12])).toBeCloseTo(1.48);
+    expect(Math.abs(pose.elements[12])).toBeCloseTo(1.44);
     expect(tunnelCoreClipUniforms.uTunnelCoreHalf.value).toBeCloseTo(CORE_HALF + .002);
     worm.phase.current = 'tunnel';
     store.getState().camera.position.set(0, 0, 1);

@@ -25,6 +25,9 @@ import { signatureReadout } from './healerWorm/signatures.js';
 import { litTiles } from './healerWorm/glowTrail.js';
 import { steamTiles, frostTiles, addElementalPatch } from './healerWorm/elementalGameplay.js';
 import { liveRotation } from './liveRotation.js';
+import { resetTunnelState } from './tunnelProgressBridge.js';
+import { resetRumble } from './rumbleBridge.js';
+import { healBurstMap, healParticleMap } from '../3d/healBurstBridge.js';
 // src/worm/useWormCrawler.js
 //
 // React adapter around the pure worm simulation core (healerWorm/wormSim.js).
@@ -839,6 +842,10 @@ export function useWormCrawler(size, cubies) {
         feedbackRef.current.reset();
         wormExpansion.amount = 0;
         useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
+        resetTunnelState();
+        resetRumble();
+        healBurstMap.clear();
+        healParticleMap.clear();
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         skillHopRef.current = makeHopTracker();
         burrowBridge.current = sim.burrows;
@@ -890,6 +897,10 @@ export function useWormCrawler(size, cubies) {
     }, [size, wormRunId, wormOrbCount, wormholeInterval]);
 
     useEffect(() => () => {
+        resetTunnelState();
+        resetRumble();
+        healBurstMap.clear();
+        healParticleMap.clear();
         if (burrowBridge.current === simRef.current.burrows) burrowBridge.current = null;
         if (deathMenuTimer.current) {
             clearTimeout(deathMenuTimer.current);
