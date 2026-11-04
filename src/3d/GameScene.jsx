@@ -328,7 +328,10 @@ export default function GameScene({
           healMoment={wormHealedCount}
         />
 
+        {/* A new attempt owns fresh tile refs, springs and instance pools. Slice
+            rotations still reuse this tree; only a retry/new run rebuilds it. */}
         <CubeAssembly
+          key={wormHealerMode ? `worm-${wormRunId}` : 'puzzle'}
           size={size}
           cubies={cubies}
           onMove={wormHealerMode ? null : onMove}

@@ -158,7 +158,8 @@ const CubeAssembly = React.memo(({
   const powerView = wormHealerMode ? getViewPowerDef(wormViewPower)?.view : null;
   const exteriorRef = useRef(null);
   const exteriorPortals = useMemo(() => createExteriorPortals(), []);
-  useEffect(() => () => exteriorPortals.dispose(), [exteriorPortals]);
+  // Retire old material hooks before a replacement attempt patches its meshes.
+  useLayoutEffect(() => () => exteriorPortals.dispose(), [exteriorPortals]);
   // Cube/style commits refresh materials, without scanning the scene each frame.
   useLayoutEffect(() => { exteriorPortals.apply(exteriorRef.current); });
   useFrame(({ camera }) => {

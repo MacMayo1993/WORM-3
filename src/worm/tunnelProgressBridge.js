@@ -16,3 +16,19 @@ export const tunnelState = {
   coreZoom: 1,     // cosmetic core growth (VoidCore); occupied tracks keep their simulation route
   coreZoomAnchor: null, // the fixed dock of that growth, in cube coordinates
 };
+
+/** Retire the entire old passage before a new board is painted, even while paused. */
+export function resetTunnelState() {
+  tunnelState.active = false;
+  tunnelState.fallOpening = null;
+  tunnelState.occupiedTunnelIds.clear();
+  tunnelState.portalTunnel = null;
+  tunnelState.t = 0;
+  tunnelState.rideHead = null;
+  tunnelState.lensT = 0;
+  tunnelState.lensLift = 0;
+  tunnelState.activeTunnelId = null;
+  tunnelState.tunnel = null;
+  tunnelState.coreZoom = 1;
+  tunnelState.coreZoomAnchor = null;
+}

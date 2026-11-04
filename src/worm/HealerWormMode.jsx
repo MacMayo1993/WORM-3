@@ -121,6 +121,7 @@ const _clockSim = { elementalT: 0, elementalType: null, elementalPair: null };
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
     const reflectionSource = useRef();
     const worm = useWormCrawler(size, cubies);
+    const wormRunId = useGameStore(s => s.wormRunId);
     // The core's mirror room reflects the worm (mirrorSubjects.js).
     useEffect(() => addMirrorSubject(reflectionSource.current), []);
 
@@ -602,6 +603,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Free play's live progress: the turns still to come before the final heal.
             useGameStore.setState({ wormTurnsLeft: story || practice ? null : inverseQueueRef.current.length });
 
+            // Retire callbacks/FX from the interrupted attempt, not just its board.
+            turnWatchRef.current = null;
+            liveDeathRef.current = null;
+            deathThunkFiredRef.current = false;
+            thunkRef.current.active = false;
+            severedRef.current.active = false;
+            fusionSeenRef.current = 0;
+            finalHealCheckTimer.current = 0;
+            skipArrivalRef.current = false;
+            slamTilesRef.current = { id: '', keys: new Set() };
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
             spawnTimerRef.current     = 0;
@@ -1179,7 +1190,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelInteriorView worm={worm} size={size} />
             {/* The shaft the camera actually rides inside — encloses the view so the
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
-            <TunnelTube worm={worm} size={size} />
+            <TunnelTube key={wormRunId} worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><ElementalAbilityEffects worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /><Rumbler worm={worm} size={size} /></group>
             {/* Keep the equipped body/face and their programs through retries. The

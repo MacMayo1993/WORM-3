@@ -8,9 +8,13 @@ import { interiorPortalGLSL } from './interiorPortals.js';
 import { CHROME_TILE_FINISH } from '../../3d/cubeViewStyles.js';
 import { createPlayStickerGeometry } from '../../3d/rubiksPiece.js';
 
-// Sit ahead of the physical sticker backs (0.018 behind the outer faces).
-// Otherwise their old shader would occlude the polished room during a ride.
-export const INTERIOR_TILE_INSET = 0.04;
+// Sit inward of the physical sticker backs, including the worm's deepest press.
+// Chrome walls are solid extrusions: their backs extend PLAY_STICKER_DEPTH
+// outward from this plane. At the old 0.04 inset those dark backs reached 0.496
+// while pressed exterior faces sank to 0.474, hiding occupied tiles for as long
+// as the tail kept the room mounted. 0.08 also leaves the room in front of the
+// physical backs when seen from inside, without changing the mouth positions.
+export const INTERIOR_TILE_INSET = 0.08;
 
 // Classic pickups retain the plain tile shader, including physical tile identity.
 // Supply each tile's frame/seed as attributes instead of rebinding uniforms and
