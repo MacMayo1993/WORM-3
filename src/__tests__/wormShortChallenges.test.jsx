@@ -46,12 +46,14 @@ it('collects real orbs, jumps onto the pad, and waits for the tail to clear befo
   expect(state().demoWormComplete).toBe(false);
   until(() => state().demoWormComplete);
   expect(state().wormHealedCount).toBe(1);
+  expect(Object.values(state().wormOrbPickups).reduce((a, b) => a + b, 0)).toBe(2);
   expect(worm.tunnelPassages.current).toHaveLength(0);
   expect(state().demoWormCompleted).toEqual(['collect-heal']);
   expect(host.textContent).toContain('sealed both linked mouths');
   act(() => state().nextWormDemoLesson()); frame(); frame();
   expect(wormDemoLesson(state()).id).toBe('body-route');
   expect(state().wormSessionOrbs).toBe(0);
+  expect(Object.values(state().wormOrbPickups).every(n => n === 0)).toBe(true);
   expect(state().wormHealedCount).toBe(0);
 });
 
@@ -62,6 +64,7 @@ it('a retry resets the inventory, route, completion and attempt without changing
   expect(state().demoWormComplete).toBe(false);
   expect(state().demoWormStarted).toBe(false);
   expect(state().wormSessionOrbs).toBe(0);
+  expect(Object.values(state().wormOrbPickups).every(n => n === 0)).toBe(true);
   expect(state().wormPowerups).toHaveLength(2);
 });
 

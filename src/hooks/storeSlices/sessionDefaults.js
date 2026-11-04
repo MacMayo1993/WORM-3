@@ -96,6 +96,8 @@ export const makeWormSessionDefaults = () => ({
   wormTimeAlive: 0,
   wormTunnelCount: 0,
   wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  // Actual pickups this run, independent of combo growth, spending and recovery.
+  wormOrbPickups: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
   wormHealingProgress: {},
   wormGamePhase: 'scrambling',
   wormCountdownStep: null,

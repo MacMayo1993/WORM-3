@@ -1,34 +1,34 @@
-// The rotation clock lives behind the orb reserve: one continuous color change,
-// with no extra countdown row or animated text competing with the game.
+// Paint from the simulation clock so holds and pause never drift with wall time.
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from './healerWorm/rotationClockBridge.js';
-
-function rotationTint(clock) {
-  const remaining = Math.max(0, Math.min(1, clock.secondsLeft / (clock.total || 1)));
-  // Green → amber → red across the whole cycle, independent of telegraph timing.
-  return `hsl(${Math.round(remaining * 120)} 65% 52%)`;
-}
 
 export default function RotationCountdownHUD() {
   const running = useGameStore(s => !!s.wormHealerMode && (s.wormAlive ?? true)
     && !s.wormPaused && (s.wormPhase ?? 'crawling') === 'crawling'
     && ['active', 'finalHealing'].includes(s.wormGamePhase ?? 'active'));
   const rootRef = useRef(null);
+  const valueRef = useRef(null);
   useEffect(() => {
     if (!running) return undefined;
     let raf;
     const paint = () => {
       const root = rootRef.current;
       if (root) {
+        const seconds = Math.max(0, rotationClock.secondsLeft).toFixed(1);
         root.hidden = !rotationClock.armed;
-        root.style.backgroundColor = rotationTint(rotationClock);
-        root.style.opacity = rotationClock.held ? '0.16' : '0.38';
+        root.dataset.held = String(rotationClock.held);
+        root.dataset.urgent = String(!rotationClock.held && rotationClock.secondsLeft <= 3);
+        root.setAttribute('aria-label', `Rotation ${rotationClock.held ? 'held at' : 'in'} ${seconds} seconds`);
+        valueRef.current.textContent = `${seconds}s`;
       }
       raf = requestAnimationFrame(paint);
     };
     paint();
     return () => cancelAnimationFrame(raf);
   }, [running]);
-  return running ? <span ref={rootRef} className="worm-rotation-clock" aria-hidden="true" hidden /> : null;
+  return running ? <span ref={rootRef} className="worm-rotation-clock" role="timer" hidden>
+    <span className="worm-rotation-label">ROTATE</span><strong ref={valueRef} />
+    <span className="worm-rotation-held">HELD</span>
+  </span> : null;
 }

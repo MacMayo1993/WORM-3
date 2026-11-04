@@ -38,15 +38,15 @@ it('preserves the guided reset and shuffle actions when spotlighted', () => {
 it('keeps six stable inventory slots and highlights only a pickup, not spending', () => {
   vi.useFakeTimers();
   const colors = {1:'#fff',2:'#fff',3:'#f00',4:'#0f0',5:'#00f',6:'#888'};
-  const render = count => act(() => root.render(<OrbInventoryHUD orbInventory={{1:count}} faceColors={colors} tileStyles={{2:'stripes'}} />));
+  const render = count => act(() => root.render(<OrbInventoryHUD orbPickups={{1:count}} faceColors={colors} tileStyles={{2:'stripes'}} />));
   render(0);
   const original = [...host.querySelectorAll('[role="listitem"]')];
   expect(original).toHaveLength(6); expect(host.querySelector('.orb-slot-pickup')).toBeNull();
   render(3);
   expect([...host.querySelectorAll('[role="listitem"]')]).toEqual(original);
   expect(host.querySelectorAll('.orb-slot-pickup')).toHaveLength(1);
-  expect(original[0].getAttribute('aria-label')).toBe('Front: 0.27 tiles of growth');
-  expect(original[1].getAttribute('aria-label')).toBe('Left: 0 tiles of growth');
+  expect(original[0].getAttribute('aria-label')).toBe('Front: 3 orbs picked up');
+  expect(original[1].getAttribute('aria-label')).toBe('Left: 0 orbs picked up');
   act(() => vi.advanceTimersByTime(400));
   render(1); expect(host.querySelector('.orb-slot-pickup')).toBeNull();
 });
