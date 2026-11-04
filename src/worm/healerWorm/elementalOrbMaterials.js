@@ -1,9 +1,9 @@
 // src/worm/healerWorm/elementalOrbMaterials.js
 //
-// Every texture and material an elemental offering draws besides its body shader
-// (elementalOrbShader.js): the crest's canvas sprites and enamel set
-// (ElementalBadge) and the orb's rings, motes, particles, pool and shockwave
-// (ElementalOrb). All are built lazily, once per element, and never disposed:
+// Every texture and material an elemental offering draws besides its relic
+// (elementalOrbShader.js): the floor sigil with its glyph and countdown, the
+// motes, the drifting matter and the spawn shockwave (ElementalOrb). All are
+// built lazily, once per element, and never disposed:
 // declared as JSX they belonged to R3F, which disposed them on unmount, and
 // disposing the last material using a program makes three destroy it, so every
 // offering relinked them. Kept out of the component modules so the WORM warm-up
@@ -55,10 +55,10 @@ export function getSoftGlowTexture() {
   return _shared.glow;
 }
 
-// ── Per-element emblem ──────────────────────────────────────────────────────
-// The element's icon, rasterised once per type into a glowing emblem texture.
-// Reuses elementalDefs' iconPath (24×24 viewBox) so the 3D badge and the HUD chip
-// show the identical silhouette.
+// ── Per-element glyph ───────────────────────────────────────────────────────
+// The element's icon, rasterised once per type into a glowing glyph for the floor
+// sigil. Reuses elementalDefs' iconPath (24×24 viewBox) so the sigil and the HUD
+// chip show the identical silhouette.
 const _emblemTexCache = {};
 function getEmblemTexture(type) {
   if (_emblemTexCache[type] !== undefined) return _emblemTexCache[type];
@@ -70,8 +70,6 @@ function getEmblemTexture(type) {
   const S = 320;
   const canvas = _canvas(S);
   const ctx = canvas.getContext('2d');
-  // The glyph fills most of the medal: it sits on dark enamel now, and at play
-  // distance a small icon was the part nobody could read.
   const pad = 40;
   const scale = (S - pad * 2) / 24;
   ctx.translate(pad, pad);
@@ -83,7 +81,7 @@ function getEmblemTexture(type) {
 
   // Three passes, widest and softest first: a coloured aura, a tighter halo, then
   // the crisp white-hot silhouette. One pass gave a flat decal; stacking them is
-  // what makes the emblem read as lit enamel.
+  // what makes the glyph read as light on the tile.
   const passes = [
     { blur: 18, width: 3.4, stroke: def.color, fill: def.color, alpha: 0.75 },
     { blur: 8, width: 2.4, stroke: def.color, fill: def.color, alpha: 1 },
@@ -114,45 +112,6 @@ function getEmblemTexture(type) {
   return _emblemTexCache[type];
 }
 
-// One long-lived material set per element. Each entry backs exactly one mesh in the
-// badge, so the parent's fade (which writes material.opacity from the MESH's
-// baseOpacity) still has a single writer per material.
-const _badgeMatCache = new Map();
-export function getBadgeMaterials(type, color) {
-  const def = getSpecialDef(type);
-  const accent = def?.accent || '#ffffff';
-  const key = `${type}_${color}`;
-  const hit = _badgeMatCache.get(key);
-  if (hit) return hit;
-  const additive = (c, opacity, map) =>
-    new THREE.MeshBasicMaterial({
-      color: c, map: map ?? null, transparent: true, opacity,
-      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
-    });
-  // Dark enamel under a bright glyph, framed in the element's own colour. Every
-  // crest used to be the same gold coin with a pale glyph on pale enamel, so from
-  // across the cube six different pickups read as six identical medals.
-  const ink = def?.fogColor || '#0b0f1a';
-  const set = {
-    bloom: additive(color, 0.4, getSoftGlowTexture()),
-    rim: new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.9,
-      metalness: 0.5, roughness: 0.25, transparent: true, opacity: 1, toneMapped: false
-    }),
-    keyline: new THREE.MeshStandardMaterial({ color: '#05070c', metalness: 0.3, roughness: 0.5, transparent: true, opacity: 1 }),
-    enamel: new THREE.MeshStandardMaterial({
-      color: ink, emissive: ink, emissiveIntensity: 0.6,
-      metalness: 0.2, roughness: 0.3, transparent: true, opacity: 1, toneMapped: false
-    }),
-    pinstripe: additive(accent, 0.9),
-    gloss: additive(accent, 0.14),
-    emblem: new THREE.MeshBasicMaterial({ map: getEmblemTexture(type), transparent: true, depthWrite: false, toneMapped: false }),
-    spark: additive(accent, 0.95)
-  };
-  _badgeMatCache.set(key, set);
-  return set;
-}
-
 // Per-element drifting matter around the orb, mirroring ElementalAtmosphere's
 // scene-scale field. `vy` is along the face normal (+ = away from the cube).
 // Every element's `particle` key must be listed: an unknown one falls back to
@@ -166,45 +125,84 @@ export const PARTICLE_KINDS = {
   ions: { count: 22, vy: 0.08, sway: 0.22, size: 0.05, opacity: 0.95 }
 };
 
-// The offering's countdown, drawn as a draining arc round the orb's footprint on
-// the tile. It used to be a hoop round the crest, which with the two orbit rings
-// made every orb a stack of concentric outlines.
-const countdownVertex = /* glsl */ `
+// The floor sigil under the relic, on the tile it is offered on: one decal that is
+// a pool of the element's light, a dark ink track round it carrying the draining
+// countdown arc (mirroring the HUD's ring), a dashed rune ring turning slowly
+// inside that, and the element's glyph glowing at the centre. It replaces a
+// separate pool, a countdown ring and the octagon medal that used to float over
+// the body: that medal made every element the same badge, and three pieces of
+// furniture round each relic made a full offering a clutter of outlines.
+const sigilVertex = /* glsl */ `
   varying vec2 vUv;
   void main() {
     vUv = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
-const countdownFragment = /* glsl */ `
+const sigilFragment = /* glsl */ `
   uniform vec3 uColor;
+  uniform vec3 uAccent;
+  uniform vec3 uInk;
   uniform float uRemaining;
   uniform float uAlpha;
+  uniform float uTime;
+  uniform sampler2D uGlyph;
+  uniform float uHasGlyph;
   varying vec2 vUv;
+
+  // Paint c at coverage a over what is already there (straight alpha).
+  void over(inout vec4 dst, vec3 c, float a) {
+    float outA = a + dst.a * (1.0 - a);
+    dst.rgb = (c * a + dst.rgb * dst.a * (1.0 - a)) / max(outA, 1e-4);
+    dst.a = outA;
+  }
+  float band(float d, float lo, float hi, float aa) {
+    return smoothstep(lo - aa, lo, d) * (1.0 - smoothstep(hi, hi + aa, d));
+  }
+
   void main() {
-    vec2 d = vUv - 0.5;
-    // Clockwise from twelve o'clock in the ring's own plane.
-    float frac = fract(0.25 - atan(d.y, d.x) / 6.2831853);
+    vec2 c = vUv - 0.5;
+    float d = length(c) * 2.0;
+    float aa = fwidth(d) * 1.2;
+    // Clockwise from twelve o'clock in the decal's own plane.
+    float frac = fract(0.25 - atan(c.y, c.x) / 6.2831853);
+    vec4 col = vec4(0.0);
+
+    // A dark plate in the element's ink, so the glyph and the arc read on any
+    // sticker colour, with a pool of the element's light welling up under the relic.
+    over(col, uInk, (1.0 - smoothstep(0.78, 0.78 + aa, d)) * 0.62);
+    over(col, uColor, exp(-d * d * 4.0) * 0.4);
+    // Rune ring: ten dashes turning slowly.
+    float dash = step(0.42, fract(frac * 10.0 + uTime * 0.04));
+    over(col, mix(uColor, uAccent, 0.5), band(d, 0.66, 0.7, aa) * dash * 0.75);
+    // Countdown: an ink track, lit where time remains.
+    over(col, uInk, band(d, 0.77, 0.97, aa) * 0.8);
     float lit = step(frac, uRemaining);
-    gl_FragColor = vec4(uColor, mix(0.12, 0.85, lit) * uAlpha);
+    over(col, mix(uColor, uAccent, 0.25), band(d, 0.83, 0.93, aa) * mix(0.18, 1.0, lit));
+    // The element's glyph, read straight off the tile.
+    if (uHasGlyph > 0.5) {
+      vec4 g = texture2D(uGlyph, c / 0.62 + 0.5);
+      float inside = 1.0 - smoothstep(0.58, 0.62, d);
+      over(col, g.rgb, g.a * inside * 0.9);
+    }
+    gl_FragColor = vec4(col.rgb, col.a * uAlpha);
+    #include <colorspace_fragment>
   }
 `;
-// The orb's non-shader materials, held per element for the same reason the badge's
-// are (see elementalBadge.jsx): R3F disposes JSX-declared materials on unmount, and
-// disposing the last user of a program makes three destroy it, so every offering
-// relinked them. Each entry backs exactly one mesh, so the lifetime fade — which
-// writes material.opacity from the MESH's baseOpacity — keeps a single writer.
+
+// The orb's non-relic materials, held per element: R3F disposes JSX-declared
+// materials on unmount, and disposing the last user of a program makes three
+// destroy it, so every offering relinked them. Each entry backs exactly one mesh,
+// so the lifetime fade (which writes material.opacity from the MESH's
+// baseOpacity) keeps a single writer.
 const _trimCache = new Map();
 export function getOrbTrimMaterials(element, color, accent, particleSize) {
   const key = `${element}_${color}_${accent}`;
   const hit = _trimCache.get(key);
   if (hit) return hit;
+  const def = getSpecialDef(element);
   const glow = getSoftGlowTexture();
-  const additive = (c, opacity, map) =>
-    new THREE.MeshBasicMaterial({
-      color: c, map: map ?? null, transparent: true, opacity,
-      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
-    });
+  const glyph = getEmblemTexture(element);
   const set = {
     mote: new THREE.SpriteMaterial({
       map: glow, color: accent, transparent: true, opacity: 0.85,
@@ -215,13 +213,25 @@ export function getOrbTrimMaterials(element, color, accent, particleSize) {
       transparent: true, opacity: 1, blending: THREE.AdditiveBlending,
       depthWrite: false, toneMapped: false
     }),
-    countdown: new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(color) }, uRemaining: { value: 1 }, uAlpha: { value: 1 } },
-      vertexShader: countdownVertex, fragmentShader: countdownFragment,
-      transparent: true, depthWrite: false, toneMapped: false
+    sigil: new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uAccent: { value: new THREE.Color(accent) },
+        uInk: { value: new THREE.Color(def?.fogColor ?? '#0b0f1a') },
+        uRemaining: { value: 1 },
+        uAlpha: { value: 1 },
+        uTime: { value: 0 },
+        uGlyph: { value: glyph },
+        uHasGlyph: { value: glyph ? 1 : 0 }
+      },
+      vertexShader: sigilVertex, fragmentShader: sigilFragment,
+      transparent: true, depthWrite: false, toneMapped: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
     }),
-    pool: additive(color, 0.42, glow),
-    shock: additive(accent, 0.8)
+    shock: new THREE.MeshBasicMaterial({
+      color: accent, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    })
   };
   _trimCache.set(key, set);
   return set;
@@ -234,10 +244,7 @@ export function elementalOrbMaterials(type) {
   const def = getSpecialDef(type);
   if (!def) return [];
   const { color = '#ffffff', accent = '#ffffff', fogColor } = def;
-  const body = getElementalOrbMaterials(type, color, accent, fogColor);
+  const relic = getElementalOrbMaterials(type, color, accent, fogColor);
   const trim = getOrbTrimMaterials(type, color, accent, PARTICLE_KINDS[def.particle]?.size ?? 0.055);
-  const badge = getBadgeMaterials(type, color);
-  return [body.core, body.shell, body.inner, body.hull, ...Object.values(trim),
-    ...Object.entries(badge).filter(([key, material]) => !['bloom', 'emblem'].includes(key) || material.map).map(([, material]) => material)];
+  return [relic.body, relic.hull, ...Object.values(trim)];
 }
-

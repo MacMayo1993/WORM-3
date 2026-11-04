@@ -4,32 +4,33 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import NatureClaimLeaves from './NatureClaimLeaves.jsx';
 // src/worm/healerWorm/ElementalOrb.jsx
 //
-// The elemental offering as it sits on the board. Telling the elements apart at a
-// glance is the whole job: Water, Ice and Air share a pale-blue palette, and six
-// tinted glass spheres under six identical gold medals were a guess. So identity is
-// carried three ways — shape, ink and glyph — before colour is needed at all:
+// The elemental offering as it sits on the board: a small relic of the element
+// hovering over a sigil on its tile. Telling the elements apart at a glance is the
+// whole job (Water, Ice and Air share a pale-blue palette), so identity is carried
+// by shape first and colour last:
 //
-//   • a body with its own silhouette per element (droplet, flame, boulder, crystal,
-//     charge star, tornado; elementalOrbShapes.js) whose dense interior churns with
-//     the element itself (elementalOrbShader.js). It is billboarded upright, so a
-//     flame always points up the screen instead of its tip at the lens;
-//   • an ink hull in the element's dark tone behind and around the body, so the
-//     sticker under it cannot tint it and the silhouette is outlined on any tile;
-//   • the crest (ElementalBadge) floating above the body as a name tag: the HUD
-//     chip's glyph, bright on dark enamel in an element-coloured rim;
-//   • a ground pool of element-coloured light on the tile it hovers over, a
-//     draining countdown arc round that pool mirroring the HUD's ring, and a
-//     one-shot shockwave on spawn, which is what makes a new offering catch the eye;
-//   • a few orbiting motes and a small field of the element's own drifting matter
+//   • the relic (elementalOrbShapes.js), a 3D piece whose silhouette is the HUD
+//     icon: a droplet, a crown of flame, a floating island, a crystal cluster, the
+//     bolt, a tornado. It is lit like a glazed toy and inked round its outline
+//     (elementalOrbShader.js), turns on its upright axis so it reads as solid, and
+//     is billboarded upright so a flame always points up the screen. A per-element
+//     tilt leans it toward the lens so the island's grass and trees show;
+//   • the sigil on the tile under it (elementalOrbMaterials.js): a pool of the
+//     element's light, the glyph at its heart, a dashed rune ring and a draining
+//     countdown arc mirroring the HUD's ring. It ties the relic to its tile and
+//     carries the name tag the old floating medal did, without a second object;
+//   • a one-shot shockwave across the tile on spawn, which is what makes a new
+//     offering catch the eye;
+//   • a few motes and a small field of the element's own drifting matter
 //     (bubbles / embers / spores / flakes / ions / wind), matching what
 //     ElementalAtmosphere plays at scene scale once the element is claimed;
-//   • a point light in the element's colour, so the orb actually lights the face
-//     under it. Skipped on mobile, where several extra dynamic lights is a real cost.
+//   • a point light in the element's colour, so the relic lights the face under
+//     it. Skipped on mobile, where several extra dynamic lights is a real cost.
 //
 // Everything animates from one useFrame writing to refs: no React renders per frame
-// and no per-frame allocation. Several of these exist at once (one offering =
-// one orb per element), so geometry AND the body's shader materials are shared at
-// module level; the orb owns only one small particle buffer, disposed on unmount.
+// and no per-frame allocation. Several of these exist at once (one per element on
+// offer), so geometry AND the shader materials are shared at module level; the orb
+// owns only one small particle buffer, disposed on unmount.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -37,70 +38,56 @@ import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { readLiveTile } from '../wormHelpers.js';
 import { prefersReducedMotion, isMobile } from '../../utils/device.js';
-import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME } from './constants.js';
+import { FACE_NORMALS, SPECIAL_FADE_TIME } from './constants.js';
 import { getSpecialDef } from './specialDefs.js';
-import { ElementalBadge } from './elementalBadge.jsx';
 import { getSoftGlowTexture, getOrbTrimMaterials, PARTICLE_KINDS } from './elementalOrbMaterials.js';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
 import { getElementalOrbShape } from './elementalOrbShapes.js';
 
-// One knob for how big the pickup reads. Every part of the orb is authored at
-// ORB_SCALE 1 and multiplied through here — the body, the billboarded crest and
-// its countdown, the pool on the tile, the hover height that keeps the sphere off
-// the face and the reach of its light — so the whole thing grows as one object
-// rather than a sphere drifting away from its own furniture.
-const ORB_SCALE = 1.5;
-// Extra clearance over SPECIAL_HOVER_HEIGHT: the flat badge could sit low, a
-// half-unit sphere cannot without sinking into the face.
-const ELEM_HOVER_LIFT = 0.3;
+// One knob for how big the relic reads. The relic, its motes, its drifting matter,
+// its hover height and the reach of its light are authored at ORB_SCALE 1 and
+// multiplied through here. At 1.08 a relic stands about one tile across, so it
+// reads as the pickup ON that tile; the old 1.5 spread each one over its
+// neighbours and floated it a full tile off the face.
+const ORB_SCALE = 1.08;
+// Height of the relic's centre over the tile (before ORB_SCALE): its foot clears
+// the sigil by about a tenth of a tile.
+const RELIC_HOVER = 0.66;
+const SIGIL_SIZE = 0.94; // the sigil stays inside its own tile at every scale
 const SHOCK_TIME = 0.7; // seconds the spawn shockwave takes to run out
-const FADE_FLOOR = 0.5; // an offering never dims past half — it should stay grabbable
+const FADE_FLOOR = 0.5; // an offering never dims past half: it should stay grabbable
 
-// The body's layers are one shape at four sizes (see elementalOrbShader.js):
-// the core sits just inside the glass, the ink hull just outside it.
-const LAYER_SCALE = { core: 0.9, inner: 0.96, shell: 1, hull: 1.09 };
-// The crest floats above the body in the billboard's frame: high enough to clear
-// the tallest shape (the crystal's tip), low enough to read as the orb's own tag.
-const CREST_LIFT = 0.76;
-const CREST_SCALE = 0.5;
-
-// The body's size relative to ORB_SCALE. Smaller than the old glass sphere: a dense
-// body hides the tile under it, where the glass let it show through.
-const BODY_SCALE = 0.98;
-
-// Spin about the upright axis, plus an optional tumble for the shapes that have no
-// natural up (a rock and a charge star can roll; a flame or a droplet cannot).
+// Spin about the upright axis, an optional tumble for the shapes that have no
+// natural up, and a lean toward the lens. The bolt is flat, so it swings to and fro
+// (`swing`, radians either side) instead of turning edge-on and vanishing.
 const SPIN = {
-  water: { rate: 0.5, wobble: 0 },
-  fire: { rate: 0.7, wobble: 0 },
-  grass: { rate: 0.35, wobble: 0.22 },
-  ice: { rate: 0.6, wobble: 0.1 },
-  lightning: { rate: 1.1, wobble: 0.35 },
-  air: { rate: 2.2, wobble: 0 }
+  water: { rate: 0.5, wobble: 0, tilt: 0.1 },
+  fire: { rate: 0.7, wobble: 0, tilt: 0.05 },
+  grass: { rate: 0.45, wobble: 0.06, tilt: 0.42 },
+  ice: { rate: 0.6, wobble: 0.05, tilt: 0.22 },
+  lightning: { rate: 1.3, wobble: 0.08, tilt: 0.08, swing: 0.55 },
+  air: { rate: 2.2, wobble: 0, tilt: 0.18 }
 };
-const DEFAULT_SPIN = { rate: 0.45, wobble: 0.2 };
+const DEFAULT_SPIN = { rate: 0.45, wobble: 0.2, tilt: 0 };
 
 // One set for every elemental orb ever spawned.
 const _geos = {
-  // A thin arc round the pool, drained by its shader (elementalOrbMaterials.js).
-  countdown: new THREE.RingGeometry(0.4, 0.45, 64, 1),
-  pool: new THREE.PlaneGeometry(2.0, 2.0),
+  sigil: new THREE.PlaneGeometry(SIGIL_SIZE, SIGIL_SIZE),
   shock: new THREE.TorusGeometry(0.42, 0.022, 8, 48)
 };
 
-// Orbiting motes: radius, orbit tilt, phase and rate, fixed so every orb of a
-// given element traces the same recognisable pattern.
+// Motes: radius, orbit tilt, phase and rate, fixed so every orb of a given element
+// traces the same recognisable pattern. Just outside the relic's 0.7 bound.
 const MOTES = [
-  { r: 0.58, incl: 0.35, phase: 0.0, speed: 1.05 },
-  { r: 0.52, incl: -0.9, phase: 2.1, speed: -0.85 },
-  { r: 0.62, incl: 1.25, phase: 4.0, speed: 0.7 },
-  { r: 0.47, incl: -0.25, phase: 5.4, speed: 1.35 },
-  { r: 0.66, incl: 0.75, phase: 3.0, speed: -0.55 }
+  { r: 0.74, incl: 0.35, phase: 0.0, speed: 1.05 },
+  { r: 0.7, incl: -0.9, phase: 2.1, speed: -0.85 },
+  { r: 0.8, incl: 1.25, phase: 4.0, speed: 0.7 },
+  { r: 0.72, incl: -0.25, phase: 5.4, speed: 1.35 }
 ];
 
 const FIELD_EXTENT = 0.9; // half-height of the box the matter wraps inside
 
-// Frame-loop scratch — shared across orbs, never retained.
+// Frame-loop scratch, shared across orbs, never retained.
 const _pos = new THREE.Vector3();
 const _norm = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
@@ -118,11 +105,7 @@ export default function ElementalOrb({ special, size }) {
   const motesRef = useRef([]);
   const pointsRef = useRef();
   const billboardRef = useRef();
-  const crestRef = useRef();
-  const sparksRef = useRef();
-  const countdownRef = useRef();
   const groundRef = useRef();
-  const poolRef = useRef();
   const shockRef = useRef();
   const lightRef = useRef();
 
@@ -133,15 +116,14 @@ export default function ElementalOrb({ special, size }) {
   const color = def?.color ?? '#ffffff';
   const accent = def?.accent ?? '#ffffff';
 
-  // Shared per element and never disposed — disposing them on unmount destroyed
-  // the compiled programs, so every offering relinked the body shaders and stalled
+  // Shared per element and never disposed: disposing them on unmount destroyed
+  // the compiled programs, so every offering relinked the relic shaders and stalled
   // the frame. See the note at the top of elementalOrbShader.js.
   const ink = def?.fogColor ?? '#0b0f1a';
   const mats = useMemo(() => getElementalOrbMaterials(special.type, color, accent, ink), [special.type, color, accent, ink]);
   const shape = useMemo(() => getElementalOrbShape(special.type), [special.type]);
   const spin = SPIN[special.type] ?? DEFAULT_SPIN;
 
-  const glowTex = useMemo(() => getSoftGlowTexture(), []);
   const trim = useMemo(
     () => getOrbTrimMaterials(special.type, color, accent, PARTICLE_KINDS[def?.particle]?.size ?? 0.055),
     [special.type, color, accent, def?.particle]
@@ -154,10 +136,10 @@ export default function ElementalOrb({ special, size }) {
     const anchors = new Float32Array(cfg.count * 2); // stable [x, z] the sway hangs off
     const seeds = new Float32Array(cfg.count * 2); // [phase, speed jitter]
     for (let i = 0; i < cfg.count; i++) {
-      // Ring the orb rather than filling a box: matter inside the sphere is hidden
-      // by the shell anyway, and the silhouette reads better with a clear centre.
+      // Ring the relic rather than filling a box: matter inside it is hidden
+      // anyway, and the silhouette reads better with a clear centre.
       const a = Math.random() * Math.PI * 2;
-      const r = 0.55 + Math.random() * 0.55;
+      const r = 0.6 + Math.random() * 0.5;
       positions[i * 3] = Math.cos(a) * r;
       positions[i * 3 + 1] = (Math.random() * 2 - 1) * FIELD_EXTENT;
       positions[i * 3 + 2] = Math.sin(a) * r;
@@ -177,6 +159,7 @@ export default function ElementalOrb({ special, size }) {
     if (!group || !def) return;
     const dt = Math.min(delta, 0.05);
     const t = state.clock.elapsedTime;
+    const reduced = reducedRef.current;
     ageRef.current += dt;
 
     // Anchor to the live cubie mesh so the orb rides a mid-rotation slice exactly
@@ -186,36 +169,34 @@ export default function ElementalOrb({ special, size }) {
       _pos.set(wp[0], wp[1], wp[2]);
       _norm.copy(FACE_NORMALS[special.dirKey] ?? FACE_NORMALS.PZ);
     }
-
-    const bob = reducedRef.current ? 0 : Math.sin(t * 1.9) * 0.07 * ORB_SCALE;
-    // Scaled with the orb: the clearance under the sphere has to grow with its
-    // radius, or a bigger orb sits half-buried in the tile it hovers over.
-    const hover = (SPECIAL_HOVER_HEIGHT + ELEM_HOVER_LIFT) * ORB_SCALE;
-    group.position.copy(_pos).addScaledVector(_norm, hover + bob);
-    // Stand the orb up off its face — +Y local is the surface normal.
+    // The group sits on the tile; only the relic hovers and bobs above it.
+    group.position.copy(_pos);
+    // Stand the orb up off its face: +Y local is the surface normal.
     _quat.setFromUnitVectors(_up, _norm);
     group.quaternion.copy(_quat);
 
     // Lifetime fade. No urgency blink: if you don't want this element you just take
-    // another, so there is nothing to panic about — the ring carries the clock.
+    // another, so there is nothing to panic about. The sigil's arc carries the clock.
     const ttl = special.ttl ?? SPECIAL_FADE_TIME;
     const life = special.maxTtl || SPECIAL_FADE_TIME;
     const fade = ttl >= SPECIAL_FADE_TIME ? 1 : Math.max(0, ttl / SPECIAL_FADE_TIME);
     const alpha = Math.max(FADE_FLOOR, fade);
 
-    // Assemble at its final size; the shared grain reveals the orb without a pop.
-    const pop = 1;
-    const breathe = reducedRef.current ? 1 : 1 + Math.sin(t * 2.6) * 0.035;
-
-    if (bodyRef.current) bodyRef.current.scale.setScalar(BODY_SCALE * ORB_SCALE * pop * breathe);
-    if (spinRef.current && !reducedRef.current) {
-      spinRef.current.rotation.y = t * spin.rate;
+    const bob = reduced ? 0 : Math.sin(t * 1.9) * 0.05;
+    const breathe = reduced ? 1 : 1 + Math.sin(t * 2.6) * 0.03;
+    if (billboardRef.current) billboardRef.current.position.y = (RELIC_HOVER + bob) * ORB_SCALE;
+    if (bodyRef.current) {
+      bodyRef.current.scale.setScalar(ORB_SCALE * breathe);
+      bodyRef.current.rotation.x = spin.tilt;
+    }
+    if (spinRef.current && !reduced) {
+      spinRef.current.rotation.y = spin.swing ? Math.sin(t * spin.rate) * spin.swing : t * spin.rate;
       spinRef.current.rotation.x = Math.sin(t * 0.7) * spin.wobble;
       spinRef.current.rotation.z = Math.cos(t * 0.55) * spin.wobble * 0.6;
     }
 
-    // Orbiting motes.
-    if (!reducedRef.current) {
+    // Motes.
+    if (!reduced) {
       for (let i = 0; i < MOTES.length; i++) {
         const mesh = motesRef.current[i];
         if (!mesh) continue;
@@ -231,7 +212,7 @@ export default function ElementalOrb({ special, size }) {
     // sway is placed directly off a stable anchor so it can never walk out of the
     // envelope over a long session.
     const pts = pointsRef.current;
-    if (pts && !reducedRef.current) {
+    if (pts && !reduced) {
       const cfg = field.cfg;
       const arr = pts.geometry.attributes.position.array;
       for (let i = 0; i < cfg.count; i++) {
@@ -246,43 +227,38 @@ export default function ElementalOrb({ special, size }) {
       pts.geometry.attributes.position.needsUpdate = true;
     }
 
-    // Stand the body and its crest upright on screen. The parent already carries
-    // the tile's orientation, so undo it before applying the camera's.
+    // Stand the relic upright on screen. The parent already carries the tile's
+    // orientation, so undo it before applying the camera's.
     if (billboardRef.current) {
       _billboard.copy(group.quaternion).invert().multiply(state.camera.quaternion);
       billboardRef.current.quaternion.copy(_billboard);
     }
-    if (crestRef.current) crestRef.current.scale.setScalar(CREST_SCALE * ORB_SCALE * pop);
-    if (sparksRef.current && !reducedRef.current) sparksRef.current.rotation.z = t * 1.1;
-
-    // Ground pool: hold it on the tile while the orb bobs above it, and swell it
-    // gently so the face looks lit rather than stickered.
-    if (groundRef.current) {
-      groundRef.current.position.y = -(hover + bob) + 0.03;
-      groundRef.current.scale.setScalar(ORB_SCALE * pop * (reducedRef.current ? 1 : 1 + Math.sin(t * 2.1) * 0.05));
-    }
 
     if (lightRef.current) {
-      // Fire gutters, ice is steady, water and nature breathe.
-      const flicker = reducedRef.current ? 1 : special.type === 'fire' ? 0.75 + 0.25 * Math.sin(t * 9.0) : 0.85 + 0.15 * Math.sin(t * 2.2);
-      lightRef.current.intensity = 1.35 * alpha * pop * flicker;
+      // Fire gutters, lightning crackles, ice is steady, water and earth breathe.
+      const flicker = reduced
+        ? 1
+        : special.type === 'fire'
+          ? 0.75 + 0.25 * Math.sin(t * 9.0)
+          : special.type === 'lightning'
+            ? 0.8 + 0.2 * Math.sin(t * 23.0) * Math.sin(t * 3.1)
+            : 0.85 + 0.15 * Math.sin(t * 2.2);
+      lightRef.current.intensity = 1.35 * alpha * flicker;
     }
 
     // One traverse drives every tagged transparent material's lifetime fade.
     group.traverse((o) => {
-      if (o.material && o.material.transparent) o.material.opacity = (o.userData.baseOpacity ?? 1) * alpha;
+      if (o.material && o.material.transparent && o.userData.baseOpacity !== undefined) o.material.opacity = o.userData.baseOpacity * alpha;
     });
     // Shader materials read their own alpha uniform, not material.opacity.
     mats.uniforms.uTime.value = t;
-    mats.uniforms.uAlpha.value = alpha * pop;
-
-    // Countdown arc on the tile, draining clockwise as the offering runs out.
-    // Its shader reads uniforms, not material.opacity, so the traverse leaves it be.
-    if (countdownRef.current) {
-      const u = countdownRef.current.material.uniforms;
-      u.uRemaining.value = Math.max(0, Math.min(1, ttl / life));
-      u.uAlpha.value = alpha;
-    }
+    mats.uniforms.uAlpha.value = alpha;
+    // The sigil: countdown arc draining clockwise as the offering runs out, and the
+    // rune ring turning (held still under reduced motion).
+    const sigil = trim.sigil.uniforms;
+    sigil.uRemaining.value = Math.max(0, Math.min(1, ttl / life));
+    sigil.uAlpha.value = alpha;
+    sigil.uTime.value = reduced ? 0 : t;
 
     // One-shot spawn shockwave across the face, then it stays hidden.
     if (shockRef.current) {
@@ -298,7 +274,7 @@ export default function ElementalOrb({ special, size }) {
     group.visible = true;
     const reveal = arrival.current;
     if (!reveal.done) {
-      reveal.effect ??= createOrbReveal(group, { radius: 1.6, reducedMotion: reducedRef.current });
+      reveal.effect ??= createOrbReveal(group, { radius: 1.6, reducedMotion: reduced });
       reveal.done = !reveal.effect.update(orbRevealProgress(ageRef.current));
     }
   });
@@ -307,14 +283,12 @@ export default function ElementalOrb({ special, size }) {
 
   return (
     <group ref={groupRef} visible={false}>
-      {/* ── Upright on screen: the body and the crest above it ─────────────── */}
+      {/* ── The relic, upright on screen, hovering over its tile ─────────────── */}
       <group ref={billboardRef}>
         <group ref={bodyRef}>
           <group ref={spinRef}>
-            <mesh geometry={shape} material={mats.hull} scale={LAYER_SCALE.hull} renderOrder={0} raycast={() => null} />
-            <mesh geometry={shape} material={mats.core} scale={LAYER_SCALE.core} renderOrder={1} raycast={() => null} />
-            <mesh geometry={shape} material={mats.inner} scale={LAYER_SCALE.inner} renderOrder={2} raycast={() => null} />
-            <mesh geometry={shape} material={mats.shell} scale={LAYER_SCALE.shell} renderOrder={3} raycast={() => null} />
+            <mesh geometry={shape} material={mats.hull} renderOrder={0} raycast={() => null} />
+            <mesh geometry={shape} material={mats.body} renderOrder={1} raycast={() => null} />
           </group>
 
           {/* Sprites, not spheres: at this size a low-poly sphere reads as a visible
@@ -323,7 +297,7 @@ export default function ElementalOrb({ special, size }) {
             <sprite
               key={i}
               material={trim.mote}
-              scale={[0.12, 0.12, 0.12]}
+              scale={[0.1, 0.1, 0.1]}
               ref={(el) => {
                 motesRef.current[i] = el;
                 if (el) el.userData.baseOpacity = 0.85;
@@ -331,16 +305,12 @@ export default function ElementalOrb({ special, size }) {
             />
           ))}
         </group>
-
-        <group ref={crestRef} position={[0, CREST_LIFT * ORB_SCALE, 0.3 * ORB_SCALE]}>
-          <ElementalBadge type={special.type} color={color} sparksRef={sparksRef} />
-        </group>
       </group>
 
-      {/* ── The element's own matter drifting round the orb, in the tile's frame
-          so bubbles rise and flakes settle relative to the cube ──────────────── */}
+      {/* ── The element's own matter drifting round the relic, in the tile's
+          frame so bubbles rise and flakes settle relative to the cube ──────── */}
       {!reducedRef.current && (
-        <group scale={1.15 * ORB_SCALE}>
+        <group position={[0, RELIC_HOVER * ORB_SCALE, 0]} scale={1.1 * ORB_SCALE}>
           <points
             ref={pointsRef}
             geometry={field.geometry}
@@ -352,24 +322,15 @@ export default function ElementalOrb({ special, size }) {
         </group>
       )}
 
-      {/* ── Light pooled on the tile below, ringed by the countdown ────────── */}
-      <group ref={groundRef} rotation={[-Math.PI / 2, 0, 0]}>
-        {glowTex && (
-          <mesh
-            geometry={_geos.pool}
-            material={trim.pool}
-            raycast={() => null}
-            ref={(el) => {
-              poolRef.current = el;
-              if (el) el.userData.baseOpacity = 0.42;
-            }}
-          />
-        )}
-        <mesh ref={countdownRef} geometry={_geos.countdown} material={trim.countdown} position={[0, 0, 0.005]} raycast={() => null} />
-        <mesh ref={shockRef} geometry={_geos.shock} material={trim.shock} raycast={() => null} />
+      {/* ── The sigil on the tile, and the spawn shockwave across it ─────────── */}
+      <group ref={groundRef} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh geometry={_geos.sigil} material={trim.sigil} renderOrder={-1} raycast={() => null} />
+        <mesh ref={shockRef} geometry={_geos.shock} material={trim.shock} raycast={() => null} userData={{ baseOpacity: 0.8 }} />
       </group>
 
-      {lightsRef.current && <WormPointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} />}
+      {lightsRef.current && (
+        <WormPointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} position={[0, RELIC_HOVER * ORB_SCALE, 0]} />
+      )}
     </group>
   );
 }

@@ -29,8 +29,29 @@ describe('elemental orb shapes', () => {
     }
   });
 
+  it('carries the piece id and the outline direction the relic shader reads', () => {
+    for (const type of [...ELEMENTAL_TYPES, 'nope']) {
+      const geo = getElementalOrbShape(type);
+      const count = geo.attributes.position.count;
+      expect(geo.attributes.aPart?.count, type).toBe(count);
+      expect(geo.attributes.aSmooth?.count, type).toBe(count);
+      const s = geo.attributes.aSmooth;
+      for (let i = 0; i < count; i++) {
+        expect(Math.hypot(s.getX(i), s.getY(i), s.getZ(i)), `${type} aSmooth ${i}`).toBeCloseTo(1, 3);
+      }
+    }
+  });
+
+  it('paints the island and the crystal cluster in several pieces', () => {
+    const pieces = (type) => new Set(getElementalOrbShape(type).attributes.aPart.array).size;
+    expect(pieces('grass')).toBe(4); // rock, grass, trunk, leaves
+    expect(pieces('ice')).toBe(2); // the main crystal and the shorter ones
+  });
+
   it('falls back to a sphere for an unknown type', () => {
-    expect(getElementalOrbShape('nope').type).toBe('SphereGeometry');
+    const geo = getElementalOrbShape('nope');
+    expect(geo.boundingSphere.radius).toBeCloseTo(0.42, 2);
+    expect(getElementalOrbShape('nope')).toBe(geo);
   });
 
   it('has a drifting-matter kind for every element', () => {

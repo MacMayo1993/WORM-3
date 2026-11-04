@@ -27,7 +27,7 @@ import { FUSION_LOOKS } from '../worm/healerWorm/fusionLooks.js';
 const fakeRenderer = () => ({ compile: vi.fn() });
 const fakeCamera = {};
 
-// Four orb materials (core, shell, inner bloom, ink hull), one ambient particle
+// Two relic materials (body, ink hull), one ambient particle
 // material, plus the skin:
 //   surface → 1, flames → 6 (bed, tongues and light, for both detail tiers),
 //   blades → 3 (moss bed, plants and the claim's burst of leaves)
@@ -38,7 +38,7 @@ const DETAIL_VARIANTS = { ice: 1 };
 const ADORNMENTS = { water: 1, ice: 1 };
 // Every fusion's reaction adds its coat and its particle material.
 const expectedCount = Object.entries(ELEMENTAL_DEFS).reduce(
-  (n, [element, def]) => n + 5 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0) + (ADORNMENTS[element] ?? 0),
+  (n, [element, def]) => n + 3 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0) + (ADORNMENTS[element] ?? 0),
   0
 ) + Object.keys(FUSION_LOOKS).length * 2 + 1; // + the sigil emblem (FusionAura)
 
