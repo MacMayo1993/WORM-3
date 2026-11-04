@@ -1,3 +1,4 @@
+import { graphicsRecoveryOwnsInput } from '../utils/graphicsRecovery.js';
 /**
  * Global cube keyboard controls. Menus own input while open; ordinary puzzle
  * shortcuts remain available during play. Retired mode bindings live in the archive.
@@ -68,6 +69,7 @@ export function useKeyboardControls({
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (graphicsRecoveryOwnsInput()) return;
       const h = handlersRef.current;
       const state = useGameStore.getState();
 

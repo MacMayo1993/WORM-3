@@ -1,3 +1,4 @@
+import { graphicsRecoveryOwnsInput } from '../../utils/graphicsRecovery.js';
 import { useEffect } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { callWormTurn } from '../../worm/wormTurnBridge.js';
@@ -20,6 +21,7 @@ export default function CaptureController() {
     const cancelTimer = () => { clearTimeout(timer); timer = null; };
     const stop = e => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
     const start = e => {
+      if (graphicsRecoveryOwnsInput()) { cancelTimer(); gesture = null; swallow = false; return; }
       if (!useGameStore.getState().captureMode && !swallow) return;
       if (e.touches.length < 2) return;
       // Let movement controls see the second finger and cancel pending input.
@@ -31,11 +33,13 @@ export default function CaptureController() {
         ? Array.from(e.touches, t => ({ id: t.identifier, x: t.clientX, y: t.clientY })) : null;
       if (!gesture) return;
       timer = setTimeout(() => {
+        if (graphicsRecoveryOwnsInput()) { gesture = null; swallow = false; timer = null; return; }
         gesture = null;
         useGameStore.getState().setCaptureMode(false);
       }, 1000);
     };
     const move = e => {
+      if (graphicsRecoveryOwnsInput()) { cancelTimer(); gesture = null; swallow = false; return; }
       if (!swallow) return;
       stop(e);
       if (!gesture) return;
@@ -45,6 +49,7 @@ export default function CaptureController() {
       })) { cancelTimer(); gesture = null; }
     };
     const end = e => {
+      if (graphicsRecoveryOwnsInput()) { cancelTimer(); gesture = null; swallow = false; return; }
       if (!swallow) return;
       stop(e);
       cancelTimer();
@@ -54,6 +59,7 @@ export default function CaptureController() {
       if (e.touches.length === 0) swallow = false;
     };
     const key = e => {
+      if (graphicsRecoveryOwnsInput()) { cancelTimer(); gesture = null; swallow = false; return; }
       if (!useGameStore.getState().captureMode) return;
       if (e.key === 'Escape') {
         stop(e); cancelTimer(); gesture = null;
