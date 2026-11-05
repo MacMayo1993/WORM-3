@@ -109,7 +109,7 @@ export const WORM_STORY_NARRATIVE = {
       'Numbers view: every face holds every number once. It kept Corps medics from getting turned around.',
       'Earth can help you clear your tail. Collect the green mountain orb, land to grow a spring pad, then jump from the pad and land safely.',
     ],
-    debrief: 'Spring planted, spring launched. That is Earth mastery: your last landing becomes your next launch point.',
+    debrief: 'Spring planted, spring launched. That is an Earth spring jump: your last landing becomes your next launch point.',
   },
   14: {
     briefing: [
@@ -207,7 +207,7 @@ export const WORM_STORY_NARRATIVE = {
   27: {
     briefing: [
       'The Core is leaking weather. A storm is forming in the neon.',
-      'Don’t just grab the elements. Use them: build water’s speed, lay fire’s trail, spring off earth.',
+      'Pick up each required element to activate its power. One use of each is all we need.',
     ],
     debrief: 'A healer who uses the weather instead of fearing it. That’s rare.',
   },
@@ -302,7 +302,7 @@ export const WORM_STORY_NARRATIVE = {
   40: {
     briefing: [
       'The Longhaul is pulling its longest body toward us through the doors. If it reconnects, the Flip Cube becomes part of it.',
-      'Heal every door on this deck and its grip loosens. Use all six elements, including Earth’s spring pads and Air’s updraft jumps. Every trick you’ve got, partner.',
+      'Heal every door on this deck and its grip loosens. Use all six elements. Pick each one up to activate it. Every trick you’ve got, partner.',
     ],
     debrief: 'It let go! For now. Its head is still in the Core, awake and hungry. And it remembers my name. It remembers me.',
   },
@@ -313,7 +313,7 @@ export const WORM_STORY_NARRATIVE = {
       'New plan. The Longhaul thinks long means strong. We’ll show them long can also mean kind.',
       'Step one is the long part. Eat.',
     ],
-    debrief: 'Nine tiles long. You’re officially a large worm. I’m having a badge made. In my head.',
+    debrief: 'That whole feast collected. You’re officially a large worm. I’m having a badge made. In my head.',
   },
   42: {
     briefing: [
@@ -512,9 +512,9 @@ export const WORM_STORY_NARRATIVE = {
   69: {
     briefing: [
       'The Longhaul’s lightning keeps hitting the doors. We’ll use that: a charged door costs less to heal.',
-      'Master all six elements, heal every door, and double one up. Spring from Earth’s pads and land an Air jump as well as surviving the lightning.',
+      'Use all six elements, heal every door, and double one up. Collect each element to activate it; no extra tricks needed.',
     ],
-    debrief: 'Every door healed and every element mastered. You’re the storm now.',
+    debrief: 'Every door healed and every element used. You’re the storm now.',
   },
   70: {
     briefing: [
@@ -622,7 +622,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Grow into a wall around the Core. The crawlers can’t get through a worm that long.',
     ],
-    debrief: 'Sixteen tiles of wall. The crawlers stopped trying. One waved. I think it was a wave.',
+    debrief: 'Every orb collected, every crawler stopped. The crawlers stopped trying. One waved. I think it was a wave.',
   },
   85: {
     briefing: [
@@ -678,7 +678,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Glass reflects everything. Grow huge here and there will be two of you to look at.',
     ],
-    debrief: 'Fifteen tiles of worm, reflected. The Longhaul stared the whole time.',
+    debrief: 'A whole feast of orbs, reflected. The Longhaul stared the whole time.',
   },
   93: {
     briefing: [
@@ -742,7 +742,7 @@ export const WORM_STORY_NARRATIVE = {
       'The longest body understands now, but understanding isn’t healing. It is still stretched across the Plane, pulling at our doors.',
       'To hold its attention you need to be enormous. The cargo deck has all the food we need.',
     ],
-    debrief: 'Eighteen tiles long. The Longhaul measured you. They looked impressed, which for the Longhaul is a hug.',
+    debrief: 'Seventy orbs collected. The Longhaul measured you. They looked impressed, which for the Longhaul is a hug.',
   },
   102: {
     briefing: [
@@ -754,7 +754,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Big decks have big gears. A huge body and nowhere to hide but everywhere.',
     ],
-    debrief: 'Twelve turns on a ten-layer deck with seventeen tiles of worm. I’m running out of compliments. Here’s one: wow.',
+    debrief: 'Twelve turns on a ten-layer deck and sixty orbs collected. I’m running out of compliments. Here’s one: wow.',
   },
   104: {
     briefing: [
@@ -786,7 +786,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Your body is so long it’s in your way everywhere. Big jumps. Lots of them.',
     ],
-    debrief: 'Ten clean jumps over nearly twenty tiles of worm. The longest body tried one. It got stuck. We’ll work on it.',
+    debrief: 'Ten clean body jumps and seventy orbs collected. The longest body tried one. It got stuck. We’ll work on it.',
   },
   109: {
     briefing: [

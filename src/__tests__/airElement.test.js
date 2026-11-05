@@ -66,7 +66,7 @@ it('combines an Earth spring pad with Air lift', () => {
   expect(sim.jumpHeight).toBeCloseTo(1.8 * 1.4);
   expect(sim.jumpSpan).toBeCloseTo(2.2 * 1.35);
 });
-it.each([0, 1, 2, 3, 4, 5])('offers Air within two refills from deal slot %i, and awards mastery only after landing', slot => {
+it.each([0, 1, 2, 3, 4, 5])('offers Air within two refills from deal slot %i, and credits use on activation without a landing', slot => {
   const { sim, ctx, practice, level } = setup(70);
   practice.elementOrder = STORY_ELEMENTS.filter(type => type !== 'air');
   practice.elementOrder.splice(slot, 0, 'air');
@@ -84,15 +84,11 @@ it.each([0, 1, 2, 3, 4, 5])('offers Air within two refills from deal slot %i, an
     expect(sim.specials[0].type).toBe('air');
   }
   expect(sim.specials.some(s => s.type === 'air')).toBe(true);
-  startElemental(sim, ctx, 'air'); sim.elementalFocusT = 0;
-  updateMastery(sim, practice, level, 0.1);
-  expect(practice.elements.has('air')).toBe(false);
-  startJump(sim, ctx);
-  updateMastery(sim, practice, level, 0.1);
-  expect(practice.elements.has('air')).toBe(false);
-  sim.isJumping = false; sim.phase = 'crawling';
-  updateMastery(sim, practice, level, 0.1);
+  startElemental(sim, ctx, 'air');
   expect(practice.elements.has('air')).toBe(true);
+  expect(sim.isJumping).toBe(false);
+  updateMastery(sim, practice, level, 0);
+  expect(practice.elements.size).toBe(6);
 });
 
 it('finishes the Air demo only after an Air jump lands alive', () => {

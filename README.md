@@ -165,7 +165,7 @@ Power pickups produce a temporary change with a visible activation, timer, and e
 
 New orbs assemble with the opening cube/bomb dissolve played in reverse. Shower orbs also fall toward their tiles; reduced-motion settings use a gentle fade. The demo stages a dense 12-orb growth exercise and a separate full-length Orb Shower lesson.
 
-### Five elements
+### Six elements
 
 Each element changes the worm/cube presentation with its own materials, atmosphere, particles, and pickup feedback. Several also change surface movement. In combat, the same element has a projectile effect.
 
@@ -176,8 +176,9 @@ Each element changes the worm/cube presentation with its own materials, atmosphe
 | **Nature / Grass** | Land to grow an eight-second spring pad; jumping from it produces a longer, higher leap. | Root enemies in place. |
 | **Ice** | Slide to the next tile before turning; jumping restores immediate steering. | Freeze crawlers. |
 | **Lightning** | Electrify cube seams and surround the worm with current and timed strikes. | Chain attacks to nearby enemies. |
+| **Air** | Hold Jump to fly, steer freely, and gather nearby growth orbs. Release to land; a flight of at least half a second triggers a two-tile orb sweep on landing. | Push and stun enemies. |
 
-Offerings rotate through available elements, and taking one resolves that offering. Timed appearances, replacement, pause behavior, and effects quality are managed separately from underlying face identity. Story distinguishes **collecting** an element from **mastering/using** its mechanic where the objective requires it.
+Offerings rotate through available elements, and taking one resolves that offering. Timed appearances, replacement, pause behavior, and effects quality are managed separately from underlying face identity. Story's **use an element** objectives count each distinct element when its effect activates on pickup. They do not require hidden movement feats or survival timers. Dedicated Earth-spring and Air-jump lessons state their landing tasks separately.
 
 ## Playable worms and signature abilities
 
@@ -207,9 +208,9 @@ WORM Story is a separate action campaign from the cube puzzle packs: twelve ten-
 | **Every Deck** | 11–20 | Every size is a deck of the same ship; the routes were sealed from inside. | 2×2 to 8×8, grid, numbers, glass, chrome and neon views, explosion and flight. |
 | **Strange Views** | 21–30 | The Core bends the decks; Mobi remembers slamming a door on the Longhaul. | Hollow, wireframe, bricks, the far side, the first fusions. |
 | **The Grand Crawl** | 31–40 | The story of W³: a mirrored tail, and a clan's first bite. | 9×9, 10×10 and 15×15 with long bodies and everything combined. |
-| **The Long Body** | 41–50 | Long can mean kind. | Growth targets on every board and the first passes through the Core. |
+| **The Long Body** | 41–50 | Long can mean kind. | Total-orb targets on every board and the first passes through the Core. |
 | **Pocket Worlds** | 51–60 | The Longhaul hides in the smallest decks. | Huge worms on 2×2–4×4 cubes; double heals. |
-| **Weather of War** | 61–70 | The Longhaul answers with storms. | Fusions of every kind, all five elements mastered. |
+| **Weather of War** | 61–70 | The Longhaul answers with storms. | Fusions of every kind, all six elements used. |
 | **The War Machine** | 71–80 | The ship turned into a weapon. | Turns every 9–10 s, blasts, bombs, rockets. |
 | **Siege of the Core** | 81–90 | The crawlers dig in around the Core. | Fights, rings, bombs and abilities on long bodies. |
 | **Mirror Decks** | 91–100 | The longest body meets its reflection. | Far-side and mirrored views; many passes and double heals. |
@@ -218,14 +219,15 @@ WORM Story is a separate action campaign from the cube puzzle packs: twelve ten-
 
 Beyond collecting orbs and colors, crossing pairs, jumping the body, surviving turns, healing, the powers, elements, fights and bombs, later levels ask for:
 
-- **Grow your worm**: reach a body length. Peak length counts, so spending segments on tolls afterwards does not take the credit back.
+- **Collect total orbs**: each fresh growth-orb pickup adds one to the run total. Healing deposits and tail cuts never remove that credit; recovering dropped inventory does not count again. Current or peak body length is not a level qualification.
+- **Use elements**: activate each requested element at least once. Repeating the same element does not advance distinct-element goals, and fusions retain their own named objectives.
 - **Pass yourself in the Core**: dive into a tunnel while your tail is still inside one (the same pair from its far end counts). It is credited once the head is crawling again.
 - **Double heals**: seal one pair while a heal on a different pair is still riding in your body, or seal two pairs with one surround.
 - **Fusions** and **different fusions**: collect two elements within one elemental window; pickup order picks the recipe.
 
 Limits and target times come from one workload model shared by every level, with less slack in later chapters. Ordinary food and required powers recur, so the opening inventory is not a lifetime allowance. Supply and completion predicates are checked against the game runtime (tests and the [level auditor](tools/worm-level-auditor/README.md)). Complete player runs still need playtesting on devices.
 
-A valid clear awards one star, finishing at or below the target time adds one, and completing without a cut adds one: **up to three stars**. Required landings, settled rotations, and tail clearance are part of completion. Some mastery stages require ring-heal/signature tasks before ordinary deposits can finish sealing the remaining tunnels.
+A valid clear awards one star. Finishing at or below the target time **or** completing without a cut earns two. Three stars require **all three bonuses**: finish within the target time, avoid tail cuts, and collect the displayed total-orb target. No star requires a body length. Required landings, settled rotations, and tail clearance are part of completion. Some combined-objective stages require ring-heal/signature tasks before ordinary deposits can finish sealing the remaining tunnels.
 
 Rewards include Parity Points and choices of hats, palettes, skins, trails, or accessories. Chapter appearances are temporary; owned and equipped cosmetics are tracked separately from the level's borrowed setup.
 

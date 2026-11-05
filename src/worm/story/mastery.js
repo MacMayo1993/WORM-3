@@ -13,20 +13,24 @@ export { STORY_ELEMENTS, storyElementCount } from './elementGoals.js';
 export const STORY_POWER_OPENING_DELAY = 10;
 export const STORY_POWER_COOLDOWN = 3;
 export const STORY_POWER_LIFETIME = 20;
-// Explode gets an early slot even when a magnet catch or element mastery is
+// Explode gets an early slot even when a magnet catch or element use is
 // unfinished. The cursor advances on an offer, not on successful task credit.
 const STORY_POWER_CYCLE = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning', 'air'];
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
-  water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
+  water: 'Water: crawl to build momentum', fire: 'Fire: crawling leaves a trail',
   air: 'Air: jump while Air is active, then release Jump and land safely',
-  grass: 'Earth: jump from a spring patch and land safely; jumping and landing with Earth grows a patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
+  grass: 'Earth: jump from a spring patch and land safely; jumping and landing with Earth grows a patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: the storm is active' };
 export const STORY_FUSION_GOALS = { steamFusions: getFusion('fire', 'water'), quenchFusions: getFusion('water', 'fire') };
 const pendingFusions = (p, level) => Object.entries(STORY_FUSION_GOALS).filter(([key]) => (p.mechanics[key] ?? 0) < (level.mechanics?.[key] ?? 0)).map(([, recipe]) => recipe);
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 
 // Events originate after a successful pickup/disarm/heal, never from button input.
 export function recordStoryMechanic(practice, key, id) {
+  if (practice && key === 'elementUsed') {
+    if (STORY_ELEMENTS.includes(id)) practice.elements.add(id);
+    return;
+  }
   if (practice && key === 'elementFusion') {
     if (!id) return;
     // Any recipe counts toward fusions; each ordered recipe counts once toward variety.
@@ -39,7 +43,7 @@ export function recordStoryMechanic(practice, key, id) {
   if (practice && key === 'airLaunch') { practice.airJump = true; return; }
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
   if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups', 'selfPasses', 'multiHeals'].includes(key)) return;
-  // Pickup variety is separate from elemental mastery actions. Repeated
+  // Pickup variety and quantity are separate from actual element activation. Repeated
   // pickups still count toward quantity quests, but each element counts once.
   if (key === 'elementPickups' && STORY_ELEMENTS.includes(id)) practice.collectedElements.add(id);
   if (key === 'bombs') {
@@ -64,18 +68,16 @@ export function updateMastery(sim, p, level, delta) {
   else if (p.boosting && sim.phase === 'crawling') { add(p, 'boosts'); p.boosting = false; }
   if (sim.isJumping && !sim.rocketActive && !p.flying) {
     p.doubleJump ||= sim.jumpCount >= 2;
-    if (hasElement(sim, 'ice')) p.iceJump = true;
   }
-  if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; p.airJump = false; }
+  if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.airJump = false; }
   // An explosion counts once the cube has closed again with the worm still on it.
   if (sim.explodeT > 0) p.exploding = true;
   else if (p.exploding && safe && !(sim.expansionAmount > 0)) { add(p, 'explodes'); p.exploding = false; }
   if (safe) {
     if (p.doubleJump) { add(p, 'doubleJumps'); p.doubleJump = false; }
     if (p.flying) { add(p, 'rockets'); p.flying = false; }
-    if (p.grassJump) { p.elements.add('grass'); p.grassJump = false; }
-    if (p.iceJump) { p.elements.add('ice'); p.iceJump = false; }
-    if (p.airJump) { p.elements.add('air'); p.airJump = false; }
+    if (p.grassJump) { add(p, 'earthSprings'); p.grassJump = false; }
+    if (p.airJump) { add(p, 'airJumps'); p.airJump = false; }
   }
   const sig = sim.signature;
   // Spectrum is passive: build its reserve with different freshly collected colors.
@@ -84,15 +86,6 @@ export function updateMastery(sim, p, level, delta) {
   // Inch increments seq when charging; only its successful launch earns credit.
   if (sig.character !== 'prism' && sig.seq > (p.signatureSeq ?? 0) && (sig.character !== 'inch' || sig.active > 0)) {
     add(p, 'signatures'); p.signatureSeq = sig.seq;
-  }
-  p.elementTimes ??= {};
-  for (const type of STORY_ELEMENTS) {
-    if (!hasElement(sim, type)) { p.elementTimes[type] = 0; continue; }
-    if (sim.elementalFocusT > 0 || sim.phase !== 'crawling') continue;
-    const time = p.elementTimes[type] = (p.elementTimes[type] ?? 0) + Math.min(Math.max(delta, 0), 0.1);
-    if (type === 'water' && time >= 3 && sim.waterMomentum > 0.75) p.elements.add('water');
-    if (type === 'fire' && time >= 3 && [...sim.elementalPatches.values()].some(patch => patch.type === 'fire')) p.elements.add('fire');
-    if (type === 'lightning' && time >= 4) p.elements.add('lightning');
   }
 }
 // The elements take their slots in the cycle in this attempt's dealt order, so
@@ -107,7 +100,7 @@ export function nextStoryPower(p, level) {
   const elements = storyElementTypes(level, p.elementOrder);
   const needs = new Set();
   for (const recipe of pendingFusions(p, level)) { needs.add(recipe.base); needs.add(recipe.catalyst); }
-  for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket']]) {
+  for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket'], ['earthSprings', 'grass'], ['airJumps', 'air']]) {
     if ((p.mechanics[key] ?? 0) < (m[key] ?? 0)) needs.add(type);
   }
   if ((p.mechanics.elementPickups ?? 0) < (m.elementPickups ?? 0)) {
@@ -245,9 +238,10 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   // starve required rockets, magnets, explosions, or the optional view offer.
   const otherGoals = Object.fromEntries(Object.entries(level.mechanics).filter(([key]) => !STORY_ELEMENT_GOALS.includes(key)));
   const offered = offerStoryQuestPower(sim, p, { ...level, mechanics: otherGoals }, size, cubies, true);
-  const missing = storyElementTypes(level, p.elementOrder).slice(0, level.mechanics.elements ?? 0)
-    .filter(type => !p.elements.has(type));
-  const actions = missing.filter(type => hasElement(sim, type)).map(type => HINTS[type]);
+  const actions = [['earthSprings', 'grass'], ['airJumps', 'air']]
+    .filter(([key, type]) => (p.mechanics[key] ?? 0) < (level.mechanics[key] ?? 0) && hasElement(sim, type))
+    .map(([, type]) => HINTS[type]);
+  if (level.mechanics.elements) actions.push('Pick up each required element to activate it. Each type counts once.');
   const recipes = pendingFusions(p, level).map(recipe => `${fusionRecipeLabel(recipe)}: collect in this order before the first effect ends`);
   const supplyHint = activeFusion(sim) ? 'Fusion active — no elemental orbs until it ends.'
     : sim.elementalClaimCooldown > 0 ? `Element refill in ${Math.ceil(sim.elementalClaimCooldown)}s. Existing orbs can still fuse.`
@@ -326,11 +320,10 @@ function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = fals
     if (recipe) return `${fusionRecipeLabel(recipe)} · ${partnerRecipe ? 'Collect the marked partner before the timer ends.' : 'Collect the first element, then follow the marked partner.'}`;
     const missing = storyElementTypes(level, p.elementOrder).slice(0, level.mechanics?.elements ?? 0)
       .filter(element => !p.elements.has(element));
-    // The remaining orb must not hide instructions for the element already
-    // picked up. Collection alone does not complete a mastery action.
+    // General use goals credit activation, without a hidden mastery action.
     const active = missing.filter(element => hasElement(sim, element));
     const shown = new Set([offered, ...sim.specials.map(orb => orb.type)]);
-    const actions = (active.length ? active : missing.filter(element => shown.has(element))).map(element => HINTS[element]);
+    const actions = (active.length ? active : missing.filter(element => shown.has(element))).map(element => `Pick up ${element === 'grass' ? 'earth' : element} to activate it`);
     const pairHint = sim.specials.filter(orb => STORY_ELEMENTS.includes(orb.type)).length > 1 && STORY_ELEMENTS.includes(offered)
       ? 'Two elements are available on different faces. Collect both before the first effect ends to fuse them; pickup order changes the result.' : null;
     if (actions.length || pairHint) return [...actions, pairHint].filter(Boolean).join(' · ');
@@ -369,7 +362,7 @@ function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = fals
   if (level.id >= 21 && !recipes.length && STORY_ELEMENTS.includes(type)) {
     // Keep the first orb focused on unfinished tasks, but cycle companions
     // independently through the entire allowed pool. Otherwise the last two
-    // unmastered elements permanently replace every other fusion choice.
+    // unused elements permanently replace every other fusion choice.
     const lastCompanion = elementPool.indexOf(p.lastElementCompanion);
     const second = Array.from({ length: elementPool.length }, (_, offset) =>
       elementPool[(lastCompanion + offset + 1) % elementPool.length]).find(element => element !== type);

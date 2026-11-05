@@ -146,15 +146,16 @@ for (const level of WORM_STORY_LEVELS) {
         assert((key === 'uniqueElements' ? distinct : p.mechanics.elementPickups) >= count);
       } else if (key === 'elements') {
         for (const type of storyElementTypes(level).slice(0, count)) {
-          sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0; sim.waterMomentum = 1;
-          if (type === 'fire') sim.elementalPatches.set('audit', { type: 'fire' });
-          if (type === 'grass') recordStoryMechanic(p, 'grassLaunch');
-          if (type === 'air') recordStoryMechanic(p, 'airLaunch');
-          if (type === 'ice') { sim.isJumping = true; tick(); sim.isJumping = false; }
-          for (let i = 0; i < 45; i++) tick();
+          recordStoryMechanic(p, 'elementUsed', type);
           assert(p.elements.has(type));
         }
         sim.elementalT = 0;
+      } else if (['earthSprings', 'airJumps'].includes(key)) {
+        for (let i = 0; i < count; i++) {
+          recordStoryMechanic(p, key === 'earthSprings' ? 'grassLaunch' : 'airLaunch');
+          tick();
+        }
+        assert.equal(p.mechanics[key], count);
       } else if (['boosts', 'doubleJumps', 'rockets', 'explodes', 'signatures'].includes(key)) {
         for (let i = 0; i < count; i++) {
           if (key === 'boosts') { sim.boostActiveT = 1; tick(); sim.boostActiveT = 0; }

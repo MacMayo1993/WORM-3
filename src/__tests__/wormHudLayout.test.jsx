@@ -77,7 +77,7 @@ it('keeps the next task visible and puts every task and star rule behind the Goa
   localStorage.setItem('worm3_story_tracker_collapsed', '0');
   const runId = useGameStore.getState().wormRunId;
   useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 7, seconds: 250,
-    starGoals: { peakLength: 76, target: 64, grown: true, fast: true, clean: true, stars: 3 },
+    starGoals: { orbs: 32, target: 28, collected: true, fast: true, clean: true, stars: 3 },
     hint: 'Rocket: steer the flight and land', goals: [
       { key: 'boosts', label: 'Finish boosts', value: 2, target: 2, done: true },
       { key: 'doubleJumps', label: 'Land double-jumps', value: 1, target: 2, done: false },
@@ -108,7 +108,7 @@ it('keeps the next task visible and puts every task and star rule behind the Goa
   expect(header.textContent).toContain('Goals 1/6');
   expect(rows()).toEqual(['Finish boosts2/2', 'Land double-jumps1/2', 'Land a rocket flight0/1', 'Catch orbs with a magnet0/4', 'Heal tunnel pairs0/2', 'Collect orbs5/24']);
   expect(top.querySelectorAll('.worm-star-requirements li')).toHaveLength(3);
-  expect(top.querySelector('.worm-star-requirements').textContent).toContain('6.84/5.76');
+  expect(top.querySelector('.worm-star-requirements').textContent).toContain('32/28');
   expect(top.querySelector('.worm-story-details').id).toBe(header.getAttribute('aria-controls'));
   expect(top.querySelector('.worm-story-live-hint').textContent).toBe('Rocket: steer the flight and land');
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

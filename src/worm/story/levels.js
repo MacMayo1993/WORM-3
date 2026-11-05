@@ -22,8 +22,8 @@ export const isChapterFinale = id => storyChapterIndex(id) === STORY_CHAPTER_SIZ
 export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: (level.cubeSize ?? 5) >= 15,
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
 export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Fire → Water)', quenchFusions: 'Quench fusions (Water → Fire)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
-  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated',
-  bodyLength: 'tiles long', bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
+  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements used', earthSprings: 'Earth spring jumps landed', airJumps: 'Air jumps landed', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated',
+  bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
 // Short nouns for the plain progress line, keyed like the checklist.
 const PROGRESS_NOUNS = { ...STORY_MECHANIC_LABELS, orbs: 'orbs', colors: 'colors', rotations: 'turns', uniqueTunnels: 'pairs crossed', healed: 'pairs healed' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
@@ -97,9 +97,9 @@ export function storyOutcome(level, metrics) {
     : metrics.healed >= level.target && metrics.remaining === 0 && metrics.tailClear && metrics.rotationSettled;
   if (!complete) return null;
   const goals = storyStarGoals(level, metrics);
-  return { stars: goals.stars, seconds: Math.ceil(metrics.elapsed), peakLength: goals.peakLength,
+  return { stars: goals.stars, seconds: Math.ceil(metrics.elapsed), orbs: goals.orbs, peakLength: metrics.peakLength,
     finalLength: metrics.currentLength,
-    starGoals: { fast: goals.fast, clean: goals.clean, grown: goals.grown } };
+    starGoals: { fast: goals.fast, clean: goals.clean, collected: goals.collected } };
 }
 
 // Explain the actual physical transition, rather than calling every completion
@@ -139,9 +139,9 @@ export function storyChecklist(level, metrics = {}) {
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
   const labels = { steamFusions: 'Make Steam: Fire → Water', quenchFusions: 'Make Quench: Water → Fire', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
-    magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
+    magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', earthSprings: 'Land Earth spring jumps', airJumps: 'Land Air jumps', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: metrics.character === 'prism' ? 'Collect different orb colors for Spectrum' : 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
-    bodyLength: 'Grow your worm (tiles)', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
+    selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
   return Object.entries(targets).map(([key, target]) => {
@@ -151,7 +151,7 @@ export function storyChecklist(level, metrics = {}) {
       : storyElementsRandom(level) && !metrics.elementOrder ? `${target} random elements`
       : storyElementNames(level, target, metrics.elementOrder).join(', ');
     const label = ['elements', 'uniqueElements'].includes(key)
-      ? `${key === 'elements' ? 'Master' : 'Collect'} ${elementLabel}`
+      ? `${key === 'elements' ? 'Use' : 'Collect'} ${elementLabel}`
       : labels[key];
     return { key, label, value, target, done: value >= target };
   });
