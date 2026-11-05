@@ -126,19 +126,34 @@ jobs:
         run: npm run e2e:install
 
       - name: Build
+        id: browser_build
         run: npm run build
 
-      - name: Run browser tests
-        run: npm run e2e
+      # Publish the focused screenshot before unrelated long-running smoke tests.
+      # Separate output folders keep its traces/report when the next run cleans up.
+      - name: Run Mega Storm visual check
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: mega-storm-report
+        run: npm run e2e -- e2e/megaStorm.e2e.js --output=mega-storm-results
 
       - name: Upload Mega Storm visual check
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mega-storm-visual-check
-          path: test-results/**/mega-storm.png
+          path: mega-storm-results/**/mega-storm.png
           if-no-files-found: ignore
           retention-days: 7
+
+      # Preserve every remaining test exactly once, even if the focused test
+      # failed. Neither invocation allows failures; either makes this job red.
+      - name: Run remaining browser tests
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' }}
+        run: |
+          mapfile -d '' -t tests < <(
+            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
+          )
+          if ((${#tests[@]})); then npm run e2e -- "${tests[@]}"; fi
 
       - name: Upload Glass view visual check
         if: always()
@@ -157,6 +172,8 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            mega-storm-report/
+            mega-storm-results/
           retention-days: 7
 
   deploy:

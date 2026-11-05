@@ -67,9 +67,34 @@ test('Mega Storm draws its colored constellation tiles on the real mega deck', a
   const probe = await page.evaluate(() => window.__constellationProbe);
   expect(probe.programs.length).toBeGreaterThan(0);
   expect(probe.programs.every(program => program.linked), JSON.stringify(probe.programs)).toBe(true);
-  expect(errors).toEqual([]);
-  await expect(page.locator('[data-testid="app-error"]')).toHaveCount(0);
+  // The surface may be richly decorated, but the six inventory samples still
+  // have to communicate their six face colors. Read the actual rendered PNGs,
+  // not just the underlying CSS fallback, which the pattern can entirely hide.
+  const samples = page.locator('.orb-reserve .orb-sample');
+  await expect(samples).toHaveCount(6);
+  await expect.poll(() => samples.evaluateAll(nodes => nodes.every(node => node.style.backgroundImage.includes('data:image/png'))))
+    .toBe(true);
   const screenshot = testInfo.outputPath('mega-storm.png');
   await page.screenshot({ path: screenshot });
   await testInfo.attach('Mega Storm staged board', { path: screenshot, contentType: 'image/png' });
+  const hues = await samples.evaluateAll(async nodes => Promise.all(nodes.map(async node => {
+    const image = new Image();
+    image.src = node.style.backgroundImage.slice(4, -1).replace(/^["']|["']$/g, '');
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width; canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, image.width, image.height).data;
+    const average = [0, 0, 0];
+    for (let i = 0; i < pixels.length; i += 4) for (let c = 0; c < 3; c++) average[c] += pixels[i + c];
+    for (let c = 0; c < 3; c++) average[c] /= pixels.length / 4;
+    const expected = node.style.backgroundColor.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const chroma = rgb => { const mean = (rgb[0] + rgb[1] + rgb[2]) / 3; return rgb.map(value => value - mean); };
+    const a = chroma(average), b = chroma(expected);
+    return { expected, average, agreement: a.reduce((sum, value, i) => sum + value * b[i], 0) / (Math.hypot(...a) * Math.hypot(...b)) };
+  })));
+  for (const hue of hues) expect(hue.agreement, JSON.stringify(hue)).toBeGreaterThan(0.85);
+  expect(errors).toEqual([]);
+  await expect(page.locator('[data-testid="app-error"]')).toHaveCount(0);
 });

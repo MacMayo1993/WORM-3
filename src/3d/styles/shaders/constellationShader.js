@@ -6,6 +6,7 @@ export const CONSTELLATION_SURFACE = Object.freeze({
   colorLift: 0.22,
   auroraMix: 0.84,
   centerMix: 0.24,
+  sampleMix: 0.08,
   frameWidth: 0.08,
   frameFeather: 0.02,
   centerRadius: 0.16,
@@ -37,6 +38,9 @@ export const constellationFragmentShader = `
     // The integer identity still follows the physical sticker through turns.
     vec3 home = floor(tileHome + 0.5);
     float face = floor(tileFace + 0.5);
+    // HUD samples and pickup bands bind face 0: their color carries gameplay
+    // meaning. Reserve the bold decorative inset for physical sticker faces.
+    float sticker = step(1.0, face) * (1.0 - step(7.0, face));
     vec2 seed = home.xy * 1.37 + vec2(home.z * 3.11, face * 7.13);
     float phase = cHash(seed + 4.7) * 6.28318;
     float t = time * (1.0 - step(0.5, reducedMotion));
@@ -77,11 +81,12 @@ export const constellationFragmentShader = `
     float center = 1.0 - smoothstep(${(CONSTELLATION_SURFACE.centerRadius - CONSTELLATION_SURFACE.centerFeather).toFixed(2)}, ${(CONSTELLATION_SURFACE.centerRadius + CONSTELLATION_SURFACE.centerFeather).toFixed(2)}, length(vUv - 0.5));
     vec3 field = baseColor * (${CONSTELLATION_SURFACE.colorFloor.toFixed(2)} + ${CONSTELLATION_SURFACE.colorLift.toFixed(2)} * curtain);
     vec3 aurora = mix(${glVec3(CONSTELLATION_SURFACE.cyan)}, ${glVec3(CONSTELLATION_SURFACE.violet)}, smoothstep(0.2, 0.8, crossGlow));
-    field = mix(field, aurora, inset * mix(${CONSTELLATION_SURFACE.auroraMix.toFixed(2)}, ${CONSTELLATION_SURFACE.centerMix.toFixed(2)}, center));
+    float accent = inset * mix(${CONSTELLATION_SURFACE.sampleMix.toFixed(2)}, mix(${CONSTELLATION_SURFACE.auroraMix.toFixed(2)}, ${CONSTELLATION_SURFACE.centerMix.toFixed(2)}, center), sticker);
+    field = mix(field, aurora, accent);
     // Four stable stars, not a field of blinking white points. Leave the frame
     // unmarked and soften the chart under the playable center of each tile.
-    float chart = inset * (1.0 - center * 0.8);
-    vec3 linkColor = mix(aurora, vec3(0.85, 0.94, 1.0), 0.56);
+    float chart = inset * (1.0 - center * 0.8) * mix(0.45, 1.0, sticker);
+    vec3 linkColor = mix(mix(baseColor, aurora, sticker), vec3(0.85, 0.94, 1.0), 0.56);
     vec3 starColor = vec3(1.0, 0.96, 0.82);
     vec3 col = mix(field, linkColor, min(line * 0.24, 0.3) * chart);
     col = mix(col, starColor, star * chart);

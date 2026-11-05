@@ -3,6 +3,7 @@ import { CONSTELLATION_SURFACE, constellationFragmentShader } from '../3d/styles
 import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
 import { getTileStyleMaterial, sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { instancedTileStyleMaterial } from '../3d/styles/instancedTileStyle.js';
+import { bindDefaultTileStyleIdentity, bindTileStyleIdentity } from '../3d/tileStyleIdentity.js';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
@@ -13,12 +14,14 @@ const smoothstep = (low, high, value) => {
   const t = Math.max(0, Math.min(1, (value - low) / (high - low)));
   return t * t * (3 - 2 * t);
 };
-const accentAt = (u, v) => {
+const accentAt = (u, v, face = 1) => {
   const s = CONSTELLATION_SURFACE;
   const edge = Math.min(u, 1 - u, v, 1 - v);
   const inset = smoothstep(s.frameWidth - s.frameFeather, s.frameWidth + s.frameFeather, edge);
   const center = 1 - smoothstep(s.centerRadius - s.centerFeather, s.centerRadius + s.centerFeather, Math.hypot(u - 0.5, v - 0.5));
-  return inset * (s.auroraMix * (1 - center) + s.centerMix * center);
+  const physicalFace = Math.floor(face + 0.5);
+  return inset * (physicalFace >= 1 && physicalFace <= 6
+    ? s.auroraMix * (1 - center) + s.centerMix * center : s.sampleMix);
 };
 
 describe('Mega Storm constellation surface', () => {
@@ -39,7 +42,7 @@ describe('Mega Storm constellation surface', () => {
     expect(colorFloor + colorLift).toBeLessThanOrEqual(0.8);
     expect(starGrid).toBe(2);
     expect(constellationFragmentShader).toContain(`baseColor * (${colorFloor.toFixed(2)} + ${colorLift.toFixed(2)} * curtain)`);
-    expect(constellationFragmentShader).toContain(`inset * mix(${auroraMix.toFixed(2)}, ${centerMix.toFixed(2)}, center)`);
+    expect(constellationFragmentShader).toContain(`inset * mix(${CONSTELLATION_SURFACE.sampleMix.toFixed(2)}, mix(${auroraMix.toFixed(2)}, ${centerMix.toFixed(2)}, center), sticker)`);
     for (const color of [cyan, violet]) expect(constellationFragmentShader).toContain(`vec3(${color.map(value => value.toFixed(2)).join(', ')})`);
     expect(constellationFragmentShader).toContain('fwidth(dist)');
     expect(constellationFragmentShader).toContain('fwidth(distanceToLine)');
@@ -55,7 +58,25 @@ describe('Mega Storm constellation surface', () => {
     expect(accentAt(0.5, 0.5)).toBeLessThanOrEqual(0.25);
     expect(constellationFragmentShader).toContain(`smoothstep(${(s.frameWidth - s.frameFeather).toFixed(2)}, ${(s.frameWidth + s.frameFeather).toFixed(2)}, edgeDistance)`);
     expect(constellationFragmentShader).toContain(`smoothstep(${(s.centerRadius - s.centerFeather).toFixed(2)}, ${(s.centerRadius + s.centerFeather).toFixed(2)}, length(vUv - 0.5))`);
-    expect(constellationFragmentShader).toContain('float chart = inset * (1.0 - center * 0.8);');
+    expect(constellationFragmentShader).toContain('float chart = inset * (1.0 - center * 0.8) * mix(0.45, 1.0, sticker);');
+  });
+
+  it('keeps non-sticker samples and pickup bands base-led instead of copying the bold tile accent', () => {
+    expect(CONSTELLATION_SURFACE.sampleMix).toBeLessThanOrEqual(0.1);
+    expect(constellationFragmentShader).toContain('float sticker = step(1.0, face) * (1.0 - step(7.0, face));');
+    for (const face of [-1, 0, 7]) {
+      for (let x = 0; x < 16; x++) for (let y = 0; y < 16; y++) {
+        expect(accentAt((x + 0.5) / 16, (y + 0.5) / 16, face)).toBeLessThanOrEqual(0.1);
+      }
+    }
+    for (let face = 1; face <= 6; face++) expect(accentAt(0.25, 0.25, face)).toBeGreaterThan(0.75);
+    const material = getTileStyleMaterial('constellation', COLOR_SCHEMES.aurora[1]);
+    const sticker = bindTileStyleIdentity({ x: 14, y: 14, z: 14 }, 6);
+    sticker(null, null, null, null, material);
+    expect(material.uniforms.tileFace.value).toBe(6);
+    bindDefaultTileStyleIdentity.call(material, null, null, null, null, { id: 10 });
+    expect(material.uniforms.tileFace.value).toBe(0);
+    expect(constellationFragmentShader).toContain('mix(baseColor, aurora, sticker)');
   });
 
   it('quantizes physical identity before hashing so perspective interpolation cannot create glitter', () => {
