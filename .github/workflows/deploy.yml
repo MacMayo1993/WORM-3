@@ -14,9 +14,14 @@ permissions:
   pages: write
   id-token: write
 
+# One queue per branch or PR, so a PR's checks can never bump a deploy off
+# main. All runs used to share the "pages" group, and GitHub keeps only one
+# pending run per group: a PR pushed while main's run was waiting cancelled
+# main's run, and that merge never deployed. A newer push to the same PR
+# supersedes its older checks; main's runs always finish.
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -138,6 +143,11 @@ jobs:
 
   deploy:
     name: Deploy
+    # Only the publish step is serialised, and only main reaches it, so a
+    # deploy can be replaced only by a newer main deploy, which carries it.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
