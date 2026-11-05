@@ -37,17 +37,17 @@ describe('expanded worm geometry', () => {
     }
   });
 
-  it('carries the in-progress step and history together without changing grid tags', () => {
-    const size = 5, sim = makeWormSim(size);
+  it.each([5, 10, 11, 14, 15])('carries the in-progress step and history together without changing grid tags (%s)', size => {
+    const sim = makeWormSim(size);
     resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
-    sim.prevTile = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
-    sim.pos = { x: 2, y: 3, z: 4, dirKey: 'PZ' };
+    sim.prevTile = { x: 2, y: 2, z: size - 1, dirKey: 'PZ' };
+    sim.pos = { x: 2, y: 3, z: size - 1, dirKey: 'PZ' };
     sim.prevWorldPos = sim._prevWP.copy(point(sim.prevTile, size, 0));
     sim.curWorldPos.copy(point(sim.pos, size, 0));
     sim.interpT = 0.4;
     sim.explodeT = 12;
     shReset(sim.stepHistory);
-    shPush(sim.stepHistory, point(sim.prevTile, size, 0).addScaledVector(FACE_NORMALS.PZ, WORM_LIFT), FACE_NORMALS.PZ, 2, 2, 4);
+    shPush(sim.stepHistory, point(sim.prevTile, size, 0).addScaledVector(FACE_NORMALS.PZ, WORM_LIFT), FACE_NORMALS.PZ, 2, 2, size - 1);
     for (let i = 0; i < 12; i++) tickExpansion(sim, size, 0.1, {});
     const actual = new THREE.Vector3();
     evaluatePosAndNormal(sim, 0.4, actual);
@@ -55,7 +55,7 @@ describe('expanded worm geometry', () => {
     expected.addScaledVector(FACE_NORMALS.PZ, -explosionGapSag(expected, FACE_NORMALS.PZ, size, sim.expansionAmount));
     expect(actual.distanceTo(expected)).toBeLessThan(1e-8);
     const record = shAt(sim.stepHistory, 0);
-    expect([record.tx, record.ty, record.tz]).toEqual([2, 2, 4]);
+    expect([record.tx, record.ty, record.tz]).toEqual([2, 2, size - 1]);
     expect(record.pos.distanceTo(point(sim.prevTile, size, sim.expansionAmount).addScaledVector(FACE_NORMALS.PZ, WORM_LIFT))).toBeLessThan(1e-8);
     expect(cubeExpansionScale(size, sim.expansionAmount)).toBeGreaterThan(1.5);
   });

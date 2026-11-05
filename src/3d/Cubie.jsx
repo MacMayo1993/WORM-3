@@ -42,6 +42,8 @@ function CubieFrameFallback({ tick, priority }) {
   return null;
 }
 
+const wormLatticeOpen = () => wormExpansion.amount > 0;
+
 // Shared hollow beam materials — one per visualMode string.
 // Each cubie uses one merged frame mesh and a shared material.
 // All beams in the same mode share identical properties so one GPU material suffices.
@@ -444,13 +446,20 @@ const Cubie = React.forwardRef(function Cubie({
   const bodyBatches = useCubieBodyBatches();
   const showsBody = !mirrorMode && !effectiveHollowMode && !hideBody && !(omitBody && !raised && !returningBody);
   const batchBody = !!bodyBatches && wormMode && showsBody && !raisedWindow && !coatBody;
+  // Mega's ordinary bodies are omitted at rest, but Explode exposes all their
+  // sides. Reuse the existing content group as an instance anchor, with no extra
+  // scene nodes or per-piece materials. Raised/returning pieces keep their own
+  // body path, so a pad never acquires a second shell.
+  const expansionBody = !!bodyBatches && wormMode && omitBody && !showsBody &&
+    !mirrorMode && !effectiveHollowMode && !hideBody && !raised && !returningBody;
   const bodyRef = useRef(null);
   const bodyGeometry = cubieBodyGeometry(bodySize);
-  const bodyLook = batchBody ? JSON.stringify(bodyMatProps) : '';
+  const bodyLook = batchBody || expansionBody ? JSON.stringify(bodyMatProps) : '';
   useLayoutEffect(() => {
-    if (!batchBody || !bodyRef.current) return undefined;
-    return bodyBatches.register(bodyRef.current, bodyGeometry, JSON.parse(bodyLook));
-  }, [batchBody, bodyBatches, bodyGeometry, bodyLook]);
+    const anchor = expansionBody ? frameHost.parent : bodyRef.current;
+    if ((!batchBody && !expansionBody) || !anchor) return undefined;
+    return bodyBatches.register(anchor, bodyGeometry, JSON.parse(bodyLook), expansionBody ? wormLatticeOpen : null);
+  }, [batchBody, expansionBody, bodyBatches, bodyGeometry, bodyLook, frameHost]);
 
 
   // The lift, kick, pop and burrow offsets. Returns whether the piece is still
