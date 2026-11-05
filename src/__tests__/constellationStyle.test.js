@@ -3,9 +3,26 @@ import { CONSTELLATION_SURFACE, constellationFragmentShader } from '../3d/styles
 import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
 import { getTileStyleMaterial, sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { instancedTileStyleMaterial } from '../3d/styles/instancedTileStyle.js';
+import { bindDefaultTileStyleIdentity, bindTileStyleIdentity } from '../3d/tileStyleIdentity.js';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
+
+// Analytic design checks only: the real shader/draw test and screenshot live in
+// megaStorm.e2e.js. These masks mirror the GLSL generated from the same controls.
+const smoothstep = (low, high, value) => {
+  const t = Math.max(0, Math.min(1, (value - low) / (high - low)));
+  return t * t * (3 - 2 * t);
+};
+const accentAt = (u, v, face = 1) => {
+  const s = CONSTELLATION_SURFACE;
+  const edge = Math.min(u, 1 - u, v, 1 - v);
+  const inset = smoothstep(s.frameWidth - s.frameFeather, s.frameWidth + s.frameFeather, edge);
+  const center = 1 - smoothstep(s.centerRadius - s.centerFeather, s.centerRadius + s.centerFeather, Math.hypot(u - 0.5, v - 0.5));
+  const physicalFace = Math.floor(face + 0.5);
+  return inset * (physicalFace >= 1 && physicalFace <= 6
+    ? s.auroraMix * (1 - center) + s.centerMix * center : s.sampleMix);
+};
 
 describe('Mega Storm constellation surface', () => {
   it('keeps the authored 15×15 deck, Aurora palette and constellation identity', () => {
@@ -15,18 +32,64 @@ describe('Mega Storm constellation surface', () => {
     expect(newStyleShaders.constellation).toBe(constellationFragmentShader);
   });
 
-  it('retains substantial face color even under the strongest aurora accent', () => {
-    // A design guard, not a rendered-image test. The old 0.11 base made the six
-    // faces converge on black. These exact parameters generate the GLSL field.
-    const { colorFloor, colorLift, auroraMix, starGrid } = CONSTELLATION_SURFACE;
-    expect(colorFloor * (1 - auroraMix)).toBeGreaterThanOrEqual(0.4);
+  it('covers most of the tile with bold cyan/violet rather than near-invisible edge tint', () => {
+    const { colorFloor, colorLift, auroraMix, centerMix, cyan, violet, starGrid } = CONSTELLATION_SURFACE;
+    const samples = [];
+    for (let x = 0; x < 64; x++) for (let y = 0; y < 64; y++) samples.push(accentAt((x + 0.5) / 64, (y + 0.5) / 64));
+    expect(samples.filter(mix => mix >= 0.6).length / samples.length).toBeGreaterThan(0.5);
+    expect(Math.hypot(...cyan.map((value, i) => value - violet[i]))).toBeGreaterThan(0.7);
+    expect(auroraMix).toBeGreaterThanOrEqual(0.75);
     expect(colorFloor + colorLift).toBeLessThanOrEqual(0.8);
-    expect(auroraMix).toBeLessThanOrEqual(0.2);
-    expect(starGrid).toBe(3);
+    expect(starGrid).toBe(2);
     expect(constellationFragmentShader).toContain(`baseColor * (${colorFloor.toFixed(2)} + ${colorLift.toFixed(2)} * curtain)`);
-    expect(constellationFragmentShader).toContain(`mix(field, aurora, ${auroraMix.toFixed(2)} * edge * curtain)`);
+    expect(constellationFragmentShader).toContain(`inset * mix(${CONSTELLATION_SURFACE.sampleMix.toFixed(2)}, mix(${auroraMix.toFixed(2)}, ${centerMix.toFixed(2)}, center), sticker)`);
+    for (const color of [cyan, violet]) expect(constellationFragmentShader).toContain(`vec3(${color.map(value => value.toFixed(2)).join(', ')})`);
     expect(constellationFragmentShader).toContain('fwidth(dist)');
     expect(constellationFragmentShader).toContain('fwidth(distanceToLine)');
+  });
+
+  it('leaves an unmarked face-color frame and a calm face-dominant center', () => {
+    const s = CONSTELLATION_SURFACE;
+    expect(s.colorFloor).toBeGreaterThanOrEqual(0.5);
+    expect(s.frameWidth - s.frameFeather).toBeGreaterThanOrEqual(0.05);
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      for (const [u, v] of [[0.02, t], [0.98, t], [t, 0.02], [t, 0.98]]) expect(accentAt(u, v)).toBe(0);
+    }
+    expect(accentAt(0.5, 0.5)).toBeLessThanOrEqual(0.25);
+    expect(constellationFragmentShader).toContain(`smoothstep(${(s.frameWidth - s.frameFeather).toFixed(2)}, ${(s.frameWidth + s.frameFeather).toFixed(2)}, edgeDistance)`);
+    expect(constellationFragmentShader).toContain(`smoothstep(${(s.centerRadius - s.centerFeather).toFixed(2)}, ${(s.centerRadius + s.centerFeather).toFixed(2)}, length(vUv - 0.5))`);
+    expect(constellationFragmentShader).toContain('float chart = inset * (1.0 - center * 0.8) * mix(0.45, 1.0, sticker);');
+  });
+
+  it('keeps non-sticker samples and pickup bands base-led instead of copying the bold tile accent', () => {
+    expect(CONSTELLATION_SURFACE.sampleMix).toBeLessThanOrEqual(0.1);
+    expect(constellationFragmentShader).toContain('float sticker = step(1.0, face) * (1.0 - step(7.0, face));');
+    for (const face of [-1, 0, 7]) {
+      for (let x = 0; x < 16; x++) for (let y = 0; y < 16; y++) {
+        expect(accentAt((x + 0.5) / 16, (y + 0.5) / 16, face)).toBeLessThanOrEqual(0.1);
+      }
+    }
+    for (let face = 1; face <= 6; face++) expect(accentAt(0.25, 0.25, face)).toBeGreaterThan(0.75);
+    const material = getTileStyleMaterial('constellation', COLOR_SCHEMES.aurora[1]);
+    const sticker = bindTileStyleIdentity({ x: 14, y: 14, z: 14 }, 6);
+    sticker(null, null, null, null, material);
+    expect(material.uniforms.tileFace.value).toBe(6);
+    bindDefaultTileStyleIdentity.call(material, null, null, null, null, { id: 10 });
+    expect(material.uniforms.tileFace.value).toBe(0);
+    expect(constellationFragmentShader).toContain('mix(baseColor, aurora, sticker)');
+  });
+
+  it('quantizes physical identity before hashing so perspective interpolation cannot create glitter', () => {
+    expect(constellationFragmentShader).toContain('vec3 home = floor(tileHome + 0.5);');
+    expect(constellationFragmentShader).toContain('float face = floor(tileFace + 0.5);');
+    expect(constellationFragmentShader).toContain('vec2 seed = home.xy * 1.37 + vec2(home.z * 3.11, face * 7.13);');
+    expect(constellationFragmentShader.match(/\btileHome\b/g)).toHaveLength(2);
+    expect(constellationFragmentShader.match(/\btileFace\b/g)).toHaveLength(2);
+    // Integer physical positions and face IDs are stable at both extremes of a
+    // mega deck, even with more interpolation error than a fragment should see.
+    for (let id = 0; id < 15; id++) {
+      for (const noise of [-0.001, -0.00001, 0, 0.00001, 0.001]) expect(Math.floor(id + noise + 0.5)).toBe(id);
+    }
   });
 
   it('shares six opaque materials across the mega board and retains instanced identity', () => {
@@ -43,18 +106,20 @@ describe('Mega Storm constellation surface', () => {
     for (const source of materials) {
       const batch = instancedTileStyleMaterial(source);
       expect(batch.uniforms.baseColor).toBe(source.uniforms.baseColor);
-      expect(batch.fragmentShader).toContain('vTileIdentity.xyz.xy * 1.37');
+      expect(batch.fragmentShader).toContain('floor(vTileIdentity.xyz + 0.5)');
+      expect(batch.fragmentShader).toContain('floor(vTileIdentity.w + 0.5)');
       expect(batch.fragmentShader).not.toMatch(/\btileHome\b|\btileFace\b/);
       expect(batch.uniforms.time).toBe(sharedUniforms.time);
       expect(batch.uniforms.reducedMotion).toBe(sharedUniforms.reducedMotion);
     }
   });
 
-  it('freezes both aurora drift and twinkle with reduced motion without adding textures', () => {
+  it('freezes aurora drift with reduced motion and keeps the sparse star chart static', () => {
     expect(constellationFragmentShader).toContain('float t = time * (1.0 - step(0.5, reducedMotion));');
     expect(constellationFragmentShader.match(/\btime\b/g)).toHaveLength(2);
     expect(constellationFragmentShader).not.toMatch(/sampler2D|texture2D|discard/);
-    expect(constellationFragmentShader).toContain('0.92 + 0.08 * sin(t * 0.7');
+    const starChart = constellationFragmentShader.slice(constellationFragmentShader.indexOf('vec2 uv'), constellationFragmentShader.indexOf('float curtain'));
+    expect(starChart).not.toMatch(/\bt\b|\btwinkle\b/);
     expect(constellationFragmentShader).toContain('abs(dx) + abs(dy) > 1.5');
   });
 });
