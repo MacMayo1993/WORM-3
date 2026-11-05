@@ -9,7 +9,7 @@ import {STORY_WORLDS,STORY_ORB_ROUTES} from '../../../src/worm/story/worlds.js';
 import {assess,ELEMENTS,elementTypes} from '../web/audit.js';
 import {requiredPowerCycle,SUPPORTED_SIZES} from '../web/generator.js';
 import {hasStoryElementGoal,STORY_ELEMENT_GOALS} from '../../../src/worm/story/elementGoals.js';
-const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills','bodyLength','bodyJumps','selfPasses','multiHeals','fusions','uniqueFusions'];
+const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','earthSprings','airJumps','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills','bodyJumps','selfPasses','multiHeals','fusions','uniqueFusions'];
 const worlds=Object.values(STORY_WORLDS),palettes=new Set(worlds.map(w=>w.palette)),backgrounds=new Set(worlds.map(w=>w.background)),styles=new Set(worlds.flatMap(w=>Object.values(w.styles)));
 const positive=n=>Number.isInteger(n)&&n>0&&n<=200;
 export function schemaErrors(candidate){
@@ -23,7 +23,8 @@ export function schemaErrors(candidate){
  if(typeof l.title!=='string'||!l.title.trim()||l.title.length>120)e.push('Use a title between 1 and 120 characters.');
  if(!Number.isFinite(l.speed)||l.speed<.5||l.speed>4)e.push('Speed must be between 0.5 and 4.');
  if(!Number.isFinite(l.limit)||l.limit<30||l.limit>10000||!Number.isFinite(l.par)||l.par<=0||l.par>=l.limit)e.push('Par must be positive and below a limit between 30 and 10000 seconds.');
- for(const key of ['orbs','colors','rotations','orbsPerFace','rotateEvery'])if(l[key]!==undefined&&!positive(l[key]))e.push(key+' must be a positive integer.');
+ for(const key of ['orbs','starOrbs','colors','rotations','orbsPerFace','rotateEvery'])if(l[key]!==undefined&&!positive(l[key]))e.push(key+' must be a positive integer.');
+ for(const key of ['bodyLength','starLength'])if(l[key]!==undefined)e.push('Unsupported target '+key+'; use '+(key==='starLength'?'starOrbs':'orbs')+'.');
  if((l.colors??0)>6)e.push('There are only six food colors.');
  if(l.kind==='rotation'&&!l.rotateEvery||(l.rotations??0)>0&&!l.rotateEvery)e.push('Required rotations need a rotateEvery interval.');
  if(l.elementTypes!==undefined&&(!Array.isArray(l.elementTypes)||!l.elementTypes.length||new Set(l.elementTypes).size!==l.elementTypes.length||l.elementTypes.some(type=>!ELEMENTS.includes(type))))e.push('Element types must be a nonempty list of distinct supported element IDs.');
@@ -32,7 +33,7 @@ export function schemaErrors(candidate){
   if(!l.mechanics||typeof l.mechanics!=='object'||Array.isArray(l.mechanics))e.push('Mechanics must be an object.');
   else for(const [key,n] of Object.entries(l.mechanics)){
    if(!mechanicKeys.includes(key))e.push('Unsupported mechanic '+key+'.');
-   if(!(key==='bodyLength'?Number.isInteger(n)&&n>10&&n<=1200:positive(n)))e.push(key+' must be a positive integer.');
+   if(!positive(n))e.push(key+' must be a positive integer.');
    if(['elements','uniqueElements'].includes(key)&&n>ELEMENTS.length)e.push('There are only '+ELEMENTS.length+' supported elemental types.');
    if(['elements','uniqueElements'].includes(key)&&Array.isArray(l.elementTypes)&&n>elementTypes(l).length)e.push('Element target exceeds the authored element set.');
    if(key==='ringHeals'&&n>l.target)e.push('Ring-heal target exceeds the staged tunnel pairs.');

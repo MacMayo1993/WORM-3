@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import * as storyMastery from '../worm/story/mastery.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
 import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
-import { DEFAULT_SETTINGS, generateCampaign, generateLevel, modeledPowerBudget } from '../../tools/worm-level-auditor/web/generator.js';
-import { assess, ELEMENTS, requiredPowerCycles } from '../../tools/worm-level-auditor/web/audit.js';
-import { auditGeneratedLevel } from '../../tools/worm-level-auditor/scripts/generator-engine.mjs';
+import { DEFAULT_SETTINGS, generateCampaign, generateLevel, levelGoal, modeledPowerBudget, requiredPowerCycle } from '../../tools/worm-level-auditor/web/generator.js';
+import { assess, difficultyFindings, ELEMENTS, requiredPowerCycles } from '../../tools/worm-level-auditor/web/audit.js';
+import { auditGeneratedLevel, schemaErrors } from '../../tools/worm-level-auditor/scripts/generator-engine.mjs';
 
 const templates = Object.entries(STORY_WORLDS).filter(([id]) => Number(id) <= 40).map(([, world]) => world);
 const RECIPE = { ...DEFAULT_SETTINGS };
@@ -12,6 +12,39 @@ const RECIPE = { ...DEFAULT_SETTINGS };
 // The shipped campaign is authored (campaign.js); the seeded generator is a
 // drafting workshop whose packs are copied in by hand.
 describe('campaign drafting workshop', () => {
+
+  it('uses total orb and element activation goals in generated copy', () => {
+    const level = { kind: 'mastery', target: 2, orbs: 30, mechanics: { elements: 2, earthSprings: 1, airJumps: 1 } };
+    expect(levelGoal(level)).toContain('collect 30 orbs');
+    expect(levelGoal(level)).toContain('use 2 elements');
+    expect(levelGoal(level)).toContain('land 1 Earth spring jump');
+    expect(levelGoal(level)).toContain('land 1 Air jump');
+    expect(levelGoal(level)).not.toMatch(/master|tiles long/);
+    expect(requiredPowerCycle({ mechanics: { earthSprings: 1, airJumps: 1 } })).toEqual(['grass', 'air']);
+  });
+
+  it('rejects retired length targets and validates optional star orb targets', () => {
+    const draft = generateLevel(50, RECIPE, templates);
+    draft.config.starOrbs = 40;
+    expect(schemaErrors(draft)).toEqual([]);
+    for (const value of [0, -1, 1.5, '40']) {
+      draft.config.starOrbs = value;
+      expect(schemaErrors(draft)).toContain('starOrbs must be a positive integer.');
+    }
+    delete draft.config.starOrbs;
+    draft.config.starLength = 100;
+    expect(schemaErrors(draft)).toContain('Unsupported target starLength; use starOrbs.');
+    delete draft.config.starLength;
+    draft.config.mechanics.bodyLength = 100;
+    expect(schemaErrors(draft)).toContain('Unsupported mechanic bodyLength.');
+  });
+
+  it('budgets ordinary and star pickups without converting body segments', () => {
+    const level = { cubeSize: 3, kind: 'orbs', target: 20, starOrbs: 33, speed: 1, limit: 10000 };
+    expect(difficultyFindings(level)).toContainEqual(expect.objectContaining({ key: 'orbs' }));
+    expect(difficultyFindings({ ...level, starOrbs: 32 })).toEqual([]);
+  });
+
   it('drafts deterministically and never replaces the authored campaign', () => {
     const pack = generateCampaign(RECIPE, templates);
     expect(generateCampaign(RECIPE, templates)).toEqual(pack);
@@ -59,7 +92,7 @@ describe('campaign drafting workshop', () => {
     expect(STORY_WORLDS[50]).toBe(prior);
   });
 
-  it.each(['elements', 'uniqueElements', 'elementPickups', 'fusions', 'uniqueFusions', 'steamFusions', 'quenchFusions'])(
+  it.each(['elements', 'earthSprings', 'airJumps', 'uniqueElements', 'elementPickups', 'fusions', 'uniqueFusions', 'steamFusions', 'quenchFusions'])(
     'audits center supplies separately from quest powers for %s', key => {
       const draft = generateLevel(50, RECIPE, templates);
       draft.config.mechanics = { [key]: 1, magnetOrbs: 4, explodes: 1, rockets: 1 };
@@ -74,6 +107,23 @@ describe('campaign drafting workshop', () => {
       }
     },
   );
+
+  it('keeps activation, collection and explicit jump audit rows distinct', () => {
+    const draft = generateLevel(50, RECIPE, templates);
+    draft.config.mechanics = { elements: 1, uniqueElements: 1, elementPickups: 2, earthSprings: 1, airJumps: 1 };
+    draft.config.limit = 10000;
+    const result = auditGeneratedLevel(draft);
+    expect(result.errors).toEqual([]);
+    const rows = assess(result.record).rows;
+    expect(rows.find(row => row.key === 'elements').detail).toContain('automatic activation on pickup counts');
+    expect(rows.find(row => row.key === 'uniqueElements').detail).toContain('Duplicate pickups do not advance');
+    expect(rows.find(row => row.key === 'elementPickups').detail).toContain('quantity credit');
+    for (const [key, type] of [['earthSprings', 'grass'], ['airJumps', 'air']]) {
+      expect(rows.find(row => row.key === key)).toMatchObject({ state: 'playtest' });
+      const disabled = assess(result.record, 'glow', { disabledPowers: [type] });
+      expect(disabled.rows.find(row => row.key === key).state).toBe('impossible');
+    }
+  });
 
   it.each(['center', 'quest'])('still rejects broken %s power supply', lane => {
     const offer = storyMastery.offerStoryPower;

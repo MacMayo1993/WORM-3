@@ -356,6 +356,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
       <small className="story-completion-level">{chapterLine(level.id)}</small>
       <h2 id="worm-story-result-title">{heading}</h2>
       <div className="story-completion-size">
+        {Number.isFinite(result.orbs) && <span>Orbs collected <strong>{result.orbs}</strong></span>}
         {Number.isFinite(result.finalLength) && <span>Worm length <strong>{segmentsToTiles(result.finalLength)}</strong> tiles</span>}
         {Number.isFinite(result.peakLength) && <span>Best length <strong>{segmentsToTiles(result.peakLength)}</strong> tiles</span>}
         {bestCombo >= 2 && <span>Best orb chain <strong>×{bestCombo}</strong></span>}

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, storyLevel, storyChecklist, storyOutcome } from '../worm/story/levels.js';
-import { storyGrowthTarget } from '../worm/story/starGoals.js';
+import { storyOrbTarget } from '../worm/story/starGoals.js';
 import { stageStory, replenishStoryTunnel } from '../worm/story/runtime.js';
 import { makeWormSim } from '../worm/healerWorm/wormSim.js';
 import { ttReset } from '../worm/circularBuffers.js';
@@ -14,15 +14,15 @@ import { modeledPowerBudget } from '../../tools/worm-level-auditor/web/generator
 
 beforeEach(resetLiveRotation);
 
-it.each(WORM_STORY_LEVELS)('level $id has combined task/recovery headroom and board-appropriate growth', level => {
-  expect(difficultyFindings({ ...level, starLength: storyGrowthTarget(level) }, modeledPowerBudget(level))).toEqual([]);
+it.each(WORM_STORY_LEVELS)('level $id has combined task/recovery headroom and board-appropriate orb totals', level => {
+  expect(difficultyFindings({ ...level, starOrbs: storyOrbTarget(level) }, modeledPowerBudget(level))).toEqual([]);
   const budget = SMALL_BOARD_BUDGETS[level.cubeSize];
   if (budget) expect(storyChecklist(level).length).toBeLessThanOrEqual(6);
 });
 
 it('level 60 can finish with repairs, food, growth and turns without either chain trick', () => {
   const level = storyLevel(60);
-  expect(storyChecklist(level).map(goal => goal.key).sort()).toEqual(['bodyLength', 'healed', 'orbs', 'rotations']);
+  expect(storyChecklist(level).map(goal => goal.key).sort()).toEqual(['healed', 'orbs', 'rotations']);
   expect(storyOutcome(level, { alive: true, elapsed: 400, cuts: 1, healed: 4, orbs: 28,
     bodyLength: 65, peakLength: 65, rotations: 3, remaining: 0, landed: true,
     tailClear: true, rotationSettled: true, selfPasses: 0, multiHeals: 0 })).not.toBeNull();
@@ -31,7 +31,7 @@ it('level 60 can finish with repairs, food, growth and turns without either chai
 it('flags the former level 60 overload and combined work that passes a power-only check', () => {
   const old = { ...storyLevel(60), speed: 2.1, rotateEvery: 11, orbs: 42,
     mechanics: { selfPasses: 2, multiHeals: 1, bodyLength: 110 } };
-  expect(difficultyFindings(old).map(f => f.key)).toEqual(expect.arrayContaining(['speed', 'bodyLength', 'orbs', 'rotations', 'chains']));
+  expect(difficultyFindings(old).map(f => f.key)).toEqual(expect.arrayContaining(['speed', 'orbs', 'rotations', 'chains']));
   const short = { ...storyLevel(57), limit: modeledPowerBudget(storyLevel(57)) + 1 };
   expect(difficultyFindings(short, modeledPowerBudget(short))).toContainEqual(expect.objectContaining({ key: 'workload' }));
 });

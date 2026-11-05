@@ -49,8 +49,8 @@ describe('the records', () => {
   it('names what the next star needs', () => {
     const level = storyLevel(4);
     expect(nextStarHint(level, 1, {})).toContain(`${level.par}s or avoid tail cuts`);
-    expect(nextStarHint(level, 2, { fast: true, clean: false, grown: true })).toBe('no tail cuts');
-    expect(nextStarHint(level, 2, { fast: false, clean: true, grown: false })).toMatch(/^finish within .*, reach \S+ tiles$/);
+    expect(nextStarHint(level, 2, { fast: true, clean: false, collected: true })).toBe('no tail cuts');
+    expect(nextStarHint(level, 2, { fast: false, clean: true, collected: false })).toMatch(/^finish within .*, collect \d+ total orbs$/);
     expect(nextStarHint(level, 3, {})).toBeNull();
   });
 });
@@ -84,7 +84,7 @@ describe('recording a run', () => {
 
   it('gives a Story clear its previous stars, best time and level-up', () => {
     const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, landed: true,
-      ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])) };
+      ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])), orbs: storyLevel(1).starOrbs };
     const play = metrics => {
       state().clearDisparityGame();
       state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, 1);
@@ -135,7 +135,7 @@ describe('the cards', () => {
   it('shows what a Story clear changed, reveals unlocks, and says what the next star needs', () => {
     useGameStore.setState({ wormGamePhase: 'solved', wormStoryLevel: 4, wormRunId: 3, wormRunBestCombo: 0,
       wormStoryResult: { levelId: 4, stars: 2, first: false, previousStars: 1, seconds: 42, previousTime: 51, newBestTime: true,
-        starGoals: { fast: true, clean: false, grown: true }, levelUp: { level: 6, points: 25 }, unlockedModes: ['chaos'] } });
+        starGoals: { fast: true, clean: false, collected: true }, levelUp: { level: 6, points: 25 }, unlockedModes: ['chaos'] } });
     act(() => root.render(<StoryResult onNext={() => {}} onRetry={() => {}} onLevels={() => {}} />));
     const records = host.querySelector('.story-completion-records').textContent;
     expect(records).toContain('★ → ★★');

@@ -3,18 +3,17 @@ export const elementTypes = level => level.elementTypes ?? ELEMENTS;
 // Playability guardrails, not geometric impossibility proofs. Keep recovery
 // lanes and reaction time instead of scaling every task with chapter number.
 export const SMALL_BOARD_BUDGETS = {
-  2: { speed: 1.5, bodyLength: 55, starLength: 61, orbs: 24, rotateEvery: 14 },
-  3: { speed: 1.75, bodyLength: 75, starLength: 84, orbs: 32, rotateEvery: 16 },
-  4: { speed: 2.05, bodyLength: 100, starLength: 112, orbs: 36, rotateEvery: 14 },
+  2: { speed: 1.5, orbs: 24, rotateEvery: 14 },
+  3: { speed: 1.75, orbs: 32, rotateEvery: 16 },
+  4: { speed: 2.05, orbs: 36, rotateEvery: 14 },
 };
 export function difficultyFindings(level, powerBudget = 0) {
   const findings = [], m = level.mechanics ?? {}, budget = SMALL_BOARD_BUDGETS[level.cubeSize];
   const flag = (key, message) => findings.push({ key, severity: 'review', message });
-  const food = Math.max(level.orbs ?? (level.kind === 'orbs' ? level.target : 0), Math.ceil(((m.bodyLength ?? 10) - 10) / 3));
+  const food = Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0, level.starOrbs ?? 0);
   const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
   if (budget) {
-    for (const key of ['speed', 'starLength']) if ((level[key] ?? 0) > budget[key]) flag(key, `${key} exceeds the ${level.cubeSize}×${level.cubeSize} comfort budget (${budget[key]}).`);
-    if ((m.bodyLength ?? 0) > budget.bodyLength) flag('bodyLength', `Growth target exceeds the small-board budget of ${budget.bodyLength} segments.`);
+    if ((level.speed ?? 0) > budget.speed) flag('speed', `speed exceeds the ${level.cubeSize}×${level.cubeSize} comfort budget (${budget.speed}).`);
     if (food > budget.orbs) flag('orbs', `Required food exceeds the small-board budget of ${budget.orbs} pickups.`);
     if (level.rotateEvery && level.rotateEvery < budget.rotateEvery) flag('rotations', `Allow at least ${budget.rotateEvery}s between small-board turns.`);
     if (level.cubeSize <= 3 && ((m.selfPasses ?? 0) > 1 || (m.multiHeals ?? 0) > 1)) flag('chains', 'Pocket decks should require at most one self-pass and one double heal.');
@@ -48,7 +47,7 @@ export function assess(record, character='glow', scenario={}) {
     const key=o.key, target=o.target;
     if(key==='orbs') {
       available=recurring?'Recurring':String(initial);
-      detail=initial+' initially staged; refill restores up to one orb per missing color every '+record.timing.refill+' active seconds.'+(target>initial?' This quest needs at least '+(target-initial)+' pickups beyond the opening inventory.':'');
+      detail='Total fresh ordinary pickups count, independent of tail length, spending or cuts. Recovered drops and special elemental pickups do not count. '+initial+' initially staged; refill restores up to one orb per missing color every '+record.timing.refill+' active seconds.'+(target>initial?' This quest needs at least '+(target-initial)+' pickups beyond the opening inventory.':'');
       if(!recurring&&target>initial)fail('No refill: '+target+' required exceeds '+initial+' supplied.');
       if(totalCap!==null&&target>totalCap)fail('Lifetime allowance '+totalCap+' is below the '+target+' pickup target.');
     } else if(key==='colors') {
@@ -66,14 +65,16 @@ export function assess(record, character='glow', scenario={}) {
       detail='Two distinct elements are offered together; collecting both within one elemental window fuses them, and pickup order picks the recipe. Route execution needs a playtest.';
       state='playtest';
       if(distinct.length<2||(key==='uniqueFusions'&&target>distinct.length*(distinct.length-1)))fail('Not enough distinct elements are offered for these fusions.');
-    } else if(key==='bodyLength') {
-      available=recurring?'Recurring food':String(initial)+' orbs';
-      detail='Peak body length counts. Each orb adds 3 segments; deposits shrink the worm afterwards without removing credit.';
-      if(!recurring&&10+3*initial<target)fail('Opening food cannot grow the worm this long without refills.');
     } else if(['elements','uniqueElements','elementPickups'].includes(key)) {
       available=distinct.length+' types · repeats';
-      detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, earth spring launch, ice jump/landing, lightning survival, air jump/landing. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
+      detail=key==='elements'?'Activate each required element once; automatic activation on pickup counts. No maneuvers or timed mastery waits are required.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
       if((key==='elementPickups'&&!distinct.length)||(key!=='elementPickups'&&elementTypes(level).slice(0,target).filter(type=>distinct.includes(type)).length<target))fail('Required elemental supply is missing from the offered cycle.');
+    } else if(['earthSprings','airJumps'].includes(key)) {
+      const type=key==='earthSprings'?'grass':'air';
+      available=powerPool.includes(type)?'Recurring':'0 offers';
+      detail=key==='earthSprings'?'Launch from an Earth spring pad and land.':'Use an Air jump and land.';
+      state='playtest';
+      if(!powerPool.includes(type))fail('The '+type+' element is absent from the required offer cycle.');
     } else if(['explodes','rockets','magnetOrbs'].includes(key)) {
       const type={explodes:'explode',rockets:'rocket',magnetOrbs:'magnet'}[key];
       available=powerPool.includes(type)?(key==='magnetOrbs'?stage.magnetReach+' in reach · repeats':'Recurring'):'0 offers';
@@ -115,7 +116,7 @@ export function filterRecords(records,filters,reviews={}) {
     const text=[l.id,l.title,l.goal,l.kind,...r.objectives.map(o=>o.key),...a.powerPool].join(' ').toLowerCase();
     const goal=l.orbs??(l.kind==='orbs'?l.target:0);
     return (!filters.scope||(filters.scope==='generated'?l.id>40:l.id<=40))&&(!search||text.includes(search))&&(!filters.chapter||Math.ceil(l.id/10)===+filters.chapter)&&(!filters.size||l.cubeSize===+filters.size)&&
-      (!filters.quest||(filters.quest==='refill'?goal>a.initial:r.objectives.some(o=>filters.quest==='elemental'?['elements','uniqueElements','elementPickups','steamFusions','quenchFusions'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest)))&&
+      (!filters.quest||(filters.quest==='refill'?goal>a.initial:r.objectives.some(o=>filters.quest==='elemental'?['elements','earthSprings','airJumps','uniqueElements','elementPickups','steamFusions','quenchFusions'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest)))&&
       (!filters.status||(filters.status==='flagged'?!!review?.flag:filters.status==='playtest'?a.rows.some(o=>o.state==='playtest'):a.status===filters.status));
   });
 }

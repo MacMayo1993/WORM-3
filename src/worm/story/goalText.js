@@ -1,4 +1,3 @@
-import { segmentsToTiles } from '../healerWorm/tileUnits.js';
 // The mission sentence on the map and pause card, built from a level's own
 // targets so every count the checklist tracks is stated exactly once, in the
 // same words on every level. Mobi's story lines live in narrative.js; this
@@ -25,7 +24,6 @@ const PRIMARY = {
 
 // Display order of the extra tasks, after the primary goal.
 const TASKS = [
-  ['bodyLength', n => `grow to ${segmentsToTiles(n)} tiles long`],
   ['selfPasses', n => `pass yourself in the Core ${times(n)}`],
   ['multiHeals', n => `make ${count(n, 'double heal')}`],
   ['bodyJumps', n => `land ${count(n, 'jump')} over your body`],
@@ -35,12 +33,14 @@ const TASKS = [
   ['rockets', n => n === 1 ? 'land a rocket flight' : `land ${n} rocket flights`],
   ['magnetOrbs', n => `catch ${count(n, 'remote orb')} with a magnet`],
   ['explodes', n => n === 1 ? 'ride out an explosion' : `ride out ${n} explosions`],
+  ['earthSprings', n => `land ${count(n, 'Earth spring jump')}`],
+  ['airJumps', n => `land ${count(n, 'Air jump')}`],
   ['elementPickups', n => `pick up ${count(n, 'elemental orb')}`],
   // A level that deals its elements at random each run cannot name them here.
   ['uniqueElements', (n, level) => n === STORY_ELEMENTS.length ? `collect all ${n} different elements`
     : storyElementsRandom(level) ? `collect ${n} different random elements` : `collect ${n} different elements (${names(level, n)})`],
-  ['elements', (n, level) => n === STORY_ELEMENTS.length ? `master all ${n} elements`
-    : storyElementsRandom(level) ? `master ${count(n, 'random element')}` : `master ${count(n, 'element')} (${names(level, n)})`],
+  ['elements', (n, level) => n === STORY_ELEMENTS.length ? `use all ${n} elements`
+    : storyElementsRandom(level) ? `use ${count(n, 'random element')}` : `use ${count(n, 'element')} (${names(level, n)})`],
   ['steamFusions', n => `make Steam (Fire → Water)${n > 1 ? ` ${times(n)}` : ''}`],
   ['quenchFusions', n => `make Quench (Water → Fire)${n > 1 ? ` ${times(n)}` : ''}`],
   ['fusions', n => `fuse two elements ${times(n)}`],
@@ -71,6 +71,7 @@ export function storyGoalText(level, character = null) {
   if ((m.ringHeals || m.signatures) && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnel deposits seal only after the surround and ability tasks.');
   if (m.signatures && character === 'mobi') notes.push('Your own tunnel can heal before the ability task is complete, after the surround task.');
   if (level.rotateEvery && (level.kind === 'rotation' || level.rotations)) notes.push(`Turns come every ${level.rotateEvery} seconds.`);
+  if (m.elements) notes.push('Picking up an element activates it and counts as one use. Each required type counts once.');
   if (level.tip) notes.push(level.tip);
   return `${sentence(tasks)}.${notes.length ? ` ${notes.join(' ')}` : ''}`;
 }

@@ -1,4 +1,3 @@
-import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 import { describe, expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS, storyChecklist } from '../worm/story/levels.js';
 import { WORM_STORY_NARRATIVE, storyNarrative, storyBriefingText, storyLaunchLines } from '../worm/story/narrative.js';
@@ -94,17 +93,16 @@ describe('the campaign gets harder', () => {
     expect(speed(12)).toBeGreaterThan(speed(4));
   });
 
-  it('grows longer on large decks while leaving pocket decks room to recover', () => {
-    const longest = (from, to) => Math.max(...levelsIn(from, to).map(level => level.mechanics?.bodyLength ?? 0));
-    expect(longest(9, 12)).toBeGreaterThan(longest(5, 8));
-    expect(longest(5, 8)).toBeGreaterThan(longest(1, 4) - 1);
-    for (let chapter = 5; chapter <= 12; chapter++) {
-      expect(levelsIn(chapter, chapter).filter(level => level.mechanics?.bodyLength).length).toBeGreaterThanOrEqual(5);
+  it('asks for larger orb totals on large later decks without any length gate', () => {
+    const orbs = level => level.orbs ?? (level.kind === 'orbs' ? level.target : 0);
+    const largest = (from, to) => Math.max(...levelsIn(from, to).map(orbs));
+    expect(largest(9, 12)).toBeGreaterThan(largest(5, 8));
+    expect(largest(5, 8)).toBeGreaterThanOrEqual(largest(1, 4));
+    for (const level of WORM_STORY_LEVELS) {
+      expect(level.mechanics?.bodyLength).toBeUndefined();
+      expect(level.goal).not.toMatch(/tiles long|master .*elements?/i);
     }
-    // Small decks keep a recovery lane; mega decks retain the long-body challenge.
-    const share = level => level.mechanics.bodyLength * 0.09 / (6 * level.cubeSize ** 2);
-    for (const level of WORM_STORY_LEVELS.filter(l => l.cubeSize <= 3 && l.mechanics?.bodyLength)) expect(share(level)).toBeLessThanOrEqual(0.21);
-    expect(WORM_STORY_LEVELS.some(level => level.cubeSize >= 10 && (level.mechanics?.bodyLength ?? 0) >= 200)).toBe(true);
+    expect(WORM_STORY_LEVELS.some(level => level.cubeSize >= 10 && orbs(level) >= 70)).toBe(true);
   });
 
   it('teaches passes and double heals, then asks for them in every later chapter', () => {
@@ -134,11 +132,7 @@ describe('every level can be supplied', () => {
     const pool = Math.max(m.uniqueElements ?? 0, m.elements ?? 0, m.elementPickups ?? 0) || STORY_ELEMENTS.length;
     if (m.uniqueFusions) expect(m.uniqueFusions).toBeLessThanOrEqual(pool * (pool - 1));
     if (level.kind === 'jump') expect(m.bodyJumps).toBeUndefined();
-    // A stated orb count covers the growth task.
-    if (m.bodyLength) {
-      expect(m.bodyLength).toBeLessThanOrEqual(10 + 3 * (level.orbs ?? (level.kind === 'orbs' ? level.target : Infinity)));
-      expect(level.goal).toContain(`grow to ${segmentsToTiles(m.bodyLength)} tiles long`);
-    }
+    if (level.orbs) expect(level.goal).toContain(`collect ${level.orbs} orbs`);
     // The auditor's conservative power-offer model (two missed cycles) fits the clock.
     const powers = requiredPowerCycle(level).length;
     const budget = powers ? STORY_POWER_OPENING_DELAY + 2 * powers * (STORY_POWER_LIFETIME + STORY_POWER_COOLDOWN)

@@ -1,4 +1,3 @@
-import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 vi.mock('../utils/device.js', async original => ({ ...(await original()), prefersReducedMotion: () => true }));
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -8,7 +7,7 @@ import DeathScreen from '../worm/DeathScreens.jsx';
 import { StoryObjectiveCard, StoryResult } from '../worm/story/StoryCards.jsx';
 import { storyNarrative, storyBriefingText } from '../worm/story/narrative.js';
 import { storyLevel } from '../worm/story/levels.js';
-import { storyGrowthTarget } from '../worm/story/starGoals.js';
+import { storyOrbTarget } from '../worm/story/starGoals.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
@@ -50,7 +49,7 @@ it('opens directly to Story Mode and switches sections without launching a run',
   const first = storyLevel(1);
   expect(rules.textContent).toContain(`${first.limit}s`);
   expect(rules.textContent).toContain(`${first.par}s OR`);
-  expect(rules.textContent).toContain(`AND reach ${segmentsToTiles(storyGrowthTarget(first))} tiles long`);
+  expect(rules.textContent).toContain(`AND collect ${storyOrbTarget(first)} total orbs`);
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 6, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));

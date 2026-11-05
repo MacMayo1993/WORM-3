@@ -131,6 +131,15 @@ jobs:
       - name: Run browser tests
         run: npm run e2e
 
+      - name: Upload Mega Storm visual check
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mega-storm-visual-check
+          path: test-results/**/mega-storm.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
