@@ -212,6 +212,7 @@ const CubeAssembly = React.memo(({
   // the priority -1 useFrame. megaChassisRef mirrors the current chassis descriptor
   // so that frame loop can read the per-band directions without a stale closure.
   const megaBandRefs = useRef([]);
+  const megaChassisGroupRef = useRef(null);
   const megaChassisRef = useRef(null);
   // Per-cubie-index turn direction for the active animation (a slice pair can turn
   // its two planes in opposite directions), built alongside sliceIndicesRef.
@@ -362,7 +363,7 @@ const CubeAssembly = React.memo(({
   // on that box back into the same grid coordinate a Cubie would have supplied,
   // retaining tile taps and slice drags without rebuilding per-cubie hit meshes.
   const onMegaChassisPointerDown = useCallback((event) => {
-    if (!cubeGroupRef.current || !event.point || !event.face?.normal) return;
+    if (currentExplosion(useGameStore.getState()) > 0 || !cubeGroupRef.current || !event.point || !event.face?.normal) return;
     const s = sizeRef.current;
     const k = (s - 1) / 2;
     const local = cubeGroupRef.current.worldToLocal(event.point.clone());
@@ -729,8 +730,12 @@ const CubeAssembly = React.memo(({
   // before raised pieces (-0.4), pads (-0.35), camera (-0.25) and stickers (0).
   useFrame(() => {
     const state = useGameStore.getState();
-    if (!state.wormHealerMode) return;
     const amount = currentExplosion(state);
+    // A continuous box cannot back separated pieces. Swap it for the ordinary
+    // body instances on the same frame that the live lattice starts opening,
+    // and restore it only when closing has completely finished.
+    if (megaChassisGroupRef.current) megaChassisGroupRef.current.visible = amount === 0;
+    if (!state.wormHealerMode) return;
     rescaleExpandedCubies(cubieRefs.current, size, appliedExpansionRef.current, amount);
     appliedExpansionRef.current = explosionFactorRef.current = amount;
   }, -0.45);
@@ -1233,6 +1238,7 @@ const CubeAssembly = React.memo(({
         {/* Keep cubies mounted for stable anchors; hide the exterior only while the
             lens is inside. The ribbons and VoidCore remain visible throughout. */}
         <group ref={exteriorRef}>
+          <group ref={megaChassisGroupRef} name="mega-chassis" visible={currentExplosion(useGameStore.getState()) === 0}>
           {megaChassis && megaChassis.rest && (
             /* Mega omits 1,178 individual rounded cubie bodies for performance,
                but still needs a continuous dark chassis beneath the sticker grid.
@@ -1281,6 +1287,7 @@ const CubeAssembly = React.memo(({
               ))}
             </>
           )}
+          </group>
           {chaosIgnitionShown && <ChaosIgnitionMarker cubieRefs={cubieRefs.current} size={size} />}
           {/* Chaos lightning: bolts, wormhole surges and impacts, all aimed at
               live cubies so they follow pieces that rise, spring and turn. */}
@@ -1327,7 +1334,9 @@ const CubeAssembly = React.memo(({
                   // rather than restoring bodies for the rotating slice every turn —
                   // stops ~170 RoundedBox mounts/unmounts per rotation, which was the
                   // main source of the mid-turn stutter.
-                  omitBody={size >= 15}
+                  // WORM keeps dormant body instances, toggled with the live
+                  // expansion amount; other modes restore their ordinary meshes.
+                  omitBody={size >= 15 && (wormHealerMode || explosionFactor === 0)}
                   onPointerDown={onPointerDown}
                 />
               );
