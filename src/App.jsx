@@ -1,3 +1,5 @@
+import { MODAL_SURFACES } from './hooks/uiSurfaces.js';
+import GraphicsRecovery, { GraphicsContextMonitor } from './3d/GraphicsRecovery.jsx';
 import AntipodalCameraPanel from './components/overlays/AntipodalCameraPanel.jsx';
 import { storyLevel, storyUnlocked, storyLaunchSettings, storyStars } from './worm/story/levels.js';
 import { storyLaunchLines } from './worm/story/narrative.js';
@@ -253,29 +255,6 @@ function TilePreviewHost() {
   return null;
 }
 
-// Error boundary to catch Three.js renderer crashes (null .visible in scene traversal)
-// and attempt recovery by resetting stickerHealAnims to clear any bad state.
-class CanvasErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error) {
-    console.error('[WORM-3] Canvas error recovered:', error?.message);
-    // Clear any in-flight heal animations that may have caused corrupted scene state.
-    try { useGameStore.setState({ stickerHealAnims: {} }); } catch (_) {}
-    // Brief delay then re-mount the canvas subtree.
-    setTimeout(() => this.setState({ hasError: false }), 200);
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
-}
-
 export default function WORM3() {
   // ========================================================================
   // STATE FROM ZUSTAND STORE
@@ -441,6 +420,7 @@ export default function WORM3() {
   // Mode-transition cover: bump this token when a mode is revealed to arm the
   // SceneLoadingGate, which covers the scene with the loading cube while its
   // environment map / textures decode (only if a decode is actually in flight).
+  const [graphicsFailed, setGraphicsFailed] = useState(false);
   const [sceneGateToken, setSceneGateToken] = useState(0);
   const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
   const [sceneGateEager, setSceneGateEager] = useState(false);
@@ -661,6 +641,28 @@ export default function WORM3() {
     if (useGameStore.getState().wormHealerMode) clearMegaReducedFXOverride();
     handleBackToMainMenu();
   }, [handleExitDemo, handleBackToMainMenu, clearMegaReducedFXOverride, cancelDisparityRun]);
+
+  const handleGraphicsMenu = useCallback(() => {
+    pendingMobiAction.current = null;
+    setShowCubeModeSelect(false);
+    setShowFreeplayWizard(false);
+    setShowComingSoon(false);
+    setShowMobiIntro(false);
+    setMobiIntroLoading(false);
+    setMobiPreviewScene(false);
+    setSceneGateToken(0);
+    setSceneGateEager(false);
+    setShowWormModeWizard(false);
+    setShowRandomWizard(false);
+    setShowModeSelect(false);
+    setShowStore(false);
+    setShowMobiusCubelet(false);
+    setShowWelcome(false);
+    useGameStore.getState().setCaptureMode(false);
+    cancelShuffle();
+    handleHomeFromGame();
+    useGameStore.setState(Object.fromEntries(MODAL_SURFACES.map(surface => [surface.flag, false])));
+  }, [cancelShuffle, handleHomeFromGame, setShowWelcome]);
 
   // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
   // animation plays, so nothing pops in late on slow connections. Delayed a
@@ -1438,10 +1440,10 @@ export default function WORM3() {
       <CaptureChrome>
       {/* WORM prepares the scene and portrait under this cover, then reveals
           Mobi over the finished backdrop as the cover dissolves. */}
-      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager}
+      {!graphicsFailed && <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager}
         minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }}
         ready={!mobiIntroLoading || (mobiSceneReadyToken === mobiLoadToken && mobiPortraitReadyToken === mobiLoadToken)}
-        onReveal={mobiIntroLoading ? revealMobiIntro : undefined} />
+        onReveal={mobiIntroLoading ? revealMobiIntro : undefined} />}
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
@@ -1472,7 +1474,9 @@ export default function WORM3() {
           overlay and the live menu cube (rotating to the active mode's face) is its
           centerpiece. The carousel deliberately avoids CSS transforms on positioned
           elements so the old mobile-Chrome compositor bleed-through cannot recur. */}
-      <CanvasErrorBoundary>
+      <GraphicsRecovery isMenu={showMainMenu} onFailure={() => setGraphicsFailed(true)}
+        onRetry={() => { setGraphicsFailed(false); useGameStore.setState({ stickerHealAnims: {} }); }} onMenu={handleGraphicsMenu}>
+      {onGraphicsFailure => (
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: DEFAULT_CAMERA_FOV }}
@@ -1481,6 +1485,7 @@ export default function WORM3() {
           shadows
           frameloop={pageHidden ? 'never' : 'always'}
         >
+          <GraphicsContextMonitor onFailure={onGraphicsFailure} />
           <PerformanceMonitor
             onDecline={handlePerformanceDecline}
             onIncline={handlePerformanceIncline}
@@ -1532,7 +1537,8 @@ export default function WORM3() {
           )}
         </Canvas>
       </div>
-      </CanvasErrorBoundary>
+      )}
+      </GraphicsRecovery>
 
       <CaptureChrome>
       <AntipodalCameraPanel active={showAntipodalFrame} resting={wormholePhaseActive} />

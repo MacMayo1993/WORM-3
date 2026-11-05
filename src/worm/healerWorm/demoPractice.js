@@ -65,7 +65,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   if (lessonId === 'collect-heal') {
     // On the front face, growth cores have the antipodal colour: exactly the
     // colour of this flipped entrance. No free inventory, random supply or timer.
-    sim.powerups = [1, 2].map(y => makeGrowthOrb({ x: c, y, z: size - 1, dirKey: 'PZ' }));
+    sim.powerups = [1, 2].map(y => makeGrowthOrb({ x: c, y, z: size - 1, dirKey: 'PZ' }, { respawn: false }));
   }
   if (lessonId === 'orbs') {
     // A guaranteed trail carries the first growth lesson around the cube's edge.

@@ -1,3 +1,4 @@
+import { graphicsRecoveryOwnsInput } from '../utils/graphicsRecovery.js';
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -104,6 +105,7 @@ export default function WormSwipeControls({ onTurn, worm }) {
             }
         };
         const onKey = (e) => {
+            if (graphicsRecoveryOwnsInput()) return;
             // A held key is one press, including after Air expires. Otherwise
             // repeat would spend a double jump or relaunch instead of landing.
             if (e.repeat) return;

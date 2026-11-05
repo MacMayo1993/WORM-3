@@ -1346,7 +1346,9 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        if (ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
+        // Fixed-budget practice orbs must not respawn onto the scripted route.
+        // Other demo food keeps replenishing for continued free practice.
+        if (pickedUp.respawn === false || ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
         else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
         collectedAny = true;
     }

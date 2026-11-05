@@ -87,6 +87,14 @@ jobs:
       - name: Check bundle budgets
         run: npm run bundle:check
 
+      - name: Upload production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+          include-hidden-files: true
+          retention-days: 7
+
       - name: Setup Pages
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/configure-pages@v4
@@ -97,16 +105,11 @@ jobs:
         with:
           path: './dist'
 
-  # Real-browser smoke tests against the production build: the unit suite is jsdom,
-  # so it cannot see a blank canvas, a thumbnail that never draws, or a page that
-  # dies on load. Software-rendered WebGL makes this the slowest job, so it runs
-  # beside the others rather than ahead of them.
-  #
-  # It does not gate `deploy` yet: a brand-new browser suite should earn that by
-  # running green for a while. To make it a release gate, add `e2e` to the
-  # `needs:` of the deploy job (and/or require it in branch protection).
+  # Validate the same production build that is uploaded for Pages. Browser
+  # failures must block publication, including graphics startup regressions.
   e2e:
     name: Browser smoke tests
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -125,9 +128,12 @@ jobs:
       - name: Install Chromium
         run: npm run e2e:install
 
-      - name: Build
-        id: browser_build
-        run: npm run build
+      - name: Download production build
+        id: production_build
+        uses: actions/download-artifact@v4
+        with:
+          name: production-build
+          path: dist/
 
       # Publish the focused screenshot before unrelated long-running smoke tests.
       # Separate output folders keep its traces/report when the next run cleans up.
@@ -148,7 +154,7 @@ jobs:
       # Preserve every remaining test exactly once, even if the focused test
       # failed. Neither invocation allows failures; either makes this job red.
       - name: Run remaining browser tests
-        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.production_build.outcome == 'success' }}
         run: |
           mapfile -d '' -t tests < <(
             find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
@@ -187,7 +193,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Deploy to GitHub Pages
