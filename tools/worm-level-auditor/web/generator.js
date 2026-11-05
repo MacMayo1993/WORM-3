@@ -15,6 +15,7 @@ export function seededRandom(seed){
 export function requiredPowerCycle(level){
  const m=level.mechanics??{},types=new Set();
  if(m.steamFusions||m.quenchFusions){types.add('water');types.add('fire');}
+ if(m.earthSprings)types.add('grass');if(m.airJumps)types.add('air');
  if(m.magnetOrbs)types.add('magnet');if(m.explodes)types.add('explode');if(m.rockets)types.add('rocket');
  const pool=Math.max(m.elementPickups??0,m.uniqueElements??0,m.elements??0);
  for(const e of elementTypes(level).slice(0,pool))types.add(e);
@@ -36,7 +37,7 @@ export function levelGoal(level){
  if(level.colors)tasks.push('collect all '+level.colors+' colors');
  if(level.rotations)tasks.push('survive '+level.rotations+' layer turns');
  for(const [key,count] of Object.entries(m)){
-  const phrase={steamFusions:'make '+count+' Steam fusions (Fire → Water)',quenchFusions:'make '+count+' Quench fusions (Water → Fire)',boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+elementTypes(level).slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',elements:'master '+count+' elements ('+elementTypes(level).slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
+  const phrase={earthSprings:'land '+count+' Earth spring jump'+(count===1?'':'s'),airJumps:'land '+count+' Air jump'+(count===1?'':'s'),steamFusions:'make '+count+' Steam fusions (Fire → Water)',quenchFusions:'make '+count+' Quench fusions (Water → Fire)',boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+elementTypes(level).slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',elements:'use '+count+' element'+(count===1?'':'s')+' ('+elementTypes(level).slice(0,count).map(e=>e==='grass'?'earth':e).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
   if(phrase)tasks.push(phrase);
  }
  const finish=['tunnel','collector','restore','mastery'].includes(level.kind)?' Clear your tail to finish.':level.kind==='jump'?' Empty jumps do not count.':'';

@@ -414,7 +414,10 @@ describe('claiming a special', () => {
     expect(sim.elementalType).toBe('water');
     expect(sim.pos).toEqual({ x: 2, y: 3, z: 4, dirKey: 'PZ' });
     expect(sim.headInterpPos.distanceTo(sim.curWorldPos)).toBeLessThan(1e-8);
-    expect(eventsOf(ctx, 'storyMechanic')).toHaveLength(1);
+    expect(eventsOf(ctx, 'storyMechanic')).toEqual([
+      { type: 'storyMechanic', args: ['elementPickups', 'water'] },
+      { type: 'storyMechanic', args: ['elementUsed', 'water'] },
+    ]);
   });
 
   it.each(ELEMENTAL_TYPES)('claims %s once at the tile center, never on approach', type => {
@@ -439,7 +442,7 @@ describe('claiming a special', () => {
     expect(sim.interpT).toBe(progress);
     expect(sim.stepAcc).toBe(accumulator);
     expect(eventsOf(ctx, 'elemental')).toHaveLength(1);
-    expect(eventsOf(ctx, 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups', type] }]);
+    expect(eventsOf(ctx, 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups', type] }, { type: 'storyMechanic', args: ['elementUsed', type] }]);
   });
 
   it.each(['magnet', 'jump', 'both'])('leaves nearby elements alone with %s assistance', assist => {

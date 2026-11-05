@@ -404,7 +404,7 @@ describe('applyRotationToSim — multi-layer commit', () => {
     expect(sim.specials).toHaveLength(0);
     stepWormSim(sim, 0.1, SIZE, ctx);
     expect(ctx.events.filter(e => e.type === 'elemental')).toHaveLength(1);
-    expect(ctx.events.filter(e => e.type === 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups', 'water'] }]);
+    expect(ctx.events.filter(e => e.type === 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups', 'water'] }, { type: 'storyMechanic', args: ['elementUsed', 'water'] }]);
   });
 
   it('resolves a deferred pickup once, against the committed cell', () => {

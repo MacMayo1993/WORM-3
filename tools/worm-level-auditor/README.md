@@ -1,6 +1,6 @@
 # WORM³ campaign workshop
 
-The game ships 120 authored levels in 12 chapters, all in `src/worm/story/campaign.js` (Mobi's lines are in `narrative.js`). Earlier builds generated levels 41–120 from a seeded recipe; that campaign was replaced by authored chapters with a story arc and harder, progressive objectives (body length, passes through the Core, double heals, fusions). The seeded generator remains here as a drafting workshop only. It no longer writes game files.
+The game ships 120 authored levels in 12 chapters, all in `src/worm/story/campaign.js` (Mobi's lines are in `narrative.js`). Earlier builds generated levels 41–120 from a seeded recipe; that campaign was replaced by authored chapters with a story arc and harder, progressive objectives (total orb collection, passes through the Core, double heals, fusions). The seeded generator remains here as a drafting workshop only. It no longer writes game files.
 
 ## Local auditor and generator
 
@@ -15,3 +15,5 @@ The generator page drafts seeded packs and checks them against the current runti
 Quest supply is checked using real game functions, not a simulated inventory model. A passing check does not prove navigation, combat difficulty, or a complete player run. Playtest chapter finales and action-based objectives before release. Timers reserve repeated pickup opportunities and routing slack; no lifetime pickup cap is introduced. The conservative power budget uses the largest of two cycles, explosion/rocket counts, elemental pickup quantity, and magnet catches divided by four (rounded up). Elemental effects block subsequent offers, and each magnet offer supports at most four quest catches. Both edited and imported packs must pass this timing check before the CLI writes campaign files or the workshop exports an integration module.
 
 The original authored catalog used for this pack is from commit `1585a1b3c01c671774ebb32b4f0e21789ec54633`. The local auditor records the current checkout and hashes the source content, including uncommitted changes, rather than claiming a live GitHub sync.
+
+Ordinary orb goals and three-star orb targets count total fresh ordinary pickups, not body length. Spending tail, cuts, and growth multipliers do not change that count; recovered drops and special elemental pickups do not advance it. Drafts use `orbs` (or an orb level’s `target`) and optional `starOrbs`, never `bodyLength` or `starLength`. Element-use goals count distinct activations, including automatic activation on pickup, without maneuvers or timers. Explicit Earth spring and Air jump tasks require landing; pickup quantity, pickup variety, and fusion goals remain separate.

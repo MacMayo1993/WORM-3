@@ -16,6 +16,7 @@ const SceneEffects = React.lazy(() => import('./SceneEffects.jsx'));
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
+import { opaqueCubePasses, updateCubeShadowCadence } from './glassViewQuality.js';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
@@ -85,13 +86,12 @@ function CameraRelativeRig({ lights }) {
  */
 // Reduced FX and tunnel rides redraw the shadow map every fourth frame instead
 // of every frame; the light still casts, so no program changes.
-function ShadowCadence({ slow }) {
+function ShadowCadence({ enabled = true, slow }) {
   const gl = useThree(s => s.gl);
   const frame = useRef(0);
   useEffect(() => () => { gl.shadowMap.autoUpdate = true; }, [gl]);
   useFrame(() => {
-    gl.shadowMap.autoUpdate = !slow;
-    if (slow && frame.current++ % 4 === 0) gl.shadowMap.needsUpdate = true;
+    updateCubeShadowCadence(gl.shadowMap, enabled, slow, frame.current++);
   });
   return null;
 }
@@ -132,6 +132,7 @@ export default function GameScene({
     size,
     cubies,
     wormHealerMode,
+    wormViewPower,
     wormRunId,
     wormPhase,
     wormHealedCount,
@@ -149,6 +150,7 @@ export default function GameScene({
     size: s.size,
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,
+    wormViewPower: s.wormViewPower,
     wormRunId: s.wormRunId,
     wormPhase: s.wormPhase,
     wormHealedCount: s.wormHealedCount ?? 0,
@@ -165,7 +167,10 @@ export default function GameScene({
   // lit program's key, so toggling it when the PerformanceMonitor declines (most
   // often mid tunnel ride) relinked the whole scene in one frame. Reduced FX and
   // rides refresh the shadow map less often instead (ShadowCadence).
-  const shadowsAvailable = !isMobile && visualMode !== 'wireframe' && visualMode !== 'glass';
+  // A glass pickup used to keep paying for the classic view's shadow map and AO.
+  // Do not change castShadow, the light rig or composer lifetime here: those
+  // change every lit program's key and would hitch on pickup and restoration.
+  const { available: shadowsAvailable, enabled: opaqueEffects } = opaqueCubePasses({ visualMode, wormHealerMode, wormViewPower }, isMobile);
   const shadowsOn = shadowsAvailable && !perfReducedFX;
 
   const wormholePhaseActive = wormHealerMode && (
@@ -178,7 +183,7 @@ export default function GameScene({
   // renderer's tone mapping and draws the scene through a render target, both
   // part of every program's key, so unmounting it for each ride relinked the
   // scene going in and again coming out, and rebuilt the AO passes every time.
-  const aoEnabled = shadowsOn && !wormholePhaseActive;
+  const aoEnabled = shadowsOn && opaqueEffects && !wormholePhaseActive;
   // Antipodal PiP is shown only when the player toggles it on (in any mode), and is
   // suppressed during wormhole travel where the dedicated tunnel camera takes over.
   // (Previously worm mode force-showed it, which made the HUD toggle a no-op there.)
@@ -396,7 +401,7 @@ export default function GameScene({
           two-camera pass) which an EffectComposer cannot share, so AO and the PiP are
           mutually exclusive — toggling the PiP on gracefully drops AO for that view.
           Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
-      {shadowsAvailable && <ShadowCadence slow={!shadowsOn || wormholePhaseActive} />}
+      {shadowsAvailable && <ShadowCadence enabled={opaqueEffects} slow={!shadowsOn || wormholePhaseActive} />}
       {shadowsAvailable && (
         <Suspense fallback={null}>
           <SceneEffects kind="game" enabled={aoEnabled && !shouldShowAntipodalPiP && !showCutawayLens} />

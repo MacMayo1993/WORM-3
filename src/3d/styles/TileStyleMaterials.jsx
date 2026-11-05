@@ -307,7 +307,16 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
 
   const isGlass = safeStyle === 'glass';
 
-  const uniforms = {
+  // Glass is not identity-seeded or animated. Its private per-tile clones used
+  // to copy every procedural style's uniforms, including a DataTexture, then
+  // request another uniform upload from each tile-identity callback. Keep only
+  // what the glass/finish shaders read, with no per-tile texture allocation.
+  const uniforms = isGlass ? {
+    baseColor: { value: color },
+    rigKey: sharedUniforms.rigKey,
+    rigFill: sharedUniforms.rigFill,
+    rigRim: sharedUniforms.rigRim,
+  } : {
     tileHome: { value: new THREE.Vector3() },
     tileFace: { value: 0 },
     baseColor: { value: color },
@@ -347,6 +356,11 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     fragmentShader: withStickerFinish(styleShader),
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,
+    // A glass sticker is only 0.016 units thick. Two separate transparent
+    // back/front passes doubled submissions and program selection per tile,
+    // without adding useful depth. Keep both sides and the independently sorted
+    // antipodal back, but submit the thin sticker once (including on WebGL1).
+    forceSinglePass: isGlass,
     depthWrite: !isGlass,
     blending: THREE.NormalBlending,
     // orbChamber ray-traces its sphere using screen-space derivatives (dFdx/dFdy)
@@ -370,6 +384,13 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
  */
 export function getGlassMaterial(colorHex) {
   return getTileStyleMaterial('glass', colorHex);
+}
+
+/** A tile's own mutable tint, while the camera-relative finish stays shared. */
+export function createGlassMaterial(colorHex) {
+  const material = getGlassMaterial(colorHex).clone();
+  for (const key of ['rigKey', 'rigFill', 'rigRim']) material.uniforms[key] = sharedUniforms[key];
+  return material;
 }
 
 /**

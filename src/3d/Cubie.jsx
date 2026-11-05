@@ -13,6 +13,7 @@ import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { cubieBodyGeometry } from './cubieBodyGeometry.js';
+import { compactGlassGeometry } from './glassViewQuality.js';
 import { useCubieBodyBatches } from './cubieBodyBatchContext.js';
 import { useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { LEGO_FACE_TRANSFORMS, LEGO_STUD_PARTS } from './legoStud.js';
@@ -41,6 +42,8 @@ function CubieFrameFallback({ tick, priority }) {
   useFrame((_state, delta) => { tick(delta); }, priority);
   return null;
 }
+
+const wormLatticeOpen = () => wormExpansion.amount > 0;
 
 // Shared hollow beam materials — one per visualMode string.
 // Each cubie uses one merged frame mesh and a shared material.
@@ -181,9 +184,11 @@ const Cubie = React.forwardRef(function Cubie({
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
-  // Classic looks wear the menu cube's piece: 0.96 black plastic, clear-coated off mobile.
+  // Outside WORM, Classic looks wear the menu cube's 0.96 black-plastic piece.
   const classicBody = CLASSIC_BODY_MODES.has(effectiveVisualMode) && (!wormMode || classicPickup);
-  const bodySize = classicBody ? CLASSIC_BODY_SIZE : wormMode ? 0.92 : 0.98;
+  // WORM's pressed stickers can sink below a 0.96 Classic shell. A view pickup
+  // changes the finish, never the inset that keeps the moving surface in front.
+  const bodySize = wormMode ? 0.92 : classicBody ? CLASSIC_BODY_SIZE : 0.98;
   // WORM keeps the shared body batch; its plain stickers carry the glossy coat.
   const coatBody = classicBody && !isMobile && !wormMode;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
@@ -444,13 +449,21 @@ const Cubie = React.forwardRef(function Cubie({
   const bodyBatches = useCubieBodyBatches();
   const showsBody = !mirrorMode && !effectiveHollowMode && !hideBody && !(omitBody && !raised && !returningBody);
   const batchBody = !!bodyBatches && wormMode && showsBody && !raisedWindow && !coatBody;
+  // Mega's ordinary bodies are omitted at rest, but Explode exposes all their
+  // sides. Reuse the existing content group as an instance anchor, with no extra
+  // scene nodes or per-piece materials. Raised/returning pieces keep their own
+  // body path, so a pad never acquires a second shell.
+  const expansionBody = !!bodyBatches && wormMode && omitBody && !showsBody &&
+    !mirrorMode && !effectiveHollowMode && !hideBody && !raised && !returningBody;
   const bodyRef = useRef(null);
-  const bodyGeometry = cubieBodyGeometry(bodySize);
-  const bodyLook = batchBody ? JSON.stringify(bodyMatProps) : '';
+  const bodyGeometry = cubieBodyGeometry(bodySize, undefined,
+    effectiveVisualMode === 'glass' && compactGlassGeometry(size, isMobile, perfReducedFX));
+  const bodyLook = batchBody || expansionBody ? JSON.stringify(bodyMatProps) : '';
   useLayoutEffect(() => {
-    if (!batchBody || !bodyRef.current) return undefined;
-    return bodyBatches.register(bodyRef.current, bodyGeometry, JSON.parse(bodyLook));
-  }, [batchBody, bodyBatches, bodyGeometry, bodyLook]);
+    const anchor = expansionBody ? frameHost.parent : bodyRef.current;
+    if ((!batchBody && !expansionBody) || !anchor) return undefined;
+    return bodyBatches.register(anchor, bodyGeometry, JSON.parse(bodyLook), expansionBody ? wormLatticeOpen : null);
+  }, [batchBody, expansionBody, bodyBatches, bodyGeometry, bodyLook, frameHost]);
 
 
   // The lift, kick, pop and burrow offsets. Returns whether the piece is still

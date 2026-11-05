@@ -3,7 +3,7 @@ import { makeWormSim, resetWormSim, stepWormSim } from '../worm/healerWorm/wormS
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
 import { recordStoryMechanic, nextStoryPower, offerStoryPower, STORY_ELEMENTS } from '../worm/story/mastery.js';
 import { storyLevel, storyChecklist, storyOutcome, storyProgressText } from '../worm/story/levels.js';
-import { storyGrowthTarget } from '../worm/story/starGoals.js';
+import { storyOrbTarget } from '../worm/story/starGoals.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { makeCubies } from '../game/cubeState.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
@@ -203,15 +203,20 @@ describe('story credit for the new goals', () => {
     expect(nextStoryPower(p, level)).toBeNull();
   });
 
-  it('measures body length at its peak, so paying tolls afterwards keeps the credit', () => {
+  it('requires total pickups, never body length, and retains credit after spending the tail', () => {
     const { level, sim, read } = setup(41);
-    sim.tailLength = 130; expect(read().bodyLength).toBe(130);
-    sim.tailLength = 40; expect(read().bodyLength).toBe(130);
-    const metrics = { alive: true, elapsed: 1, landed: true, orbs: level.target, colors: 6, bodyLength: 99 };
+    sim.tailLength = 130;
+    expect(read().orbs).toBe(0);
+    const target = level.target;
+    expect(read({ wormSessionOrbs: target }).orbs).toBe(target);
+    sim.tailLength = 10;
+    expect(read({ wormSessionOrbs: target }).orbs).toBe(target);
+    const metrics = { alive: true, elapsed: 1, landed: true, orbs: target - 1, colors: 6, peakLength: 999 };
     expect(storyOutcome(level, metrics)).toBeNull();
-    expect(storyOutcome(level, { ...metrics, bodyLength: 100 })).not.toBeNull();
-    expect(storyGrowthTarget(level)).toBeGreaterThan(level.mechanics.bodyLength);
-    expect(storyProgressText(level, { ...metrics, elapsed: 10 })).toContain('8.91/9 tiles long');
+    expect(storyOutcome(level, { ...metrics, orbs: target, peakLength: 10 })).not.toBeNull();
+    expect(storyOrbTarget(level)).toBeGreaterThanOrEqual(target);
+    expect(storyProgressText(level, { ...metrics, elapsed: 10 })).toContain(`${target - 1}/${target} orbs`);
+    expect(level.mechanics?.bodyLength).toBeUndefined();
   });
 
   it('counts landed body jumps on a level that is not a jump trial', () => {
@@ -230,7 +235,7 @@ describe('story credit for the new goals', () => {
 
   it('labels every new goal on a tunnel trial that also asks for them', () => {
     const level = storyLevel(54);
-    expect(storyChecklist(level).map(goal => goal.label)).toEqual(['Pass yourself in the Core', 'Double heals', 'Grow your worm (tiles)', 'Cross tunnel pairs']);
+    expect(storyChecklist(level).map(goal => goal.label)).toEqual(['Pass yourself in the Core', 'Double heals', 'Cross tunnel pairs', 'Collect orbs']);
     expect(level.goal).toContain('pass yourself in the Core once');
   });
 });

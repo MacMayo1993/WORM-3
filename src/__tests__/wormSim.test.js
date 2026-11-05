@@ -342,17 +342,17 @@ describe('jump rescue window', () => {
     expect(eventsOf(ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
   });
 
-  it.each([[30, 0], [60, 0], [120, 0], [60, 0.001]])('does not freeze or bite a relocated tail while closing at %s Hz (timer %s)', (hz, timer) => {
-    const { sim, ctx } = setup();
+  it.each([5, 10, 11, 14, 15].flatMap(size => [[30, 0], [60, 0], [120, 0], [60, 0.001]].map(([hz, timer]) => [size, hz, timer])))('does not freeze or bite a relocated tail while closing size %s at %s Hz (timer %s)', (size, hz, timer) => {
+    const { sim, ctx } = setup({}, size);
     sim.explodeT = 12;
-    tickExpansion(sim, 5, EXPLODE_TRANSITION, ctx);
+    tickExpansion(sim, size, EXPLODE_TRANSITION, ctx);
     sim.explodeT = timer;
     sim.selfCollisionGraceSteps = 0;
     sim.pendingSelfCollision = { key: tileKey(sim.pos) };
     // A pending hit on the first closing frame used to offer a rescue before
     // advancing the explosion, or kill as the old route compressed under it.
     for (let frame = 0; frame < hz * 2 && sim.expansionAmount > 0; frame++) {
-      stepWormSim(sim, 1 / hz, 5, ctx);
+      stepWormSim(sim, 1 / hz, size, ctx);
       expect(sim.alive).toBe(true);
       expect(sim.jumpRescueT).toBe(0);
     }
@@ -362,7 +362,7 @@ describe('jump rescue window', () => {
     expect(sim.tailLength).toBe(100);
     // Protection is measured in departing tiles, so it works at every speed,
     // and ends instead of making the whole 12-second pickup invulnerable.
-    for (let frame = 0; frame < hz * 6 && sim.selfCollisionGraceSteps > 0; frame++) stepWormSim(sim, 1 / hz, 5, ctx);
+    for (let frame = 0; frame < hz * 6 && sim.selfCollisionGraceSteps > 0; frame++) stepWormSim(sim, 1 / hz, size, ctx);
     expect(sim.selfCollisionGraceSteps).toBe(0);
     expect(eventsOf(ctx, 'death')).toHaveLength(0);
     expect(eventsOf(ctx, 'rescue')).toHaveLength(0);

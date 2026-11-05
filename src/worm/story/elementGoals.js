@@ -6,7 +6,7 @@ export const STORY_ELEMENTS = ELEMENTAL_TYPES;
 // its elements afresh on each attempt: stageStory rolls `practice.elementOrder`
 // and the offers, credit, checklist and hints all read that one order.
 const DEALT_GOALS = ['elements', 'uniqueElements', 'elementPickups', 'fusions', 'uniqueFusions'];
-export const STORY_ELEMENT_GOALS = [...DEALT_GOALS, 'steamFusions', 'quenchFusions'];
+export const STORY_ELEMENT_GOALS = [...DEALT_GOALS, 'earthSprings', 'airJumps', 'steamFusions', 'quenchFusions'];
 export const hasStoryElementGoal = level => STORY_ELEMENT_GOALS.some(key => level.mechanics?.[key] > 0);
 export const storyElementsRandom = level => !level.elementTypes && DEALT_GOALS.some(key => level.mechanics?.[key]);
 /** This attempt's element order, or null for a level that names its own (or asks for none). */

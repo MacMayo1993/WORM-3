@@ -63,8 +63,8 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
   return {
     group,
     /** Draw `anchor`'s body in the batch for its look; returns the unregister. */
-    register(anchor, geometry, props = EMPTY) {
-      const entry = { anchor, geometry, batch: batchFor(geometry, props), depth: 0, version: -1, rootVersion: -1 };
+    register(anchor, geometry, props = EMPTY, enabled = null) {
+      const entry = { anchor, geometry, enabled, batch: batchFor(geometry, props), depth: 0, version: -1, rootVersion: -1 };
       entries.add(entry);
       return () => entries.delete(entry);
     },
@@ -84,6 +84,11 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
       }
       for (const batch of batches.values()) batch.items.length = 0;
       for (const entry of entries) {
+        // Mega's resting chassis replaces its ordinary shells. Keep their
+        // anchors registered, but draw them only while the lattice is open.
+        // This switches on the simulation's first frame, without mounting a
+        // thousand meshes or waiting for React's expansion snapshot.
+        if (entry.enabled && !entry.enabled()) continue;
         const { anchor, geometry } = entry;
         // The anchor itself is invisible by design; what hides a body is a hidden
         // ancestor (the exterior while the lens is inside the cube, a cubie).

@@ -1,25 +1,25 @@
-import { segmentsToTiles } from '../worm/healerWorm/tileUnits.js';
 import { expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, storyLevel, storyChecklist, storyOutcome } from '../worm/story/levels.js';
-import { storyGrowthTarget, storyStarRules, shouldFinishStory } from '../worm/story/starGoals.js';
+import { storyOrbTarget, storyStarRules, shouldFinishStory } from '../worm/story/starGoals.js';
 import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { stageStory, storyMetrics, replenishStoryOrbs } from '../worm/story/runtime.js';
 import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
-import { BASE_TAIL_LENGTH, MAX_TAIL } from '../worm/healerWorm/constants.js';
+import { BASE_TAIL_LENGTH } from '../worm/healerWorm/constants.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 
 const completed = level => ({ alive: true, elapsed: level.par, cuts: 0,
   ...Object.fromEntries(storyChecklist(level).map(goal => [goal.key, goal.target])),
   tailClear: true, landed: true, rotationSettled: true, remaining: 0,
-  peakLength: storyGrowthTarget(level) });
+  orbs: storyOrbTarget(level), peakLength: 10 });
 
-it.each(WORM_STORY_LEVELS)('requires real growth for three stars on level $id and keeps a lower-star clear possible', level => {
+it.each(WORM_STORY_LEVELS)('requires total collected orbs for three stars on level $id and keeps a lower-star clear possible', level => {
   const metrics = completed(level);
   expect(storyOutcome(level, metrics)?.stars).toBe(3);
-  expect(storyGrowthTarget(level)).toBeGreaterThan(BASE_TAIL_LENGTH);
-  expect(storyGrowthTarget(level)).toBeLessThanOrEqual(MAX_TAIL);
-  expect(storyOutcome(level, { ...metrics, peakLength: metrics.peakLength - 1 })?.stars).toBe(2);
-  expect(storyOutcome(level, { ...metrics, peakLength: undefined, orbs: 999 })?.stars).toBe(2);
+  expect(storyOrbTarget(level)).toBeGreaterThan(0);
+  expect(storyOrbTarget(level)).toBeGreaterThanOrEqual(level.orbs ?? (level.kind === 'orbs' ? level.target : 0));
+  const below = storyOutcome(level, { ...metrics, orbs: metrics.orbs - 1 });
+  expect(below?.stars ?? null).toBe(metrics.orbs > (level.orbs ?? (level.kind === 'orbs' ? level.target : 0)) ? 2 : null);
+  expect(storyOutcome(level, { ...metrics, peakLength: undefined })?.stars).toBe(3);
   expect(storyOutcome(level, { ...metrics, elapsed: level.par + 0.01 })?.stars).toBe(2);
   expect(storyOutcome(level, { ...metrics, cuts: 1 })?.stars).toBe(2);
   expect(storyOutcome(level, { ...metrics, cuts: 1, elapsed: level.par + 0.01 })?.stars).toBe(1);
@@ -30,21 +30,21 @@ it.each(WORM_STORY_LEVELS)('requires real growth for three stars on level $id an
   const rules = storyStarRules(level);
   expect(rules[0]).toContain(`${level.limit}s`);
   expect(rules[1]).toContain(' OR ');
-  expect(rules[2]).toContain(`${segmentsToTiles(metrics.peakLength)} tiles long`);
+  expect(rules[2]).toContain(`${metrics.orbs} total orbs`);
 });
 
-it('offers a finish button while growth is attainable, then finishes at three stars or par expiry', () => {
-  const level = storyLevel(2), metrics = { ...completed(level), elapsed: 50, peakLength: 10 };
+it('offers a finish button while more orbs are attainable, then finishes at three stars or par expiry', () => {
+  const level = storyLevel(2), metrics = { ...completed(level), elapsed: 50, orbs: 0, peakLength: 10 };
   const outcome = storyOutcome(level, metrics);
   expect(shouldFinishStory(level, metrics, outcome)).toBe(false);
   expect(shouldFinishStory(level, metrics, null)).toBe(false);
-  for (const patch of [{ peakLength: storyGrowthTarget(level) }, { elapsed: level.par }, { cuts: 1 }]) {
+  for (const patch of [{ orbs: storyOrbTarget(level), peakLength: 10 }, { elapsed: level.par }, { cuts: 1 }]) {
     const changed = { ...metrics, ...patch };
     expect(shouldFinishStory(level, changed, storyOutcome(level, changed))).toBe(true);
   }
   const hud = storyHudSnapshot(null, level, metrics, 42, outcome);
-  expect(hud.checklist).toMatchObject({ canFinish: true, settling: false, starGoals: { peakLength: 10, grown: false } });
-  expect(storyHudSnapshot(hud, level, { ...metrics, peakLength: 13 }, 42, outcome)).not.toBe(hud);
+  expect(hud.checklist).toMatchObject({ canFinish: true, settling: false, starGoals: { orbs: 0, collected: false } });
+  expect(storyHudSnapshot(hud, level, { ...metrics, orbs: 1 }, 42, outcome)).not.toBe(hud);
 });
 
 it('keeps peak length through a healing deposit and resets it on retry', () => {
@@ -56,14 +56,14 @@ it('keeps peak length through a healing deposit and resets it on retry', () => {
   expect(storyMetrics(sim, practice, level, state, [], 0.05).peakLength).toBe(46);
   sim.tailLength = 10;
   const afterDeposit = storyMetrics(sim, practice, level, state, [], 0.05);
-  expect(afterDeposit).toMatchObject({ peakLength: 46, currentLength: 10 });
+  expect(afterDeposit).toMatchObject({ peakLength: 46, currentLength: 10, orbs: 12 });
   expect(storyOutcome(level, { ...completed(level), currentLength: afterDeposit.currentLength, peakLength: afterDeposit.peakLength }))
     .toMatchObject({ finalLength: 10, peakLength: 46 });
   // A pickup and deposit can occur within the same tick: retain the pickup peak.
   sim.peakTailLength = 49;
   expect(storyMetrics(sim, practice, level, state, [], 0.05).peakLength).toBe(49);
   const retry = stageStory(sim, level.cubeSize, level);
-  expect(storyMetrics(sim, retry, level, state, [], 0.05).peakLength).toBe(BASE_TAIL_LENGTH);
+  expect(storyMetrics(sim, retry, level, { ...state, wormSessionOrbs: 0 }, [], 0.05)).toMatchObject({ peakLength: BASE_TAIL_LENGTH, orbs: 0 });
 });
 
 it('refreshes the finish offer when the visible worm shrinks below its best length', () => {

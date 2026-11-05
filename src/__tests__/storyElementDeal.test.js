@@ -51,11 +51,11 @@ describe('Story deals its elements per attempt', () => {
     expect(nextStoryPower(p, level)).toBe(dealt[0]);
     const goal = storyChecklist(level, { elementOrder: p.elementOrder }).find(g => g.key === 'elements');
     const names = { grass: 'earth' };
-    expect(goal.label).toBe(`Master ${dealt.map(type => names[type] ?? type).join(', ')}`);
+    expect(goal.label).toBe(`Use ${dealt.map(type => names[type] ?? type).join(', ')}`);
   });
 
   it('says the elements are random before a run, and names fixed ones', () => {
-    expect(storyLevel(27).goal).toContain('master 3 random elements');
+    expect(storyLevel(27).goal).toContain('use 3 random elements');
     expect(storyChecklist(storyLevel(30)).find(g => g.key === 'uniqueElements').label).toBe('Collect 3 random elements');
     expect(storyLevel(8).goal).toContain('collect 3 different elements (water, fire and earth)');
     expect(storyLevel(64).goal).toContain('collect all 6 different elements');
@@ -66,7 +66,7 @@ describe('Story deals its elements per attempt', () => {
     const first = storyHudSnapshot(null, level, { ...metrics, elementOrder: ['ice', 'air', 'fire', 'water', 'grass', 'lightning'] }, 1, null);
     const retry = storyHudSnapshot(first, level, { ...metrics, elementOrder: ['water', 'lightning', 'grass', 'ice', 'air', 'fire'] }, 1, null);
     const label = snapshot => snapshot.checklist.goals.find(g => g.key === 'elements').label;
-    expect(label(first)).toBe('Master ice, air, fire');
-    expect(label(retry)).toBe('Master water, lightning, earth');
+    expect(label(first)).toBe('Use ice, air, fire');
+    expect(label(retry)).toBe('Use water, lightning, earth');
   });
 });

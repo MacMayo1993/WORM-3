@@ -58,7 +58,8 @@ it('gives the Classic pickup a full black plastic chassis and keeps raised tunne
   const ordinary = render(null, { wormMode: false, visualMode: 'classic' });
   const classic = render('view-classic', { randomMode: true, hollowMode: true, mirrorMode: true });
   expect(body(classic).props).toMatchObject({ color: '#141416', opacity: 1, transparent: false });
-  expect(geometry(classic)).toBe(geometry(ordinary));
+  expect(geometry(classic)).toBe(geometry(render(null)));
+  expect(geometry(classic)).not.toBe(geometry(ordinary)); // WORM keeps room for tile depression
   expect(classic.some(n => n.type === MergedLedEdges)).toBe(false);
   expect(classic.filter(n => n.type === StickerPlane).every(n => n.props.mode === 'classic')).toBe(true);
   const raised = render('view-classic', { flipped: true });

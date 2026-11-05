@@ -24,6 +24,13 @@ That config is the deploy config, unminified (so profiles keep function names) w
 
 ## Modes
 
+### Glass geometry cost
+
+`node scripts/perf-worm/glass-cost.mjs` reports reproducible before/after glass
+sticker submissions and triangle counts at 3×3, 7×7, 10×10 and 15×15. It needs no
+browser; these structural counts are not GPU timings or device FPS. The baseline,
+quality policy and verification limits are in `docs/glass-view-performance-2026-11-05.md`.
+
 ### Tunnel ride camera trace
 
 ```bash

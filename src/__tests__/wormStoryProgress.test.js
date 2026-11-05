@@ -6,7 +6,7 @@ import { getStoreItem } from '../utils/storeCatalog.js';
 import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
 const state = () => useGameStore.getState();
 const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, landed: true,
-  ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])) };
+  ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])), orbs: storyLevel(1).starOrbs };
 function start(id = 1) {
   state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, id);
   useGameStore.setState({ wormStoryReady: true, wormGamePhase: 'active' });

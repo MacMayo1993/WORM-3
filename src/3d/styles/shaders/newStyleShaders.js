@@ -1,4 +1,5 @@
 import { eyeTileFragmentShader } from './eyeTileShader.js';
+import { constellationFragmentShader } from './constellationShader.js';
 
 // New tile style shaders: stainedGlass, fingerprint, topographic, mandelbrot, penrose,
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
@@ -179,45 +180,8 @@ export const newStyleShaders = {
     }
   `,
 
-  // Constellation - twinkling star field with drawn connecting lines
-  constellation: `
-    uniform vec3 baseColor;
-    uniform float time;
-    varying vec2 vUv;
-
-    float cHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-
-    void main() {
-      vec2 uv   = vUv * 4.0;
-      vec2 cell = floor(uv);
-      vec2 loc  = fract(uv) - 0.5;
-
-      vec2 spos  = vec2(cHash(cell) - 0.5, cHash(cell + vec2(17.3, 3.7)) - 0.5) * 0.68;
-      float bri  = cHash(cell + vec2(5.1, 9.4));
-      float twkl = 0.85 + 0.15 * sin(time * (2.0 + bri * 3.0) + bri * 6.28318);
-      float star = smoothstep(0.07, 0.01, length(loc - spos)) * bri * twkl;
-
-      float line = 0.0;
-      for (float dx = -1.0; dx <= 1.0; dx += 1.0) {
-        for (float dy = -1.0; dy <= 1.0; dy += 1.0) {
-          if (abs(dx) + abs(dy) < 0.5) continue;
-          vec2 nc   = cell + vec2(dx, dy);
-          vec2 npos = vec2(cHash(nc) - 0.5, cHash(nc + vec2(17.3, 3.7)) - 0.5) * 0.68 + vec2(dx, dy);
-          float con = step(0.63, cHash((cell + nc) * 0.5));
-          vec2 pa   = loc - spos;
-          vec2 ba   = npos - spos;
-          float t2  = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-          line += smoothstep(0.028, 0.006, length(pa - ba * t2)) * con * 0.35;
-        }
-      }
-
-      vec3 bg  = baseColor * 0.11;
-      vec3 sc  = mix(baseColor, vec3(1.0), 0.65);
-      vec3 lc  = baseColor * 0.42;
-      vec3 col = bg + lc * clamp(line, 0.0, 1.0) + sc * clamp(star, 0.0, 1.0);
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
-    }
-  `,
+  // Constellation - colored aurora glass, linked stars and a map per sticker.
+  constellation: constellationFragmentShader,
 
   // Waveform - animated oscilloscope lines pulsing between antipodal colors
   waveform: `

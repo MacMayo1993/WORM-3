@@ -26,33 +26,33 @@ it('requires Earth in the opening collection lesson, even after duplicate or unr
   expect(level.goal).toContain('water, fire and earth');
 });
 
-it.each([[13, 'grass', 'earth'], [17, 'air', 'air']])('level %i teaches %s before all-element mastery', (id, type, name) => {
+it.each([[13, 'grass', 'earthSprings'], [17, 'air', 'airJumps']])('level %i teaches %s as an explicit action lesson', (id, type, key) => {
   const { level, sim, p, read } = setup(id);
   expect(id).toBeLessThan(40);
   expect(storyElementTypes(level)).toEqual([type]);
-  // An unrelated mastered element cannot satisfy the focused lesson.
+  // An unrelated activation cannot satisfy an explicit action lesson.
   p.elements.add('water'); p.mechanics.rockets = 1;
-  expect(read().elements).toBe(0);
+  expect(read()[key] ?? 0).toBe(0);
   for (let miss = 0; miss < 3; miss++) {
     p.powerDelay = 0; p.elementSupplyDelay = 0; sim.specials = [];
     expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
     expect(sim.specials.map(orb => orb.type)).toContain(type);
   }
   expect(p.powerHint).toContain('All six elements');
-  expect(level.goal).toContain(`master 1 element (${name})`);
-  expect(storyChecklist(level).find(goal => goal.key === 'elements').label).toBe(`Master ${name}`);
+  expect(level.goal).toContain(type === 'grass' ? 'land 1 Earth spring jump' : 'land 1 Air jump');
+  expect(storyChecklist(level).find(goal => goal.key === key).label).toContain('Land');
   expect(requiredPowerCycle(level)).toContain(type);
   expect(requiredPowerCycle(level)).not.toContain('water');
-  expect(levelGoal(level)).toContain(`(${name})`);
+  expect(levelGoal(level)).toContain(type === 'grass' ? 'Earth spring jump' : 'Air jump');
   const ctx = { getCubies: () => p.cubies, feel() {}, onElementalTheme() {}, onStoryMechanic: (...args) => recordStoryMechanic(p, ...args) };
   startElemental(sim, ctx, type); sim.elementalFocusT = 0;
-  expect(read().elements).toBe(0); // pickup is not mastery
+  expect(read()[key] ?? 0).toBe(0); // activation is not an explicit jump lesson
   if (type === 'grass') addElementalPatch(sim, sim.pos, 'grass');
   startJump(sim, ctx, level.cubeSize);
-  expect(read().elements).toBe(0); // takeoff is not a completed lesson
+  expect(read()[key] ?? 0).toBe(0); // takeoff is not a completed lesson
   sim.isJumping = false; sim.phase = 'crawling';
   updateMastery(sim, p, level, 0.1);
-  expect(read().elements).toBe(1);
+  expect(read()[key]).toBe(1);
   expect(nextStoryPower(p, level)).toBeNull();
 });
 

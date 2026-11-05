@@ -17,9 +17,9 @@ export function storyHudSnapshot(previous, level, metrics, runId, outcome) {
   const starGoals = storyStarGoals(level, metrics);
   const canFinish = !!outcome;
   if (sameGoals && old.seconds === seconds && old.hint === hint && old.settling === settling && old.settlingHint === settlingHint &&
-      old.canFinish === canFinish && old.starGoals?.peakLength === starGoals.peakLength &&
+      old.canFinish === canFinish && old.starGoals?.orbs === starGoals.orbs &&
       old.starGoals?.fast === starGoals.fast && old.starGoals?.clean === starGoals.clean &&
-      (!canFinish || old.finishMetrics?.currentLength === metrics.currentLength) &&
+      (!canFinish || (old.finishMetrics?.currentLength === metrics.currentLength && old.finishMetrics?.peakLength === metrics.peakLength)) &&
       previous.tailClear === metrics.tailClear) return previous;
   return {
     tailClear: metrics.tailClear,

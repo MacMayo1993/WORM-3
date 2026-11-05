@@ -4,7 +4,7 @@ import { stageStory, storyMetrics } from '../worm/story/runtime.js';
 import { STORY_ELEMENTS, nextStoryPower, offerStoryPower, recordStoryMechanic, updateMastery } from '../worm/story/mastery.js';
 import { hasStoryElementGoal } from '../worm/story/elementGoals.js';
 import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
-import { makeWormSim, startElemental, startJump, tileKey } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, startElemental, tileKey } from '../worm/healerWorm/wormSim.js';
 
 function setup(id = 69) {
   const level = storyLevel(id), size = level.cubeSize, sim = makeWormSim(size);
@@ -86,38 +86,31 @@ it('keeps the elemental opening/refill clock frozen when gameplay time is held',
   expect(p.elementSupplyDelay).toBe(10); expect(offer()).toBe(false);
 });
 
-it('keeps the active Earth action visible while an Air companion remains uncollected', () => {
+it('explains activation credit without adding Earth or Air mastery tasks', () => {
   const { sim, p, offer, ctx, size } = setup();
-  sim.specials = [{ ...sim.pos, type: 'air' }];
   startElemental(sim, ctx, 'grass', size);
   sim.elementalFocusT = 0;
   offer();
-  expect(p.powerHint).toContain('Earth: jump from a spring patch and land safely');
-  expect(p.powerHint).not.toContain('Air:');
+  expect(p.powerHint).toContain('Pick up each required element to activate it');
+  expect(p.powerHint).not.toContain('spring patch');
 });
 
-it('finishes level 69 elemental mastery after real Earth and Air launches land', () => {
-  const { level, size, sim, p, ctx, offer } = setup();
+it('finishes level 69 element use immediately on actual Earth and Air activation', () => {
+  const { level, size, sim, p, ctx } = setup();
   const completed = { alive: true, elapsed: 100, healed: level.target, remaining: 0, tailClear: true,
     rotationSettled: true, landed: true, orbs: level.orbs, rotations: level.rotations, multiHeals: 1 };
   const outcome = () => storyOutcome(level, { ...completed, elements: storyMetrics(sim, p, level, { size, cubies: p.cubies }, [], 0).elements });
   expect(outcome()).toBeNull();
-  for (const type of ['grass', 'air']) {
-    startElemental(sim, ctx, type, size); sim.elementalFocusT = 0;
-    offer();
-    expect(p.powerHint).toContain(type === 'grass' ? 'Earth:' : 'Air:');
-    if (type === 'air') expect(p.powerHint).toContain('release Jump and land');
-    startJump(sim, ctx, size);
-    updateMastery(sim, p, level, 0.1);
-    expect(p.elements.has(type)).toBe(false);
-    expect(outcome()).toBeNull();
-    sim.isJumping = false; sim.jumpCount = 0; sim.jumpT = 0;
-    updateMastery(sim, p, level, 0.1);
-    expect(p.elements.has(type)).toBe(true);
-  }
+  startElemental(sim, ctx, 'grass', size);
+  expect(p.elements.has('grass')).toBe(true);
+  expect(outcome()).toBeNull();
+  startElemental(sim, ctx, 'air', size);
+  expect(p.elements.has('air')).toBe(true);
   expect(nextStoryPower(p, level)).toBeNull();
   expect(outcome()).not.toBeNull();
-  expect(stageStory(sim, size, level, 'classic').lastElementCompanion).toBeNull();
+  const retry = stageStory(sim, size, level, 'classic');
+  expect(retry.elements.size).toBe(0);
+  expect(retry.lastElementCompanion).toBeNull();
 });
 
 it('clears all elemental choices during fusion while preserving unrelated pickups', () => {

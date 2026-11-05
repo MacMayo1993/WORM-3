@@ -14,9 +14,14 @@ permissions:
   pages: write
   id-token: write
 
+# One queue per branch or PR, so a PR's checks can never bump a deploy off
+# main. All runs used to share the "pages" group, and GitHub keeps only one
+# pending run per group: a PR pushed while main's run was waiting cancelled
+# main's run, and that merge never deployed. A newer push to the same PR
+# supersedes its older checks; main's runs always finish.
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -124,13 +129,46 @@ jobs:
         run: npm run e2e:install
 
       - name: Download production build
+        id: production_build
         uses: actions/download-artifact@v4
         with:
           name: production-build
           path: dist/
 
-      - name: Run browser tests
-        run: npm run e2e
+      # Publish the focused screenshot before unrelated long-running smoke tests.
+      # Separate output folders keep its traces/report when the next run cleans up.
+      - name: Run Mega Storm visual check
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: mega-storm-report
+        run: npm run e2e -- e2e/megaStorm.e2e.js --output=mega-storm-results
+
+      - name: Upload Mega Storm visual check
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mega-storm-visual-check
+          path: mega-storm-results/**/mega-storm.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Preserve every remaining test exactly once, even if the focused test
+      # failed. Neither invocation allows failures; either makes this job red.
+      - name: Run remaining browser tests
+        if: ${{ !cancelled() && steps.production_build.outcome == 'success' }}
+        run: |
+          mapfile -d '' -t tests < <(
+            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
+          )
+          if ((${#tests[@]})); then npm run e2e -- "${tests[@]}"; fi
+
+      - name: Upload Glass view visual check
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glass-view-visual-check
+          path: test-results/**/glass-view.png
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload failure artifacts
         if: failure()
@@ -140,10 +178,17 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            mega-storm-report/
+            mega-storm-results/
           retention-days: 7
 
   deploy:
     name: Deploy
+    # Only the publish step is serialised, and only main reaches it, so a
+    # deploy can be replaced only by a newer main deploy, which carries it.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

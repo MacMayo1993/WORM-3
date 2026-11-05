@@ -793,6 +793,8 @@ export function startElemental(sim, ctx, type, size = 0) {
         }
     }
     claimElementalAbility(sim, type, size, ctx);
+    // Credit the real activation, including an automatic activation on pickup.
+    ctx.onStoryMechanic?.('elementUsed', type);
     // Where the element enters the world. The orb is claimed by the head, so the
     // head's tile IS the claim point; the skin sweeps outward from it. Snapshotted
     // rather than referenced, since sim.pos keeps moving once the beat ends.

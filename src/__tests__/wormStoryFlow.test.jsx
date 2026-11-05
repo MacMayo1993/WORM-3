@@ -429,7 +429,7 @@ it('publishes level 30 distinct element credit from real pickups and resets it o
   } } }));
   begin(30); frame();
   const [sim, practice] = metricsSpy.mock.calls.at(-1);
-  // Leave the other goals incomplete; isolate pickup credit from mastery and
+  // Leave the other goals incomplete; isolate pickup and activation credit from
   // the offer delay while using the real crawler, event bridge and HUD store.
   // The run dealt its own three elements; collect them, repeating the first.
   const [first, second, third] = practice.elementOrder;
@@ -443,7 +443,7 @@ it('publishes level 30 distinct element credit from real pickups and resets it o
     expect(state().wormStoryChecklist.goals.find(g => g.key === 'uniqueElements')).toMatchObject({
       value: expected, target: 3, done: expected === 3,
     });
-    expect(practice.elements.size).toBe(0);
+    expect(practice.elements.size).toBe(expected);
     expect(state().wormStoryResult).toBeNull();
   }
   begin(30); frame();
@@ -628,4 +628,30 @@ it('Mobi can retire its own Story tunnel before the repeated-use quota, without 
   expect(ctx.allowTunnelHeal({ pairId: owned.pairId })).toBe(true);
   expect(ctx.allowTunnelHeal({ pairId: 'unrelated' })).toBe(false);
   expect(state().wormStoryResult).toBeNull();
+});
+
+
+it('tracks fresh ordinary pickups independently of growth, recovery and healing, then resets on retry', () => {
+  begin(1);
+  let context;
+  const step = wormSimulation.stepWormSim;
+  vi.spyOn(wormSimulation, 'stepWormSim').mockImplementation((sim, dt, size, ctx) => {
+    context = ctx;
+    return step(sim, dt, size, ctx);
+  });
+  frame(0);
+  const before = state().wormSessionOrbs;
+  act(() => {
+    context.onOrbPickup(1, 2, '#fff', 1, 6, false); // one powered-up orb, double growth
+    context.onOrbPickup(1, 3, '#fff', 1, 3, true); // recovered drop, not a new orb
+    context.onOrbPickup(2, 4, '#fff', 1, 3, false);
+  });
+  expect(state().wormSessionOrbs).toBe(before + 2);
+  worm.tailLength.current = 10;
+  frame(0);
+  expect(state().wormStoryChecklist.goals.find(g => g.key === 'orbs').value).toBe(before + 2);
+  expect(state().wormStoryChecklist.starGoals.orbs).toBe(before + 2);
+  begin(1); frame(0);
+  expect(state().wormSessionOrbs).toBe(0);
+  expect(state().wormStoryChecklist.starGoals.orbs).toBe(0);
 });

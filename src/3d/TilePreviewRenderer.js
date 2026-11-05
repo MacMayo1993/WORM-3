@@ -1,5 +1,6 @@
 import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 const bindPreviewIdentity = bindTileStyleIdentity(null, 0);
+const bindStickerPreviewIdentity = bindTileStyleIdentity(null, 1);
 import { prefersReducedMotion, isMobile } from '../utils/device.js';
 // TilePreviewRenderer.js
 // Renders tile-style preview thumbnails using the shared R3F renderer so no
@@ -108,7 +109,7 @@ function imageDataFor(ctx, canvas, w, h) {
   return fresh;
 }
 
-function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
+function renderToCanvas(styleKey, colorHex, simTime, targetCanvas, colorSample = false) {
   if (_usingShared) {
     if (!previewContextAvailable(renderer)) return false;
     ensureRenderTarget();
@@ -124,7 +125,10 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
     mat.uniforms.time.value = simTime;
   }
   mesh.material = mat;
-  mesh.onBeforeRender = bindPreviewIdentity;
+  // Constellation keeps HUD/pickup samples color-led but decorates real tiles.
+  // A catalog thumbnail must show the latter, like the full cube preview does.
+  mesh.onBeforeRender = styleKey === 'constellation' && !colorSample
+    ? bindStickerPreviewIdentity : bindPreviewIdentity;
 
   try {
     if (_usingShared) {
@@ -392,7 +396,9 @@ export function hasSharedRenderer() {
 }
 
 /**
- * One-shot: render a tile style to a PNG data URL using the shared main renderer.
+ * One-shot HUD color sample: render a tile pattern to a PNG data URL using the
+ * shared main renderer. Unlike catalog tiles, this binds non-sticker identity
+ * so color-led styles keep the sample recognizable at inventory-icon size.
  * Returns null when the shared renderer isn't available yet (e.g. before the main
  * <Canvas> mounts) so callers can fall back to a plain look. Never creates a
  * second WebGL context, so it stays safe on mobile — unlike a standalone canvas.
@@ -408,7 +414,7 @@ export function renderTileImage(styleKey, colorHex, size = 96) {
   canvas.width = size;
   canvas.height = size;
   try {
-    if (renderToCanvas(styleKey, colorHex, simTime, canvas) === false) return null;
+    if (renderToCanvas(styleKey, colorHex, simTime, canvas, true) === false) return null;
     return canvas.toDataURL();
   } catch {
     return null;

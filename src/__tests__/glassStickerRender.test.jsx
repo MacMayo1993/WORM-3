@@ -13,10 +13,11 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { storyAppearance } from '../worm/story/worlds.js';
 
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
+vi.mock('../utils/device.js', async importOriginal => ({ ...await importOriginal(), isMobile: false }));
 extend(THREE);
 
-it.each([14, 28].flatMap(level => [false, true].map(textured => ({ level, textured }))))(
-  'keeps level $level glass tinted through turns and flips (loaded texture: $textured)', async ({ level, textured }) => {
+it.each([14, 28].flatMap(level => [3, 7, 15].flatMap(size => [false, true].map(textured => ({ level, size, textured })))))(
+  'keeps level $level size-$size glass tinted through turns and flips (loaded texture: $textured)', async ({ level, size, textured }) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -26,16 +27,16 @@ it.each([14, 28].flatMap(level => [false, true].map(textured => ({ level, textur
   const settings = { ...before.settings, ...storyAppearance(level), flipPads: 'off', soundEnabled: false, hapticsEnabled: false };
   const texture = new THREE.Texture({ width: 2, height: 2, complete: true });
   const faceTextures = textured ? Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, texture])) : {};
-  useGameStore.setState({ size: 3, wormHealerMode: true, chaosLevel: 0, faceTextures, settings });
+  useGameStore.setState({ size, wormHealerMode: true, chaosLevel: 0, faceTextures, settings, perfReducedFX: false });
   const colors = resolveColors(settings);
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
   const root = createRoot(canvas);
   root.configure({ gl, frameloop: 'never', size: { width: 500, height: 500 } });
-  let cubies = makeCubies(3), meta = cubies[1][1][2].stickers.PZ, store, time = 0;
+  let cubies = makeCubies(size), meta = cubies[1][1][size - 1].stickers.PZ, store, time = 0;
   const draw = (mode = 'glass', key = 'slot') => <PadProvider>
-    <StickerPlane key={key} meta={meta} pos={[0, 0, .51]} mode={mode} faceSize={3} />
+    <StickerPlane key={key} meta={meta} pos={[0, 0, .51]} mode={mode} faceSize={size} />
   </PadProvider>;
   const render = async (mode, key) => act(async () => { store = root.render(draw(mode, key)); });
   const front = () => store.getState().scene.getObjectByName('sticker-front');
@@ -43,6 +44,7 @@ it.each([14, 28].flatMap(level => [false, true].map(textured => ({ level, textur
   const checkGlass = (mesh, color) => {
     expect(mesh.material.fragmentShader).toBe(getGlassMaterial('#888888').fragmentShader);
     expect(mesh.material.transparent).toBe(true);
+    expect(mesh.material.forceSinglePass).toBe(true);
     expect(mesh.material.depthWrite).toBe(false);
     expect(mesh.material.uniforms.baseColor.value.getHexString()).toBe(new THREE.Color(color).getHexString());
   };
@@ -54,18 +56,29 @@ it.each([14, 28].flatMap(level => [false, true].map(textured => ({ level, textur
     }
     await render();
     const owned = front().material;
+    expect(front().geometry.attributes.position.count).toBe(size >= 6 ? 276 : 852);
+    expect(front().material.side).toBe(THREE.DoubleSide);
+    expect(back().material.side).toBe(THREE.FrontSide);
     checkGlass(front(), colors[meta.curr]);
     checkGlass(back(), colors[ANTIPODAL_COLOR[meta.curr]]);
     expect(owned).not.toBe(getGlassMaterial('#888888'));
     // The same grid slot receives different physical stickers during layer turns.
-    for (const [axis, index] of [['col', 1], ['row', 1], ['col', 1], ['depth', 2], ['row', 1]]) {
-      cubies = rotateSliceCubies(cubies, 3, axis, index, 1);
-      meta = cubies[1][1][2].stickers.PZ;
+    for (const [axis, index] of [['col', 1], ['row', 1], ['col', 1], ['depth', size - 1], ['row', 1]]) {
+      cubies = rotateSliceCubies(cubies, size, axis, index, 1);
+      meta = cubies[1][1][size - 1].stickers.PZ;
       await render();
       expect(front().material).toBe(owned);
       checkGlass(front(), colors[meta.curr]);
       checkGlass(back(), colors[ANTIPODAL_COLOR[meta.curr]]);
     }
+    // Quality and reduced motion can change mid-pickup without replacing the
+    // material or its live tint. The normal look is restored when quality rises.
+    await act(async () => useGameStore.setState({ perfReducedFX: true, settings: { ...settings, reducedMotion: true } }));
+    expect(front().geometry.attributes.position.count).toBe(276);
+    expect(front().material).toBe(owned);
+    checkGlass(front(), colors[meta.curr]);
+    await act(async () => useGameStore.setState({ perfReducedFX: false, settings }));
+    expect(front().geometry.attributes.position.count).toBe(size >= 6 ? 276 : 852);
     const from = meta.curr;
     meta = { ...meta, curr: ANTIPODAL_COLOR[from], flips: 1 };
     await render();

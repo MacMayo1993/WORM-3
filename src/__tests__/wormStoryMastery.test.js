@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { makeWormSim } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, startElemental } from '../worm/healerWorm/wormSim.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
 import { recordStoryMechanic, offerStoryPower, nextStoryPower } from '../worm/story/mastery.js';
@@ -15,7 +15,7 @@ import { STORY_ELEMENTS } from '../worm/story/elementGoals.js';
 // Every listed task at its target, settled on the surface.
 const completed = (level, extra = {}) => ({ alive: true, elapsed: 200, cuts: 0, peakLength: 300, remaining: 0,
   tailClear: true, landed: true, rotationSettled: true,
-  ...Object.fromEntries(storyChecklist(level).map(goal => [goal.key, goal.target])), ...extra });
+  ...Object.fromEntries(storyChecklist(level).map(goal => [goal.key, goal.target])), orbs: Math.max(level.starOrbs ?? 0, level.orbs ?? 0), ...extra });
 function setup(id = 10) {
   resetLiveRotation();
   const level = storyLevel(id), size = level.cubeSize ?? 5;
@@ -93,26 +93,30 @@ it('checks all six elemental effects and cycles back to missed powers', () => {
     expect(offerStoryPower(sim, p, level, level.cubeSize, p.cubies)).toBe(true);
     expect(sim.specials.map(o => o.type).sort()).toEqual([...STORY_ELEMENTS].sort());
   }
-  for (const type of ['water', 'fire', 'grass', 'ice', 'lightning', 'air']) {
-    sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
-    sim.waterMomentum = 0;
-    for (let i = 0; i < 81; i++) read();
-    if (type === 'water') { expect(p.elements.has(type)).toBe(false); sim.waterMomentum = 0.9; read(); }
-    if (type === 'fire') { expect(p.elements.has(type)).toBe(false); sim.elementalPatches.set('test', { type: 'fire' }); read(); }
-    if (type === 'grass' || type === 'ice' || type === 'air') {
-      expect(p.elements.has(type)).toBe(false);
-      sim.isJumping = true; sim.jumpHeight = type === 'grass' ? 3 : 1;
-      if (type === 'air') recordStoryMechanic(p, 'airLaunch');
-      if (type === 'grass') { read(); expect(p.elements.has(type)).toBe(false); recordStoryMechanic(p, 'grassLaunch'); }
-      read();
-      expect(p.elements.has(type)).toBe(false);
-      sim.isJumping = false; read();
-    }
+  for (const type of STORY_ELEMENTS) {
+    recordStoryMechanic(p, 'elementUsed', type);
+    recordStoryMechanic(p, 'elementUsed', type); // repeated use counts once
     expect(p.elements.has(type)).toBe(true);
-    offerStoryPower(sim, p, level, level.cubeSize, p.cubies);
-    expect(sim.elementalType).toBe(type); // offers never replace an active effect
   }
   expect(read().elements).toBe(6); expect(nextStoryPower(p, level)).toBeNull();
+});
+it('tracks activation independently of pickup quantity, variety, and mastery feats', () => {
+  const { sim, p, read } = setup(40);
+  for (const type of STORY_ELEMENTS) recordStoryMechanic(p, 'elementPickups', type);
+  expect(read()).toMatchObject({ elements: 0, uniqueElements: 6, elementPickups: 6 });
+  const ctx = { feel() {}, onElementalTheme() {}, onStoryMechanic: (...args) => recordStoryMechanic(p, ...args) };
+  for (const type of STORY_ELEMENTS) {
+    startElemental(sim, ctx, type);
+    startElemental(sim, ctx, type);
+  }
+  for (const type of [undefined, 'magnet', 'unknown']) recordStoryMechanic(p, 'elementUsed', type);
+  expect(read()).toMatchObject({ elements: 6, uniqueElements: 6, elementPickups: 6 });
+  expect(sim.isJumping).toBe(false);
+  expect(p.elements.size).toBe(6);
+  const retry = stageStory(sim, 10, storyLevel(40));
+  expect(retry.elements.size).toBe(0);
+  expect(retry.collectedElements.size).toBe(0);
+  expect(retry.mechanics.elementPickups).toBeUndefined();
 });
 it('finishes level eight with three collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
