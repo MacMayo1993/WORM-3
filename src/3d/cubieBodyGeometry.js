@@ -39,18 +39,18 @@ function roundedShape(width, height, radius0) {
 }
 
 /** A centred rounded cube of edge `size`, shared; never dispose the result. */
-export function cubieBodyGeometry(size, radius = CUBIE_BODY_RADIUS) {
-  const key = `${size}|${radius}`;
+export function cubieBodyGeometry(size, radius = CUBIE_BODY_RADIUS, compact = false) {
+  const key = `${size}|${radius}|${compact}`;
   let geo = cache.get(key);
   if (geo) return geo;
   geo = new THREE.ExtrudeGeometry(roundedShape(size, size, radius), {
     depth: size - radius * 2,
     bevelEnabled: true,
-    bevelSegments: BEVEL_SEGMENTS,
+    bevelSegments: compact ? 2 : BEVEL_SEGMENTS,
     steps: 1,
     bevelSize: radius - EPS,
     bevelThickness: radius,
-    curveSegments: SMOOTHNESS
+    curveSegments: compact ? 2 : SMOOTHNESS
   });
   geo.center();
   geo = toCreasedNormals(geo, CREASE_ANGLE);

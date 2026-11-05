@@ -11,6 +11,7 @@ import React, { useRef, useEffect, useLayoutEffect, useMemo, useReducer, useStat
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { compactGlassGeometry } from './glassViewQuality.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { tileDisplayAngle, advanceTileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
 import { liveRotation } from '../worm/liveRotation.js';
@@ -23,7 +24,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, sharedUniforms, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, createGlassMaterial, sharedTremorState, sharedUniforms, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { TileSurfaceInstance, useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { instancedTileStyleMaterial } from './styles/instancedTileStyle.js';
@@ -67,6 +68,9 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 // Plain solid tiles wear the menu cube's sticker: the same rounded, bevelled
 // outline and glossy coat (rubiksPiece.js), thin enough to keep every overlay in front.
 const _playStickerGeo = createPlayStickerGeometry();
+// Same thickness, round corners, UVs and bevel radius. Shared across all glass
+// tiles, so changing quality never builds a geometry for each sticker.
+const _compactGlassGeo = createPlayStickerGeometry(0.85, 0, { bevelSegments: 1, curveSegments: 2 });
 const _playFinish = rubiksFinish(isMobile).sticker;
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
@@ -1288,10 +1292,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // caused disposed materials to linger on corner-sticker meshes when the cache
   // evicted entries, producing wrong colors after rotations.
   const useGlassStyle = isGlass && !isSudokube;
+  const glassGeometry = compactGlassGeometry(faceSize ?? 3, isMobile, perfReducedFX) ? _compactGlassGeo : _playStickerGeo;
   // Available on the first render, including stickers remounted by a turn.
   // The layout effect below sets its live color before paint; flips update only
   // that uniform instead of replacing glass with the equipped opaque style.
-  const glassMaterial = useMemo(() => useGlassStyle ? getGlassMaterial('#888888').clone() : null, [useGlassStyle]);
+  const glassMaterial = useMemo(() => useGlassStyle ? createGlassMaterial('#888888') : null, [useGlassStyle]);
   useEffect(() => () => glassMaterial?.dispose(), [glassMaterial]);
 
   // Full-face GLBs (arch, volcano) cover the entire sticker — suppress shader + volumes beneath them.
@@ -1342,7 +1347,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (instanceBack) return isChrome ? surfaceCtx.chromeMaterial : surfaceCtx.backMaterial;
     if (isChrome) return new THREE.MeshStandardMaterial({ ...CHROME_TILE_FINISH, color: isDead ? '#555555' : antipodalHex });
     if (useGlassStyle) {
-      const material = getGlassMaterial(isDead ? '#555555' : antipodalHex).clone();
+      const material = createGlassMaterial(isDead ? '#555555' : antipodalHex);
       material.side = THREE.FrontSide;
       return material;
     }
@@ -1663,7 +1668,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           ) : roundedStyle ? (
             // Styled and glass tiles wear the same rounded, bevelled sticker as plain
             // ones; their shader adds the matching finish (stickerFinish.js).
-            <primitive object={_playStickerGeo} attach="geometry" />
+            <primitive object={useGlassStyle ? glassGeometry : _playStickerGeo} attach="geometry" />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
             <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
