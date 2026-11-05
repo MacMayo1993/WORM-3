@@ -107,9 +107,15 @@ jobs:
 
   # Validate the same production build that is uploaded for Pages. Browser
   # failures must block publication, including graphics startup regressions.
-  e2e:
-    name: Browser smoke tests
+  browser:
+    name: Browser smoke tests (${{ matrix.project }})
     needs: build
+    strategy:
+      # Separate software-GL runners keep one slow desktop path from consuming
+      # the phone suite's budget. Let both finish so failures retain all evidence.
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -138,12 +144,13 @@ jobs:
       # Publish the focused screenshot before unrelated long-running smoke tests.
       # Separate output folders keep its traces/report when the next run cleans up.
       - name: Run Mega Storm visual check
+        if: matrix.project == 'desktop'
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: mega-storm-report
         run: npm run e2e -- e2e/megaStorm.e2e.js --output=mega-storm-results
 
       - name: Upload Mega Storm visual check
-        if: always()
+        if: always() && matrix.project == 'desktop'
         uses: actions/upload-artifact@v4
         with:
           name: mega-storm-visual-check
@@ -159,10 +166,10 @@ jobs:
           mapfile -d '' -t tests < <(
             find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
           )
-          if ((${#tests[@]})); then npm run e2e -- "${tests[@]}"; fi
+          if ((${#tests[@]})); then npm run e2e -- --project="${{ matrix.project }}" "${tests[@]}"; fi
 
       - name: Upload Glass view visual check
-        if: always()
+        if: always() && matrix.project == 'desktop'
         uses: actions/upload-artifact@v4
         with:
           name: glass-view-visual-check
@@ -171,16 +178,27 @@ jobs:
           retention-days: 7
 
       - name: Upload failure artifacts
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-failures
+          name: playwright-failures-${{ matrix.project }}
           path: |
             playwright-report/
             test-results/
             mega-storm-report/
             mega-storm-results/
           retention-days: 7
+
+  # Retain the existing required-check name and block releases unless every
+  # browser runner succeeded, including when a runner was cancelled or skipped.
+  e2e:
+    name: Browser smoke tests
+    needs: browser
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every browser runner to pass
+        run: test "${{ needs.browser.result }}" = "success"
 
   deploy:
     name: Deploy
