@@ -4,8 +4,10 @@ WORM can collect nine cube-view orbs: Classic, Grid, Sudoku, Wireframe, Glass,
 Chrome, Neon, Gap, and LEGO. Each uses the existing whole-cube renderer and the
 elemental orb presentation and claim burst. Classic temporarily replaces level tile
 patterns, face textures, and biome art with rounded glossy stickers in the six
-classic Rubik's colors and an opaque black plastic chassis. Live tile colors,
-rotations, tunnel mouths, and spent-tile indicators still follow gameplay; the
+classic Rubik's colors and an opaque black plastic chassis. The chassis retains
+WORM's 0.92 inset so pressed tiles stay in front of it, including while the pickup
+starts or expires under the worm. Ordinary non-WORM Classic keeps its 0.96 body.
+Live tile colors, rotations, tunnel mouths, and spent-tile indicators still follow gameplay; the
 previous palette and tile appearance return when the pickup expires. The same
 override applies to tunnel wall backs, portal-mouth tints, the antipodal core,
 and its mirror tints; pickup changes refresh cached tunnel batches immediately,
@@ -45,4 +47,6 @@ of individual body meshes; Gap hides that backing to keep the gaps open.
   the orbit for 2/7/10/15 cubes, portrait/square/landscape, and expanded geometry.
 - Render/HUD: glass opacity, LEGO studs, whole-corner neon, saved view restoration,
   mode isolation, countdown, expiry, and Story objective priority.
+- Contact clearance: real body/sticker batches on all six faces of 3×3 and 10×10
+  boards through Classic pickup, expiry, repeated swaps, spring rebound, and retry.
 - Full Vitest suite, ESLint, production build, and bundle budget checks.

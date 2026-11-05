@@ -13,6 +13,7 @@ import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { cubieBodyGeometry } from './cubieBodyGeometry.js';
+import { compactGlassGeometry } from './glassViewQuality.js';
 import { useCubieBodyBatches } from './cubieBodyBatchContext.js';
 import { useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { LEGO_FACE_TRANSFORMS, LEGO_STUD_PARTS } from './legoStud.js';
@@ -183,9 +184,11 @@ const Cubie = React.forwardRef(function Cubie({
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
-  // Classic looks wear the menu cube's piece: 0.96 black plastic, clear-coated off mobile.
+  // Outside WORM, Classic looks wear the menu cube's 0.96 black-plastic piece.
   const classicBody = CLASSIC_BODY_MODES.has(effectiveVisualMode) && (!wormMode || classicPickup);
-  const bodySize = classicBody ? CLASSIC_BODY_SIZE : wormMode ? 0.92 : 0.98;
+  // WORM's pressed stickers can sink below a 0.96 Classic shell. A view pickup
+  // changes the finish, never the inset that keeps the moving surface in front.
+  const bodySize = wormMode ? 0.92 : classicBody ? CLASSIC_BODY_SIZE : 0.98;
   // WORM keeps the shared body batch; its plain stickers carry the glossy coat.
   const coatBody = classicBody && !isMobile && !wormMode;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
@@ -453,7 +456,8 @@ const Cubie = React.forwardRef(function Cubie({
   const expansionBody = !!bodyBatches && wormMode && omitBody && !showsBody &&
     !mirrorMode && !effectiveHollowMode && !hideBody && !raised && !returningBody;
   const bodyRef = useRef(null);
-  const bodyGeometry = cubieBodyGeometry(bodySize);
+  const bodyGeometry = cubieBodyGeometry(bodySize, undefined,
+    effectiveVisualMode === 'glass' && compactGlassGeometry(size, isMobile, perfReducedFX));
   const bodyLook = batchBody || expansionBody ? JSON.stringify(bodyMatProps) : '';
   useLayoutEffect(() => {
     const anchor = expansionBody ? frameHost.parent : bodyRef.current;
