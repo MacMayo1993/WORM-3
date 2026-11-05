@@ -1,14 +1,28 @@
 import { test, expect, openGame } from './helpers.js';
 
+async function enterDemo(page, phone) {
+  await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1024, height: 700 });
+  await openGame(page);
+  // The visible triangle is aria-hidden; target the accessible name, not raw text.
+  await page.getByRole('button', { name: 'Demo', exact: true }).click({ timeout: 45000 });
+  const card = page.getByRole('region', { name: 'WORM practice', exact: true });
+  await expect(card).toBeVisible({ timeout: 180000 });
+  return { card, scenes: card.getByRole('combobox', { name: 'Choose demo scene' }) };
+}
+
+async function exitDemo(page, card, errors) {
+  // Exit is the real cleanup action, not a cosmetic hide.
+  await card.getByRole('button', { name: 'Exit Demo', exact: true }).click();
+  await Promise.all([
+    expect(card).toBeHidden(),
+    expect(page.getByRole('button', { name: 'Demo', exact: true })).toBeVisible()
+  ]);
+  expect(errors).toEqual([]);
+}
+
 for (const phone of [false, true]) {
   test(`opens the main DEMO directly into playable highlights${phone ? ' @phone' : ''}`, async ({ page, errors }) => {
-    await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1024, height: 700 });
-    await openGame(page);
-    // The visible triangle is aria-hidden; target the accessible name, not raw text.
-    await page.getByRole('button', { name: 'Demo', exact: true }).click({ timeout: 45000 });
-    const card = page.getByRole('region', { name: 'WORM practice', exact: true });
-    await expect(card).toBeVisible({ timeout: 180000 });
-    const scenes = card.getByRole('combobox', { name: 'Choose demo scene' });
+    const { card, scenes } = await enterDemo(page, phone);
     // Queue independent DOM assertions together rather than paying for another
     // software-rendered frame between each read. Keep locator retry semantics.
     await Promise.all([
@@ -27,25 +41,46 @@ for (const phone of [false, true]) {
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(phone ? 390 : 1024);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(phone ? 844 : 700);
-    // Start the real simulation, then switch scenes mid-run and retry. Neither
-    // selection nor restart is allowed to invent a completed objective.
+    // Keep live scene switching in this journey. Combat retry and switching
+    // back have their own complete journey below: chaining both after layout
+    // checks exhausts four minutes on software GL even when every action works.
     await card.getByRole('button', { name: 'Try it', exact: true }).click();
     await expect(card).toContainText('LIVE GAMEPLAY');
     await scenes.selectOption('showcase:8');
-    await expect(card).toContainText('Return fire');
-    await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
-    await expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+    await Promise.all([
+      expect(card).toContainText('Return fire'),
+      expect(scenes).toHaveValue('showcase:8'),
+      expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled(),
+      expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    ]);
+    await exitDemo(page, card, errors);
+  });
+
+  test(`retries the combat demo and switches back without completing objectives${phone ? ' @phone' : ''}`, async ({ page, errors }) => {
+    const { card, scenes } = await enterDemo(page, phone);
+    await scenes.selectOption('showcase:8');
+    await Promise.all([
+      expect(card).toContainText('Return fire'),
+      expect(scenes).toHaveValue('showcase:8'),
+      expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled(),
+      expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    ]);
     await card.getByRole('button', { name: 'Try it', exact: true }).click();
     await expect(page.getByRole('button', { name: /Fire.*F|Fire/i }).first()).toBeVisible();
     await card.getByRole('button', { name: 'Retry', exact: true }).click();
-    await expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled();
+    await Promise.all([
+      expect(scenes).toHaveValue('showcase:8'),
+      expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled(),
+      expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    ]);
     await scenes.selectOption('showcase:0');
-    await expect(card).toContainText('Grow, ride, restore');
-    // Exit is the real cleanup action, not a cosmetic hide.
-    await card.getByRole('button', { name: 'Exit Demo', exact: true }).click();
-    await expect(card).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Demo', exact: true })).toBeVisible();
-    expect(errors).toEqual([]);
+    await Promise.all([
+      expect(card).toContainText('Grow, ride, restore'),
+      expect(scenes).toHaveValue('showcase:0'),
+      expect(card.getByRole('button', { name: 'Try it', exact: true })).toBeEnabled(),
+      expect(card.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    ]);
+    await exitDemo(page, card, errors);
   });
 }
 
