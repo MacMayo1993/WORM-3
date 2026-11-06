@@ -95,42 +95,62 @@ test('Store compact preview and tabs stay usable across portrait and short lands
   }
 });
 
-// Each orientation gets its own budget: shader-backed categories can be slow
-// on software GL, and neither journey should consume the other's timeout.
-for (const [width, height, insets] of [[320, 568, { top: 24, bottom: 20 }], [844, 390, { left: 44, right: 44, bottom: 21 }]]) {
-  test(`Store categories, safe areas and dismissal at ${width} × ${height} @phone`, async ({ page }, testInfo) => {
-    await openStore(page);
-    const cdp = await page.context().newCDPSession(page);
-    await page.setViewportSize({ width, height });
-    await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
-    const bounds = await page.locator('.store-catalogue').evaluate(element => {
-      const selectors = ['.catalogue-header', '.catalogue-layout', '.catalogue-footer'];
-      return selectors.map(selector => element.querySelector(selector).getBoundingClientRect().toJSON());
-    });
-    for (const box of bounds) {
-      expect(box.top).toBeGreaterThanOrEqual(insets.top || 0);
-      expect(box.left).toBeGreaterThanOrEqual(insets.left || 0);
-      expect(box.right).toBeLessThanOrEqual(width - (insets.right || 0));
-      expect(box.bottom).toBeLessThanOrEqual(height - (insets.bottom || 0));
-    }
+async function openStoreInSafeArea(page, { width, height, insets }) {
+  await openStore(page);
+  const cdp = await page.context().newCDPSession(page);
+  await page.setViewportSize({ width, height });
+  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
+  const bounds = await page.locator('.store-catalogue').evaluate(element => {
+    const selectors = ['.catalogue-header', '.catalogue-layout', '.catalogue-footer'];
+    return selectors.map(selector => element.querySelector(selector).getBoundingClientRect().toJSON());
+  });
+  for (const box of bounds) {
+    expect(box.top).toBeGreaterThanOrEqual(insets.top || 0);
+    expect(box.left).toBeGreaterThanOrEqual(insets.left || 0);
+    expect(box.right).toBeLessThanOrEqual(width - (insets.right || 0));
+    expect(box.bottom).toBeLessThanOrEqual(height - (insets.bottom || 0));
+  }
+}
+
+// Give categories, shader-backed tile families and menu re-entry independent
+// budgets. Combining them exhausted the four-minute software-GL timeout only
+// at re-entry, after the catalogue assertions had already passed.
+for (const viewport of [
+  { width: 320, height: 568, insets: { top: 24, bottom: 20 } },
+  { width: 844, height: 390, insets: { left: 44, right: 44, bottom: 21 } },
+]) {
+  const { width, height } = viewport;
+
+  test(`Store categories and item navigation in safe areas at ${width} × ${height} @phone`, async ({ page }) => {
+    await openStoreInSafeArea(page, viewport);
     for (const category of ['Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles']) {
-      await page.locator('.catalogue-category', { hasText: category }).click();
-      await expect(page.getByRole('heading', { name: category, exact: true })).toBeVisible();
-      const title = page.locator('.catalogue-preview h3');
-      const initial = await title.textContent();
-      await page.getByRole('button', { name: 'Next item', exact: true }).click();
-      await expect(title).not.toHaveText(initial);
-      await page.getByRole('button', { name: 'Previous item', exact: true }).click();
-      await expect(title).toHaveText(initial);
-      await assertTouchTargets(page);
-      await assertShelfScroll(page);
+      await test.step(category, async () => {
+        await page.locator('.catalogue-category', { hasText: category }).click();
+        await expect(page.getByRole('heading', { name: category, exact: true })).toBeVisible();
+        const title = page.locator('.catalogue-preview h3');
+        const initial = await title.textContent();
+        await page.getByRole('button', { name: 'Next item', exact: true }).click();
+        await expect(title).not.toHaveText(initial);
+        await page.getByRole('button', { name: 'Previous item', exact: true }).click();
+        await expect(title).toHaveText(initial);
+        await assertTouchTargets(page);
+        await assertShelfScroll(page);
+      });
     }
+  });
+
+  test(`Store tile families and ownership filter in safe areas at ${width} × ${height} @phone`, async ({ page }, testInfo) => {
+    await openStoreInSafeArea(page, viewport);
+    await page.locator('.catalogue-category', { hasText: 'Tiles' }).click();
+    await expect(page.getByRole('heading', { name: 'Tiles', exact: true })).toBeVisible();
     const families = page.locator('.catalogue-families button');
     for (let i = 0; i < await families.count(); i++) {
-      await families.nth(i).click();
-      await expect(families.nth(i)).toHaveAttribute('aria-pressed', 'true');
-      await expect(families.nth(i)).toBeInViewport({ ratio: 1 });
-      await assertShelfScroll(page);
+      await test.step(`Tile family ${i + 1}`, async () => {
+        await families.nth(i).click();
+        await expect(families.nth(i)).toHaveAttribute('aria-pressed', 'true');
+        await expect(families.nth(i)).toBeInViewport({ ratio: 1 });
+        await assertShelfScroll(page);
+      });
     }
     // Crafted has no free/default-owned items, so both the shortfall and
     // empty Owned only state are deterministic for this fresh save.
@@ -142,12 +162,17 @@ for (const [width, height, insets] of [[320, 568, { top: 24, bottom: 20 }], [844
     await page.getByRole('button', { name: 'Owned only', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Browse all items', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Browse all items', exact: true }).click();
-    // Close and repeat entry, then escape through the dialog's keyboard path.
+  });
+
+  test(`Store closes, reopens and dismisses with Escape at ${width} × ${height} @phone`, async ({ page }) => {
+    await openStoreInSafeArea(page, viewport);
     await page.getByRole('button', { name: 'Close store', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Store', exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
     await enterStoreFromMenu(page);
     await page.getByRole('button', { name: 'Close store', exact: true }).focus();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'Store', exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
   });
 }

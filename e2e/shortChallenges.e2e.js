@@ -1,45 +1,82 @@
 import { test, expect, openGame, openWormEntry, press } from './helpers.js';
 
-for (const phone of [false, true]) {
-  test(`opens the short challenge course from WORM${phone ? ' @phone' : ''}`, async ({ page, errors }) => {
-    await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1024, height: 700 });
-    await openWormEntry(page);
-    await page.getByRole('combobox', { name: 'Worm mode section', exact: true }).selectOption('challenges');
-    const launch = page.getByRole('button', { name: 'Start challenges', exact: true });
-    await expect(launch).toBeVisible();
+async function openChallenges(page, { phone, checkEntry = false }) {
+  await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1024, height: 700 });
+  await openWormEntry(page);
+  await page.getByRole('combobox', { name: 'Worm mode section', exact: true }).selectOption('challenges');
+  const launch = page.getByRole('button', { name: 'Start challenges', exact: true });
+  await expect(launch).toBeVisible();
+  if (checkEntry) {
     const bounds = await launch.boundingBox();
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(phone ? 390 : 1024);
-    await launch.click();
+  }
+  await launch.click();
+  const card = page.getByRole('region', { name: 'WORM short challenges', exact: true });
+  await expect(card).toBeVisible({ timeout: 180000 });
+  return card;
+}
+
+async function expectCompact(card) {
+  // One read observes the same rendered card atomically, rather than spending
+  // several software-WebGL frames on separate count and geometry round trips.
+  await expect.poll(() => card.evaluate(element => ({
+    details: element.querySelectorAll('.worm-challenge-details').length,
+    compact: element.getBoundingClientRect().height <= 70,
+  }))).toEqual({ details: 0, compact: true });
+}
+
+for (const phone of [false, true]) {
+  const suffix = phone ? ' @phone' : '';
+
+  // Each journey launches through the real menus, within the existing budget.
+  // The old all-in-one journey reached Pause only after ~200s on desktop CI;
+  // its Resume call began after teardown despite the correct menu being open.
+  test(`opens short challenges with compact, optional guidance${suffix}`, async ({ page, errors }) => {
+    const card = await openChallenges(page, { phone, checkEntry: true });
     await expect(page.getByRole('heading', { name: 'Choose your mode', exact: true })).toBeHidden();
     await expect(page.getByRole('group', { name: 'Demo controls', exact: true })).toBeHidden();
-    const card = page.getByRole('region', { name: 'WORM short challenges', exact: true });
-    await expect(card).toBeVisible({ timeout: 180000 });
     await expect(card).toContainText('Grow, ride, restore');
     await expect(card.getByRole('button', { name: 'Start challenge', exact: true })).toBeEnabled();
     await expect(card.getByRole('button', { name: 'Next challenge', exact: true })).toHaveCount(0);
     await card.getByRole('button', { name: 'Start challenge', exact: true }).click();
-    await expect(card.locator('.worm-challenge-details')).toHaveCount(0);
-    expect((await card.boundingBox()).height).toBeLessThanOrEqual(70);
+    await expectCompact(card);
     await card.getByRole('button', { name: 'Challenge options', exact: true }).click();
     await expect(card).toContainText('Clock pauses during help');
-    await card.getByRole('button', { name: 'Pause', exact: true }).click();
-    await page.locator('.worm-pause-resume').click();
+    expect(errors).toEqual([]);
+  });
+
+  test(`keeps challenge help paused across keyboard Pause and Resume${suffix}`, async ({ page, errors }) => {
+    // Exercise accessible activation as well as the pointer flows below.
+    const card = await openChallenges(page, { phone });
+    await card.getByRole('button', { name: 'Start challenge', exact: true }).press('Enter');
+    await card.getByRole('button', { name: 'Challenge options', exact: true }).press('Enter');
+    await card.getByRole('button', { name: 'Pause', exact: true }).press('Enter');
+    const pause = page.getByRole('dialog', { name: 'Game paused', exact: true });
+    await pause.getByRole('button', { name: 'Resume', exact: true }).press('Enter');
     await expect(card).toContainText('Clock pauses during help');
     const heldProgress = await card.getByRole('status').textContent();
     await page.waitForTimeout(1200);
     await expect(card.getByRole('status')).toHaveText(heldProgress);
-    await card.getByRole('button', { name: 'Resume', exact: true }).click();
-    await expect(card.locator('.worm-challenge-details')).toHaveCount(0);
-    await card.getByRole('button', { name: 'Challenge options', exact: true }).click();
-    // Use the suite's software-WebGL action budget: CI can take over 15 seconds
-    // to acknowledge this click even after the second challenge has rendered.
+    await card.getByRole('button', { name: 'Resume', exact: true }).press('Enter');
+    await expectCompact(card);
+    expect(errors).toEqual([]);
+  });
+
+  test(`skips an active challenge and starts the next compact attempt${suffix}`, async ({ page, errors }) => {
+    const card = await openChallenges(page, { phone });
+    await card.getByRole('button', { name: 'Start challenge', exact: true }).press('Enter');
+    await card.getByRole('button', { name: 'Challenge options', exact: true }).press('Enter');
+    // Keep real pointer coverage for Pause; the other journey tests the full
+    // keyboard nesting and clock hold without repeating every mouse round trip.
+    await card.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Game paused', exact: true })
+      .getByRole('button', { name: 'Resume', exact: true }).press('Enter');
     await card.getByRole('button', { name: 'Skip challenge', exact: true }).click();
     await expect(card).toContainText('Cross your own route');
     await expect(card.getByRole('button', { name: 'Start challenge', exact: true })).toBeEnabled();
     await card.getByRole('button', { name: 'Start challenge', exact: true }).click();
-    await expect(card.locator('.worm-challenge-details')).toHaveCount(0);
-    expect((await card.boundingBox()).height).toBeLessThanOrEqual(70);
+    await expectCompact(card);
     await page.screenshot({ path: `/tmp/worm-challenges-${phone ? 'phone' : 'desktop'}.png` });
     expect(errors).toEqual([]);
   });

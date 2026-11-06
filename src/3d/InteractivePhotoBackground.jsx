@@ -15,32 +15,12 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BackSide, RepeatWrapping } from 'three';
-import { useEnvironment } from '@react-three/drei';
+import useOptionalEnvironment from './useOptionalEnvironment.js';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { menuLeanInto } from '../components/menus/menuPointer.js';
 import { prefersReducedMotion } from '../utils/device.js';
 
-// Contain a failed texture load to the background alone (mirrors SafeEnvironment)
-// so a blocked/slow HDR fetch never blanks the whole scene.
-class SkyBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { failed: false };
-  }
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch(err) {
-    console.warn('[InteractivePhotoBackground] panorama failed to load; continuing without a photo backdrop.', err?.message ?? err);
-  }
-  render() {
-    if (this.state.failed) return null;
-    return this.props.children;
-  }
-}
-
-function PanoramaSky({ preset, files, rotationSpeed, intensity, visible, parallax }) {
-  const texture = useEnvironment(files ? { files } : { preset });
+function PanoramaSky({ texture, rotationSpeed, intensity, visible, parallax }) {
   const meshRef = useRef();
   const drift = useRef({ yaw: 0, x: 0, y: 0, target: { x: 0, y: 0 } });
 
@@ -59,7 +39,7 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity, visible, paralla
   // The clone carries its own GPU upload — the source texture's cache entry does
   // not cover it — so switching backgrounds leaks a full panorama's worth of
   // texture memory unless the outgoing clone is disposed. The source stays alive
-  // in drei's environment cache and is not ours to free.
+  // in the shared optional-environment resource and is not ours to free.
   useEffect(() => () => skyTexture.dispose(), [skyTexture]);
 
   useFrame((state, delta) => {
@@ -97,17 +77,15 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity, visible, paralla
 // opts into the drift by passing a speed. In-game photo panoramas stay still.
 // `parallax` (the main menu) slides the panorama against the pointer's lean.
 export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true, parallax = false }) {
+  const texture = useOptionalEnvironment({ preset, files });
+  if (!texture) return null;
   return (
     <>
       {/* Reflections / ambient IBL only (no `background`) so the rotating sphere
           below is the visible panorama. blurriness only affects the reflection
           probe here; all current callers pass 0. */}
-      <SafeEnvironment preset={files ? undefined : preset} files={files} backgroundBlurriness={blurriness} />
-      <SkyBoundary>
-        <React.Suspense fallback={null}>
-          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} parallax={parallax} />
-        </React.Suspense>
-      </SkyBoundary>
+      <SafeEnvironment map={texture} backgroundBlurriness={blurriness} />
+      <PanoramaSky visible={visible} texture={texture} rotationSpeed={rotationSpeed} intensity={intensity} parallax={parallax} />
     </>
   );
 }
