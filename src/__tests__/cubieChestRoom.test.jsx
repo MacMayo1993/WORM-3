@@ -128,6 +128,21 @@ it('renders only the selected tile family and switches its preview', () => {
   expect(host.querySelector('.catalogue-preview h3').textContent).not.toBe(first);
 });
 
+it('centers selected tile families while resetting only the collection scroll', () => {
+  act(() => root.render(<ParityStoreScreen onClose={close} />));
+  act(() => button('Tiles').click());
+  const selector = host.querySelector('.catalogue-selector');
+  for (const label of ['Living Surfaces', 'Crafted', 'Classic']) {
+    const family = button(label);
+    family.scrollIntoView = vi.fn();
+    selector.scrollTop = 200;
+    act(() => family.click());
+    expect(family.getAttribute('aria-pressed')).toBe('true');
+    expect(family.scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: 'nearest', inline: 'center' });
+    expect(selector.scrollTop).toBe(0);
+  }
+});
+
 it('restores a paid cosmetic choice after leaving mid-roll, without another charge', () => {
   act(() => button('Two cubies').click());
   act(() => button('Roll two cubies').click());

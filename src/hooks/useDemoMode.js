@@ -606,6 +606,16 @@ export function useDemoMode({
     const nextStep = nextDemoStep(fromStep);
     setDemoStepIntroVisible(false);
     if (nextStep === 'end' && !useGameStore.getState().demoSkipped) store.recordDiscoveryXp('introduction');
+    if (fromStep === 'chaos-forecast') {
+      // Clearing the Chaos ledger does not repair exhausted or eliminated
+      // stickers. Stage a clean preview, but wait for Start Random to remix.
+      cancelDisparityRun();
+      store.setChaosLevel(0);
+      store.setAutoRotateEnabled(false);
+      store.setRotatedCubies(makeCubies(store.size));
+      store.setFlipMode(false);
+      store.setShowTunnels(false);
+    }
     store.setDemoStep(nextStep);
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
@@ -885,9 +895,14 @@ export function useDemoMode({
     // Continue) from re-granting PP. The pending ref is the idempotency lock.
     if (demoRewardPendingRef.current) return;
     const store = useGameStore.getState();
+    if (!store.demoMode || store.demoStep !== 'chaos-forecast') return;
     demoRewardPendingRef.current = true;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
+    setDemoHintStep(null);
+    setDemoCoachCopy(null);
+    setDemoLaunchStep(null);
+    closeNavSheet?.();
     setDemoForecastVisible(false);
     setDemoRewardStamp({ amount: reward, correct });
     store.earnCoins(reward);
@@ -895,13 +910,18 @@ export function useDemoMode({
     store.clearDisparityGame();
     store.setChaosLevel(0);
     cancelDisparityRun();
+    // Cancel queued work before replacing spent stickers for the reward pause.
+    store.setAutoRotateEnabled(false);
+    store.setRotatedCubies(makeCubies(store.size));
+    store.setFlipMode(false);
+    store.setShowTunnels(false);
     demoForecastPickRef.current = null;
     demoWatchTimers.current.push(scheduleDemoTimer(() => {
       setDemoRewardStamp(null);
       demoRewardPendingRef.current = false;
       advanceDemoStepRef.current?.('chaos-forecast');
     }, 2600));
-  }, [cancelDisparityRun, clearDemoWatchTimers]);
+  }, [cancelDisparityRun, clearDemoWatchTimers, closeNavSheet]);
 
   // Mobi's mid-step aside was acknowledged — drop back to the compact coach
   // pill. Held here rather than inside DemoCoach so the app knows the blocking

@@ -5,7 +5,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
-import { DemoControlTour, DemoStepIntro, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach, CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
+import { DemoRewardStamp, DemoControlTour, DemoStepIntro, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach, CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
 import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
@@ -150,7 +150,7 @@ it('publishes pause-menu ownership and provides a 48px pause target', () => {
 });
 
 
-it('places demo controls below the actual HUD and remeasures after rotation', () => {
+it('keeps cube demo controls in the shared header position through rotation', () => {
   let bottom = 72;
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
     return { bottom: this.classList.contains('top-app-bar') ? bottom : 0 };
@@ -158,10 +158,10 @@ it('places demo controls below the actual HUD and remeasures after rotation', ()
   const skip = vi.fn(), exit = vi.fn();
   render(<><div className="top-app-bar" /><DemoProgressBar currentStep="view-showcase" onSkipStep={skip} onExit={exit} /></>);
   const bar = host.querySelector('[aria-label="Demo controls"]');
-  expect(bar.style.top).toBe('84px');
+  expect(bar.style.top).toBe('');
   bottom = 48;
   act(() => window.dispatchEvent(new Event('resize')));
-  expect(bar.style.top).toBe('60px');
+  expect(bar.style.top).toBe('');
   const buttons = bar.querySelectorAll('button');
   act(() => buttons[0].click()); act(() => buttons[1].click());
   expect(skip).toHaveBeenCalledTimes(1); expect(exit).toHaveBeenCalledTimes(1);
@@ -195,4 +195,34 @@ it('combines demo navigation, instructions and pause at the top, leaving only ga
   act(() => [...card.querySelectorAll('button')].find(b => b.textContent === 'Exit Demo').click());
   expect(skip).toHaveBeenCalledTimes(1);
   expect(exit).toHaveBeenCalledTimes(1);
+});
+
+
+it('keeps the reward pause accessible while blocking gameplay and stale results', () => {
+  const exit = vi.fn();
+  render(<><button id="gameplay">Shuffle</button><DemoRewardStamp amount={200} correct onExit={exit} /></>);
+  const reward = host.querySelector('[aria-label="Chaos reward"]');
+  expect(reward.getAttribute('aria-modal')).toBe('true');
+  expect(reward.closest('[inert]')).toBeNull();
+  expect(host.querySelector('#gameplay').hasAttribute('inert')).toBe(true);
+  expect(reward.querySelector('[role="status"]').textContent).toContain('+200 PP');
+  expect(reward.textContent).toContain('Up next: Random');
+  expect(reward.querySelectorAll('[aria-label="Demo progress"]')).toHaveLength(1);
+  const button = reward.querySelector('button');
+  expect(button.textContent).toBe('Exit Demo');
+  Object.defineProperty(button, 'offsetParent', { get: () => host });
+  button.focus();
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+  expect(document.activeElement).toBe(button);
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(exit).toHaveBeenCalledTimes(1);
+  render(<button id="gameplay">Shuffle</button>);
+  expect(host.querySelector('#gameplay').hasAttribute('inert')).toBe(false);
+});
+
+it('puts forecast choices on one reading surface below the demo header', () => {
+  render(<DemoForecastPicker onPick={() => {}} onExit={() => {}} />);
+  expect(host.querySelector('.demo-toolbar--inline')).toBeNull();
+  expect(host.querySelector('.demo-forecast-panel').textContent).toContain('Which pair survives?');
+  expect(host.querySelectorAll('[aria-label="Demo progress"]')).toHaveLength(1);
 });

@@ -7,7 +7,7 @@ import SettingsMenu from '../components/menus/SettingsMenu.jsx';
 import ScreenTransition from '../components/ScreenTransition.jsx';
 import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
 import DisparityWinnerScreen from '../components/screens/DisparityWinnerScreen.jsx';
-import { DemoCoach, DemoStepIntro } from '../components/screens/DemoFlowController.jsx';
+import { DemoCoach, DemoStepIntro, DemoRewardStamp } from '../components/screens/DemoFlowController.jsx';
 import { STEP_INTRO_LINES } from '../utils/demoStepCopy.js';
 import { makeCubies } from '../game/cubeState.js';
 
@@ -21,7 +21,7 @@ const callbacks = {
   setRotatedCubies: cubies => useGameStore.getState().setRotatedCubies(cubies),
   cancelShuffle: vi.fn(), changeSize: vi.fn(), reset: vi.fn(),
   cancelDisparityRun: vi.fn(), startDisparityGame: vi.fn(),
-  animatedShuffle: vi.fn(), handleOpenStore: vi.fn(),
+  animatedShuffle: vi.fn(), handleOpenStore: vi.fn(), closeNavSheet: vi.fn(),
 };
 
 function Harness() {
@@ -39,6 +39,7 @@ function Harness() {
     </ScreenTransition>
     {demo.demoForecastVisible && <DemoForecastPicker onPick={demo.handleDemoForecastPick} onExit={demo.handleExitDemo} />}
     {showWinner && <DisparityWinnerScreen demoNavigation onDismiss={demo.handleDemoDisparityDismiss} />}
+    {demo.demoRewardStamp && <DemoRewardStamp {...demo.demoRewardStamp} onExit={demo.handleExitDemo} />}
     {demo.demoStepIntroVisible && <DemoStepIntro step={demo.demoStep}
       onContinue={demo.handleDemoStepContinue} onExit={demo.handleExitDemo} />}
   </>;
@@ -199,10 +200,22 @@ it.each(['first strike', 'playing', 'winner reveal', 'results'])(
       expect(document.activeElement).toBe(next);
       expect(host.querySelector('.demo-coach-pill')).toBeNull();
     }
+    act(() => useGameStore.getState().setRotatedCubies(makeCubies(3).map(plane => plane.map(row => row.map(c => ({ ...c,
+      stickers: Object.fromEntries(Object.entries(c.stickers).map(([dir, sticker]) => [dir, { ...sticker, flips: 6 }]))
+    }))))));
     const coins = useGameStore.getState().parityPoints;
     act(() => { next.click(); next.click(); });
     expect(useGameStore.getState().parityPoints).toBe(coins + (won ? 200 : 50));
     expect(demo.demoTryVisible).toBe(false);
+    expect(demo.demoHintStep).toBeNull();
+    expect(demo.demoLaunchStep).toBeNull();
+    expect(demo.demoCoachCopy).toBeNull();
+    expect(callbacks.closeNavSheet).toHaveBeenCalled();
+    expect(demo.demoRewardStamp.amount).toBe(won ? 200 : 50);
+    expect(host.querySelector('[aria-label="Chaos reward"]')).not.toBeNull();
+    expect(useGameStore.getState().cubies).toEqual(makeCubies(3));
+    expect(useGameStore.getState().randomMode).toBe(false);
+    expect(useGameStore.getState().autoRotateEnabled).toBe(false);
     expect(useGameStore.getState().showDisparityWinner).toBe(false);
     expect(useGameStore.getState().chaosLevel).toBe(0);
     expect(callbacks.cancelDisparityRun).toHaveBeenCalled();
@@ -212,3 +225,22 @@ it.each(['first strike', 'playing', 'winner reveal', 'results'])(
     expect(useGameStore.getState().randomMode).toBe(false);
   }
 );
+
+
+it.each(['exit', 'replay'])('cancels a pending Chaos reward on %s and ignores its retained callback', action => {
+  act(() => useGameStore.getState().setDemoStep('chaos-forecast'));
+  act(() => demo.handleDemoStepContinue());
+  act(() => demo.handleDemoForecastPick({ faceIds: [1, 4] }));
+  const staleDismiss = demo.handleDemoDisparityDismiss;
+  act(() => staleDismiss());
+  const coins = useGameStore.getState().parityPoints;
+  expect(demo.demoRewardStamp).not.toBeNull();
+  if (action === 'exit') click(button('Exit Demo'));
+  else act(() => demo.handleDemoReplay());
+  act(() => staleDismiss());
+  wait(20000);
+  expect(demo.demoRewardStamp).toBeNull();
+  expect(useGameStore.getState().parityPoints).toBe(coins);
+  expect(useGameStore.getState().randomMode).toBe(false);
+  expect(demo.demoStep).toBe(action === 'exit' ? null : 'worm-traversal');
+});

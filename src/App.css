@@ -3821,3 +3821,12 @@ textarea:focus-visible {
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
+
+/* Challenge guidance starts folded into a 44px strip. It never opens itself
+   after a move or between puzzles; the player can request the hint. */
+.story-objective-hud.challenge-objective { width: min(290px, calc(100vw - 24px)); }
+.challenge-objective .story-objective-toggle { min-height: 44px; }
+.challenge-objective .story-objective-content { max-height: min(40vh, 260px); overflow-y: auto; }
+@media (max-width: 768px) {
+  .story-objective-hud.challenge-objective { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+}

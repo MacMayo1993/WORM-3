@@ -450,7 +450,12 @@ const StoreCollection = ({ onClose, onChests }) => {
           <div className="catalogue-section-heading"><div><h2>{activeTab.label}</h2></div>
             <button className="catalogue-owned" aria-pressed={ownedOnly} onClick={() => setOwnedOnly(v => !v)}>Owned only</button></div>
           {tab === 'tiles' && <nav className="catalogue-families" aria-label="Tile families">{TILE_SECTIONS.map(section =>
-            <button key={section.key} aria-pressed={tileFamily === section.key} onClick={() => { setTileFamily(section.key); setFocusedId(null); resetScroll(); }}>{section.label}<small>{section.items.length}</small></button>
+            <button key={section.key} aria-pressed={tileFamily === section.key} onClick={event => {
+              setTileFamily(section.key); setFocusedId(null); resetScroll();
+              // Nearest-edge scrolling can leave a fractional-pixel border clipped
+              // in the landscape grid. Keep the selected family clear of either edge.
+              event.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+            }}>{section.label}<small>{section.items.length}</small></button>
           )}</nav>}
           {focused ? <div className="catalogue-preview" style={{ '--item-accent': heroAccent }}>
             <div className="catalogue-preview-art">{heroArt()}</div>
@@ -463,8 +468,10 @@ const StoreCollection = ({ onClose, onChests }) => {
             </div>
             <div className="catalogue-preview-nav"><button aria-label="Previous item" onClick={() => stepFocus(-1)}>‹</button><button aria-label="Next item" onClick={() => stepFocus(1)}>›</button></div>
           </div> : <div className="catalogue-empty"><h3>Nothing collected here yet</h3><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
-          <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
-          {renderItems(items)}
+          <div className="catalogue-shelf">
+            <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
+            {renderItems(items)}
+          </div>
         </section>
       </div>
       <footer className="catalogue-footer">Collect orbs in WORM and win Chaos bets to earn PP.</footer>

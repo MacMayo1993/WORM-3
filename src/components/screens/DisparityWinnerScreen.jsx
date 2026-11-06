@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { bettingPalette, getFaceFromGridId } from '../../utils/disparityBetting.js';
@@ -8,7 +8,7 @@ import { Z, UI_FONT, HEADING_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
 import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
-import { useDialogBehavior } from '../ui/Panel.jsx';
+import DemoDialog from './DemoDialog.jsx';
 
 const sourceName = source => source === 'conway' ? 'Surface surge' : source === 'chain' ? 'Chain spread' : 'Chaos';
 export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure, demoNavigation = false }) {
@@ -19,8 +19,6 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const paletteSettings = run?.paletteSettings || settings;
   const { faces: faceInfo } = bettingPalette(paletteSettings);
   const [ready, setReady] = useState(false);
-  const dialogRef = useRef(null);
-  const onDialogKeyDown = useDialogBehavior(dialogRef, ready ? onSecondary : undefined);
   useEffect(() => { const t = setTimeout(() => setReady(true), 500); return () => clearTimeout(t); }, []);
   const pair = winner?.pair || (winner?.gridId ? [winner.gridId] : []);
   const elapsed = run?.endedAt != null ? Math.max(0, Math.round((run.endedAt - run.startedAt) / 1000)) : null;
@@ -32,7 +30,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const outcome = result?.push ? `${result.wager} PP returned`
     : result?.won ? `Prediction won · +${result.net ?? result.payout - result.wager} PP`
     : result ? `Prediction missed · −${result.wager} PP` : 'Round complete';
-  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
+  return <DemoDialog onClose={demoNavigation ? onDismiss : ready ? onSecondary : undefined} className="chaos-ui chaos-results" data-demo={demoNavigation || undefined} style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} aria-labelledby="chaos-result-title">
     <div className="chaos-result-sheet">
       {demoNavigation && <nav className="chaos-demo-next" aria-label="Demo navigation">
         <span>Chaos complete</span>
@@ -99,5 +97,5 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         </div>}
       </div>
     </div>
-  </div>;
+  </DemoDialog>;
 }

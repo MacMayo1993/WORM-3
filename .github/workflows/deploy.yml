@@ -108,15 +108,20 @@ jobs:
   # Validate the same production build that is uploaded for Pages. Browser
   # failures must block publication, including graphics startup regressions.
   browser:
-    name: Browser smoke tests (${{ matrix.project }})
+    name: Browser smoke tests (${{ matrix.project }} ${{ matrix.shard }}/2)
     needs: build
     strategy:
-      # Separate software-GL runners keep one slow desktop path from consuming
-      # the phone suite's budget. Let both finish so failures retain all evidence.
+      # Keep each software-GL queue bounded even on slower hosted runners.
+      # Test-level sharding avoids assigning the entire Store file to one job;
+      # one worker per shard still renders only one browser at a time.
+      # Every test runs once; every shard must pass the aggregate gate.
       fail-fast: false
       matrix:
         project: [desktop, phone]
-    runs-on: ubuntu-latest
+        shard: [1, 2]
+    # Playwright 1.56.1 supports 24.04; ubuntu-latest now selects 26.04,
+    # whose dependencies it cannot install. Keep both browser gates runnable.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Checkout
@@ -144,13 +149,13 @@ jobs:
       # Publish the focused screenshot before unrelated long-running smoke tests.
       # Separate output folders keep its traces/report when the next run cleans up.
       - name: Run Mega Storm visual check
-        if: matrix.project == 'desktop'
+        if: matrix.project == 'desktop' && matrix.shard == 1
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: mega-storm-report
         run: npm run e2e -- e2e/megaStorm.e2e.js --output=mega-storm-results
 
       - name: Upload Mega Storm visual check
-        if: always() && matrix.project == 'desktop'
+        if: always() && matrix.project == 'desktop' && matrix.shard == 1
         uses: actions/upload-artifact@v4
         with:
           name: mega-storm-visual-check
@@ -166,14 +171,23 @@ jobs:
           mapfile -d '' -t tests < <(
             find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
           )
-          if ((${#tests[@]})); then npm run e2e -- --project="${{ matrix.project }}" "${tests[@]}"; fi
+          if ((${#tests[@]})); then npm run e2e -- --project="${{ matrix.project }}" --fully-parallel --workers=1 --shard="${{ matrix.shard }}/2" "${tests[@]}"; fi
 
       - name: Upload Glass view visual check
         if: always() && matrix.project == 'desktop'
         uses: actions/upload-artifact@v4
         with:
-          name: glass-view-visual-check
+          name: glass-view-visual-check-${{ matrix.shard }}
           path: test-results/**/glass-view.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Store visual check
+        if: always() && matrix.project == 'phone'
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-visual-check-${{ matrix.shard }}
+          path: test-results/**/store-*.png
           if-no-files-found: ignore
           retention-days: 7
 
@@ -181,7 +195,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-failures-${{ matrix.project }}
+          name: playwright-failures-${{ matrix.project }}-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/

@@ -14,7 +14,7 @@ const route = (size, corner = false) => ({
   padHeight: WORM_PAD_HEIGHT, padExpansion: wormRaisedAmount(size)
 });
 const encode = uniforms => Object.fromEntries(Object.entries(uniforms).map(([name, { value }]) =>
-  [name, Array.isArray(value) ? value.flatMap(v => v.toArray()) : value?.isVector3 ? value.toArray() : value]));
+  [name, value?.isDataTexture ? { data: Array.from(value.image.data), width: value.image.width, height: value.image.height } : Array.isArray(value) ? value.flatMap(v => v.toArray()) : value?.isVector3 ? value.toArray() : value]));
 
 // Draw the production GLSL, rather than reproducing its distance formula in JS.
 // Each point occupies one framebuffer pixel: red means discarded, green retained.
@@ -43,12 +43,24 @@ async function rasterize(page, source, cases) {
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, width, gl.FLOAT, false, 0, 0);
     };
-    const failures = [];
+    const failures = [], textures = [];
     for (const item of cases) {
       for (const [name, value] of Object.entries(item.uniforms)) {
         const location = gl.getUniformLocation(program, name);
         if (location === null) continue;
-        if (Array.isArray(value)) gl.uniform3fv(location, value);
+        if (value?.data) {
+          gl.activeTexture(gl.TEXTURE0);
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, value.width, value.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(value.data));
+          gl.uniform1i(location, 0);
+          // Release after the cases finish so the current draw keeps its binding.
+          textures.push(texture);
+        } else if (Array.isArray(value)) gl.uniform3fv(location, value);
         else gl.uniform1f(location, value);
       }
       attribute('aPoint', 3, item.probes.flatMap(p => p.point));
@@ -62,8 +74,10 @@ async function rasterize(page, source, cases) {
       });
     }
     const error = gl.getError();
+    textures.forEach(texture => gl.deleteTexture(texture));
+    const activeUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
     gl.getExtension('WEBGL_lose_context')?.loseContext();
-    return { failures, error };
+    return { failures, error, activeUniforms };
   }, { source, cases });
 }
 
@@ -129,8 +143,8 @@ test('inner and outer mouth pixels preserve neighboring corner faces', async ({ 
       const half = (size - 1) / 2 + SURFACE_OFFSET;
       const probes = [];
       for (let side = 0; side < 2; side++) {
-        const center = interior.uniforms.uInteriorCenters.value[side];
-        const normal = interior.uniforms.uInteriorNormals.value[side];
+        const center = interior.centers[side];
+        const normal = interior.normals[side];
         const axis = coordinates.find(k => Math.abs(normal[k]) > .5);
         probes.push({ point: center.toArray(), open: true, kind: 'centerline' });
         for (const tangent of coordinates.filter(k => k !== axis)) {
@@ -187,4 +201,35 @@ test('keeps the fixed route open at a shifted-core tile seam without enlarging i
   const result = await rasterize(page, corePassageGLSL, [{ label: '3x3-zoom1.5-seam', uniforms: encode(passage.uniforms), probes }]);
   expect(result.error).toBe(0);
   expect(result.failures).toEqual([]);
+});
+
+// The full live-pair ceiling plus several older tail passages must fit in WebGL1
+// without uniform arrays, float textures, or losing the last pair's apertures.
+test('opens every live and retained mouth with bounded mobile shader uniforms', async ({ page }) => {
+  const interior = makeInteriorPortals(), cases = [];
+  const tunnels = Array.from({ length: 14 }, (_, i) => ({
+    entry: { x: 1 + i % 7 * 2, y: 14, z: i < 7 ? 3 : 10, dirKey: 'PY' },
+    exit: { x: 1 + i % 7 * 2, y: 0, z: i < 7 ? 3 : 10, dirKey: 'NY' },
+    padHeight: WORM_PAD_HEIGHT, padExpansion: 0
+  }));
+  try {
+    for (const routes of [tunnels, tunnels.slice(2), tunnels.slice(0, 1), []]) {
+      syncInteriorPortals(interior, routes, 15, 0);
+      const probes = [];
+      for (let i = 0; i < tunnels.length * 2; i++) {
+        // Current slots move when a pair heals; inactive stale texels must not cut.
+        const center = interior.centers[i];
+        probes.push({ point: center.toArray(), open: i < routes.length * 2 || routes.some((_, j) =>
+          interior.centers[j * 2].distanceTo(center) < .01 || interior.centers[j * 2 + 1].distanceTo(center) < .01), kind: 'mouth-center' });
+        const neighbor = center.clone(); neighbor.x += .34;
+        probes.push({ point: neighbor.toArray(), open: false, kind: 'outside-circle' });
+      }
+      cases.push({ label: `${routes.length} pairs`, uniforms: encode(interior.uniforms), probes });
+    }
+    const result = await rasterize(page, interiorPortalGLSL, cases);
+    expect(result.error).toBe(0);
+    expect(result.failures).toEqual([]);
+    // Two scalars, two face-count vectors and one sampler, independent of pair count.
+    expect(result.activeUniforms).toBeLessThanOrEqual(5);
+  } finally { interior.dispose(); }
 });

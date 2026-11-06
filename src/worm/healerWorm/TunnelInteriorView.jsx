@@ -12,6 +12,9 @@ import { resolveCubeViewAppearance } from '../../3d/cubeViewAppearance.js';
 import { withPortalCutout } from '../../3d/portalCutout.js';
 import { makeInteriorPortals, syncInteriorPortals, interiorPortalGLSL } from './interiorPortals.js';
 import { prefersReducedMotion } from '../../utils/device.js';
+import { interiorPortalRoutes } from './interiorPortalRoutes.js';
+
+const NO_ROUTES = [];
 
 // ─── Tunnel Interior View — all 6 inner faces of the Rubik's cube ────────────
 // During wormhole traversal shows the coloured back-sides of every sticker on
@@ -46,6 +49,7 @@ export function TunnelInteriorView({ worm, size }) {
     const dimMatRef = useRef();
     const materialSnapshot = useRef({ cubies: null, settings: null, cap: null });
     const portalColorSnapshot = useRef({});
+    const networkSnapshot = useRef({});
     const portals = useMemo(() => makeInteriorPortals(), []);
     const tiles = useMemo(() => makeInteriorTileBatches(portals.uniforms), [portals]);
     useEffect(() => () => {
@@ -110,24 +114,27 @@ export function TunnelInteriorView({ worm, size }) {
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
         const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
         const active = inTraversal || !!tunnel;
-        syncInteriorPortals(portals, tunnel, size, expansion);
+        const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
+        const routes = active ? interiorPortalRoutes(networkSnapshot.current, st.cubies, size, st.rotationEpoch, cap,
+            expansion, worm.activeTunnel?.current, worm.tunnelPassages?.current ?? NO_ROUTES) : NO_ROUTES;
+        syncInteriorPortals(portals, routes, size, expansion);
 
         // Refresh on cube, layout, equipped styles, or a temporary view changing.
         // Pickups can change while the same paused tunnel and cube stay mounted.
-        const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
         const viewPower = st.wormHealerMode ? st.wormViewPower : null;
         const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap
             || materialSnapshot.current.layout !== stickerLayout || materialSnapshot.current.viewPower !== viewPower;
         if (!st.wormPaused && !st.settings?.reducedMotion && !prefersReducedMotion()) portals.time.value += Math.min(delta, 0.05);
         const portalColors = portalColorSnapshot.current;
-        if (tunnel && (portalColors.tunnel !== tunnel || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings || portalColors.viewPower !== viewPower)) {
+        if (routes.length && (portalColors.routes !== routes || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings || portalColors.viewPower !== viewPower)) {
             const { colors: fc } = resolveCubeViewAppearance(st.settings, viewPower);
-            for (let side = 0; side < 2; side++) {
-                const cell = side === 0 ? tunnel.entry : tunnel.exit;
+            for (let i = 0; i < routes.length * 2; i++) {
+                const route = routes[Math.floor(i / 2)];
+                const cell = i % 2 === 0 ? route.entry : route.exit;
                 const sticker = st.cubies?.[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
-                portals.mouths[side].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
+                portals.mouths[i].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
             }
-            portalColorSnapshot.current = { tunnel, cubies: st.cubies, settings: st.settings, viewPower };
+            portalColorSnapshot.current = { routes, cubies: st.cubies, settings: st.settings, viewPower };
         }
         // Prepare hidden walls too: the run-start compile sees the exact portal
         // variant used on entry, instead of linking hundreds of tiles mid-dive.
@@ -154,7 +161,7 @@ export function TunnelInteriorView({ worm, size }) {
                 <meshBasicMaterial ref={dimMatRef} onUpdate={clipBacking} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
             <primitive object={tiles.group} dispose={null} />
-            {portals.mouths.map(mouth => <primitive key={mouth.name} object={mouth} dispose={null} />)}
+            <primitive object={portals.group} dispose={null} />
         </group>
     );
 }

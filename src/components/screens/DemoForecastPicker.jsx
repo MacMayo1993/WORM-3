@@ -28,12 +28,13 @@ export default function DemoForecastPicker({ onPick, onSkipStep, onExit }) {
     <DemoDialog onClose={onExit} aria-label="Choose a color pair" style={{
       position: 'fixed', inset: 0, zIndex: 11500,
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'safe center', overflowY: 'auto', boxSizing: 'border-box',
+      alignItems: 'center', justifyContent: 'flex-start', overflowY: 'auto', boxSizing: 'border-box',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
       backdropFilter: 'var(--paper-blur, none)',
-      fontFamily: UI_FONT, textAlign: 'center', padding: 24,
+      fontFamily: UI_FONT, textAlign: 'center', padding: 'calc(env(safe-area-inset-top, 0px) + 78px) 12px max(16px, env(safe-area-inset-bottom, 0px))',
     }}>
-      {(onExit || onSkipStep) && <DemoProgressBar currentStep="chaos-forecast" inline onSkipStep={onSkipStep} onExit={onExit} />}
+      {(onExit || onSkipStep) && <DemoProgressBar currentStep="chaos-forecast" onSkipStep={onSkipStep} onExit={onExit} />}
+      <section className="demo-panel demo-forecast-panel">
       <p style={{
         color: UI_GOLD, fontSize: 12, fontWeight: 800,
         letterSpacing: '0.16em', textTransform: 'uppercase', margin: '0 0 8px',
@@ -115,6 +116,7 @@ export default function DemoForecastPicker({ onPick, onSkipStep, onExit }) {
         {selected ? 'Confirm pick' : 'Choose a pair'}
       </button>
 
+      </section>
     </DemoDialog>
   );
 }
