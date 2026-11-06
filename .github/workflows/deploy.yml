@@ -116,7 +116,9 @@ jobs:
       fail-fast: false
       matrix:
         project: [desktop, phone]
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports 24.04; ubuntu-latest now selects 26.04,
+    # whose dependencies it cannot install. Keep both browser gates runnable.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Checkout
