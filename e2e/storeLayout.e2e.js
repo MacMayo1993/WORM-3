@@ -30,6 +30,29 @@ async function assertTouchTargets(page) {
   }
 }
 
+// DOM visibility alone accepts content below the scrollport. Measure the
+// actual intersection so a preview-only landscape screen cannot pass again.
+async function assertPreviewAndShelfShareViewport(page) {
+  const visible = await page.locator('.catalogue-selector').evaluate(selector => {
+    const frame = selector.getBoundingClientRect();
+    const measure = target => {
+      const rect = selector.querySelector(target).getBoundingClientRect();
+      return {
+        width: rect.width, height: rect.height,
+        visibleWidth: Math.max(0, Math.min(rect.right, frame.right, window.innerWidth)
+          - Math.max(rect.left, frame.left, 0)),
+        visibleHeight: Math.max(0, Math.min(rect.bottom, frame.bottom, window.innerHeight)
+          - Math.max(rect.top, frame.top, 0)),
+      };
+    };
+    return { preview: measure('.catalogue-preview'), item: measure('.store-card') };
+  });
+  expect(visible.preview.visibleWidth, 'preview fits horizontally').toBeGreaterThanOrEqual(visible.preview.width - 1);
+  expect(visible.preview.visibleHeight, 'whole preview remains above the fold').toBeGreaterThanOrEqual(visible.preview.height - 1);
+  expect(visible.item.visibleWidth, 'item shelf is on screen').toBeGreaterThanOrEqual(44);
+  expect(visible.item.visibleHeight, 'a useful portion of the first card is on screen').toBeGreaterThanOrEqual(Math.min(96, visible.item.height));
+}
+
 async function assertShelfScroll(page) {
   const shelf = page.locator('.catalogue-selector');
   const header = await page.locator('.catalogue-header').boundingBox();
@@ -63,7 +86,7 @@ test('Store compact preview and tabs stay usable across portrait and short lands
         return {
           header: box('.catalogue-header'), rail: box('.catalogue-sidebar'),
           shelf: box('.catalogue-selector'), preview: box('.catalogue-preview'),
-          firstItem: box('.store-card'), footer: box('.catalogue-footer'),
+          footer: box('.catalogue-footer'),
           tabs: [...element.querySelectorAll('.catalogue-category')].map(tab => tab.getBoundingClientRect().toJSON()),
           overflows: [...element.querySelectorAll('.catalogue-header, .catalogue-selector, .catalogue-preview')]
             .map(node => node.scrollWidth > node.clientWidth + 1),
@@ -73,22 +96,21 @@ test('Store compact preview and tabs stay usable across portrait and short lands
       expect(geometry.header.top).toBeGreaterThanOrEqual(0);
       expect(geometry.footer.bottom).toBeLessThanOrEqual(height);
       expect(geometry.shelf.height).toBeGreaterThan(140);
-      if (width <= 650) {
+      const shortLandscape = width >= 560 && width <= 1000 && height <= 500;
+      if (width <= 650 && !shortLandscape) {
         expect(geometry.rail.bottom).toBeLessThanOrEqual(geometry.shelf.top);
         for (const tab of geometry.tabs) {
           expect(tab.top).toBeGreaterThanOrEqual(geometry.rail.top);
           expect(tab.bottom).toBeLessThanOrEqual(geometry.rail.bottom);
         }
+      } else {
+        expect(geometry.rail.right).toBeLessThanOrEqual(geometry.shelf.left);
       }
       if (width <= 650 || (width <= 1000 && height <= 500)) {
         expect(geometry.preview.height).toBeLessThan(180);
-        // Extremely short phones still scroll the shelf; ordinary portrait and
-        // wider landscape leave the start of the grid visible above the fold.
-        if (height >= 500 || width > 650) {
-          expect(geometry.firstItem.top).toBeLessThan(geometry.shelf.bottom);
-        }
       }
       await assertTouchTargets(page);
+      await assertPreviewAndShelfShareViewport(page);
       await assertShelfScroll(page);
       await page.screenshot({ path: testInfo.outputPath(`store-${width}x${height}.png`) });
     });
@@ -134,6 +156,7 @@ for (const viewport of [
         await page.getByRole('button', { name: 'Previous item', exact: true }).click();
         await expect(title).toHaveText(initial);
         await assertTouchTargets(page);
+        if (width > height) await assertPreviewAndShelfShareViewport(page);
         await assertShelfScroll(page);
       });
     }
@@ -149,6 +172,7 @@ for (const viewport of [
         await families.nth(i).click();
         await expect(families.nth(i)).toHaveAttribute('aria-pressed', 'true');
         await expect(families.nth(i)).toBeInViewport({ ratio: 1 });
+        if (width > height) await assertPreviewAndShelfShareViewport(page);
         await assertShelfScroll(page);
       });
     }
@@ -158,6 +182,7 @@ for (const viewport of [
     await page.getByRole('button', { name: 'Next item', exact: true }).click();
     await expect(page.locator('.catalogue-preview-info > small')).toContainText('more PP needed');
     await expect(page.locator('.catalogue-action')).toBeDisabled();
+    if (width > height) await assertPreviewAndShelfShareViewport(page);
     await page.screenshot({ path: testInfo.outputPath(`store-safe-${width}x${height}.png`) });
     await page.getByRole('button', { name: 'Owned only', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Browse all items', exact: true })).toBeVisible();

@@ -463,8 +463,10 @@ const StoreCollection = ({ onClose, onChests }) => {
             </div>
             <div className="catalogue-preview-nav"><button aria-label="Previous item" onClick={() => stepFocus(-1)}>‹</button><button aria-label="Next item" onClick={() => stepFocus(1)}>›</button></div>
           </div> : <div className="catalogue-empty"><h3>Nothing collected here yet</h3><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
-          <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
-          {renderItems(items)}
+          <div className="catalogue-shelf">
+            <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
+            {renderItems(items)}
+          </div>
         </section>
       </div>
       <footer className="catalogue-footer">Collect orbs in WORM and win Chaos bets to earn PP.</footer>
