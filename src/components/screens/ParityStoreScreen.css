@@ -188,7 +188,7 @@
   .catalogue-section-heading { min-height:44px; margin-bottom:10px; }
   .catalogue-section-heading h2 { font-size:18px; margin:0; }
   .catalogue-owned { min-height:44px; padding:6px 9px; }
-  .catalogue-families { flex-wrap:nowrap; overflow-x:auto; gap:6px; padding-bottom:4px; }
+  .catalogue-families { flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:0 4px 4px; scroll-padding-inline:4px; }
   .catalogue-families button { flex:0 0 auto; min-height:44px; padding:6px 10px; font-size:11px; white-space:nowrap; }
 
   /* Keep the selected item useful without dedicating half the phone to it. */
@@ -248,7 +248,7 @@
   .catalogue-selector { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1fr); grid-template-rows:44px auto; align-content:start; align-items:start; gap:8px 12px; padding:8px 8px 16px; }
   .catalogue-section-heading { grid-column:1; grid-row:1; margin:0; }
   .catalogue-section-heading h2 { font-size:16px; }
-  .catalogue-families { grid-column:2; grid-row:1; min-width:0; margin:0; padding:0; scrollbar-width:none; }
+  .catalogue-families { grid-column:2; grid-row:1; min-width:0; margin:0; padding:0 4px; scrollbar-width:none; }
   .catalogue-families::-webkit-scrollbar { display:none; }
   .catalogue-preview, .catalogue-empty { grid-column:1; grid-row:2; min-width:0; }
   .catalogue-preview { grid-template-columns:minmax(0,1fr) 44px 44px; grid-template-rows:auto auto 44px auto; min-height:0; gap:4px 6px; padding:8px; }

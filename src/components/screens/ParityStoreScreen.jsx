@@ -450,7 +450,12 @@ const StoreCollection = ({ onClose, onChests }) => {
           <div className="catalogue-section-heading"><div><h2>{activeTab.label}</h2></div>
             <button className="catalogue-owned" aria-pressed={ownedOnly} onClick={() => setOwnedOnly(v => !v)}>Owned only</button></div>
           {tab === 'tiles' && <nav className="catalogue-families" aria-label="Tile families">{TILE_SECTIONS.map(section =>
-            <button key={section.key} aria-pressed={tileFamily === section.key} onClick={() => { setTileFamily(section.key); setFocusedId(null); resetScroll(); }}>{section.label}<small>{section.items.length}</small></button>
+            <button key={section.key} aria-pressed={tileFamily === section.key} onClick={event => {
+              setTileFamily(section.key); setFocusedId(null); resetScroll();
+              // Nearest-edge scrolling can leave a fractional-pixel border clipped
+              // in the landscape grid. Keep the selected family clear of either edge.
+              event.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+            }}>{section.label}<small>{section.items.length}</small></button>
           )}</nav>}
           {focused ? <div className="catalogue-preview" style={{ '--item-accent': heroAccent }}>
             <div className="catalogue-preview-art">{heroArt()}</div>
