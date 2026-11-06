@@ -31,6 +31,7 @@ export function seedPracticeBody(sim, size, path) {
 export function trackPracticeBodyJump(sim, practice, size) {
   if (sim.isJumping) {
     practice.airborne = true;
+    practice.flightJumps = Math.max(practice.flightJumps ?? 0, (sim.jumpCount ?? 0));
     if (!practice.crossedThisJump && !sim.rocketActive && sim.interpT >= 0.5) {
       const key = tileKey(sim.pos);
       const covered = bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount);
@@ -41,7 +42,12 @@ export function trackPracticeBodyJump(sim, practice, size) {
       }
     }
   } else if (practice.airborne) {
-    if (practice.crossedThisJump && sim.alive && sim.phase === 'crawling') practice.bodyJumps++;
+    if (practice.crossedThisJump && sim.alive && sim.phase === 'crawling') {
+      practice.bodyJumps++;
+      // Both properties belong to this completed flight, never an earlier hop.
+      if (practice.flightJumps >= 2) practice.doubleBodyJumps = (practice.doubleBodyJumps ?? 0) + 1;
+    }
+    practice.flightJumps = 0;
     practice.airborne = false;
     practice.crossedThisJump = false;
   }

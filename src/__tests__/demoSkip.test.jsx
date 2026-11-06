@@ -203,3 +203,26 @@ it('keeps the saved character during a temporary showcase and restores it on exi
   act(() => state().setWormCharacter('classic'));
   expect(localStorage.getItem('worm3_character')).toBe('classic');
 });
+
+
+it('repairs spent Chaos stickers when skipping the live round without a payout or early Random start', () => {
+  const spent = makeCubies(3).map(plane => plane.map(row => row.map(c => ({ ...c,
+    stickers: Object.fromEntries(Object.entries(c.stickers).map(([dir, sticker]) => [dir, { ...sticker, flips: 6 }]))
+  }))));
+  useGameStore.setState({ demoStep: 'chaos-forecast', cubies: spent, chaosLevel: 3,
+    flipMode: true, showTunnels: true, autoRotateEnabled: true });
+  draw(<Harness />);
+  const coins = state().parityPoints;
+  act(() => demo.handleDemoSkipStep('chaos-forecast'));
+  expect(state().cubies).toEqual(makeCubies(3));
+  expect(state().chaosLevel).toBe(0);
+  expect(state().autoRotateEnabled).toBe(false);
+  expect(state().flipMode).toBe(false);
+  expect(state().showTunnels).toBe(false);
+  expect(state().parityPoints).toBe(coins);
+  expect(state().demoStep).toBe('random-showcase');
+  expect(demo.demoStepIntroVisible).toBe(true);
+  wait(20000);
+  expect(state().randomMode).toBe(false);
+  expect(callbacks.animatedShuffle).not.toHaveBeenCalled();
+});

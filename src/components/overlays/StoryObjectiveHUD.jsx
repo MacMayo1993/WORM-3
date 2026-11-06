@@ -23,7 +23,10 @@ const readCollapsed = () => {
 export default function StoryObjectiveHUD({ level }) {
   // Whether the card is tucked away is a lasting player preference, so it is
   // seeded from — and written back to — storage rather than reset per chapter.
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const challenge = levelsManager.getPackForLevel(level?.id)?.id === 'short-challenges';
+  const [storyCollapsed, setStoryCollapsed] = useState(readCollapsed);
+  const [challengeCollapsed, setChallengeCollapsed] = useState(true);
+  const collapsed = challenge ? challengeCollapsed : storyCollapsed;
   const [showHint, setShowHint] = useState(false);
   const moves = useGameStore((s) => s.moves);
 
@@ -40,15 +43,17 @@ export default function StoryObjectiveHUD({ level }) {
   // chapter's revealed hint into the next one.
   useEffect(() => {
     setShowHint(false);
-  }, [levelId]);
+    if (challenge) setChallengeCollapsed(true);
+  }, [levelId, challenge]);
 
   useEffect(() => {
+    if (challenge) return;
     try {
-      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+      localStorage.setItem(COLLAPSE_KEY, storyCollapsed ? '1' : '0');
     } catch {
       /* storage unavailable (private mode / quota) — non-fatal */
     }
-  }, [collapsed]);
+  }, [storyCollapsed, challenge]);
 
   if (!level || !objective) return null;
 
@@ -61,14 +66,14 @@ export default function StoryObjectiveHUD({ level }) {
     chapterIndex >= 0 ? `Chapter ${chapterIndex + 1} of ${ownerLevels.length}` : `Chapter ${levelId}`;
 
   return (
-    <aside className={`story-objective-hud ${collapsed ? 'is-collapsed' : ''}`} aria-label="Story objective">
+    <aside className={`story-objective-hud${challenge ? ' challenge-objective' : ''} ${collapsed ? 'is-collapsed' : ''}`} aria-label={challenge ? 'Challenge objective' : 'Story objective'}>
       <button
         type="button"
         className="story-objective-toggle"
-        onClick={() => setCollapsed((value) => !value)}
+        onClick={() => (challenge ? setChallengeCollapsed : setStoryCollapsed)((value) => !value)}
         aria-expanded={!collapsed}
       >
-        <span className="story-objective-kicker">Mobi's objective</span>
+        <span className="story-objective-kicker">{challenge ? `Challenge ${chapterIndex + 1}/${ownerLevels.length}` : "Mobi's objective"}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
           {par != null && (
             <span
@@ -86,7 +91,7 @@ export default function StoryObjectiveHUD({ level }) {
       {!collapsed && (
         <div className="story-objective-content">
           <div className="story-objective-chapter">
-            <span>{chapterLabel}</span>
+            <span>{challenge ? 'Restore all six faces' : chapterLabel}</span>
             <span aria-hidden="true">·</span>
             <span>{level.name}</span>
           </div>
@@ -133,7 +138,7 @@ export default function StoryObjectiveHUD({ level }) {
                 onClick={() => setShowHint((value) => !value)}
                 aria-expanded={showHint}
               >
-                {showHint ? 'Hide Mobi hint' : 'Need a hint?'}
+                {showHint ? challenge ? 'Hide hint' : 'Hide Mobi hint' : 'Need a hint?'}
               </button>
               {showHint && <p className="story-objective-hint">{tutorial.tip}</p>}
             </>

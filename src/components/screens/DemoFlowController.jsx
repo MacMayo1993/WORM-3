@@ -63,7 +63,7 @@ const ensureDemoShellStyle = () => {
       width: min(420px, calc(100vw - 32px));
       padding: 16px 18px 18px;
       border-radius: 22px;
-      background: rgba(250, 247, 238, 0.94);
+      background: #faf7ee;
       border: 1px solid rgba(111, 126, 86, 0.25);
       box-shadow: 0 14px 34px rgba(40, 48, 32, 0.18);
       color: #26331f;
@@ -118,7 +118,7 @@ const ensureDemoShellStyle = () => {
       width: min(340px, calc(100vw - 40px));
       padding: 13px 16px 14px;
       border-radius: 18px;
-      background: rgba(250, 247, 238, 0.95);
+      background: #faf7ee;
       border: 1px solid rgba(111, 126, 86, 0.25);
       box-shadow: 0 14px 34px rgba(40, 48, 32, 0.2);
       color: #26331f;
@@ -137,7 +137,7 @@ const ensureDemoShellStyle = () => {
       transform: translateX(-50%) rotate(45deg);
       width: 16px;
       height: 16px;
-      background: rgba(250, 247, 238, 0.95);
+      background: #faf7ee;
       border-right: 1px solid rgba(111, 126, 86, 0.25);
       border-bottom: 1px solid rgba(111, 126, 86, 0.25);
     }
@@ -210,10 +210,17 @@ const ensureDemoShellStyle = () => {
       animation: demo-stamp-punch-long 2.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
+    .demo-beat-root > .demo-panel { width: min(460px, calc(100% - 24px)); }
+
     .demo-beat-root--upper {
       justify-content: flex-start;
-      padding-top: calc(25vh - 60px);
+      padding-top: max(calc(env(safe-area-inset-top, 0px) + 88px), calc(25dvh - 60px));
+      box-sizing: border-box;
     }
+
+    .demo-beat-root--reward { pointer-events: auto; overflow-y: auto; padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+    .demo-beat-root--reward .demo-panel { flex-shrink: 0; }
+    .demo-beat-flash { pointer-events: none; }
 
     @keyframes demo-stamp-punch-long {
       0%   { opacity: 0; transform: scale(2.3) rotate(-3deg); }
@@ -265,6 +272,10 @@ const ensureDemoShellStyle = () => {
        scene, waiting for a tap or the Next Step button instead of auto-advancing. */
     .demo-beat-root--hold {
       pointer-events: auto;
+      box-sizing: border-box;
+      padding: calc(env(safe-area-inset-top, 0px) + 78px) 12px max(16px, env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      justify-content: safe center;
       cursor: pointer;
       background: radial-gradient(ellipse at center, rgba(24, 31, 18, 0.34), rgba(24, 31, 18, 0.62));
       backdrop-filter: var(--paper-blur, none);
@@ -315,11 +326,10 @@ const ensureDemoShellStyle = () => {
     }
 
     /* Compact advance pill left behind after Mobi's coach dialogue dismisses.
-       Declared BEFORE the phone media query — the override below drops it under
-       the crowded top bar, and at equal specificity source order decides. */
+       Sits immediately below the shared demo header. */
     .demo-coach-pill {
       position: fixed;
-      top: calc(env(safe-area-inset-top, 0px) + 140px);
+      top: calc(env(safe-area-inset-top, 0px) + 76px);
       left: 50%;
       transform: translateX(-50%);
       z-index: 11000;
@@ -328,11 +338,11 @@ const ensureDemoShellStyle = () => {
     @media (max-width: 640px) {
       /* Everything else that stacks below the pill moves down with it. */
       .demo-coach-pill {
-        top: calc(env(safe-area-inset-top, 0px) + 134px);
+        top: calc(env(safe-area-inset-top, 0px) + 76px);
       }
 
       .demo-tour-card--top {
-        top: calc(env(safe-area-inset-top, 0px) + 134px);
+        top: calc(env(safe-area-inset-top, 0px) + 76px);
       }
 
       .demo-intro-root {
@@ -391,7 +401,7 @@ const ensureDemoShellStyle = () => {
       width: min(320px, calc(100vw - 40px));
       padding: 10px 16px;
       border-radius: 14px;
-      background: rgba(250, 247, 238, 0.94);
+      background: #faf7ee;
       border: 1px solid rgba(111, 126, 86, 0.25);
       box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
       color: #26331f;
@@ -423,7 +433,7 @@ const ensureDemoShellStyle = () => {
       width: min(340px, calc(100vw - 32px));
       padding: 9px 15px;
       border-radius: 14px;
-      background: rgba(250, 247, 238, 0.94);
+      background: #faf7ee;
       border: 1px solid rgba(111, 126, 86, 0.25);
       box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
       color: #26331f;
@@ -508,8 +518,6 @@ const DemoStepIntro = ({ step, onContinue, onSkipStep, onExit }) => {
       onSkip={onContinue}
       onSkipStep={onSkipStep}
       onExit={onExit}
-      // The in-game top bar is up during the demo — keep the dialogue under it.
-      topInset="var(--topbar-h)"
     />
   );
 };
@@ -983,7 +991,7 @@ const DemoStepComplete = ({ step, onDismiss }) => {
     <DemoDialog className="demo-beat-root demo-beat-root--hold" onClose={handleDismiss}
       aria-label={`${info.label} complete`} onClick={handleDismiss}>
       <div className="demo-beat-flash" />
-      <div className="demo-complete-stamp demo-complete-stamp--hold">
+      <div className="demo-panel demo-complete-stamp demo-complete-stamp--hold">
         <p className="demo-complete-check">✓</p>
         <p className="demo-beat-sub">Demo {info.num} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
@@ -1014,7 +1022,7 @@ const DemoStepLaunch = ({ step }) => {
   return (
     <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
       <div className="demo-beat-flash" />
-      <div className="demo-launch-stamp">
+      <div className="demo-panel demo-launch-stamp">
         <p className="demo-beat-sub">Step {info.num}</p>
         <h2 className="demo-beat-title">{info.label}</h2>
       </div>
@@ -1026,16 +1034,18 @@ const DemoStepLaunch = ({ step }) => {
 // text treatment as DemoStepLaunch, so the reward reads with the same weight
 // as a new step arriving. `correct` distinguishes a nailed forecast (200) from
 // the consolation grant (50).
-const DemoRewardStamp = ({ amount, correct }) => {
+const DemoRewardStamp = ({ amount, correct, onExit }) => {
   ensureDemoShellStyle();
   return (
-    <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
+    <DemoDialog className="demo-beat-root demo-beat-root--upper demo-beat-root--reward" onClose={onExit} aria-label="Chaos reward">
+      <DemoProgressBar currentStep="chaos-forecast" onExit={onExit} />
       <div className="demo-beat-flash" />
-      <div className="demo-launch-stamp">
+      <div className="demo-panel demo-launch-stamp" role="status" aria-live="polite" aria-atomic="true">
         <p className="demo-beat-sub">{correct ? 'Forecast Correct' : 'Parity Points Won'}</p>
         <h2 className="demo-beat-title">+{amount} PP</h2>
+        <p className="demo-complete-note">Up next: Random</p>
       </div>
-    </div>
+    </DemoDialog>
   );
 };
 

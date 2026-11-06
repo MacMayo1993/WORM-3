@@ -34,11 +34,12 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
       backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT,
-      padding: 16,
+      padding: 'calc(env(safe-area-inset-top, 0px) + 78px) 16px max(16px, env(safe-area-inset-bottom, 0px))',
+      boxSizing: 'border-box',
       overflowY: 'auto',
     }}>
       <div style={{
-        background: 'rgba(250,247,238,0.94)',
+        background: '#faf7ee',
         border: '1px solid rgba(111,126,86,0.25)',
         borderRadius: 20,
         boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
