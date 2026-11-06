@@ -63,15 +63,23 @@ for (const phone of [false, true]) {
     expect(errors).toEqual([]);
   });
 
+  test(`opens and resumes the challenge pause menu with the pointer${suffix}`, async ({ page, errors }) => {
+    const card = await openChallenges(page, { phone });
+    await card.getByRole('button', { name: 'Start challenge', exact: true }).press('Enter');
+    await card.getByRole('button', { name: 'Challenge options', exact: true }).press('Enter');
+    // Keep mouse Pause distinct from the keyboard hold and Skip journeys. In
+    // slow software-WebGL runs this pair alone costs more than 50 seconds.
+    await card.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Game paused', exact: true })
+      .getByRole('button', { name: 'Resume', exact: true }).click();
+    await expect(card).toContainText('Clock pauses during help');
+    expect(errors).toEqual([]);
+  });
+
   test(`skips an active challenge and starts the next compact attempt${suffix}`, async ({ page, errors }) => {
     const card = await openChallenges(page, { phone });
     await card.getByRole('button', { name: 'Start challenge', exact: true }).press('Enter');
     await card.getByRole('button', { name: 'Challenge options', exact: true }).press('Enter');
-    // Keep real pointer coverage for Pause; the other journey tests the full
-    // keyboard nesting and clock hold without repeating every mouse round trip.
-    await card.getByRole('button', { name: 'Pause', exact: true }).click();
-    await page.getByRole('dialog', { name: 'Game paused', exact: true })
-      .getByRole('button', { name: 'Resume', exact: true }).press('Enter');
     await card.getByRole('button', { name: 'Skip challenge', exact: true }).click();
     await expect(card).toContainText('Cross your own route');
     await expect(card.getByRole('button', { name: 'Start challenge', exact: true })).toBeEnabled();

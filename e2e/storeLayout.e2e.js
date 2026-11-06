@@ -1,4 +1,12 @@
 import { test, expect, openGame, press } from './helpers.js';
+import { TILE_STYLE_SECTIONS } from '../src/utils/tileStyleCatalog.js';
+
+// Bound each shader-backed family journey without dropping future additions.
+const FAMILY_GROUP_SIZE = 4;
+const FAMILY_GROUPS = Array.from({ length: Math.ceil(TILE_STYLE_SECTIONS.length / FAMILY_GROUP_SIZE) }, (_, group) => ({
+  start: group * FAMILY_GROUP_SIZE,
+  sections: TILE_STYLE_SECTIONS.slice(group * FAMILY_GROUP_SIZE, (group + 1) * FAMILY_GROUP_SIZE),
+}));
 
 async function openStore(page) {
   // Keep the real zero-balance catalogue, but make Store available as it is for
@@ -74,48 +82,54 @@ test.afterEach(async ({ page, errors }) => {
   await expect(page.locator('[data-testid="app-error"]')).toHaveCount(0);
 });
 
-test('Store compact preview and tabs stay usable across portrait and short landscape @phone', async ({ page }, testInfo) => {
-  await openStore(page);
-  for (const [width, height] of [[320, 568], [360, 640], [412, 800], [640, 320], [844, 390], [1024, 768]]) {
-    await test.step(`${width} × ${height}`, async () => {
-      await page.setViewportSize({ width, height });
-      await expect.poll(() => page.locator('.store-catalogue').evaluate(element =>
-        Math.abs(element.getBoundingClientRect().height - window.innerHeight))).toBeLessThan(1);
-      const geometry = await page.locator('.store-catalogue').evaluate(element => {
-        const box = selector => element.querySelector(selector).getBoundingClientRect().toJSON();
-        return {
-          header: box('.catalogue-header'), rail: box('.catalogue-sidebar'),
-          shelf: box('.catalogue-selector'), preview: box('.catalogue-preview'),
-          footer: box('.catalogue-footer'),
-          tabs: [...element.querySelectorAll('.catalogue-category')].map(tab => tab.getBoundingClientRect().toJSON()),
-          overflows: [...element.querySelectorAll('.catalogue-header, .catalogue-selector, .catalogue-preview')]
-            .map(node => node.scrollWidth > node.clientWidth + 1),
-        };
-      });
-      expect(geometry.overflows).toEqual([false, false, false]);
-      expect(geometry.header.top).toBeGreaterThanOrEqual(0);
-      expect(geometry.footer.bottom).toBeLessThanOrEqual(height);
-      expect(geometry.shelf.height).toBeGreaterThan(140);
-      const shortLandscape = width >= 560 && width <= 1000 && height <= 500;
-      if (width <= 650 && !shortLandscape) {
-        expect(geometry.rail.bottom).toBeLessThanOrEqual(geometry.shelf.top);
-        for (const tab of geometry.tabs) {
-          expect(tab.top).toBeGreaterThanOrEqual(geometry.rail.top);
-          expect(tab.bottom).toBeLessThanOrEqual(geometry.rail.bottom);
+// Three screenshots per journey leave room for slow software-rendered frames.
+for (const { name, viewports } of [
+  { name: 'portrait', viewports: [[320, 568], [360, 640], [412, 800]] },
+  { name: 'landscape and desktop', viewports: [[640, 320], [844, 390], [1024, 768]] },
+]) {
+  test(`Store compact preview and tabs stay usable in ${name} @phone`, async ({ page }, testInfo) => {
+    await openStore(page);
+    for (const [width, height] of viewports) {
+      await test.step(`${width} × ${height}`, async () => {
+        await page.setViewportSize({ width, height });
+        await expect.poll(() => page.locator('.store-catalogue').evaluate(element =>
+          Math.abs(element.getBoundingClientRect().height - window.innerHeight))).toBeLessThan(1);
+        const geometry = await page.locator('.store-catalogue').evaluate(element => {
+          const box = selector => element.querySelector(selector).getBoundingClientRect().toJSON();
+          return {
+            header: box('.catalogue-header'), rail: box('.catalogue-sidebar'),
+            shelf: box('.catalogue-selector'), preview: box('.catalogue-preview'),
+            footer: box('.catalogue-footer'),
+            tabs: [...element.querySelectorAll('.catalogue-category')].map(tab => tab.getBoundingClientRect().toJSON()),
+            overflows: [...element.querySelectorAll('.catalogue-header, .catalogue-selector, .catalogue-preview')]
+              .map(node => node.scrollWidth > node.clientWidth + 1),
+          };
+        });
+        expect(geometry.overflows).toEqual([false, false, false]);
+        expect(geometry.header.top).toBeGreaterThanOrEqual(0);
+        expect(geometry.footer.bottom).toBeLessThanOrEqual(height);
+        expect(geometry.shelf.height).toBeGreaterThan(140);
+        const shortLandscape = width >= 560 && width <= 1000 && height <= 500;
+        if (width <= 650 && !shortLandscape) {
+          expect(geometry.rail.bottom).toBeLessThanOrEqual(geometry.shelf.top);
+          for (const tab of geometry.tabs) {
+            expect(tab.top).toBeGreaterThanOrEqual(geometry.rail.top);
+            expect(tab.bottom).toBeLessThanOrEqual(geometry.rail.bottom);
+          }
+        } else {
+          expect(geometry.rail.right).toBeLessThanOrEqual(geometry.shelf.left);
         }
-      } else {
-        expect(geometry.rail.right).toBeLessThanOrEqual(geometry.shelf.left);
-      }
-      if (width <= 650 || (width <= 1000 && height <= 500)) {
-        expect(geometry.preview.height).toBeLessThan(180);
-      }
-      await assertTouchTargets(page);
-      await assertPreviewAndShelfShareViewport(page);
-      await assertShelfScroll(page);
-      await page.screenshot({ path: testInfo.outputPath(`store-${width}x${height}.png`) });
-    });
-  }
-});
+        if (width <= 650 || (width <= 1000 && height <= 500)) {
+          expect(geometry.preview.height).toBeLessThan(180);
+        }
+        await assertTouchTargets(page);
+        await assertPreviewAndShelfShareViewport(page);
+        await assertShelfScroll(page);
+        await page.screenshot({ path: testInfo.outputPath(`store-${width}x${height}.png`) });
+      });
+    }
+  });
+}
 
 async function openStoreInSafeArea(page, { width, height, insets }) {
   await openStore(page);
@@ -143,39 +157,54 @@ for (const viewport of [
 ]) {
   const { width, height } = viewport;
 
-  test(`Store categories and item navigation in safe areas at ${width} × ${height} @phone`, async ({ page }) => {
-    await openStoreInSafeArea(page, viewport);
-    for (const category of ['Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles']) {
-      await test.step(category, async () => {
-        await page.locator('.catalogue-category', { hasText: category }).click();
-        await expect(page.getByRole('heading', { name: category, exact: true })).toBeVisible();
-        const title = page.locator('.catalogue-preview h3');
-        const initial = await title.textContent();
-        await page.getByRole('button', { name: 'Next item', exact: true }).click();
-        await expect(title).not.toHaveText(initial);
-        await page.getByRole('button', { name: 'Previous item', exact: true }).click();
-        await expect(title).toHaveText(initial);
-        await assertTouchTargets(page);
-        if (width > height) await assertPreviewAndShelfShareViewport(page);
-        await assertShelfScroll(page);
-      });
-    }
-  });
+  const categories = ['Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles'];
+  const categoryGroups = width > height ? [categories.slice(0, 3), categories.slice(3)] : [categories];
+  for (const [group, groupCategories] of categoryGroups.entries()) {
+    test(`Store categories and item navigation${categoryGroups.length > 1 ? ` group ${group + 1}` : ''} in safe areas at ${width} × ${height} @phone`, async ({ page }) => {
+      await openStoreInSafeArea(page, viewport);
+      for (const category of groupCategories) {
+        await test.step(category, async () => {
+          await page.locator('.catalogue-category', { hasText: category }).click();
+          await expect(page.getByRole('heading', { name: category, exact: true })).toBeVisible();
+          const title = page.locator('.catalogue-preview h3');
+          const initial = await title.textContent();
+          await page.getByRole('button', { name: 'Next item', exact: true }).click();
+          await expect(title).not.toHaveText(initial);
+          await page.getByRole('button', { name: 'Previous item', exact: true }).click();
+          await expect(title).toHaveText(initial);
+          await assertTouchTargets(page);
+          if (width > height) await assertPreviewAndShelfShareViewport(page);
+          await assertShelfScroll(page);
+        });
+      }
+    });
+  }
 
-  test(`Store tile families and ownership filter in safe areas at ${width} × ${height} @phone`, async ({ page }, testInfo) => {
+  for (const { start, sections } of FAMILY_GROUPS) {
+    test(`Store tile families ${start + 1}-${start + sections.length} in safe areas at ${width} × ${height} @phone`, async ({ page }) => {
+      await openStoreInSafeArea(page, viewport);
+      await page.locator('.catalogue-category', { hasText: 'Tiles' }).click();
+      await expect(page.getByRole('heading', { name: 'Tiles', exact: true })).toBeVisible();
+      const families = page.locator('.catalogue-families button');
+      await expect(families).toHaveCount(TILE_STYLE_SECTIONS.length);
+      for (const [offset, section] of sections.entries()) {
+        await test.step(section.label, async () => {
+          const family = families.nth(start + offset);
+          await family.click();
+          await expect(family).toHaveAttribute('aria-pressed', 'true');
+          await expect(family).toBeInViewport({ ratio: 1 });
+          if (width > height) await assertPreviewAndShelfShareViewport(page);
+          await assertShelfScroll(page);
+        });
+      }
+    });
+  }
+
+  test(`Store tile ownership filter in safe areas at ${width} × ${height} @phone`, async ({ page }, testInfo) => {
     await openStoreInSafeArea(page, viewport);
     await page.locator('.catalogue-category', { hasText: 'Tiles' }).click();
     await expect(page.getByRole('heading', { name: 'Tiles', exact: true })).toBeVisible();
     const families = page.locator('.catalogue-families button');
-    for (let i = 0; i < await families.count(); i++) {
-      await test.step(`Tile family ${i + 1}`, async () => {
-        await families.nth(i).click();
-        await expect(families.nth(i)).toHaveAttribute('aria-pressed', 'true');
-        await expect(families.nth(i)).toBeInViewport({ ratio: 1 });
-        if (width > height) await assertPreviewAndShelfShareViewport(page);
-        await assertShelfScroll(page);
-      });
-    }
     // Crafted has no free/default-owned items, so both the shortfall and
     // empty Owned only state are deterministic for this fresh save.
     await families.filter({ hasText: /^Crafted/ }).click();
