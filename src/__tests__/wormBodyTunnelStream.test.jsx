@@ -20,7 +20,7 @@ import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideWidthAt } from '../utils/tunnelRide.js';
 import { tunnelRiderDockWidth, tunnelTraversalT } from '../utils/tunnelPath.js';
-import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD } from '../worm/healerWorm/constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS, WORM_HEAD_SHOW_LIFT, FACE_NORMALS, DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { SPRING_COIL_SECONDS } from '../worm/characterAbilities.js';
@@ -217,7 +217,8 @@ it.each(Object.keys(FACE_NORMALS))('keeps trampoline support on the live %s head
       for (let frame = 0; frame < 2; frame++) {
         expect(rideLiveRotation(worm)).toBe(true);
         expect(sim.headInterpPos.distanceTo(expected)).toBeLessThan(1e-9);
-        expect(renderPoints()[0].distanceTo(expected.clone().addScaledVector(liveNormal, WORM_LIFT))).toBeLessThan(1e-6);
+        // The head is drawn bigger than its collision radius and stands that much higher.
+        expect(renderPoints()[0].distanceTo(expected.clone().addScaledVector(liveNormal, WORM_LIFT + WORM_HEAD_SHOW_LIFT))).toBeLessThan(1e-6);
       }
     }
   }
@@ -642,7 +643,7 @@ it('removes every bead beyond a slice seam without stretching the remaining tail
 it('renders a connected three-tile tail sweep with its head fixed', () => {
   sim.tailLength = 4;
   sim.signature.sweep = makeWiggleSweep(sim);
-  const anchor = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, WORM_LIFT);
+  const anchor = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, WORM_LIFT + WORM_HEAD_SHOW_LIFT);
   for (const offset of [-3, 3, -3, 3, 0]) {
     sim.signature.sweep.offset = offset;
     sim.signature.sweep.elapsed = 1;

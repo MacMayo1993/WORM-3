@@ -49,6 +49,8 @@ import {
 import {
     WORM_LIFT,
     WORM_HEAD_RADIUS,
+    WORM_HEAD_SHOW,
+    WORM_HEAD_SHOW_LIFT,
     WORM_BODY_RADIUS,
     ORB_SEGMENT_GROWTH,
     BODY_BALL_SPACING,
@@ -300,7 +302,16 @@ export function WormBody({ worm, size }) {
         const _isWiggle = isWiggleRef.current;
         worm.wiggleHeadPosition = _isWiggle ? wiggleHeadRef.current : null;
         const _isPrism = isPrismRef.current;
-        const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS;
+        // MOBI keeps its blocks, and the Inch Worm its head: already 1.4x its slim
+        // body, and it has to pass under its own humps. WormFace reads the same scale.
+        const headShow = isMobi || _isInch ? 1 : WORM_HEAD_SHOW;
+        worm.headShow = headShow;
+        const headRadius = isMobi ? MOBI_RADIUS : (_isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS) * headShow;
+        // The bigger head stands on the tile rather than sinking into it; it eases
+        // back onto the route's centreline with the ride and never lifts inside the
+        // tunnel or a fall. WormFace adds the same lift.
+        worm.headShowLift = headShow === 1 || worm.phase.current === 'falling' || worm.phase.current === 'tunnel' ? 0
+            : WORM_HEAD_SHOW_LIFT * (_isBook ? BOOK_HEAD_RADIUS / WORM_HEAD_RADIUS : 1) * (1 - (_headPathPoint.rideWeight ?? 0));
         tunnelApertureProfileInto(apertureProfile.current, _headPathPoint, _bodyHeadPos,
             tunnelCoreClipUniforms.uTunnelCoreCenter.value, tunnelCoreClipUniforms.uTunnelCoreHalf.value,
             size, tunnelState.coreZoom ?? 1);
@@ -345,9 +356,9 @@ export function WormBody({ worm, size }) {
             if (headMesh) {
                 _bookHeadDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_bookHeadDummy.position, size, orbitT);
-                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift);
+                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift + worm.headShowLift);
                 _bookHeadDummy.quaternion.identity();
-                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale * worm.tunnelHeadScale);
+                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * headShow * worm.pickupHeadScale * worm.tunnelHeadScale);
                 _bookHeadDummy.updateMatrix();
                 headMesh.setMatrixAt(0, _bookHeadDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
@@ -513,8 +524,8 @@ export function WormBody({ worm, size }) {
                 // Book worm's head rides a hair high, on its books' line (the
                 // orb itself is drawn above; this dummy is only the zero-size slot).
                 if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight));
-                _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
-                _wormDummy.scale.setScalar(_isBook ? 0.092 : WORM_HEAD_RADIUS);
+                _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift + (_isWiggle ? 0 : worm.headShowLift));
+                _wormDummy.scale.setScalar((_isBook ? 0.092 : WORM_HEAD_RADIUS) * headShow);
                 if (_isWiggle) {
                     bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);

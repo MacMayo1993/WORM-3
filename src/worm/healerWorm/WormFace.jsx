@@ -15,15 +15,17 @@ import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
-import { WORM_LIFT, WORM_HEAD_RADIUS } from './constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS, WORM_HEAD_SHOW } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, mobiHeadFrameInto, MOBI_RADIUS } from '../mobiModel.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { headFrameInto } from './headFrame.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
-// Head radius, matching WormBody's head scale.
+// Head radius, matching WormBody's head scale (WORM_HEAD_SHOW included, so the
+// face, the accents and the hat grow with the head they sit on; the Inch Worm
+// keeps its own head).
 // Book keeps its authored head; round characters share the larger body head.
-const headRadiusFor = character => character === 'book' ? 0.092 : WORM_HEAD_RADIUS;
+const headRadiusFor = character => (character === 'book' ? 0.092 : WORM_HEAD_RADIUS) * (character === 'inch' ? 1 : WORM_HEAD_SHOW);
 
 // Reused each frame so the layout never allocates.
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
@@ -139,7 +141,8 @@ export function WormFace({ worm, size }) {
         const state = useGameStore.getState();
         const rideWeight = inTransit ? (worm.tunnelRide?.current?.rideWeight ?? 0) : 0;
         const rideShift = inTransit ? (worm.tunnelHeadShift ?? 0) : 0;
-        _faceHeadPos.addScaledVector(normal, rideShift);
+        // WormBody's lift for the bigger head (0 for MOBI, and eased out inside a ride).
+        _faceHeadPos.addScaledVector(normal, rideShift + (mobi ? 0 : worm.headShowLift ?? 0));
         // WormBody runs first and supplies the final surface-cleared head anchor.
         if (wormCharacterId === 'wiggle' && worm.wiggleHeadPosition) _faceHeadPos.copy(worm.wiggleHeadPosition);
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);

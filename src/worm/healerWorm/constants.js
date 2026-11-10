@@ -66,6 +66,14 @@ export const BODY_BALL_SPACING = 0.09;
 export const BASE_TAIL_LENGTH = 10;
 export const WORM_HEAD_RADIUS = 0.115;
 export const WORM_BODY_RADIUS = 0.105;
+// The head is DRAWN this much bigger than WORM_HEAD_RADIUS, and lifted by the
+// difference so it grows away from the tile. The chase camera sits behind the
+// worm, so the face is rarely seen in play: at bead size the head was one more
+// bead at the far end of the body. Render-only (body, face, hat, tunnel fit):
+// collision, clearance and rescue keep WORM_HEAD_RADIUS. MOBI keeps its blocks
+// and the Inch Worm its head (already 1.4x its body; it passes under its humps).
+export const WORM_HEAD_SHOW = 1.3;
+export const WORM_HEAD_SHOW_LIFT = WORM_HEAD_RADIUS * (WORM_HEAD_SHOW - 1);
 export const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 export const MAX_JUMPS = 2;
 export const MAX_POWERUP_RENDER = 24;
