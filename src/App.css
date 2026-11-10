@@ -1241,23 +1241,23 @@ textarea:focus-visible,
 }
 
 /* ── Dark-panel scrollbars (settings, help, store modals) ─────────────────── */
-.settings-panel::-webkit-scrollbar,
+.settings-body::-webkit-scrollbar,
 .tutorial-card::-webkit-scrollbar,
 .sheet-container::-webkit-scrollbar {
   width: 4px;
 }
-.settings-panel::-webkit-scrollbar-track,
+.settings-body::-webkit-scrollbar-track,
 .tutorial-card::-webkit-scrollbar-track,
 .sheet-container::-webkit-scrollbar-track {
   background: transparent;
 }
-.settings-panel::-webkit-scrollbar-thumb,
+.settings-body::-webkit-scrollbar-thumb,
 .tutorial-card::-webkit-scrollbar-thumb,
 .sheet-container::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 2px;
 }
-.settings-panel::-webkit-scrollbar-thumb:hover,
+.settings-body::-webkit-scrollbar-thumb:hover,
 .tutorial-card::-webkit-scrollbar-thumb:hover,
 .sheet-container::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.28);
@@ -1334,25 +1334,6 @@ textarea:focus-visible,
   }
 
   /* Settings panel mobile improvements */
-  .settings-panel {
-    width: 95%;
-    max-width: 420px;
-    max-height: calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
-
-  .settings-header {
-    padding: 16px 18px;
-    position: sticky;
-    top: 0;
-    background: var(--night-sheet);
-    backdrop-filter: blur(24px);
-    z-index: 1;
-  }
-
-  .settings-body {
-    padding: 12px 18px 20px;
-  }
-
   .settings-section {
     margin-bottom: 16px;
   }
@@ -1373,27 +1354,6 @@ textarea:focus-visible,
   .tile-style-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-  }
-
-  /* Make toggles easier to tap */
-  .settings-toggle-row {
-    padding: 12px;
-    min-height: 48px;
-  }
-
-  .toggle-switch {
-    width: 48px;
-    height: 26px;
-    border-radius: 13px;
-  }
-
-  .toggle-knob {
-    width: 22px;
-    height: 22px;
-  }
-
-  .toggle-switch.on .toggle-knob {
-    transform: translateX(22px);
   }
 
   /* Larger tap targets for radio buttons */
@@ -1628,86 +1588,12 @@ textarea:focus-visible,
   box-sizing: border-box;
 }
 
-.settings-panel {
-  background: var(--night-sheet);
-  border: 1px solid var(--night-border);
-  border-radius: 20px;
-  padding: 0;
-  max-width: 480px;
-  width: 90%;
-  max-height: calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  overflow-y: auto;
-  backdrop-filter: blur(24px);
-  box-shadow: var(--night-shadow);
-  animation: modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--night-border);
-  background: var(--night-sheet);
-  border-radius: 20px 20px 0 0;
-}
-
-.settings-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--night-text);
-  font-family: var(--ui-font);
-  letter-spacing: 0.01em;
-}
-
-.settings-close-btn {
-  background: transparent;
-  border: none;
-  color: var(--night-text-muted);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.settings-close-btn:hover {
-  background: var(--night-panel);
-  color: var(--night-text);
-}
-
-.settings-body {
-  padding: 16px 24px 24px;
-}
-
 .settings-section {
   margin-bottom: 20px;
 }
 
 .settings-section:last-child {
   margin-bottom: 0;
-}
-
-.settings-section-title {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #ffffff;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-family: var(--ui-font);
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 3px rgba(0, 0, 0, 0.8);
 }
 
 /* Radio Group */
@@ -2076,101 +1962,6 @@ textarea:focus-visible,
   letter-spacing: 0.05em;
 }
 
-/* Toggle Switches */
-.settings-toggles {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.settings-toggle-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.settings-toggle-row:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.toggle-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.87);
-  font-family: var(--ui-font);
-}
-
-.toggle-switch {
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  background: var(--border-medium);
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
-}
-
-.toggle-switch.on {
-  background: var(--rubiks-blue);
-}
-
-.toggle-knob {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.2s ease;
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3);
-}
-
-.toggle-switch.on .toggle-knob {
-  transform: translateX(20px);
-}
-
-/* Settings Tab Bar */
-.settings-tabs {
-  overflow-x: auto;
-  display: flex;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0 16px;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.settings-tab {
-  flex: 1;
-  min-height: 44px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: var(--ui-font);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 10px 4px 9px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-  white-space: nowrap;
-}
-
-.settings-tab:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.settings-tab.active {
-  color: #ffffff;
-  border-bottom-color: #3b82f6;
-}
-
 /* Tile preview canvas (shared by style cards and per-face rows) */
 .tile-preview-canvas {
   display: block;
@@ -2407,7 +2198,6 @@ textarea:focus-visible,
 
   .btn-compact,
   .bauhaus-btn,
-  .settings-close-btn,
   .net-close-btn {
     min-height: 44px;
     min-width: 44px;
@@ -2420,12 +2210,7 @@ textarea:focus-visible,
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Larger close button for settings on touch */
-  .settings-close-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 24px;
-  }
+}
 }
 
 /* Landscape mode adjustments for mobile */
@@ -2457,12 +2242,7 @@ textarea:focus-visible,
     bottom: 56px;
   }
 
-  /* Settings panel landscape adjustments */
-  .settings-panel {
-    max-height: calc(100dvh - 20px);
-    width: 80%;
-    max-width: 500px;
-  }
+}
 }
 
 /* ========================================
@@ -3245,22 +3025,17 @@ select.btn-compact:disabled {
   font-family: var(--ui-font);
 }
 
-.settings-section-title {
-  color: var(--night-text-muted) !important;
-  text-shadow: none;
-  font-family: var(--ui-font);
-}
-
 .settings-radio,
 .scheme-grid .settings-radio {
-  border: 1px solid var(--night-border);
-  background: var(--night-panel);
+  border: 2px solid var(--arcade-line-soft);
+  border-radius: 12px;
+  background: #f7f2e3;
 }
 
 .settings-radio:hover,
 .scheme-grid .settings-radio:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: #f4efdf;
+  border-color: var(--arcade-line);
 }
 
 /* These labels resolved to --ui-ink (#1e1612) — near-black text on the
@@ -3277,35 +3052,6 @@ select.btn-compact:disabled {
 .settings-label {
   color: var(--night-text);
   font-family: var(--ui-font);
-}
-
-.settings-tab {
-  color: var(--night-text-muted);
-  border-bottom-color: transparent;
-  font-family: var(--ui-font);
-}
-
-.settings-tab:hover {
-  color: var(--night-text);
-}
-
-.settings-tab.active {
-  background: var(--night-panel);
-  color: var(--night-text);
-  border-bottom-color: var(--ui-moss-light);
-}
-
-.settings-tabs {
-  border-bottom-color: var(--night-border) !important;
-}
-
-.toggle-label {
-  color: var(--night-text) !important;
-  font-family: var(--ui-font) !important;
-}
-
-.settings-toggle-row:hover {
-  background: var(--night-panel) !important;
 }
 
 /* Style cards — Tiles panel */
@@ -3390,8 +3136,9 @@ select.btn-compact:disabled {
 
 /* Settings radio active state */
 .settings-radio.active {
-  background: rgba(159, 219, 122, 0.16) !important;
-  border-color: rgba(159, 219, 122, 0.45) !important;
+  background: #e9f3dc !important;
+  border-color: #3f8f3a !important;
+  box-shadow: 0 2px 0 #3f8f3a;
 }
 
 /* Scheme dots ring */
@@ -3757,8 +3504,80 @@ textarea:focus-visible {
 }
 
 .settings-overlay { backdrop-filter: var(--night-blur, blur(6px)); }
-.settings-close-btn, .settings-tab { min-height: 48px; }
-.settings-close-btn { min-width: 48px; }
+/* Settings sheet: an arcade card. The header and tabs hold still and only the
+   body scrolls; the sheet keeps one height, so the tabs never move under the
+   pointer when a short page follows a long one. */
+.settings-panel {
+  display: flex; flex-direction: column; box-sizing: border-box;
+  width: min(520px, calc(100% - 24px));
+  height: min(720px, calc(100dvh - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  overflow: hidden;
+  color: var(--arcade-ink); background: var(--arcade-card);
+  border: 2px solid var(--arcade-line); border-radius: 24px;
+  box-shadow: var(--arcade-card-shadow);
+  animation: modalSheetIn .3s cubic-bezier(.22, 1, .36, 1);
+}
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0;
+  padding: 14px 14px 12px 22px;
+  background-color: #f4efdf; background-image: var(--arcade-grid); background-size: var(--arcade-grid-size);
+}
+.settings-title { margin: 0; color: var(--arcade-ink); font: 400 clamp(22px, 6vw, 28px)/1.05 var(--display-font); letter-spacing: .01em; text-transform: uppercase; }
+.settings-close-btn {
+  display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; padding: 0;
+  border: 2px solid var(--arcade-line); border-radius: 16px;
+  background: var(--arcade-card); color: var(--arcade-ink-strong); box-shadow: var(--arcade-key-shadow);
+  cursor: pointer; transition: translate .08s ease, box-shadow .08s ease;
+}
+.settings-close-btn:active { translate: 0 3px; box-shadow: 0 1px 0 var(--arcade-line); }
+/* Folder tabs: the open one joins the page below it. */
+.settings-tabs {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; flex-shrink: 0;
+  padding: 0 10px; background: #f4efdf; border-bottom: 2px solid var(--arcade-line);
+}
+.settings-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 56px; margin-bottom: -2px; padding: 8px 0 6px;
+  border: 2px solid transparent; border-bottom: 0; border-radius: 12px 12px 0 0;
+  background: none; color: var(--arcade-muted); cursor: pointer;
+  font: 800 11px/1.1 var(--heading-font); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
+}
+.settings-tab:hover { color: var(--arcade-ink); }
+.settings-tab.active { border-color: var(--arcade-line); background: var(--arcade-card); color: var(--arcade-ink); box-shadow: inset 0 3px 0 #009b48; }
+.settings-tab.active svg { color: #009b48; }
+.settings-panel > .settings-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 22px 24px; }
+.settings-section-title {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+  color: var(--arcade-ink); font: 800 12px/1.3 var(--heading-font); letter-spacing: .08em; text-transform: uppercase;
+}
+.settings-section-title::after { content: ''; flex: 1; height: 2px; border-radius: 2px; background: var(--arcade-line-soft); }
+.settings-section-title:not(:first-child) { margin-top: 22px; }
+.settings-section > p { margin: 0 0 10px; color: var(--arcade-muted); font-size: 14px; line-height: 1.5; }
+button.settings-radio { color: var(--arcade-ink); font: 700 14px/1.3 var(--ui-font); }
+button.settings-radio:disabled { opacity: .55; cursor: default; }
+.settings-toggles { display: flex; flex-direction: column; gap: 8px; }
+.settings-toggle-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  min-height: 52px; box-sizing: border-box; padding: 8px 12px 8px 14px;
+  border: 2px solid var(--arcade-line-soft); border-radius: 14px; background: #f7f2e3; cursor: pointer;
+}
+.toggle-label { color: var(--arcade-ink); font: 700 14px/1.3 var(--ui-font); }
+.toggle-switch {
+  position: relative; flex-shrink: 0; box-sizing: border-box; width: 52px; height: 30px; padding: 0;
+  border: 2px solid var(--arcade-ink-strong); border-radius: 999px; background: #d9d3bf;
+  cursor: pointer; transition: background .15s ease;
+}
+.toggle-switch.on { background: #009b48; }
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fffdf2; box-shadow: 0 2px 0 #26372d40; transition: translate .15s ease;
+}
+.toggle-switch.on .toggle-knob { translate: 22px 0; }
+:is(.settings-close-btn, .settings-tab, .toggle-switch):focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 2px; }
+.settings-radio-group + p { margin-top: 10px; }
+.style-card.selected { background: #e9f3dc !important; border: 2px solid #3f8f3a !important; box-shadow: 0 2px 0 #3f8f3a; }
+@media (max-width: 420px) { .settings-panel > .settings-body { padding: 16px 16px 22px; } .settings-header { padding-left: 18px; } }
+@media (prefers-reduced-motion: reduce) { .settings-close-btn, .toggle-switch, .toggle-knob { transition: none; } }
 /* Even very short windows retain a scroll path to every home action. */
 @media (max-height: 560px) and (orientation: portrait) {
   .home-actions { max-height: calc(100dvh - 130px); overflow-y: auto; background: var(--bg-primary); }
