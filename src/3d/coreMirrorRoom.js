@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CORE_MIRROR_HALF, corePassageGLSL } from './corePassage.js';
 import { withPortalCutout } from './portalCutout.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
-import { MIRROR_LAYER, tagMirrorSubjects } from './mirrorSubjects.js';
+import { MIRROR_LAYER, createMirrorCaptureScene } from './mirrorSubjects.js';
 
 // The hollow inside the antipodal core that a WORM ride passes through is a room
 // of real mirrors. Each wall is the core face's own grid, size × size, and each
@@ -171,6 +171,7 @@ const _scale = new THREE.Vector3();
 export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType) {
   const targets = [0, 1].map(() => new THREE.WebGLCubeRenderTarget(resolution, { type, generateMipmaps: false }));
   const camera = new THREE.CubeCamera(0.01, 60, targets[0]);
+  const captureScene = createMirrorCaptureScene();
   for (const face of camera.children) face.layers.set(MIRROR_LAYER);
   let next = 0, elapsed = 0, face = 6;
   return {
@@ -208,10 +209,10 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       }
       camera.position.copy(_center);
       camera.updateMatrixWorld();
-      tagMirrorSubjects(scene);
-      // The views share one pose: update the scene once, and keep the main view's
-      // shadow maps and render state, including when a capture throws.
-      const autoWorld = scene.matrixWorldAutoUpdate;
+      // Only reflected subtrees need fresh transforms or per-face projection.
+      // The exterior cube never enters this render list, even on large boards.
+      const reflected = captureScene.sync(scene, room.group);
+      // Keep the main view's shadow maps and render state, even on failure.
       const shadows = renderer.shadowMap;
       const autoShadow = shadows?.autoUpdate, shadowDirty = shadows?.needsUpdate;
       const target = renderer.getRenderTarget();
@@ -220,16 +221,13 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       const xr = renderer.xr.enabled;
       const end = Math.min(6, face + Math.max(1, faces));
       try {
-        if (autoWorld) scene.updateMatrixWorld();
-        scene.matrixWorldAutoUpdate = false;
         if (shadows) { shadows.autoUpdate = false; shadows.needsUpdate = false; }
         renderer.xr.enabled = false;
         for (; face < end; face++) {
           renderer.setRenderTarget(targets[next], face, 0);
-          renderer.render(scene, camera.children[face]);
+          renderer.render(reflected, camera.children[face]);
         }
       } finally {
-        scene.matrixWorldAutoUpdate = autoWorld;
         if (shadows) { shadows.autoUpdate = autoShadow; shadows.needsUpdate = shadowDirty; }
         renderer.setRenderTarget(target, activeFace, mip);
         renderer.xr.enabled = xr;
@@ -239,6 +237,6 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       room.uniforms.uMirrorLive.value = 1;
       next = 1 - next;
     },
-    dispose() { targets.forEach(target => target.dispose()); }
+    dispose() { captureScene.dispose(); targets.forEach(target => target.dispose()); }
   };
 }
