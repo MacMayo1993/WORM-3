@@ -49,6 +49,8 @@ import {
 import {
     WORM_LIFT,
     WORM_HEAD_RADIUS,
+    WORM_HEAD_SHOW,
+    WORM_HEAD_SHOW_LIFT,
     WORM_BODY_RADIUS,
     ORB_SEGMENT_GROWTH,
     BODY_BALL_SPACING,
@@ -57,7 +59,8 @@ import {
     DIR_FORWARD,
 } from './constants.js';
 import { inchBodyRadius, inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
-import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
+import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto, bodySurfaceDrop } from './bodySurface.js';
+import { createWormShadow, WORM_SHADOW_STRIDE } from './wormShadow.js';
 import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { headFrameInto } from './headFrame.js';
@@ -127,6 +130,8 @@ export function WormBody({ worm, size }) {
     const accessoryRig = useMemo(() => createAccessoryRig({body: equipment.body, tail: equipment.tail}), [equipment.body, equipment.tail]);
     useEffect(() => () => accessoryRig.dispose(), [accessoryRig]);
     const surface = useMemo(() => createBodySurface(), []);
+    const shadow = useMemo(() => createWormShadow(), []);
+    useEffect(() => () => shadow.dispose(), [shadow]);
     const bookParts = useMemo(() => createBookParts(), []);
     useEffect(() => () => disposeBookParts(bookParts), [bookParts]);
     const meshRef = useRef();       // sphere body (classic / inch / glow)
@@ -300,7 +305,16 @@ export function WormBody({ worm, size }) {
         const _isWiggle = isWiggleRef.current;
         worm.wiggleHeadPosition = _isWiggle ? wiggleHeadRef.current : null;
         const _isPrism = isPrismRef.current;
-        const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS;
+        // MOBI keeps its blocks, and the Inch Worm its head: already 1.4x its slim
+        // body, and it has to pass under its own humps. WormFace reads the same scale.
+        const headShow = isMobi || _isInch ? 1 : WORM_HEAD_SHOW;
+        worm.headShow = headShow;
+        const headRadius = isMobi ? MOBI_RADIUS : (_isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS) * headShow;
+        // The bigger head stands on the tile rather than sinking into it; it eases
+        // back onto the route's centreline with the ride and never lifts inside the
+        // tunnel or a fall. WormFace adds the same lift.
+        worm.headShowLift = headShow === 1 || worm.phase.current === 'falling' || worm.phase.current === 'tunnel' ? 0
+            : WORM_HEAD_SHOW_LIFT * (_isBook ? BOOK_HEAD_RADIUS / WORM_HEAD_RADIUS : 1) * (1 - (_headPathPoint.rideWeight ?? 0));
         tunnelApertureProfileInto(apertureProfile.current, _headPathPoint, _bodyHeadPos,
             tunnelCoreClipUniforms.uTunnelCoreCenter.value, tunnelCoreClipUniforms.uTunnelCoreHalf.value,
             size, tunnelState.coreZoom ?? 1);
@@ -345,9 +359,9 @@ export function WormBody({ worm, size }) {
             if (headMesh) {
                 _bookHeadDummy.position.copy(headAnchor);
                 if (orbitT > 0) rocketOrbitInto(_bookHeadDummy.position, size, orbitT);
-                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift);
+                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift + worm.headShowLift);
                 _bookHeadDummy.quaternion.identity();
-                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale * worm.tunnelHeadScale);
+                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * headShow * worm.pickupHeadScale * worm.tunnelHeadScale);
                 _bookHeadDummy.updateMatrix();
                 headMesh.setMatrixAt(0, _bookHeadDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
@@ -424,11 +438,13 @@ export function WormBody({ worm, size }) {
         transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
         const transitScale = transitScaleRef.current;
 
+        shadow.begin(state.camera);
         if (transitScale < 0.015) {
             // Body hidden (mid-tunnel): publish an empty feed so effects aiming at it
             // stop rather than firing at where it used to be.
             beginWormSegments();
             endWormSegments();
+            shadow.end();
             mesh.count = 0;
             if (mobiCoreRef.current) mobiCoreRef.current.count = 0;
             if (mobiFrameRef.current) mobiFrameRef.current.count = 0;
@@ -513,8 +529,8 @@ export function WormBody({ worm, size }) {
                 // Book worm's head rides a hair high, on its books' line (the
                 // orb itself is drawn above; this dummy is only the zero-size slot).
                 if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight));
-                _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
-                _wormDummy.scale.setScalar(_isBook ? 0.092 : WORM_HEAD_RADIUS);
+                _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift + (_isWiggle ? 0 : worm.headShowLift));
+                _wormDummy.scale.setScalar((_isBook ? 0.092 : WORM_HEAD_RADIUS) * headShow);
                 if (_isWiggle) {
                     bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
@@ -841,6 +857,15 @@ export function WormBody({ worm, size }) {
             // through the curve walk and the live-slice ride —
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
+            // Contact shadow: on the tile under this bead, wherever the bead itself is
+            // (a jump leaves it behind on the floor). Not in a tunnel, a fall or the burn.
+            if (i % WORM_SHADOW_STRIDE === 0 && orbitT === 0 && !(i === 0 ? _bodyTransit : segmentTransit)) {
+                const shade = i === 0 ? _bodyNormal : _bodyCloneNormal;
+                // A book's scale is in book units; the head's slot is zero-sized there.
+                const beadRadius = _isBook ? (i === 0 ? BOOK_HEAD_RADIUS * headShow : BOOK_BEAD_RADIUS)
+                    : Math.max(_wormDummy.scale.x, _wormDummy.scale.y);
+                shadow.add(_wormDummy.position, shade, beadRadius, bodySurfaceDrop(_wormDummy.position, shade, surface));
+            }
             if (i > 0) poseBodyAccessories(accessoryRig, writeIdx, _wormDummy.position, _bodySegForward,
                 _bodyCloneNormal, Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * (_isBook ? BOOK_BELLY : 1),
                 reducedPickupMotion ? 0 : time, segmentTransit,
@@ -929,6 +954,7 @@ export function WormBody({ worm, size }) {
         mesh.count = writeIdx;
         uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
         endWormSegments();
+        shadow.end();
 
         const haloMesh = haloRef.current;
         if (haloMesh) {
@@ -966,6 +992,7 @@ export function WormBody({ worm, size }) {
            binding material; the instance colour is each volume's cover. */
         <>
             <primitive object={accessoryRig.root} dispose={null} />
+            <primitive object={shadow.mesh} dispose={null} />
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 <primitive object={bookParts.spine} attach="geometry" />
                 <primitive object={bindingMaterial} attach="material" />
@@ -996,6 +1023,7 @@ export function WormBody({ worm, size }) {
            so any non-white material color taints every orb pickup color. */
         <>
             <primitive object={accessoryRig.root} dispose={null} />
+            <primitive object={shadow.mesh} dispose={null} />
             <instancedMesh key={isMobi ? 'mobi' : 'worm'} ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false} renderOrder={isMobi ? 2 : 0}>
                 {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <primitive object={characterGeometry} attach="geometry" />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
