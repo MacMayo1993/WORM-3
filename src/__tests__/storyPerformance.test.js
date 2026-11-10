@@ -8,20 +8,31 @@ import { tileKey } from '../worm/healerWorm/wormSim.js';
 import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
 import { storyLevel, storyOutcome } from '../worm/story/levels.js';
 
-const originalTileSearch = (pos, size, cubies, occupied) => getAllSurfaceTiles(size).find(tile => {
+// Every tile the local patch allows: the head's own face, two to three tiles away
+// (four on the big boards, one on the tiny ones), healthy and free.
+const patchTiles = (pos, size, cubies, occupied) => getAllSurfaceTiles(size).filter(tile => {
   const sticker = cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey];
   const distance = Math.hypot(tile.x-pos.x, tile.y-pos.y, tile.z-pos.z);
-  return tile.dirKey === pos.dirKey && distance >= (size >= 4 ? 2 : 1) && distance <= 3 &&
+  return tile.dirKey === pos.dirKey && distance >= (size >= 4 ? 2 : 1) && distance <= (size >= 8 ? 4 : 3) &&
     sticker.curr === sticker.orig && !occupied.has(tileKey(tile));
-});
+}).map(tileKey);
 describe('local story offerings', () => {
-  it.each([2,3,4,5,6,7,8,9,10,15])('preserves placement on every face and edge of a %i cube', size => {
+  it.each([2,3,4,5,6,7,8,9,10,15])('places inside the local patch on every face and edge of a %i cube', size => {
     const cubies = makeCubies(size), tiles = getAllSurfaceTiles(size);
     const occupied = new Set(tiles.filter((_, i) => i % 3 === 0).map(tileKey));
     for (const [i, tile] of tiles.entries()) if (i % 5 === 0) cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey].curr = -1;
-    for (const pos of tiles) expect(storySurfaceTile({ pos }, size, cubies, occupied))
-      .toEqual(originalTileSearch(pos, size, cubies, occupied));
+    // Each end of the draw, and one in between: whatever is drawn is in the patch.
+    for (const draw of [0, 0.5, 0.999]) for (const pos of tiles) {
+      const allowed = patchTiles(pos, size, cubies, occupied);
+      const tile = storySurfaceTile({ pos, rand: () => draw }, size, cubies, occupied);
+      if (allowed.length) expect(allowed).toContain(tileKey(tile)); else expect(tile).toBeUndefined();
+    }
     expect(storySurfaceTile({ pos: tiles[0] }, size, cubies, new Set(tiles.map(tileKey)))).toBeUndefined();
+  });
+  it('does not put every item on the same side of the worm', () => {
+    const size = 6, cubies = makeCubies(size), pos = { x: 3, y: 3, z: 5, dirKey: 'PZ' };
+    const picks = new Set([0, 0.2, 0.4, 0.6, 0.8, 0.999].map(draw => tileKey(storySurfaceTile({ pos, rand: () => draw }, size, cubies))));
+    expect(picks.size).toBeGreaterThan(3);
   });
   it.each([27,30])('tracks the three required identities separately from the six-element supply in level %i', id => {
     const p = { mechanics: { explodes: 1, magnetOrbs: 4 }, elements: new Set(['water','fire']), collectedElements: new Set(['water','fire']) };

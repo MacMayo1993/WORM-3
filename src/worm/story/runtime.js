@@ -1,4 +1,5 @@
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
+import { spreadCells, pickSpread } from '../healerWorm/spawnSpread.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import { rollStoryElements, storyElementTypes } from './elementGoals.js';
@@ -145,12 +146,19 @@ function smallBoardMouths(size, count) {
   return mouths;
 }
 
-// Route cells are authored on a 5×5 footprint. Larger boards center them;
-// smaller ones scale them onto the face.
-const routeCell = (size, [u, v]) => {
-  if (size >= TEMPLATE_SIZE) { const offset = Math.floor(size / 2) - 2; return [u + offset, v + offset]; }
-  return [Math.round(u * (size - 1) / 4), Math.round(v * (size - 1) / 4)];
+// Route cells are authored on a 5×5 footprint and scaled onto the face, so the
+// pattern keeps its shape at any size. Kept centred at 5×5 on a bigger board it
+// left the rest of the face bare. The biggest boards hold the pattern a little in
+// from the rim (`storyRouteInset`), which keeps its far cells within reach.
+export const storyRouteInset = size => size >= 8 ? Math.floor(size / 6) : 0;
+export const routeCell = (size, [u, v]) => {
+  const inset = storyRouteInset(size), span = size - 1 - 2 * inset;
+  return [inset + Math.round(u * span / 4), inset + Math.round(v * span / 4)];
 };
+// Orbs a face holds on a Story board: 10 up to 7×7, one more per size above
+// that, to 15 (90 on the cube, the most the campaign's food budget allows). A
+// flat 10 was a third of a 6×6 face and a twenty-second of a 15×15 one.
+export const storyOrbCap = size => size <= 7 ? 10 : Math.min(15, 10 + (size - 7));
 
 export function stageStory(sim, size, level) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
@@ -174,14 +182,17 @@ export function stageStory(sim, size, level) {
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
   const cells = STORY_ORB_ROUTES[STORY_WORLDS[level.id].route];
-  const density = size <= 3 ? (size === 2 ? 2 : 4) : Math.min(10, Math.ceil(size * size * 0.3));
-  const orbsPerFace = Math.min(10, Math.max(level.orbsPerFace ?? cells.length, density, level.mechanics?.ringHeals ? 6 : 0));
+  const cap = storyOrbCap(size);
+  const density = size <= 3 ? (size === 2 ? 2 : 4) : Math.min(cap, Math.ceil(size * size * 0.3));
+  const orbsPerFace = Math.min(cap, Math.max(level.orbsPerFace ?? cells.length, density, level.mechanics?.ringHeals ? 6 : 0));
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
     // A tunnel may occupy a route tile. Fill locally with distinct safe cells
     // to retain the full matching-color supply on every face.
-    const fallback = Array.from({ length: size * size }, (_, i) => [i % size, Math.floor(i / size)]);
+    // The rest of the face's quota goes wherever is farthest from the route and
+    // from each other. Filling in raster order lined them up along one edge.
+    const route = cells.map(cell => routeCell(size, cell));
     const used = new Set();
-    for (const [a, b] of [...cells.map(cell => routeCell(size, cell)), ...fallback]) {
+    for (const [a, b] of [...route, ...spreadCells(size, route)]) {
       if (used.size >= orbsPerFace) break;
       const key = `${a},${b}`;
       if (used.has(key)) continue;
@@ -281,7 +292,8 @@ export function replenishStoryOrbs(sim, practice, state, size, delta) {
   }
   let added = false;
   for (const tiles of Object.values(candidates)) {
-    const tile = tiles[Math.floor(sim.rand() * tiles.length)];
+    // Back where the board is barest, not beside the orbs still standing.
+    const tile = pickSpread(tiles, sim.powerups, sim.rand);
     sim.powerups.push(makeGrowthOrb(tile));
     added = true;
   }

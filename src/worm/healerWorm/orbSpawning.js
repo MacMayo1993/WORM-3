@@ -1,6 +1,7 @@
 import { getAllSurfaceTiles } from './surfaceTiles.js';
 import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING } from './constants.js';
+import { pickSpread } from './spawnSpread.js';
 
 export const ORB_SHOWER_DURATION = 10;
 export const ORB_SHOWER_INTERVAL = 0.65;
@@ -52,7 +53,7 @@ export function showerWave(sim, size, cubies) {
     const index = (firstFace + offset) % SHOWER_FACES.length;
     const tiles = faces.get(SHOWER_FACES[index]);
     if (!tiles?.length) continue;
-    sim.powerups.push(makeGrowthOrb(tiles[Math.floor(sim.rand() * tiles.length)], { shower: true }));
+    sim.powerups.push(makeGrowthOrb(pickSpread(tiles, sim.powerups, sim.rand), { shower: true }));
     // Resume after the last face actually served. Even one newly available slot
     // per wave rotates through the cube rather than restarting at PX forever.
     sim.orbShowerFace = (index + 1) % SHOWER_FACES.length;

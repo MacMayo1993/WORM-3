@@ -166,6 +166,9 @@ it('counts existing remote food before allocating magnet support and only suppli
   const { sim, p, reoffer } = setup(7);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 3;
   sim.powerups = [];
+  // The magnet lands on a drawn tile of the local patch; hold the draw so both
+  // offers land on the same tile and share one catch ring.
+  sim.rand = () => 0;
   expect(reoffer()).toBe(true);
   expect(sim.powerups).toHaveLength(1);
   sim.powerups[0].storyMagnet = false; // An ordinary orb already in the catch ring.

@@ -127,9 +127,13 @@ it('requires cross-face routing for 18 orbs and all six colors, then resets on r
   expect(state().wormSessionOrbs).toBeLessThan(18);
   begin(1);
   const initialLength = state().wormBodyTiles; expect(initialLength).toBe(0);
+  // The level wants all six colours, so go for a new colour while one is missing.
+  const eaten = new Set(), colorOf = orb => state().cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].orig;
   while (!state().wormStoryResult) {
-    const orb = state().wormPowerups[0]; expect(orb).toBeTruthy();
+    const orb = nearestOrb(candidate => !eaten.has(colorOf(candidate))); expect(orb).toBeTruthy();
+    const color = colorOf(orb);
     seek(orb, () => !!state().wormStoryResult || !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+    eaten.add(color);
   }
   expect(state()).toMatchObject({ wormPaused: true, wormAlive: true });
   expect(state().wormBodyTiles).toBe(initialLength + state().wormSessionOrbs);
@@ -293,6 +297,25 @@ it('expires with a clear cause and resets the deadline on retry', () => {
   begin(1); frame(); expect(state().wormStoryProgress).toContain(`${storyLevel(1).limit}s left`);
 });
 
+// The orb a player would go for: the nearest one the head can reach round its own
+// body and the open mouths. Orbs stand all over each face, so always chasing the
+// first in the list winds a long body into a dead end.
+function nearestOrb(wanted = () => true) {
+  const orbs = new Map(state().wormPowerups.map(orb => [tileKey(orb), orb]));
+  const blocked = new Set(getActiveTunnels(state().cubies, state().size).flatMap(t => [tileKey(t.entry), tileKey(t.exit)]));
+  for (let i = 1; i < Math.min(worm.tileTrail.current.count, Math.ceil(worm.tailLength.current * 0.09)); i++) blocked.add(ttAt(worm.tileTrail.current, i));
+  const queue = [worm.pos.current], seen = new Set([tileKey(worm.pos.current)]);
+  for (let i = 0; i < queue.length; i++) for (const dir of ['up', 'right', 'down', 'left']) {
+    const pos = getNextSurfacePosition(queue[i], dir, state().size), key = tileKey(pos);
+    if (blocked.has(key) || seen.has(key)) continue;
+    if (orbs.has(key) && wanted(orbs.get(key))) return orbs.get(key);
+    seen.add(key); queue.push(pos);
+  }
+  return wanted === nearestOrb.any ? state().wormPowerups[0] : nearestOrb(nearestOrb.any);
+}
+
+nearestOrb.any = () => true;
+
 // Navigate through the real surface movement and tunnel triggers. Only steering
 // is automated; no teleports, inventory grants or heal callbacks bypass physics.
 function seek(target, done) {
@@ -323,8 +346,13 @@ function seek(target, done) {
           seen.add(key); queue.push({ pos, first });
         }
       }
-      expect(direction, `route to ${tileKey(target)} from ${here}`).toBeTruthy();
-      act(() => worm.queueTurn(direction)); steered = here;
+      // The body can wall a target off for a few steps (orbs now stand all over a
+      // face, its rim included). Keep moving, as a player would, and plan again
+      // from the next tile.
+      direction ??= [worm.moveDir.current, 'up', 'right', 'down', 'left']
+        .find(dir => !blocked.has(tileKey(getNextSurfacePosition(worm.pos.current, dir, state().size))));
+      // Boxed in by its own body: hop over it, as the Jump key is for.
+      act(() => worm.queueTurn(direction ?? 'jump')); steered = here;
     }
     frame();
   }
@@ -340,7 +368,7 @@ function travelUntil(done) {
       const blocked = new Set(getActiveTunnels(state().cubies, state().size).flatMap(t => [tileKey(t.entry), tileKey(t.exit)]));
       for (let i = 1; i < Math.min(worm.tileTrail.current.count, Math.ceil(worm.tailLength.current * 0.09)); i++) blocked.add(ttAt(worm.tileTrail.current, i));
       const direction = [worm.moveDir.current, 'up', 'right', 'down', 'left'].find(dir => !blocked.has(tileKey(getNextSurfacePosition(worm.pos.current, dir, state().size))));
-      expect(direction).toBeTruthy(); act(() => worm.queueTurn(direction)); steered = here;
+      act(() => worm.queueTurn(direction ?? 'jump')); steered = here; // boxed in: hop the body
     }
     frame();
   }
