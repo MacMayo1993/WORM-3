@@ -534,3 +534,30 @@
 }
 
 .worm-instrument[data-lesson] .worm-hud-reserve { display:flex; align-items:center; gap:5px; }
+
+/* The live challenge chip fills along its foot, so progress reads at a glance
+   without the numbers. */
+.worm-instrument .worm-mission-glance { position: relative; overflow: hidden; padding-bottom: 9px; }
+.worm-mission-glance::before, .worm-mission-glance::after { content: ''; position: absolute; inset: auto 0 0; height: 5px; }
+.worm-mission-glance::before { background: var(--hud-border); opacity: .55; }
+.worm-mission-glance::after { background: #009b48; transform-origin: left; transform: scaleX(var(--mission-progress, 0)); transition: transform .25s ease; }
+/* Every key in the dock names itself the same way. */
+.worm-signature-control .worm-control-label { text-transform: uppercase; letter-spacing: .03em; }
+
+/* A phone held sideways: height is the scarce edge, and the thumbs sit at the
+   corners. Status runs along the top in one row instead of a stack; the keys
+   leave the centred column for the corners (ability beside the left steer key,
+   Jump and Boost beside the right), which opens the middle of the screen, where
+   the worm is, between them. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .worm-hud-top, .worm-hud-bottom { max-width: none; }
+  .worm-hud-top { flex-direction: row; flex-wrap: wrap; align-items: stretch; column-gap: 8px; }
+  .worm-hud-top > .worm-hud-bar { flex: 1 1 380px; max-width: 560px; }
+  .worm-instrument .worm-hud-top > .worm-mission-glance { flex: 1 1 200px; }
+  .worm-hud-top > .worm-hud-status-row { order: 3; flex: 1 1 100%; }
+  .worm-hud-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  .worm-action-center { justify-content: space-between !important; }
+  .worm-action-center > .worm-signature-control { flex: 0 1 200px; width: auto !important; }
+  .worm-action-center > .worm-primary-actions { flex: 0 1 230px; }
+}
+@media (prefers-reduced-motion: reduce) { .worm-mission-glance::after { transition: none; } }

@@ -29,6 +29,7 @@ export default function WormMissionCard({ summary = false, onInspect }) {
   if (demo || (!summary && (!mission || finished || (paused && !onInspect)))) return null;
   const active = mission ? <ActiveAchievement mission={mission} xp={Math.round((mission.xp || 50) * multiplier)} number={earned.length + 1} compact={!summary} /> : <p>All available challenges completed this run.</p>;
   if (!summary && onInspect) return <button type="button" className="worm-mission-live worm-mission-glance worm-hud-chip" onClick={onInspect}
+    style={{ '--mission-progress': mission.target > 0 ? Math.min(1, mission.progress / mission.target) : 0 }}
     aria-label={`${mission.title}: ${mission.progress} of ${mission.target}. Pause for details.`} aria-haspopup="dialog">
     <span className="worm-mission-glance-title">{mission.title}</span><strong>{mission.progress}/{mission.target}</strong>
   </button>;
