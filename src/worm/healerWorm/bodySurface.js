@@ -106,6 +106,33 @@ export function clearBodySurfaceInto(position, normal, radius, surface, shape = 
   return position.addScaledVector(normal, distance);
 }
 
+/** Distance from `position` down `-normal` to the cube's solid slabs: 0 inside
+ * one, Infinity when nothing lies below (a bead past the cube's edge). The
+ * contact shadow lands there. Uses the caller's surface scratch, like the
+ * clearance above. */
+export function bodySurfaceDrop(position, normal, surface) {
+  const { point, direction, boxes, count } = surface;
+  let drop = Infinity;
+  for (let i = 0; i < count; i++) {
+    const box = boxes[i];
+    point.copy(position).applyQuaternion(box.inverse).sub(box.center);
+    direction.copy(normal).applyQuaternion(box.inverse).negate();
+    let enter = -Infinity, exit = Infinity;
+    for (const axis of AXES) {
+      const h = box.half[axis], d = direction[axis], p = point[axis];
+      if (Math.abs(d) < 1e-8) {
+        if (Math.abs(p) > h) { exit = -Infinity; break; }
+      } else {
+        const a = (-h - p) / d, b = (h - p) / d;
+        enter = Math.max(enter, Math.min(a, b));
+        exit = Math.min(exit, Math.max(a, b));
+      }
+    }
+    if (exit >= Math.max(enter, 0)) drop = Math.min(drop, Math.max(enter, 0));
+  }
+  return drop;
+}
+
 /** Transform each endpoint normal BEFORE interpolation, just like its position. */
 export function blendBodyNormalInto(out, a, b, t, axis, angleA, angleB, scratchA, scratchB) {
   scratchA.copy(a);

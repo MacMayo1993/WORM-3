@@ -59,7 +59,8 @@ import {
     DIR_FORWARD,
 } from './constants.js';
 import { inchBodyRadius, inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
-import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
+import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto, bodySurfaceDrop } from './bodySurface.js';
+import { createWormShadow, WORM_SHADOW_STRIDE } from './wormShadow.js';
 import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { headFrameInto } from './headFrame.js';
@@ -129,6 +130,8 @@ export function WormBody({ worm, size }) {
     const accessoryRig = useMemo(() => createAccessoryRig({body: equipment.body, tail: equipment.tail}), [equipment.body, equipment.tail]);
     useEffect(() => () => accessoryRig.dispose(), [accessoryRig]);
     const surface = useMemo(() => createBodySurface(), []);
+    const shadow = useMemo(() => createWormShadow(), []);
+    useEffect(() => () => shadow.dispose(), [shadow]);
     const bookParts = useMemo(() => createBookParts(), []);
     useEffect(() => () => disposeBookParts(bookParts), [bookParts]);
     const meshRef = useRef();       // sphere body (classic / inch / glow)
@@ -435,11 +438,13 @@ export function WormBody({ worm, size }) {
         transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
         const transitScale = transitScaleRef.current;
 
+        shadow.begin(state.camera);
         if (transitScale < 0.015) {
             // Body hidden (mid-tunnel): publish an empty feed so effects aiming at it
             // stop rather than firing at where it used to be.
             beginWormSegments();
             endWormSegments();
+            shadow.end();
             mesh.count = 0;
             if (mobiCoreRef.current) mobiCoreRef.current.count = 0;
             if (mobiFrameRef.current) mobiFrameRef.current.count = 0;
@@ -852,6 +857,15 @@ export function WormBody({ worm, size }) {
             // through the curve walk and the live-slice ride —
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
+            // Contact shadow: on the tile under this bead, wherever the bead itself is
+            // (a jump leaves it behind on the floor). Not in a tunnel, a fall or the burn.
+            if (i % WORM_SHADOW_STRIDE === 0 && orbitT === 0 && !(i === 0 ? _bodyTransit : segmentTransit)) {
+                const shade = i === 0 ? _bodyNormal : _bodyCloneNormal;
+                // A book's scale is in book units; the head's slot is zero-sized there.
+                const beadRadius = _isBook ? (i === 0 ? BOOK_HEAD_RADIUS * headShow : BOOK_BEAD_RADIUS)
+                    : Math.max(_wormDummy.scale.x, _wormDummy.scale.y);
+                shadow.add(_wormDummy.position, shade, beadRadius, bodySurfaceDrop(_wormDummy.position, shade, surface));
+            }
             if (i > 0) poseBodyAccessories(accessoryRig, writeIdx, _wormDummy.position, _bodySegForward,
                 _bodyCloneNormal, Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * (_isBook ? BOOK_BELLY : 1),
                 reducedPickupMotion ? 0 : time, segmentTransit,
@@ -940,6 +954,7 @@ export function WormBody({ worm, size }) {
         mesh.count = writeIdx;
         uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
         endWormSegments();
+        shadow.end();
 
         const haloMesh = haloRef.current;
         if (haloMesh) {
@@ -977,6 +992,7 @@ export function WormBody({ worm, size }) {
            binding material; the instance colour is each volume's cover. */
         <>
             <primitive object={accessoryRig.root} dispose={null} />
+            <primitive object={shadow.mesh} dispose={null} />
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 <primitive object={bookParts.spine} attach="geometry" />
                 <primitive object={bindingMaterial} attach="material" />
@@ -1007,6 +1023,7 @@ export function WormBody({ worm, size }) {
            so any non-white material color taints every orb pickup color. */
         <>
             <primitive object={accessoryRig.root} dispose={null} />
+            <primitive object={shadow.mesh} dispose={null} />
             <instancedMesh key={isMobi ? 'mobi' : 'worm'} ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false} renderOrder={isMobi ? 2 : 0}>
                 {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <primitive object={characterGeometry} attach="geometry" />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
