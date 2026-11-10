@@ -51,6 +51,8 @@ it('stains each mirror with the colour of the core sticker it sits behind', () =
 it('box-projects reflections onto the room as it is placed and scaled in the world', () => {
   const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
   const parent = new THREE.Group();
+  const scene = new THREE.Scene();
+  scene.add(parent);
   parent.position.set(0.4, -0.2, 0.1); parent.scale.setScalar(2.5);
   parent.add(room.group); parent.updateMatrixWorld(true);
   // Record what each capture draws into against what the mirrors sample then.
@@ -60,13 +62,13 @@ it('box-projects reflections onto the room as it is placed and scaled in the wor
     render() { if (bound) draws.push([bound.texture, room.uniforms.uMirrorEnv.value]); },
     xr: { enabled: false }, coordinateSystem: 2000, toneMapping: 0, outputColorSpace: 'srgb' };
   try {
-    probe.capture(renderer, new THREE.Scene(), room);
+    probe.capture(renderer, scene, room);
     const half = CORE_MIRROR_HALF * 2.5;
     expect(room.uniforms.uMirrorProbe.value.toArray()).toEqual([0.4, -0.2, 0.1]);
     expect(room.uniforms.uMirrorBoxMax.value.x).toBeCloseTo(0.4 + half);
     expect(room.uniforms.uMirrorBoxMin.value.y).toBeCloseTo(-0.2 - half);
     expect(room.uniforms.uMirrorLive.value).toBe(1);
-    for (let i = 0; i < 4; i++) probe.capture(renderer, new THREE.Scene(), room);
+    for (let i = 0; i < 4; i++) probe.capture(renderer, scene, room);
     // Alternate targets: the mirrors never sample the one being drawn into, and
     // always show the capture that just finished.
     expect(draws).toHaveLength(5 * 6);
@@ -78,6 +80,7 @@ it('box-projects reflections onto the room as it is placed and scaled in the wor
 it('bounds captures by elapsed time, including high-refresh screens, and publishes complete cubes', () => {
   const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
   const scene = new THREE.Scene();
+  scene.add(room.group);
   let draws = 0;
   const renderer = { coordinateSystem: THREE.WebGLCoordinateSystem, xr: { enabled: false },
     getRenderTarget: () => null, setRenderTarget() {}, getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
@@ -92,33 +95,39 @@ it('bounds captures by elapsed time, including high-refresh screens, and publish
   } finally { room.dispose(); probe.dispose(); }
 });
 
-it('updates one scene pose for six views and restores pending main-view shadows and render state on errors', () => {
+it('leaves the main scene alone and restores pending shadows and render state on capture errors', () => {
   const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
   const scene = new THREE.Scene();
-  let updates = 0, draws = 0, target = null, face = 0, mip = 0;
+  scene.add(room.group);
+  const previous = new THREE.WebGLCubeRenderTarget(16);
+  let updates = 0, draws = 0, target = previous, face = 4, mip = 2;
   const update = scene.updateMatrixWorld.bind(scene);
   scene.updateMatrixWorld = (...args) => { updates++; update(...args); };
   const shadows = { autoUpdate: true, needsUpdate: true };
   const renderer = { coordinateSystem: THREE.WebGLCoordinateSystem, xr: { enabled: true }, shadowMap: shadows,
     getRenderTarget: () => target, getActiveCubeFace: () => face, getActiveMipmapLevel: () => mip,
     setRenderTarget(t, f, m) { target = t; face = f; mip = m; },
-    render() {
+    render(reflected) {
       draws++;
-      expect(scene.matrixWorldAutoUpdate).toBe(false);
+      expect(reflected).not.toBe(scene);
+      expect(reflected.matrixWorldAutoUpdate).toBe(false);
+      expect(scene.matrixWorldAutoUpdate).toBe(true);
       expect(shadows).toEqual({ autoUpdate: false, needsUpdate: false });
       if (draws === 8) throw Error('capture interrupted');
     } };
   try {
     probe.capture(renderer, scene, room);
-    expect(updates).toBe(1); expect(draws).toBe(6);
+    expect(updates).toBe(0); expect(draws).toBe(6);
     const texture = room.uniforms.uMirrorEnv.value;
     expect(() => probe.capture(renderer, scene, room)).toThrow('capture interrupted');
     expect(room.uniforms.uMirrorEnv.value).toBe(texture); // no partial cube is published
     expect(scene.matrixWorldAutoUpdate).toBe(true);
     expect(shadows).toEqual({ autoUpdate: true, needsUpdate: true });
     expect(renderer.xr.enabled).toBe(true);
-    expect([target, face, mip]).toEqual([null, 0, 0]);
-  } finally { room.dispose(); probe.dispose(); }
+    expect([target, face, mip]).toEqual([previous, 4, 2]);
+    expect(room.group.parent).toBe(scene);
+    expect(scene.children).toEqual([room.group]);
+  } finally { room.dispose(); probe.dispose(); previous.dispose(); }
 });
 
 it('reflects only the mirror layer: the mirrors, the registered worm and band, and every light', () => {
@@ -156,6 +165,7 @@ it('reflects only the mirror layer: the mirrors, the registered worm and band, a
 it('spreads a capture over frames and publishes the cube once all six views are drawn', () => {
   const room = createCoreMirrorRoom(3, makeCorePassage().uniforms), probe = createCoreMirrorProbe(16);
   const scene = new THREE.Scene(), faces = [];
+  scene.add(room.group);
   let bound = null, face = 0;
   const renderer = { coordinateSystem: THREE.WebGLCoordinateSystem, xr: { enabled: false },
     getRenderTarget: () => null, setRenderTarget(target, f) { bound = target; face = f; },
