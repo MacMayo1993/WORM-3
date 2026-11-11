@@ -1,0 +1,28 @@
+name: Focused mouth rendering verification
+on:
+  push:
+    branches: [diagnostic/seamless-wormhole-crossings]
+permissions:
+  contents: read
+jobs:
+  mouth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:install
+      - name: Verify desktop and phone mouths
+        run: |
+          printf "import config from './playwright.config.js';\nexport default { ...config, webServer: undefined };\n" > mouth.ci.config.mjs
+          npx playwright test -c mouth.ci.config.mjs e2e/wormholeMouth.e2e.js e2e/chargedMirrorRoom.e2e.js --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focused-mouth-results
+          path: test-results/
+          retention-days: 3
