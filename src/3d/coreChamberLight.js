@@ -109,9 +109,9 @@ vec3 chamberLight(vec3 p) {
   float dock = exp(-a * a * 2.8) * (1.0 - .65 * uChamberReveal)
     + exp(-b * b * 2.8) * (.35 + .65 * uChamberReveal);
   vec3 prism = .55 + .45 * cos(vec3(0.0, 2.1, 4.2) + dot(p, vec3(.9, 1.2, .7)) + progress * 1.8);
-  vec3 light = tint * (.035 + .28 * ribbon + .13 * caustic + .16 * dock)
-    + pearl * (.09 * glint + .13 * frame + .045 * echo) * (.8 + .2 * uChamberCrest)
-    + prism * caustic * .065;
+  vec3 light = tint * (.025 + .62 * ribbon + .24 * caustic + .24 * dock)
+    + pearl * (.15 * glint + .22 * frame + .07 * echo) * (.8 + .2 * uChamberCrest)
+    + prism * caustic * .10;
   // Recursive reflections receive a softer copy, avoiding white feedback.
   return light * uChamberLevel * mix(1.0, .28, uChamberCapture);
 }

@@ -83,11 +83,11 @@ void main() {
   // Silvered glass stained by the tile's colour: the reflection is filtered
   // through it, and the tint itself shows a little where the room is dark.
   vec3 stain = mix(vec3(0.86), vMirrorTint, 0.22);
-  vec3 color = reflection * stain * 0.88;
-  vec3 light = vMirrorTint * (uMirrorLive > 0.5 ? 0.045 : 0.18) + fresnel * 0.10;
+  vec3 color = reflection * stain * 0.68;
+  vec3 light = vMirrorTint * (uMirrorLive > 0.5 ? 0.018 : 0.12) + fresnel * 0.055;
   // A polished bevel round each mirror catches the light.
   float edge = min(min(vMirrorUv.x, 1.0 - vMirrorUv.x), min(vMirrorUv.y, 1.0 - vMirrorUv.y));
-  light += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.065;
+  light += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.035;
   light += chamberLight(vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
   // The LDR capture is fed back into the other mirrors. Unbounded addition
   // clips the bevel and ribbons to white before the next reflection can tint
@@ -118,7 +118,9 @@ export function createCoreMirrorRoom(size, uniforms) {
   const group = new THREE.Group();
   group.name = 'anticube-mirror-room';
   const pitch = CORE_MIRROR_HALF * 2 / size;
-  const geometry = createPlayStickerGeometry(.95);
+  // Fine joints and small corner radii let the room-scale ribbons read across
+  // the glass, while the exterior keeps the play cube's rounded stickers.
+  const geometry = createPlayStickerGeometry(.985, 0, { cornerRadius: .035 });
   const lighting = makeCoreChamberLight();
   const mirrorUniforms = {
     ...lighting.uniforms,
