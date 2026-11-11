@@ -73,12 +73,19 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
     update(.5); const direct = take();
     room.uniforms.uChargeLevel.value = 0; const uncharged = take(false);
     // The center subject should remain distinguishable, not a white flare.
-    let white = 0;
-    for (let i = 0; i < centre.length; i += 4) if (centre[i] > 245 && centre[i + 1] > 245 && centre[i + 2] > 245) white++;
-    update(.5); take();
+    const whiteFraction = pixels => {
+      let white = 0;
+      for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) white++;
+      return white / (width * height);
+    };
+    // Keep peak charge through repeated complete capture cycles too: a single
+    // frame can look restrained while additive infinity reflections wash out.
+    update(.5);
+    for (let i = 0; i < 8; i++) take();
+    const settled = take();
     return { entryToCentre: diff(entry, centre), centreToExit: diff(centre, exit),
       staticReducedMotion: diff(calm, calmLater), staticReducedFlashing: diff(flashCalm, flashCalmLater), staticPaused: diff(beforePause, paused),
-      visibleCharge: diff(direct, uncharged), whiteFraction: white / (width * height),
+      visibleCharge: diff(direct, uncharged), whiteFraction: whiteFraction(centre), settledWhiteFraction: whiteFraction(settled),
       error: renderer.getContext().getError(), programs: renderer.info.programs.length,
       meshes: room.group.children.length, rimPools: rims.group.children.length, rimCount: rims.layers[1].mesh.count };
   } finally {
@@ -96,6 +103,8 @@ async function verify(page, info, mobile) {
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   for (const size of [3, 15]) {
     const result = await page.evaluate(options => window.checkChargedMirrors(options), { mobile, size });
+    await info.attach('charged-mirrors-' + size + '.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
+    console.log('Mirror readability', JSON.stringify({ mobile, size, ...result }));
     expect(errors).toEqual([]);
     expect(result.error).toBe(0);
     expect(result.entryToCentre, JSON.stringify(result)).toBeGreaterThan(100);
@@ -105,6 +114,7 @@ async function verify(page, info, mobile) {
     expect(result.staticPaused).toBe(0);
     expect(result.staticReducedFlashing).toBe(0);
     expect(result.whiteFraction).toBeLessThan(.08);
+    expect(result.settledWhiteFraction).toBeLessThan(.08);
     expect(result.meshes).toBe(2);
     expect(result.rimPools).toBe(2);
     expect(result.rimCount).toBe(2);

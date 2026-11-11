@@ -4,8 +4,8 @@
 // beside them), and filling a face in raster order lines orbs up along one
 // edge. These two helpers replace both: `spreadCells` orders a face's cells so
 // each next one is as far as possible from those already taken, and
-// `pickSpread` keeps a random pick random while steering it away from what is
-// already on the board. Pure: every draw goes through the caller's `rand`.
+// `pickSpread` balances available faces before steering a random pick away
+// from what is already on the board. Pure: every draw uses the caller's `rand`.
 
 const FACE_NORMAL = { PX: [1, 0, 0], NX: [-1, 0, 0], PY: [0, 1, 0], NY: [0, -1, 0], PZ: [0, 0, 1], NZ: [0, 0, -1] };
 
@@ -57,10 +57,11 @@ const gapSq = (p, q) => {
 export const SPREAD_TRIES = 5;
 
 /**
- * A random tile from `tiles`, steered away from `others`: the best of a few
- * random draws by distance to the nearest of `others` (Mitchell's best
- * candidate). With nothing to avoid, or one tile to choose from, it is the
- * plain uniform pick.
+ * A random tile on a least-stocked available face, steered away from `others`:
+ * the best of a few random draws by distance to the nearest of `others`
+ * (Mitchell's best candidate). Only faces represented in `tiles` compete, so a
+ * blocked or full face cannot prevent placement. Single-face pools retain the
+ * distance selection; with nothing to avoid it is the plain uniform pick.
  *
  * @param {Array<{x:number,y:number,z:number,dirKey:string}>} tiles
  * @param {Array<{x:number,y:number,z:number,dirKey:string}>} others pickups already on the board
@@ -69,10 +70,23 @@ export const SPREAD_TRIES = 5;
  */
 export function pickSpread(tiles, others = [], rand = Math.random, tries = SPREAD_TRIES) {
   if (!tiles?.length) return null;
-  const draw = () => tiles[Math.min(tiles.length - 1, Math.floor(rand() * tiles.length))];
+  let pool = tiles;
+  const draw = () => pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))];
   if (tiles.length === 1 || !others.length) return draw();
+  // Best-of-five distances alone can repeatedly miss a face. Choosing among
+  // the least-stocked eligible faces first guarantees balanced initial supply,
+  // even when every random draw repeats, and replenishes depleted faces later.
+  const counts = new Map();
+  for (const tile of tiles) counts.set(tile.dirKey, 0);
+  if (counts.size > 1) {
+    for (const other of others) {
+      if (counts.has(other.dirKey)) counts.set(other.dirKey, counts.get(other.dirKey) + 1);
+    }
+    const least = Math.min(...counts.values());
+    pool = tiles.filter(tile => counts.get(tile.dirKey) === least);
+  }
   let best = null, bestGap = -1;
-  for (let i = 0; i < Math.min(tries, tiles.length); i++) {
+  for (let i = 0; i < Math.min(tries, pool.length); i++) {
     const tile = draw();
     let near = Infinity;
     for (const other of others) near = Math.min(near, gapSq(tile, other));

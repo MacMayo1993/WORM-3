@@ -152,6 +152,15 @@ describe('randomFreeTile lane bias', () => {
     expect(prefer(tile)).toBe(true);
   });
 
+  it('keeps safe-lane preference ahead of face balancing when spreading orbs', () => {
+    const orbs = getAllSurfaceTiles(3).filter(tile => tile.dirKey === 'PX').slice(0, 5);
+    const prefer = tile => tile.dirKey === 'PX';
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const tile = randomFreeTile(3, orbs, prefer, 1, orbs);
+    expect(prefer(tile)).toBe(true);
+    expect(orbs).not.toContainEqual(tile);
+  });
+
   it('falls back to the whole board when the bias roll fails', () => {
     const prefer = laneOf(3, { axis: 'col', sliceIndex: 0 });
     // A failed roll must sample the FULL free pool, not the lane — so it lands on

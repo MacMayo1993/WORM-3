@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { spreadCells, pickSpread } from '../worm/healerWorm/spawnSpread.js';
 import { stageStory, routeCell, storyOrbCap } from '../worm/story/runtime.js';
 import { storyElementTile } from '../worm/story/mastery.js';
@@ -6,6 +6,9 @@ import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
 import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
 import { STORY_ORB_ROUTES } from '../worm/story/worlds.js';
 import { makeCubies } from '../game/cubeState.js';
+import { makeRng } from '../levels/antipodalRandomizer.js';
+
+afterEach(() => vi.restoreAllMocks());
 
 // A face's cells in the tile's own two axes.
 const cellOf = tile => tile.dirKey.endsWith('X') ? [tile.y, tile.z] : tile.dirKey.endsWith('Y') ? [tile.x, tile.z] : [tile.x, tile.y];
@@ -40,17 +43,47 @@ describe('pickSpread', () => {
     let i = 0;
     expect(pickSpread(row, [row[0], row[1]], () => draws[i++ % draws.length])).toBe(row[7]);
   });
-  it('lays free-play orbs across all six faces of a big cube', () => {
+  it('chooses the least-stocked available face even when every draw repeats', () => {
+    const crowded = { x: 7, y: 7, z: 7, dirKey: 'PX' };
+    const sparse = row[0];
+    const others = [
+      { x: 7, y: 1, z: 7, dirKey: 'PX' },
+      { x: 7, y: 2, z: 7, dirKey: 'PX' },
+      row[1],
+    ];
+    // Four completely empty faces have no eligible tile and must be ignored.
+    expect(pickSpread([crowded, sparse], others, () => 0)).toBe(sparse);
+    // Once PZ is blocked, PX remains eligible despite its higher count.
+    expect(pickSpread([crowded, { ...crowded, y: 6 }], others, () => 0)).toBe(crowded);
+  });
+  it.each([0, 37, 123, 2026, 99])('lays free-play orbs across all six faces with seed %i', seed => {
+    // Seed 37 left NZ with only two orbs under unconstrained best-of-five draws.
+    vi.spyOn(Math, 'random').mockImplementation(makeRng(seed));
     const sim = makeWormSim(10);
     for (let run = 0; run < 5; run++) {
       resetWormSim(sim, 10, { orbCount: 40, wormholeInterval: 10 });
       const faces = {};
       for (const orb of sim.powerups) faces[orb.dirKey] = (faces[orb.dirKey] ?? 0) + 1;
       expect(Object.keys(faces)).toHaveLength(6);
-      // 40 orbs are about 7 a face: no face is left with a stray one or two.
-      expect(Math.min(...Object.values(faces))).toBeGreaterThanOrEqual(3);
+      // The supply is guaranteed: 40 orbs give every face six or seven.
+      expect(Math.min(...Object.values(faces))).toBe(6);
+      expect(Math.max(...Object.values(faces))).toBe(7);
       // And no two orbs share a tile.
       expect(new Set(sim.powerups.map(orb => `${orb.x},${orb.y},${orb.z},${orb.dirKey}`)).size).toBe(40);
+    }
+  });
+  it.each([0, 0.999999])('balances every supported size with a constant random draw of %s', draw => {
+    vi.spyOn(Math, 'random').mockReturnValue(draw);
+    for (const size of [2, 3, 4, 5, 6, 7, 8, 9, 10, 15]) {
+      const sim = makeWormSim(size), count = Math.min(40, 6 * size * size - 1);
+      resetWormSim(sim, size, { orbCount: 40, wormholeInterval: 10 });
+      const faces = Object.fromEntries(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'].map(face => [face, 0]));
+      const key = tile => `${tile.x},${tile.y},${tile.z},${tile.dirKey}`;
+      for (const orb of sim.powerups) faces[orb.dirKey]++;
+      expect(Math.min(...Object.values(faces)), `size ${size}`).toBe(Math.floor(count / 6));
+      expect(Math.max(...Object.values(faces)), `size ${size}`).toBe(Math.ceil(count / 6));
+      expect(new Set(sim.powerups.map(key)).size).toBe(count);
+      expect(sim.powerups.map(key)).not.toContain(key(sim.pos));
     }
   });
 });
