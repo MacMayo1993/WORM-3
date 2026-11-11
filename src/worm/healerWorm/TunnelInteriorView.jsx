@@ -57,7 +57,7 @@ export function TunnelInteriorView({ worm, size }) {
         tiles.dispose();
     }, [portals, tiles]);
     const clipBacking = useMemo(() => material => {
-        withPortalCutout(material, portals.uniforms, interiorPortalGLSL, 'interior');
+        withPortalCutout(material, portals.uniforms, interiorPortalGLSL, 'interior', 'pearl');
     }, [portals]);
 
     // Precompute every surface sticker's world position and rotation (size-dependent only).

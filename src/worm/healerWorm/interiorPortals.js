@@ -92,14 +92,14 @@ const mouthFragment = `
 uniform vec3 uColor;
 varying vec2 vUv;
 void main() {
-  // A recessed dark sleeve, narrow pearl lip and brushed outer bevel. No
+  // A luminous pearl sleeve, narrow white lip and brushed outer bevel. No
   // animated spiral competing with the worm or hiding the true circular edge.
   float lip = smoothstep(0.31, 0.40, vUv.y) * (1.0 - smoothstep(0.47, 0.57, vUv.y));
   float bevel = smoothstep(0.53, 0.65, vUv.y) * (1.0 - smoothstep(0.82, 1.0, vUv.y));
   float light = 0.65 + 0.35 * cos(vUv.x * 6.283185 - 1.2);
-  vec3 pearl = mix(vec3(0.5, 0.65, 0.72), uColor, 0.18);
-  vec3 color = vec3(0.025, 0.038, 0.05) + uColor * 0.035
-    + pearl * (lip * 0.9 + bevel * light * 0.45);
+  vec3 pearl = mix(vec3(0.72, 0.84, 0.92), uColor, 0.06);
+  vec3 color = pearl * (0.62 + bevel * light * 0.16);
+  color = mix(color, vec3(0.94, 0.98, 1.0), lip * 0.85);
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
 }`;

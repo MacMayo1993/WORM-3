@@ -58,7 +58,7 @@ it.each(['retry after death', 'restart while alive'])(
     worm.activeTunnel.current = passage;
     worm.tunnelPassages.current = [{ tunnel: passage }];
     Object.assign(tunnelState, { active: true, fallOpening: tile, portalTunnel: passage,
-      t: 0.5, rideHead: {}, lensT: 0.4, lensLift: 0.2, activeTunnelId: 'old', tunnel: passage,
+      t: 0.5, rideHead: {}, lensT: 0.4, lensLift: 0.2, mouthGlow: 1, activeTunnelId: 'old', tunnel: passage,
       coreZoom: 3, coreZoomAnchor: {} });
     tunnelState.occupiedTunnelIds.add('old');
     rumbleLifts.set('old', 0.4);
@@ -84,7 +84,7 @@ it.each(['retry after death', 'restart while alive'])(
     expect(worm.activeTunnel.current).toBeNull();
     expect(worm.tunnelPassages.current).toEqual([]);
     expect(tunnelState).toEqual({ active: false, fallOpening: null, occupiedTunnelIds: new Set(),
-      portalTunnel: null, t: 0, rideHead: null, lensT: 0, lensLift: 0,
+      portalTunnel: null, t: 0, rideHead: null, lensT: 0, lensLift: 0, mouthGlow: 0,
       activeTunnelId: null, tunnel: null, coreZoom: 1, coreZoomAnchor: null });
     expect(rumbleLifts.size + healBurstMap.size + healParticleMap.size).toBe(0);
     // Paused frames cannot resurrect the old passage or commit its interrupted turn.

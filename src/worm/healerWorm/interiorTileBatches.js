@@ -16,7 +16,7 @@ function batchMaterial(source, portals) {
   const material = source.clone();
   material.uniforms = { ...source.uniforms };
   instanceTileStyleShaders(material, 'aTileIdentity', 'vInteriorIdentity');
-  return withPortalCutout(material, portals, interiorPortalGLSL, 'interior');
+  return withPortalCutout(material, portals, interiorPortalGLSL, 'interior', 'pearl');
 }
 
 export function makeInteriorTileBatches(portals) {

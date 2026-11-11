@@ -10,13 +10,14 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ wormHealerMode: true, wormPhase: 'tunnel', wormAlive: true, wormPaused: false,
+    settings: { ...useGameStore.getState().settings, reducedMotion: false, reduceFlashing: false },
     wormActiveTunnelColors: { entryColor: '#ff477e', exitColor: '#3edbff' } });
   // The lens at the centre: the crossing beats follow it, not the head.
-  tunnelState.t = 0.58; tunnelState.lensT = 0.5;
+  tunnelState.t = 0.58; tunnelState.lensT = 0.5; tunnelState.mouthGlow = 0;
 });
 afterEach(() => {
   act(() => root.unmount()); host.remove();
-  tunnelState.t = 0; tunnelState.lensT = 0;
+  tunnelState.t = 0; tunnelState.lensT = 0; tunnelState.mouthGlow = 0;
   vi.unstubAllGlobals(); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 const frame = ms => act(() => vi.advanceTimersByTime(ms));
@@ -41,10 +42,37 @@ it('keeps a continuous, unobstructed overlay across the exit handoff', () => {
   act(() => useGameStore.setState({ wormPhase: 'exiting' })); frame(100);
   const before = Number(host.children[0].style.opacity);
   act(() => useGameStore.setState({ wormPhase: 'windout' })); frame(32);
-  expect(host.children).toHaveLength(3);
+  expect(host.children).toHaveLength(4);
   expect(Math.abs(Number(host.children[0].style.opacity) - before)).toBeLessThan(.02);
   act(() => useGameStore.setState({ wormPhase: 'crawling' })); frame(2000);
   expect([...host.children].every(el => Number(el.style.opacity) === 0)).toBe(true);
+});
+
+it('holds white passage light through entry and exit, freezes on pause and releases after leaving', () => {
+  act(() => useGameStore.setState({ wormPhase: 'entering' }));
+  tunnelState.mouthGlow = 1;
+  act(() => root.render(<TunnelTransitOverlay />)); frame(1000);
+  const mouth = host.querySelector('[data-testid="tunnel-mouth-glow"]');
+  const entry = Number(mouth.style.opacity);
+  expect(entry).toBeGreaterThan(.8);
+  act(() => useGameStore.setState({ wormPhase: 'exiting' })); frame(100);
+  expect(Math.abs(Number(mouth.style.opacity) - entry)).toBeLessThan(.01);
+  act(() => useGameStore.setState({ wormPaused: true }));
+  const paused = mouth.style.opacity;
+  tunnelState.mouthGlow = .2; frame(200);
+  expect(mouth.style.opacity).toBe(paused);
+  act(() => useGameStore.setState({ wormPaused: false })); frame(32);
+  expect(Number(mouth.style.opacity)).toBeCloseTo(.17, 2);
+  tunnelState.mouthGlow = 0; frame(32);
+  expect(Number(mouth.style.opacity)).toBe(0);
+});
+
+it.each(['reducedMotion', 'reduceFlashing'])('suppresses white crossing light with %s enabled', setting => {
+  tunnelState.mouthGlow = 1;
+  act(() => useGameStore.setState({ settings: { ...useGameStore.getState().settings, [setting]: true } }));
+  act(() => root.render(<TunnelTransitOverlay />)); frame(1000);
+  expect(host.querySelector('[data-testid="tunnel-mouth-glow"]').style.opacity).toBe('0');
+  expect(host.children[2].style.opacity).toBe('0');
 });
 
 it('blooms the identification beat when the lens reaches the centre, not when the head does', () => {

@@ -24,14 +24,19 @@ void main() {
   float portalGap = portalDistance(vPortalPosition);
   if (portalGap < 0.0) discard;
   portalSurfaceMain();
-  ${rim ? 'gl_FragColor.rgb += vec3(0.28, 0.55, 0.65) * (1.0 - smoothstep(0.0, 0.012, portalGap));' : ''}
+  ${rim === 'pearl' ? `
+  // Light the exposed tile/plastic edge itself. The bore still discards
+  // above, so there is no opaque white disc to fly through.
+  float pearl = 1.0 - smoothstep(0.0, 0.14, portalGap);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.93, 0.97, 1.0), pearl * 0.96);
+  ` : rim ? 'gl_FragColor.rgb += vec3(0.28, 0.55, 0.65) * (1.0 - smoothstep(0.0, 0.012, portalGap));' : ''}
 }`;
   };
   if (material.isShaderMaterial) patch(material);
   else {
     const original = material.onBeforeCompile, cacheKey = material.customProgramCacheKey();
     material.onBeforeCompile = (shader, renderer) => { original.call(material, shader, renderer); patch(shader); };
-    material.customProgramCacheKey = () => `${cacheKey}-portal-${key}`;
+    material.customProgramCacheKey = () => `${cacheKey}-portal-${key}-${rim}`;
   }
   material.userData.portalCutout = uniforms;
   return material;

@@ -53,7 +53,7 @@ const warmupUniforms = { uExteriorOpen: { value: 0 }, uExteriorRadius: { value: 
 export function exteriorPortalWarmupMaterial(source) {
   const material = source.clone();
   if (source.isShaderMaterial) material.uniforms = { ...source.uniforms };
-  return withPortalCutout(material, warmupUniforms, exteriorPortalGLSL, 'outer-mouth');
+  return withPortalCutout(material, warmupUniforms, exteriorPortalGLSL, 'outer-mouth', 'pearl');
 }
 
 export function createExteriorPortals() {
@@ -88,7 +88,7 @@ export function createExteriorPortals() {
       }
       else originals.set(source, { onBeforeCompile: source.onBeforeCompile,
         customProgramCacheKey: source.customProgramCacheKey, portalCutout: source.userData.portalCutout });
-      withPortalCutout(material, uniforms, exteriorPortalGLSL, 'outer-mouth');
+      withPortalCutout(material, uniforms, exteriorPortalGLSL, 'outer-mouth', 'pearl');
       material.needsUpdate = true;
       materials.set(source, material); owned.add(material);
       // Random view changes dispose private glass/body materials; cache
