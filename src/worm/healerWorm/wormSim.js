@@ -426,7 +426,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     const startPos = INITIAL_POS(size);
     const initial = [];
     for (let i = 0; i < Math.min(orbCount, 6 * size * size - 1); i++) {
-        initial.push(makeGrowthOrb(randomFreeTile(size, [...initial, startPos])));
+        // Away from the orbs already down: a uniform pick left bare faces beside clumps.
+        initial.push(makeGrowthOrb(randomFreeTile(size, [...initial, startPos], null, 0, initial)));
     }
 
     sim.pos = startPos;
@@ -1224,17 +1225,17 @@ function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey, reachOverride = 0) 
  * sim already uses for liveRotation. With nothing armed, or on a board big enough
  * not to need the help, this is the plain uniform pick it always was.
  */
-function respawnTile(size, exclude) {
+function respawnTile(size, exclude, orbs = null) {
     if (size > SAFE_LANE_MAX_SIZE || !rotationClock.armed || !rotationClock.axis) {
-        return randomFreeTile(size, exclude);
+        return randomFreeTile(size, exclude, null, 0, orbs);
     }
     const lane = chooseSafeLane(size, {
         axis: rotationClock.axis,
         sliceIndex: rotationClock.sliceIndex,
         sliceIndices: rotationClock.sliceIndices,
     });
-    if (!lane) return randomFreeTile(size, exclude);
-    return randomFreeTile(size, exclude, (t) => isTileOnLane(lane, t.x, t.y, t.z), SAFE_LANE_ORB_BIAS);
+    if (!lane) return randomFreeTile(size, exclude, null, 0, orbs);
+    return randomFreeTile(size, exclude, (t) => isTileOnLane(lane, t.x, t.y, t.z), SAFE_LANE_ORB_BIAS, orbs);
 }
 
 // Reusable scratch for the magnet's manifold reach — rebuilt in place per check.
@@ -1349,7 +1350,8 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // Fixed-budget practice orbs must not respawn onto the scripted route.
         // Other demo food keeps replenishing for continued free practice.
         if (pickedUp.respawn === false || ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade || pickedUp.garden) sim.powerups.splice(puIdx--, 1);
-        else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
+        else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos],
+            sim.powerups.filter((_, index) => index !== puIdx)));
         collectedAny = true;
     }
 

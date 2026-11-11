@@ -1,3 +1,5 @@
+import { pickSpread } from './spawnSpread.js';
+
 // Module-level cache: playable cube sizes are 2–10 and 15, so this has at most 10 entries.
 // Both callers (randomFreeTile, randomUnflippedTile) immediately call .filter() on
 // the result, which creates a new array — the cached reference is never mutated.
@@ -53,7 +55,7 @@ export function isSurfaceTilePos(p, size) {
  * the board barren, and it degrades to the old uniform pick whenever the preferred
  * subset is empty (no lane armed, or the lane is already full of orbs).
  */
-export function randomFreeTile(size, exclude, prefer = null, bias = 0) {
+export function randomFreeTile(size, exclude, prefer = null, bias = 0, spread = null) {
     const all = getAllSurfaceTiles(size);
     const excludeKeys = new Set(exclude.map((e) => `${e.x},${e.y},${e.z},${e.dirKey}`));
     const free = all.filter((t) => !excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`));
@@ -62,6 +64,9 @@ export function randomFreeTile(size, exclude, prefer = null, bias = 0) {
         const preferred = pool.filter(prefer);
         if (preferred.length > 0) return preferred[Math.floor(Math.random() * preferred.length)];
     }
+    // `spread` (the pickups already down) steers the pick away from them, so a
+    // board fills evenly instead of clumping by chance (spawnSpread.js).
+    if (spread?.length) return pickSpread(pool, spread);
     return pool[Math.floor(Math.random() * pool.length)];
 }
 

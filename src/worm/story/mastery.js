@@ -126,29 +126,45 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set(), reacha
   const axes = dirKey.endsWith('X') ? ['y', 'z'] : dirKey.endsWith('Y') ? ['x', 'z'] : ['x', 'y'];
   const u = sim.pos[axes[0]], v = sim.pos[axes[1]];
   const minDistanceSq = size >= 4 ? 4 : 1;
-  // Only the local radius-three patch can qualify. Preserve surface-cache order
-  // so spawn positions stay identical, without scanning all 6*size² stickers.
-  for (let a = Math.max(0, u - 3); a <= Math.min(size - 1, u + 3); a++) {
-    for (let b = Math.max(0, v - 3); b <= Math.min(size - 1, v + 3); b++) {
+  // Only the local patch can qualify (three tiles round the head, four on the
+  // big boards), so this never scans all 6*size² stickers. Any tile in it may be
+  // chosen: taking the first one in scan order put every item on the same side
+  // of the worm, level after level.
+  const reach = size >= 8 ? 4 : 3;
+  const tiles = [];
+  for (let a = Math.max(0, u - reach); a <= Math.min(size - 1, u + reach); a++) {
+    for (let b = Math.max(0, v - reach); b <= Math.min(size - 1, v + reach); b++) {
       const distanceSq = (a - u) ** 2 + (b - v) ** 2;
-      if (distanceSq < minDistanceSq || distanceSq > 9) continue;
+      if (distanceSq < minDistanceSq || distanceSq > reach * reach) continue;
       const tile = { x, y, z, dirKey, [axes[0]]: a, [axes[1]]: b };
       const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[dirKey];
-      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile)) && (!reachable || reachable.has(tileKey(tile)))) return tile;
+      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile)) && (!reachable || reachable.has(tileKey(tile)))) tiles.push(tile);
     }
   }
+  if (tiles.length) return tiles[Math.min(tiles.length - 1, Math.floor((sim.rand ?? Math.random)() * tiles.length))];
 }
+// How many cells in from its face's rim a tile sits.
+const faceInset = (tile, size) => {
+  const axes = tile.dirKey.endsWith('X') ? ['y', 'z'] : tile.dirKey.endsWith('Y') ? ['x', 'z'] : ['x', 'y'];
+  return Math.min(tile[axes[0]], size - 1 - tile[axes[0]], tile[axes[1]], size - 1 - tile[axes[1]]);
+};
 // Search safe surface routes rather than choosing by cube-space distance. The
 // first element is on another face; timed catalysts may use a local safe fallback.
 export function storyElementTile(sim, size, cubies, occupied = new Set(), reachable = null) {
   const visited = new Set([tileKey(sim.pos)]), queue = [{ tile: sim.pos, depth: 0 }];
   const maxSteps = reachable ? 6 : Math.max(6, size * 2);
-  let fallback = null;
+  const inset = size >= 8 ? 2 : size >= 5 ? 1 : 0;
+  let fallback = null, rim = null;
   for (let i = 0; i < queue.length; i++) {
     const { tile, depth } = queue[i], key = tileKey(tile);
     if (depth >= 2 && !occupied.has(key) && (!reachable || reachable.has(key))) {
-      if (tile.dirKey !== sim.pos.dirKey) return tile;
-      fallback ??= tile;
+      // The nearest tile on another face is always on that face's rim, hard
+      // against the edge the worm came over. Take the nearest one that stands in
+      // from the rim instead, and keep the rim tile in case there is none.
+      if (tile.dirKey !== sim.pos.dirKey) {
+        if (faceInset(tile, size) >= inset) return tile;
+        rim ??= tile;
+      } else fallback ??= tile;
     }
     if (depth >= maxSteps) continue;
     for (const direction of ['up', 'right', 'down', 'left']) {
@@ -159,7 +175,7 @@ export function storyElementTile(sim, size, cubies, occupied = new Set(), reacha
       visited.add(nextKey); queue.push({ tile: next, depth: depth + 1 });
     }
   }
-  return reachable ? fallback : null;
+  return rim ?? (reachable ? fallback : null);
 }
 
 // A separate, bounded bonus lane keeps optional powers available even while
