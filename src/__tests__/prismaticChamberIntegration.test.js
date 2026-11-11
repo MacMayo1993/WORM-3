@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { CORE_MIRROR_HALF, coreOpeningRadius, makeCorePassage, updateCorePassage } from '../3d/corePassage.js';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from '../3d/coreMirrorRoom.js';
 import { createCorePortalRims } from '../3d/corePortalRims.js';
-import { updateCoreMirrorCharge } from '../3d/coreMirrorCharge.js';
+import { updateCoreChamberLight } from '../3d/coreChamberLight.js';
 import { addMirrorSubject, mirrorSubjects } from '../3d/mirrorSubjects.js';
 
 const palette = { 1: '#2abaff', 2: '#ff7a45' };
@@ -20,7 +20,7 @@ const pose = (passage, room, rims, route, size, zoom) => {
 
 it('corrects stretched bevel normals so adaptive panels retain the proper reflection direction', () => {
   const passage = makeCorePassage(), room = createCoreMirrorRoom(3, passage.uniforms);
-  const rims = createCorePortalRims(passage.uniforms);
+  const rims = createCorePortalRims(passage.uniforms, room.lighting);
   const matrix = new THREE.Matrix4(), world = new THREE.Matrix4(), expectedMatrix = new THREE.Matrix3();
   const basis = new THREE.Matrix3(), scale = new THREE.Vector3(), normal = new THREE.Vector3();
   try {
@@ -46,24 +46,26 @@ it('corrects stretched bevel normals so adaptive panels retain the proper reflec
   } finally { room.dispose(); rims.dispose(); }
 });
 
-it('anchors charge to the adaptive openings across zoom, route reversal and board sizes', () => {
+it('anchors light to the adaptive openings across zoom, route reversal and board sizes', () => {
   for (const size of [2, 3, 5, 15]) {
     const passage = makeCorePassage(), room = createCoreMirrorRoom(size, passage.uniforms);
-    const rims = createCorePortalRims(passage.uniforms), route = routeFor(size);
-    const buffer = room.tiles.instanceMatrix, uniforms = Object.values(room.charge.uniforms);
+    const rims = createCorePortalRims(passage.uniforms, room.lighting), route = routeFor(size);
+    const buffer = room.tiles.instanceMatrix, uniforms = Object.values(room.lighting.uniforms);
     try {
       for (const tunnel of [route, { ...route, entry: route.exit, exit: route.entry, entryColor: 2, exitColor: 1 }]) {
         for (const zoom of [1, 1.5, 2, 4, 6]) {
           pose(passage, room, rims, tunnel, size, zoom);
-          updateCoreMirrorCharge(room.charge, tunnel, size, palette, .5, { passageEnds: room.passageEnds });
-          expect(Object.values(room.charge.uniforms)).toEqual(uniforms);
+          updateCoreChamberLight(room.lighting, tunnel, size, palette, .5, { passageEnds: room.passageEnds });
+          expect(Object.values(room.lighting.uniforms)).toEqual(uniforms);
           expect(room.tiles.instanceMatrix).toBe(buffer);
-          expect(room.material.uniforms.uChargeEntry).toBe(room.charge.uniforms.uChargeEntry);
+          for (const { mesh } of rims.layers) for (const key of Object.keys(room.lighting.uniforms))
+            expect(mesh.material.uniforms[key]).toBe(room.lighting.uniforms[key]);
+          expect(room.material.uniforms.uChamberEntry).toBe(room.lighting.uniforms.uChamberEntry);
           expect(room.material.uniforms.uCoreRoomCenter).toBe(passage.uniforms.uCoreRoomCenter);
           if (!room.passageEnds.active) continue; // A very large room can enclose a complete shoulder.
-          for (const [uniform, endpoint] of [['uChargeEntry', 'entry'], ['uChargeExit', 'exit']]) {
-            const world = room.charge.uniforms[uniform].value.clone().multiplyScalar(CORE_MIRROR_HALF * zoom).add(room.group.position);
-            expect(room.charge.uniforms[uniform].value.distanceTo(room.passageEnds[endpoint].clone().divideScalar(CORE_MIRROR_HALF))).toBeLessThan(1e-10);
+          for (const [uniform, endpoint] of [['uChamberEntry', 'entry'], ['uChamberExit', 'exit']]) {
+            const world = room.lighting.uniforms[uniform].value.clone().multiplyScalar(CORE_MIRROR_HALF * zoom).add(room.group.position);
+            expect(room.lighting.uniforms[uniform].value.distanceTo(room.passageEnds[endpoint].clone().divideScalar(CORE_MIRROR_HALF))).toBeLessThan(1e-10);
             const { mesh, crossings } = rims.layers[1];
             expect(Math.min(...crossings.slice(0, mesh.count).map(crossing => world.distanceTo(crossing.center)))).toBeLessThan(1e-10);
           }
@@ -75,29 +77,29 @@ it('anchors charge to the adaptive openings across zoom, route reversal and boar
 
 it.each(['paused', 'reducedMotion', 'reduceFlashing'])('keeps the %s event steady while its aperture follows the zoom', setting => {
   const size = 3, passage = makeCorePassage(), room = createCoreMirrorRoom(size, passage.uniforms);
-  const rims = createCorePortalRims(passage.uniforms), route = routeFor(size);
+  const rims = createCorePortalRims(passage.uniforms, room.lighting), route = routeFor(size);
   const options = { [setting]: true, passageEnds: room.passageEnds };
   try {
     pose(passage, room, rims, route, size, 1);
-    updateCoreMirrorCharge(room.charge, route, size, palette, .47, options);
-    const event = ['uChargeLevel', 'uChargeProgress', 'uChargeExchange', 'uChargeDischarge'].map(key => room.uniforms[key].value);
-    const firstEnd = room.uniforms.uChargeExit.value.clone();
+    updateCoreChamberLight(room.lighting, route, size, palette, .47, options);
+    const event = ['uChamberLevel', 'uChamberProgress', 'uChamberReveal', 'uChamberCrest'].map(key => room.uniforms[key].value);
+    const firstEnd = room.uniforms.uChamberExit.value.clone();
     pose(passage, room, rims, route, size, 1.5);
-    updateCoreMirrorCharge(room.charge, route, size, palette, .56, options);
-    expect(['uChargeLevel', 'uChargeProgress', 'uChargeExchange', 'uChargeDischarge'].map(key => room.uniforms[key].value)).toEqual(event);
-    expect(room.uniforms.uChargeExit.value.distanceTo(firstEnd)).toBeGreaterThan(.1);
-    expect(room.uniforms.uChargeExit.value.distanceTo(room.passageEnds.exit.clone().divideScalar(CORE_MIRROR_HALF))).toBeLessThan(1e-10);
+    updateCoreChamberLight(room.lighting, route, size, palette, .56, options);
+    expect(['uChamberLevel', 'uChamberProgress', 'uChamberReveal', 'uChamberCrest'].map(key => room.uniforms[key].value)).toEqual(event);
+    expect(room.uniforms.uChamberExit.value.distanceTo(firstEnd)).toBeGreaterThan(.1);
+    expect(room.uniforms.uChamberExit.value.distanceTo(room.passageEnds.exit.clone().divideScalar(CORE_MIRROR_HALF))).toBeLessThan(1e-10);
     updateCorePassage(passage, null, size, 0); rims.update(passage, size, 1); room.updateLayout(passage, 1);
-    updateCoreMirrorCharge(room.charge, null, size, palette, .5, options);
+    updateCoreChamberLight(room.lighting, null, size, palette, .5, options);
     expect(rims.group.visible).toBe(false); expect(room.passageEnds.active).toBe(false);
-    expect(room.uniforms.uChargeLevel.value).toBe(0);
+    expect(room.uniforms.uChamberLevel.value).toBe(0);
     expect(room.tiles.count).toBe(6 * size * size);
   } finally { room.dispose(); rims.dispose(); }
 });
 
 it('captures only the inner rim with the existing face budget and releases every instance pool', () => {
   const passage = makeCorePassage(), room = createCoreMirrorRoom(3, passage.uniforms);
-  const rims = createCorePortalRims(passage.uniforms), probe = createCoreMirrorProbe(16);
+  const rims = createCorePortalRims(passage.uniforms, room.lighting), probe = createCoreMirrorProbe(16);
   const scene = new THREE.Scene(); scene.add(room.group, rims.group);
   pose(passage, room, rims, routeFor(3), 3, 1.5);
   const remove = addMirrorSubject(rims.layers[1].mesh);
@@ -109,11 +111,12 @@ it('captures only the inner rim with the existing face budget and releases every
       expect(capture.children).toContain(room.group);
       expect(capture.children).toContain(rims.layers[1].mesh);
       expect(capture.children).not.toContain(rims.layers[0].mesh);
-      expect(room.uniforms.uChargeCapture.value).toBe(1);
+      expect(room.uniforms.uChamberCapture.value).toBe(1);
+      expect(rims.layers[1].mesh.material.uniforms.uChamberCapture.value).toBe(1);
     } };
   try {
     probe.capture(renderer, scene, room, { faces: 2 });
-    expect(draws).toBe(2); expect(room.uniforms.uChargeCapture.value).toBe(0);
+    expect(draws).toBe(2); expect(room.uniforms.uChamberCapture.value).toBe(0);
     expect(rims.group.children).toHaveLength(2); expect(room.group.children).toHaveLength(2);
     remove(); expect(mirrorSubjects().has(rims.layers[1].mesh)).toBe(false);
   } finally { remove(); room.dispose(); rims.dispose(); probe.dispose(); }

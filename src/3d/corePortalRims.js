@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CORE_PASSAGE_POINTS, CORE_MIRROR_HALF } from './corePassage.js';
+import { makeCoreChamberLight } from './coreChamberLight.js';
 import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_STICKER_OFFSET, tunnelCoreScale } from '../utils/tunnelPath.js';
 
 // A real, continuous rim makes a port read as one circular opening even when
@@ -44,33 +45,48 @@ export function coreWallCrossingsInto(out, points, center, half) {
 const vertexShader = `
 varying vec3 vRimWorld, vRimNormal;
 varying vec2 vRimPoint;
+varying float vRimRoute;
+uniform vec3 uCenter, uChamberEntry, uChamberExit;
+uniform float uHalf;
 void main() {
   vRimPoint = position.xy;
   vec4 local = instanceMatrix * vec4(position, 1.0);
   vRimWorld = (modelMatrix * local).xyz;
+  vec3 center = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vec3 p = (center - uCenter) / max(uHalf, .001);
+  float a = length(p - uChamberEntry), b = length(p - uChamberExit);
+  vRimRoute = a / max(a + b, .001);
   vRimNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
   gl_Position = projectionMatrix * viewMatrix * vec4(vRimWorld, 1.0);
 }`;
 const fragmentShader = `
-uniform vec3 uCenter;
-uniform float uHalf;
+uniform vec3 uCenter, uChamberColorA, uChamberColorB;
+uniform float uHalf, uChamberReveal, uChamberLevel, uChamberCapture;
 varying vec3 vRimWorld, vRimNormal;
 varying vec2 vRimPoint;
+varying float vRimRoute;
 void main() {
   // Never wrap a corner or paint over the perpendicular neighboring face.
   vec3 side = abs(vRimWorld - uCenter) * (vec3(1.0) - abs(vRimNormal));
   if (max(side.x, max(side.y, side.z)) > uHalf) discard;
   float band = (length(vRimPoint) - 1.0) / ${CORE_PORTAL_RIM_OUTER - 1};
-  float inner = 1.0 - smoothstep(0.0, 0.20, band);
-  float bevel = smoothstep(0.20, 0.34, band) * (1.0 - smoothstep(0.58, 0.94, band));
-  float light = 0.55 + 0.45 * dot(normalize(vRimPoint), normalize(vec2(-0.6, 0.8)));
-  vec3 color = vec3(0.025, 0.040, 0.052) + vec3(0.35, 0.56, 0.64) * inner
-    + vec3(0.25, 0.32, 0.36) * bevel * light;
+  float lip = 1.0 - smoothstep(.04, .25, band);
+  float inset = smoothstep(.28, .40, band) * (1.0 - smoothstep(.58, .76, band));
+  float outer = smoothstep(.82, .91, band) * (1.0 - smoothstep(.96, 1.0, band));
+  float sheen = .55 + .45 * dot(normalize(vRimPoint), normalize(vec2(-.6, .8)));
+  vec3 tint = mix(uChamberColorA, uChamberColorB, smoothstep(.20, .80, vRimRoute));
+  vec3 pearl = mix(tint, vec3(.87, .95, 1.0), .80);
+  // Entry gently yields to exit. A stable pearl lip remains even in calm modes.
+  float reveal = mix(1.0 - .4 * uChamberReveal, .6 + .4 * uChamberReveal, vRimRoute);
+  vec3 light = pearl * lip * .65 + tint * inset * (.20 + .25 * sheen)
+    + pearl * outer * .22;
+  light *= (.65 + .35 * uChamberLevel) * reveal * mix(1.0, .35, uChamberCapture);
+  vec3 color = vec3(.025, .032, .044) + (vec3(1.0) - exp(-light));
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
 }`;
 
-export function createCorePortalRims(uniforms) {
+export function createCorePortalRims(uniforms, lighting = makeCoreChamberLight()) {
   const geometry = new THREE.RingGeometry(1, CORE_PORTAL_RIM_OUTER, 96, 4);
   const group = new THREE.Group();
   group.name = 'anticube-portal-rims';
@@ -78,7 +94,7 @@ export function createCorePortalRims(uniforms) {
   // no per-opening draw calls, and only inner rims join existing mirror capture.
   const layers = [false, true].map(inner => {
     const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, side: THREE.DoubleSide, toneMapped: false,
-      uniforms: { uCenter: uniforms.uCoreRoomCenter, uHalf: { value: 0 } } });
+      uniforms: { ...lighting.uniforms, uCenter: uniforms.uCoreRoomCenter, uHalf: { value: 0 } } });
     const mesh = new THREE.InstancedMesh(geometry, material, (CORE_PASSAGE_POINTS - 1) * 6);
     mesh.name = inner ? 'anticube-inner-rims' : 'anticube-outer-rims';
     mesh.count = 0; mesh.frustumCulled = false;

@@ -34,10 +34,9 @@ import { createPlayStickerGeometry } from './rubiksPiece.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
-import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
 import { makeCorePassage, updateCorePassage, updateCoreSightline, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
 import { mirrorSubjects, warmMirrorPrograms, addMirrorSubject } from './mirrorSubjects.js';
-import { updateCoreMirrorCharge } from './coreMirrorCharge.js';
+import { updateCoreChamberLight } from './coreChamberLight.js';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from './coreMirrorRoom.js';
 import { createCorePortalRims } from './corePortalRims.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
@@ -55,7 +54,6 @@ import {
 } from './antipodalCore.js';
 
 const LIGHT_BASE = new THREE.Color('#9aacc8');
-const BOLT_BASE = new THREE.Color(0.36, 0.42, 1.0);
 const WHITE = new THREE.Color(1, 1, 1);
 const _tint = new THREE.Color();
 const _color = new THREE.Color();
@@ -103,41 +101,37 @@ function VoidCore({ cubieRefs = null }) {
 
   const glow = useMemo(() => ({ value: 0.08 }), []);
   const passage = useMemo(() => makeCorePassage(), []);
-  const portalRims = useMemo(() => createCorePortalRims(passage.uniforms), [passage]);
+  const mirrors = useMemo(() => createCoreMirrorRoom(size, passage.uniforms), [size, passage]);
+  useEffect(() => () => mirrors.dispose(), [mirrors]);
+  const portalRims = useMemo(() => createCorePortalRims(passage.uniforms, mirrors.lighting), [passage, mirrors]);
   useEffect(() => () => portalRims.dispose(), [portalRims]);
   useEffect(() => addMirrorSubject(portalRims.layers[1].mesh), [portalRims]);
-  // The seams between the core's pieces are live lightning (coreLightning.js).
-  const lightning = useMemo(() => makeCoreLightningUniforms(), []);
-  useLayoutEffect(() => setCoreLightningSize(lightning, size, tunnelCoreScale(size)), [lightning, size]);
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    chromeMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile, true), lightning, { haloOnly: true }),
+    chromeMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile, true),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room'),
-    stickerMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile), lightning, { haloOnly: true }),
+    stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room')
-  }), [glow, passage, lightning]);
+  }), [glow, passage]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   // Every look's materials are kept for the core's life. A view power swaps the
   // cube's look and back within seconds, and a disposed material releases its
   // program: every swap, and every restore, relinked the core's programs mid-run.
   // Built for one board size and one set of core uniforms; a new one starts over.
-  const looks = useMemo(() => ({ size, passage, lightning, bodies: new Map(), styles: new Map() }), [size, passage, lightning]);
+  const looks = useMemo(() => ({ size, passage, bodies: new Map(), styles: new Map() }), [size, passage]);
   useEffect(() => () => {
     looks.bodies.forEach(material => material.dispose());
     looks.styles.forEach(look => { look.geometry.dispose(); look.material.dispose(); });
   }, [looks]);
   let bodyMaterial = looks.bodies.get(mode);
   if (!bodyMaterial) {
-    bodyMaterial = withPortalCutout(withCoreLightning(createCoreBodyMaterial(isMobile, mode), lightning),
+    bodyMaterial = withPortalCutout(createCoreBodyMaterial(isMobile, mode),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room');
     looks.bodies.set(mode, bodyMaterial);
   }
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
-  // The mirror room inside the core reflects the room itself, live (coreMirrorRoom.js).
-  const mirrors = useMemo(() => createCoreMirrorRoom(size, passage.uniforms), [size, passage]);
-  useEffect(() => () => mirrors.dispose(), [mirrors]);
   const gl = useThree(s => s.gl);
   const probe = useMemo(() => {
     if (!wormMode) return null;
@@ -309,20 +303,7 @@ function VoidCore({ cubieRefs = null }) {
     }
     f.tintMix *= Math.exp(-dt * 1.2);
     glow.value = (wormMode ? 0.12 : 0.08) + f.flash * 0.25;
-    // The seams' lightning runs on the game clock and surges with each flip in that
-    // flip's colour. While held, nothing about it moves: a paused or dead worm keeps
-    // the arcs exactly as they were, and reduced motion shows them steady at the
-    // network's charge, with no surge or tint fading in and out.
     const flashCalm = !!state.settings?.reduceFlashing;
-    const held = still || flashCalm || (wormMode && (state.wormPaused || !state.wormAlive));
-    if (!held) {
-      lightning.uCoreBoltTime.value += dt;
-      lightning.uCoreBoltGain.value = (0.55 + 0.45 * charge) * (1 + f.flash * 0.8);
-      lightning.uCoreBoltColor.value.copy(BOLT_BASE).lerp(f.tint, 0.6 * f.tintMix);
-    } else if (still || flashCalm) {
-      lightning.uCoreBoltGain.value = 0.55 + 0.45 * charge;
-      lightning.uCoreBoltColor.value.copy(BOLT_BASE);
-    }
 
     // The approach zoom: while a WORM ride closes on the core, grow it about the
     // tile the worm is diving into, then let it go once the rider is through.
@@ -373,8 +354,9 @@ function VoidCore({ cubieRefs = null }) {
     tunnelCoreClipUniforms.uTunnelCoreCenter.value.copy(passage.uniforms.uCoreRoomCenter.value);
     portalRims.update(passage, size, f.zoom);
     mirrors.updateLayout(passage, f.zoom);
-    updateCoreMirrorCharge(mirrors.charge, wormMode ? ride ?? tunnelState.portalTunnel : null,
-      size, faceColors, tunnelState.t, {
+    // The reveal follows the lens, which reaches the chamber after the worm head.
+    updateCoreChamberLight(mirrors.lighting, wormMode ? ride ?? tunnelState.portalTunnel : null,
+      size, faceColors, tunnelState.lensT, {
         active: wormMode && tunnelState.active,
         paused: wormMode && (state.wormPaused || !state.wormAlive),
         reducedMotion: still, reduceFlashing: flashCalm, passageEnds: mirrors.passageEnds

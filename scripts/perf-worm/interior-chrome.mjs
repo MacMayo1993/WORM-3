@@ -15,7 +15,6 @@ import { getStickerWorldPos } from './src/game/coordinates.js';
 import { coreLayout, CORE_STICKER, CORE_STICKER_LOCAL, coreCubieMatrixInto, createCoreStickerMaterial } from './src/3d/antipodalCore.js';
 import { createPlayStickerGeometry } from './src/3d/rubiksPiece.js';
 import { makeCorePassage, coreRoomCutoutGLSL } from './src/3d/corePassage.js';
-import { makeCoreLightningUniforms, withCoreLightning } from './src/3d/coreLightning.js';
 import { withPortalCutout } from './src/3d/portalCutout.js';
 import { FACE_COLORS, ANTIPODAL_COLOR } from './src/utils/constants.js';
 window.renderInterior = () => {
@@ -51,8 +50,8 @@ window.renderInterior = () => {
   const opened=pixel();
   if(opened!==background || closed===background)throw Error('Outer wall portal did not open: '+JSON.stringify({background,closed,opened}));
   syncInteriorPortals(portals,null,3,0); camera.position.copy(pose); camera.quaternion.copy(rotation); renderer.render(scene,camera);
-  const core = coreLayout(3), passage = makeCorePassage(), lightning = makeCoreLightningUniforms();
-  const material = withPortalCutout(withCoreLightning(createCoreStickerMaterial({value: .08}, true, true), lightning, {haloOnly: true}), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true);
+  const core = coreLayout(3), passage = makeCorePassage();
+  const material = withPortalCutout(createCoreStickerMaterial({value: .08}, true, true), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true);
   const mesh = new THREE.InstancedMesh(createPlayStickerGeometry(CORE_STICKER), material, core.stickers.length);
   const matrix = new THREE.Matrix4(), cellMatrix = new THREE.Matrix4();
   core.stickers.forEach((cell,i) => {

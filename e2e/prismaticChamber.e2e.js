@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
+import { writeFile } from 'node:fs/promises';
 
 // Actual production shaders in WebGL, with bounded reflection captures. This is
 // a rendering regression, not a hardware/mobile frame-rate claim.
@@ -11,17 +12,17 @@ import * as THREE from 'three';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from './src/3d/coreMirrorRoom.js';
 import { makeCorePassage, updateCorePassage } from './src/3d/corePassage.js';
 import { createCorePortalRims } from './src/3d/corePortalRims.js';
-import { updateCoreMirrorCharge } from './src/3d/coreMirrorCharge.js';
+import { updateCoreChamberLight } from './src/3d/coreChamberLight.js';
 import { addMirrorSubject } from './src/3d/mirrorSubjects.js';
-window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
-  const width = mobile ? 240 : 360, height = mobile ? 320 : 240;
+window.checkPrismaticChamber = ({ mobile = false, size = 3 } = {}) => {
+  const width = mobile ? 300 : 480, height = mobile ? 400 : 320;
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(width, height); renderer.setPixelRatio(1);
   document.body.replaceChildren(renderer.domElement);
   const scene = new THREE.Scene(), passage = makeCorePassage();
   const room = createCoreMirrorRoom(size, passage.uniforms);
-  const probe = createCoreMirrorProbe(mobile ? 32 : 64);
-  const rims = createCorePortalRims(passage.uniforms);
+  const probe = createCoreMirrorProbe(mobile ? 64 : 128);
+  const rims = createCorePortalRims(passage.uniforms, room.lighting);
   scene.add(room.group, rims.group);
   const unregisterRims = addMirrorSubject(rims.layers[1].mesh);
   const worm = new THREE.Group(); scene.add(worm);
@@ -48,7 +49,7 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
   updateCorePassage(passage, tunnel, size, 0);
   rims.update(passage, size, 1); room.updateLayout(passage, 1);
   const faces = mobile ? 2 : 3;
-  const update = (t, options) => updateCoreMirrorCharge(room.charge, tunnel, size, palette, t, { ...options, passageEnds: room.passageEnds });
+  const update = (t, options) => updateCoreChamberLight(room.lighting, tunnel, size, palette, t, { ...options, passageEnds: room.passageEnds });
   const take = (refresh = true) => {
     scene.updateMatrixWorld(true);
     if (refresh) for (let i = 0; i < 18 / faces; i++) probe.capture(renderer, scene, room, { faces });
@@ -59,9 +60,11 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
   };
   const diff = (a, b) => a.reduce((total, v, i) => total + (i % 4 !== 3 && Math.abs(v - b[i]) > 2 ? 1 : 0), 0);
   try {
-    update(.42); const entry = take();
-    update(.5); const centre = take();
-    update(.58); const exit = take();
+    const images = {};
+    const save = name => { images[name] = renderer.domElement.toDataURL('image/png').split(',')[1]; };
+    update(.42); const entry = take(); save('entry');
+    update(.5); const centre = take(); save('centre');
+    update(.58); const exit = take(); save('exit');
     // Hold the reflection snapshot to isolate direct shader motion. Existing
     // infinity reflections can still settle on subsequent production captures.
     update(.5, { reducedMotion: true }); const calm = take();
@@ -71,21 +74,21 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
     update(.48); const beforePause = take();
     update(.57, { paused: true }); const paused = take(false);
     update(.5); const direct = take();
-    room.uniforms.uChargeLevel.value = 0; const uncharged = take(false);
+    room.uniforms.uChamberLevel.value = 0; const unlit = take(false);
     // The center subject should remain distinguishable, not a white flare.
     const whiteFraction = pixels => {
       let white = 0;
       for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) white++;
       return white / (width * height);
     };
-    // Keep peak charge through repeated complete capture cycles too: a single
+    // Keep peak light through repeated complete capture cycles too: a single
     // frame can look restrained while additive infinity reflections wash out.
     update(.5);
     for (let i = 0; i < 8; i++) take();
-    const settled = take();
-    return { entryToCentre: diff(entry, centre), centreToExit: diff(centre, exit),
+    const settled = take(); save('settled');
+    return { images, entryToCentre: diff(entry, centre), centreToExit: diff(centre, exit),
       staticReducedMotion: diff(calm, calmLater), staticReducedFlashing: diff(flashCalm, flashCalmLater), staticPaused: diff(beforePause, paused),
-      visibleCharge: diff(direct, uncharged), whiteFraction: whiteFraction(centre), settledWhiteFraction: whiteFraction(settled),
+      visibleLight: diff(direct, unlit), whiteFraction: whiteFraction(centre), settledWhiteFraction: whiteFraction(settled),
       error: renderer.getContext().getError(), programs: renderer.info.programs.length,
       meshes: room.group.children.length, rimPools: rims.group.children.length, rimCount: rims.layers[1].mesh.count };
   } finally {
@@ -99,17 +102,24 @@ async function verify(page, info, mobile) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.setContent('<title>Charged mirror room</title><style>body { margin: 0; background: #05080e; } canvas { width: 100vw !important; height: 100vh !important; object-fit: contain; }</style>');
+  await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><title>Prismatic mirror chamber</title><style>body { margin: 0; background: #05080e; } canvas { width: 100vw !important; height: 100vh !important; object-fit: contain; }</style>');
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   for (const size of [3, 15]) {
-    const result = await page.evaluate(options => window.checkChargedMirrors(options), { mobile, size });
-    await info.attach('charged-mirrors-' + size + '.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
+    const result = await page.evaluate(options => window.checkPrismaticChamber(options), { mobile, size });
+    const { images } = result; delete result.images;
+    for (const [phase, png] of Object.entries(images)) {
+      const name = 'prismatic-chamber-' + size + '-' + phase + '.png';
+      const path = info.outputPath(name);
+      await writeFile(path, Buffer.from(png, 'base64'));
+      await info.attach(name, { path, contentType: 'image/png' });
+    }
+    await info.attach('prismatic-chamber-' + size + '.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
     console.log('Mirror readability', JSON.stringify({ mobile, size, ...result }));
     expect(errors).toEqual([]);
     expect(result.error).toBe(0);
     expect(result.entryToCentre, JSON.stringify(result)).toBeGreaterThan(100);
     expect(result.centreToExit).toBeGreaterThan(100);
-    expect(result.visibleCharge).toBeGreaterThan(100);
+    expect(result.visibleLight).toBeGreaterThan(100);
     expect(result.staticReducedMotion).toBe(0);
     expect(result.staticPaused).toBe(0);
     expect(result.staticReducedFlashing).toBe(0);
@@ -119,9 +129,9 @@ async function verify(page, info, mobile) {
     expect(result.rimPools).toBe(2);
     expect(result.rimCount).toBe(2);
     expect(result.programs).toBeLessThanOrEqual(7);
-    await page.screenshot({ path: info.outputPath('charged-mirrors-' + size + '.png') });
+    await page.screenshot({ path: info.outputPath('prismatic-chamber-' + size + '.png') });
   }
 }
 
-test('charged mirror sequence stays readable and direct seams freeze on pause', async ({ page }, info) => verify(page, info, false));
-test('charged mirror sequence stays readable and direct seams freeze on pause @phone', async ({ page }, info) => verify(page, info, true));
+test('prismatic chamber stays readable and light ribbons freeze on pause', async ({ page }, info) => verify(page, info, false));
+test('prismatic chamber stays readable and light ribbons freeze on pause @phone', async ({ page }, info) => verify(page, info, true));
