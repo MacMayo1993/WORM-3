@@ -94,10 +94,16 @@ describe('tile beacon', () => {
     const beacons = createOrbBeacons(4);
     const material = beacons.mesh.material;
     expect(material.customProgramCacheKey()).toBe('orb-beacon');
-    const shader = { vertexShader: '#include <begin_vertex>', fragmentShader: '#include <color_fragment>' };
+    const shader = { uniforms: {}, vertexShader: '#include <begin_vertex>', fragmentShader: '#include <color_fragment>' };
     material.onBeforeCompile(shader);
     expect(shader.vertexShader).toContain('vBeaconIntensity = aIntensity');
     expect(shader.fragmentShader).toContain('diffuseColor.a *= vBeaconIntensity');
+    // The gem's caustic pool rides the same program, after the ring's opacity so
+    // a far, dim ring still has its gem's light under it.
+    expect(shader.vertexShader).toContain('vBeaconCaustic = aCaustic');
+    expect(shader.fragmentShader.indexOf('orbCausticLines(bc')).toBeGreaterThan(shader.fragmentShader.indexOf('diffuseColor.a *= vBeaconIntensity'));
+    beacons.setTime(2.5);
+    expect(shader.uniforms.uBeaconTime.value).toBe(2.5);
     // One pass: a transparent double-sided material would otherwise draw twice a
     // frame and re-select its program each time.
     expect(material.forceSinglePass).toBe(true);
@@ -132,6 +138,21 @@ describe('tile beacon', () => {
     expect(new THREE.Vector3(0, 0, 1).applyQuaternion(q).x).toBeCloseTo(1);
     beacons.begin(); beacons.end();
     expect(beacons.mesh.visible).toBe(false);
+    beacons.dispose();
+  });
+
+  it('lays the caustic pool per instance, and keeps a pool whose ring is dark', () => {
+    const beacons = createOrbBeacons(4);
+    const up = new THREE.Vector3(0, 0, 1);
+    beacons.begin();
+    beacons.add(new THREE.Vector3(), up, 1, '#ff0000', 0.3, 0.9, 1.5);
+    beacons.add(new THREE.Vector3(), up, 1, '#ff0000', 0.5); // a ping: no pool
+    beacons.add(new THREE.Vector3(), up, 1, '#ff0000', 0, 0.6, 0); // ring faded, light still there
+    beacons.add(new THREE.Vector3(), up, 1, '#ff0000', 0, 0, 0); // nothing at all
+    beacons.end();
+    expect(beacons.count).toBe(3);
+    const pool = beacons.mesh.geometry.getAttribute('aCaustic').array;
+    expect(Array.from(pool.slice(0, 6))).toEqual([expect.closeTo(0.9), 1.5, 0, 0, expect.closeTo(0.6), 0]);
     beacons.dispose();
   });
 });

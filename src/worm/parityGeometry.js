@@ -60,6 +60,15 @@ export function createParityMobiusGeometry(R, w) {
   g.setAttribute('position', new THREE.Float32BufferAttribute([...pos, ...pos], 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute([...uvs, ...uvs], 2));
   g.setAttribute('normal', new THREE.Float32BufferAttribute([...normals, ...normals.map((n) => -n)], 3));
+  // Where each vertex lies along the band's ONE surface, 0 → 2: the near side
+  // runs 0 → 1 round the loop and arrives on the far side, which runs 1 → 2 back
+  // to the start (P(2π, v) = P(0, −v) with its normal reversed). The orb comet
+  // (orbComet.js) rides this, so it needs two laps to come home.
+  const loop = [];
+  for (let side = 0; side < 2; side++) {
+    for (let i = 0; i <= uS; i++) for (let j = 0; j <= vS; j++) loop.push(side + i / uS);
+  }
+  g.setAttribute('aLoop', new THREE.Float32BufferAttribute(loop, 1));
   g.setIndex([...idx, ...back]);
   return g;
 }

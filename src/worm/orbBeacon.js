@@ -110,15 +110,73 @@ const _z = new THREE.Vector3(0, 0, 1);
 const _c = new THREE.Color();
 
 /**
+ * The light a glass gem throws on its tile. Under every resting orb the beacon
+ * carries a pool: a soft shadow the gem casts, a bright spot where it focuses
+ * the light, and moving caustic filaments in the gem's colour. The shadow is what
+ * lets it read on white and yellow stickers, where coloured light alone vanished.
+ * It is drawn in the beacon's own program (per-instance `aCaustic`: strength and
+ * phase), so it adds no draw and no program, and it runs on `uBeaconTime`, which
+ * the orb loop holds still for reduced motion.
+ */
+export const CAUSTIC_POOL = 0.56; // radius of the pool, as a fraction of the beacon's half-size
+// Caustic filaments: the edges of a slowly drifting, gently warped Voronoi
+// network, the cell pattern light makes through a curved glass surface. Drawn a
+// pixel or so wide from screen derivatives, so they stay crisp at chip size.
+export const BEACON_CAUSTIC_GLSL = /* glsl */ `
+vec2 orbCausticHash(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+float orbCausticLines(vec2 q, float t) {
+  vec2 p = q * 8.0;
+  p += 0.3 * vec2(sin(p.y * 1.3 + t * 0.9), sin(p.x * 1.1 - t * 0.7));
+  vec2 cell = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = 0.5 + 0.4 * sin(t * 0.8 + 6.2831 * orbCausticHash(cell + g));
+      float d = length(g + o - f);
+      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+    }
+  }
+  float e = d2 - d1;
+  float l = 1.0 - smoothstep(0.0, 0.16 + fwidth(e) * 1.5, e);
+  return l * l;
+}`;
+export const BEACON_CAUSTIC_FRAGMENT = /* glsl */ `
+  {
+    vec2 bc = vMapUv - 0.5;
+    float bcR = length(bc) * 2.0;
+    float bcPool = (1.0 - smoothstep(0.16, ${CAUSTIC_POOL.toFixed(2)}, bcR)) * vBeaconCaustic.x;
+    float bcLines = orbCausticLines(bc, uBeaconTime + vBeaconCaustic.y);
+    float bcFocus = exp(-bcR * bcR / 0.012);
+    float shadeA = bcPool * 0.42 * (1.0 - bcFocus);
+    float lightA = clamp((bcLines * 0.8 + bcFocus) * bcPool, 0.0, 1.0);
+    // The gem's shadow over the ring, then its light over both (non-premultiplied "over").
+    float a1 = shadeA + diffuseColor.a * (1.0 - shadeA);
+    vec3 c1 = diffuseColor.rgb * diffuseColor.a * (1.0 - shadeA) / max(a1, 1e-4);
+    vec3 lightC = mix(vColor, vec3(1.0), 0.25 + 0.55 * bcFocus);
+    float a2 = lightA + a1 * (1.0 - lightA);
+    diffuseColor.rgb = (lightC * lightA + c1 * a1 * (1.0 - lightA)) / max(a2, 1e-4);
+    diffuseColor.a = a2;
+  }`;
+
+/**
  * One InstancedMesh for every beacon (ring and ping) on the board. Each instance
- * carries the orb's colour and an opacity (`aIntensity`), patched into the one
- * shared material, so a fading ping never darkens into a shadow ring.
+ * carries the orb's colour, an opacity (`aIntensity`) and its caustic pool
+ * (`aCaustic`), patched into the one shared material, so a fading ping never
+ * darkens into a shadow ring.
  */
 export function createOrbBeacons(capacity = 512) {
   const geometry = new THREE.PlaneGeometry(1, 1);
   const opacity = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
   opacity.setUsage(THREE.DynamicDrawUsage);
   geometry.setAttribute('aIntensity', opacity);
+  const caustic = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2);
+  caustic.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('aCaustic', caustic);
+  const time = { value: 0 };
   const material = new THREE.MeshBasicMaterial({
     map: beaconTexture(), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide,
     // Transparent + DoubleSide would otherwise draw in two passes, flipping `side`
@@ -126,10 +184,11 @@ export function createOrbBeacons(capacity = 512) {
     forceSinglePass: true
   });
   material.onBeforeCompile = shader => {
-    shader.vertexShader = 'attribute float aIntensity;\nvarying float vBeaconIntensity;\n' +
-      shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBeaconIntensity = aIntensity;');
-    shader.fragmentShader = 'varying float vBeaconIntensity;\n' +
-      shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.a *= vBeaconIntensity;');
+    shader.uniforms.uBeaconTime = time;
+    shader.vertexShader = 'attribute float aIntensity;\nattribute vec2 aCaustic;\nvarying float vBeaconIntensity;\nvarying vec2 vBeaconCaustic;\n' +
+      shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBeaconIntensity = aIntensity;\n  vBeaconCaustic = aCaustic;');
+    shader.fragmentShader = 'varying float vBeaconIntensity;\nvarying vec2 vBeaconCaustic;\nuniform float uBeaconTime;\n' + BEACON_CAUSTIC_GLSL + '\n' +
+      shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.a *= vBeaconIntensity;' + BEACON_CAUSTIC_FRAGMENT);
   };
   material.customProgramCacheKey = () => 'orb-beacon';
   const mesh = new THREE.InstancedMesh(geometry, material, capacity);
@@ -144,14 +203,22 @@ export function createOrbBeacons(capacity = 512) {
   return {
     mesh,
     begin() { count = 0; },
-    /** Lay a ring of world `diameter` flat on a tile with outward `normal`. `color` is a THREE.Color or CSS string. */
-    add(position, normal, diameter, color, intensity) {
-      if (count >= capacity || intensity <= 0.002) return;
+    /** The caustics' clock (seconds); hold it still for reduced motion. */
+    setTime(seconds) { time.value = seconds; },
+    /**
+     * Lay a ring of world `diameter` flat on a tile with outward `normal`. `color`
+     * is a THREE.Color or CSS string. `pool` (0 → 1) adds the gem's caustic pool
+     * under it, at caustic clock offset `phase`; pings pass none.
+     */
+    add(position, normal, diameter, color, intensity, pool = 0, phase = 0) {
+      if (count >= capacity || (intensity <= 0.002 && pool <= 0.002)) return;
       _q.setFromUnitVectors(_z, normal);
       _m.compose(position, _q, _s.setScalar(diameter));
       mesh.setMatrixAt(count, _m);
       mesh.setColorAt(count, color.isColor ? color : _c.set(color));
-      opacity.array[count] = Math.min(1, intensity);
+      opacity.array[count] = Math.min(1, Math.max(0, intensity));
+      caustic.array[count * 2] = Math.min(1, Math.max(0, pool));
+      caustic.array[count * 2 + 1] = phase;
       count++;
     },
     end() {
@@ -159,6 +226,7 @@ export function createOrbBeacons(capacity = 512) {
       uploadInstancePrefix(mesh.instanceMatrix, count);
       if (mesh.instanceColor) uploadInstancePrefix(mesh.instanceColor, count);
       uploadInstancePrefix(opacity, count);
+      uploadInstancePrefix(caustic, count);
     },
     get count() { return count; },
     dispose() { geometry.dispose(); material.dispose(); mesh.dispose(); }
