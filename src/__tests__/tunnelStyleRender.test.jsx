@@ -116,6 +116,13 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const held = sharedTime.value;
     await act(async () => useGameStore.setState({ wormPaused: true })); frame();
     expect(sharedTime.value).toBe(held);
+    await act(async () => useGameStore.setState({ wormPaused: false, settings: {
+      ...useGameStore.getState().settings, reduceFlashing: true
+    } })); frame(); frame();
+    expect(sharedTime.value).toBe(held);
+    await act(async () => useGameStore.setState({ wormPaused: true, settings: {
+      ...useGameStore.getState().settings, reduceFlashing: false
+    } }));
     const version = halves[0].geometry.attributes.position.version;
     const disposed = vi.spyOn(halves[0].material, 'dispose');
     await act(async () => {

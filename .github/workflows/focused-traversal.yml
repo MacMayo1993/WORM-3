@@ -19,7 +19,7 @@ jobs:
       - name: Render production traversal components
         run: |
           printf "import config from './playwright.config.js';\nexport default { ...config, webServer: undefined, timeout: 360000, retries: 0 };\n" > traversal.ci.config.mjs
-          npx playwright test -c traversal.ci.config.mjs e2e/anticubeTraversal.e2e.js --reporter=list
+          npx playwright test -c traversal.ci.config.mjs e2e/anticubeTraversal.e2e.js e2e/prismaticChamber.e2e.js e2e/wormholeMouth.e2e.js --reporter=list
       - uses: actions/upload-artifact@v4
         if: always()
         with:

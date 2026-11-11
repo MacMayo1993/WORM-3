@@ -93,6 +93,12 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
   const marker=new THREE.Mesh(new THREE.SphereGeometry(.07,16,12),new THREE.MeshBasicMaterial({color:'#50ff70'})); scene.add(marker);
   const pose=makeTunnelCamPose(), head=new THREE.Vector3(); let time=0;
   const band=scene.getObjectByName('ridden-band');
+  // Complete the two-second platform entrance before inspecting a live ride.
+  // Otherwise a newly mounted band's grow mask hides the very obstruction
+  // this fixture is meant to catch.
+  useGameStore.setState({settings:{...useGameStore.getState().settings,reducedMotion:true}});
+  store.getState().advance(time+=1/30);
+  useGameStore.setState({settings:{...useGameStore.getState().settings,reducedMotion:false}});
   const take = () => { renderer.setRenderTarget(null); renderer.render(scene,camera); return canvas.toDataURL('image/png').split(',')[1]; };
   window.traversalFrame = (t, label) => {
     getTunnelWorldPosSmoothInto(head,tunnel,t,size); marker.position.copy(head);
@@ -105,10 +111,17 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
     }
     const pixels=new Uint8Array(width*height*4), gl=renderer.getContext();
     const image=take();
+    const visibleBand=band.getObjectByName('tunnel-styled-half-0');
+    const grown=visibleBand.material.uniforms.uGrowT.value;
     gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
     let white=0; for(let i=0;i<pixels.length;i+=4) if(pixels[i]>245&&pixels[i+1]>245&&pixels[i+2]>245)white++;
     // Separate the occupied band's geometry from the chrome/mirror shell.
     band.visible=false; const withoutBand=take(); band.visible=true;
+    // Counterfactual: render this same frame with only the old short lens
+    // capsule, so the screenshot records the previously occluding strip.
+    tunnelCameraUniforms.uTunnelSightEnd.value.copy(camera.position);
+    const oldClearance=take();
+    tunnelCameraUniforms.uTunnelSightEnd.value.copy(head);
     const path=buildTunnelPathForTunnel(makeTunnelPath(),tunnel,size);
     const shell=tunnelCoreClipUniforms;
     const meshes=[]; band.traverse(o=>{if(o.isMesh&&o.visible&&o.name.startsWith('tunnel-styled'))meshes.push(o);});
@@ -124,7 +137,7 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
           if(Math.max(...point.toArray().map(Math.abs))>shell.uTunnelCoreHalf.value)exposedCrossing++;}
       }
     }
-    return {label,image,withoutBand,t,lensT:pose.lensT,zoom:tunnelState.coreZoom,exposedCrossing,
+    return {label,image,withoutBand,oldClearance,grown,t,lensT:pose.lensT,zoom:tunnelState.coreZoom,exposedCrossing,
       whiteFraction:white/(width*height),error:gl.getError()};
   };
   window.stopTraversal = async () => { root.unmount(); await new Promise(resolve=>setTimeout(resolve,20)); env.dispose();pmrem.dispose();environment.dispose();marker.geometry.dispose();marker.material.dispose();renderer.dispose(); };
@@ -148,11 +161,13 @@ async function verify(page, info, mobile) {
     expect(errors).toEqual([]);
     for(const t of (route === 'corner' ? [.39,.50,.72] : route === 'return' ? [.31,.50,.72] : [.39,.50,.72])) {
       const result=await page.evaluate(t=>window.traversalFrame(t),t);
-      const {image,withoutBand,...stats}=result;
+      const {image,withoutBand,oldClearance,...stats}=result;
       console.log('Traversal',JSON.stringify({mobile,route,...stats}));
-      const name=route+'-'+Math.round(t*100);
+      const name='traversal-'+route+'-'+Math.round(t*100);
       await writeFile(info.outputPath(name+'.png'),Buffer.from(image,'base64'));
       await writeFile(info.outputPath(name+'-no-band.png'),Buffer.from(withoutBand,'base64'));
+      await writeFile(info.outputPath(name+'-old-clearance.png'),Buffer.from(oldClearance,'base64'));
+      expect(result.grown).toBe(1);
       expect(result.error).toBe(0);
       expect(errors).toEqual([]);
     }

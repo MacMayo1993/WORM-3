@@ -90,6 +90,8 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     } })); frame();
     expect(scene.getObjectByName('antipodal-core-style-5-checkerboard')).toBeUndefined();
     expect(stickers.material).toMatchObject(CORE_CHROME_FINISH);
+    expect(bodies.material.roughness).toBeGreaterThanOrEqual(.8);
+    expect(bodies.material.clearcoat).toBe(0);
     expect(stickers.count).toBe(54);
     expect(colour(own).getHexString()).toBe('b24bde');
     expect(universe.uPalette.value[4].getHexString()).toBe('b24bde');
