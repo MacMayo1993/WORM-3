@@ -1,0 +1,28 @@
+name: Focused traversal scene verification
+on:
+  push:
+    branches: [diagnostic/anticube-traversal-artifacts]
+permissions:
+  contents: read
+jobs:
+  traversal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:install
+      - name: Render production traversal components
+        run: |
+          printf "import config from './playwright.config.js';\nexport default { ...config, webServer: undefined, timeout: 360000, retries: 0 };\n" > traversal.ci.config.mjs
+          npx playwright test -c traversal.ci.config.mjs e2e/anticubeTraversal.e2e.js --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traversal-scene-results
+          path: test-results/
+          retention-days: 3
