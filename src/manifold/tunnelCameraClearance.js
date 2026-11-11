@@ -12,9 +12,17 @@ export const TUNNEL_CAMERA_CLEAR_MIN = 0.16;
 export const tunnelCameraUniforms = {
   uCameraAhead: { value: new Vector3(0, 0, -1) },
   uTunnelCameraPosition: { value: new Vector3() },
+  uTunnelSightEnd: { value: new Vector3() },
   // Radius of the lens's clearance capsule (see tunnelCameraClearRadius).
   uCameraClearRadius: { value: TUNNEL_CAMERA_CLEAR_MAX },
 };
+
+export function syncTunnelCamera(camera, head, lift) {
+  camera.getWorldDirection(tunnelCameraUniforms.uCameraAhead.value);
+  camera.getWorldPosition(tunnelCameraUniforms.uTunnelCameraPosition.value);
+  tunnelCameraUniforms.uTunnelSightEnd.value.copy(head ?? tunnelCameraUniforms.uTunnelCameraPosition.value);
+  tunnelCameraUniforms.uCameraClearRadius.value = tunnelCameraClearRadius(lift);
+}
 
 /**
  * The capsule's radius for a lens `lift` off the ridden route. On the route (the
@@ -43,7 +51,7 @@ export const tunnelCameraClearanceGLSL = `
   ${tunnelCoreClipGLSL}
   ${cautionOpeningGLSL}
   uniform float uCameraClearance, uCameraClearRadius;
-  uniform vec3 uCameraAhead, uTunnelCameraPosition;
+  uniform vec3 uCameraAhead, uTunnelCameraPosition, uTunnelSightEnd;
   bool tunnelCoreHides(vec3 worldPoint) {
     return outsideTunnelCore(worldPoint) < 0.5;
   }
@@ -53,7 +61,22 @@ export const tunnelCameraClearanceGLSL = `
     vec3 toPoint = worldPoint - uTunnelCameraPosition;
     float along = clamp(dot(toPoint, uCameraAhead), 0.0, 0.35);
     float clearance = length(toPoint - uCameraAhead * along);
-    return smoothstep(uCameraClearRadius * 0.76, uCameraClearRadius, clearance);
+    float visibility = smoothstep(uCameraClearRadius * 0.76, uCameraClearRadius, clearance);
+    // On a return/corner route the band can turn across the view well beyond
+    // the lens capsule. Clear that obstruction up to the head, tapering to
+    // zero there so its supporting track and everything beyond it remain.
+    // Use the published rider frame, never a reflection probe's camera.
+    vec3 sight = uTunnelSightEnd - uTunnelCameraPosition;
+    float lengthSq = dot(sight, sight);
+    if (lengthSq > 0.0001) {
+      float t = dot(toPoint, sight) / lengthSq;
+      if (t > 0.0 && t < 1.0) {
+        float radius = 0.28 * sqrt(1.0 - t);
+        float distance = length(toPoint - sight * t);
+        visibility = min(visibility, smoothstep(radius * 0.76, radius, distance));
+      }
+    }
+    return visibility;
   }
   void clearTunnelCamera(vec3 worldPoint) {
     if (tunnelCoreHides(worldPoint) || insideCautionOpening(worldPoint)) discard;

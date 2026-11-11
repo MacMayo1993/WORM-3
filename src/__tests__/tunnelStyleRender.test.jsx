@@ -81,6 +81,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const camera = store.getState().camera;
     camera.position.set(1.2, -0.4, 0.7);
     camera.rotation.set(0.4, -0.8, 1.1);
+    tunnelState.rideHead = new THREE.Vector3(-.4, .3, -.2);
     frame();
     const lens = halves[0].material.uniforms.uTunnelCameraPosition;
     const ahead = halves[0].material.uniforms.uCameraAhead;
@@ -89,6 +90,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     for (const part of halves[0].parent.children) {
       expect(part.material.uniforms.uTunnelCameraPosition).toBe(lens);
       expect(part.material.uniforms.uCameraAhead).toBe(ahead);
+      expect(part.material.uniforms.uTunnelSightEnd.value).toEqual(tunnelState.rideHead);
     }
     const intact = halves[0].geometry.attributes.position.version;
     tunnelState.active = false; frame();
@@ -114,6 +116,14 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const held = sharedTime.value;
     await act(async () => useGameStore.setState({ wormPaused: true })); frame();
     expect(sharedTime.value).toBe(held);
+    await act(async () => useGameStore.setState({ wormPaused: false, settings: {
+      ...useGameStore.getState().settings, reduceFlashing: true
+    } })); frame(); frame();
+    expect(sharedTime.value).toBe(held);
+    expect(halves[0].material.uniforms.uGrowT.value).toBe(1);
+    await act(async () => useGameStore.setState({ wormPaused: true, settings: {
+      ...useGameStore.getState().settings, reduceFlashing: false
+    } }));
     const version = halves[0].geometry.attributes.position.version;
     const disposed = vi.spyOn(halves[0].material, 'dispose');
     await act(async () => {

@@ -8,7 +8,7 @@ import { TunnelTube } from '../worm/healerWorm/TunnelTube.jsx';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
-import { CHROME_TILE_FINISH } from '../3d/cubeViewStyles.js';
+import { CORE_CHROME_FINISH } from '../3d/antipodalCore.js';
 import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
 import { CORE_HALF } from '../3d/antipodalCore.js';
 import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
@@ -60,7 +60,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     const body = scene.getObjectByName('antipodal-core-body').material;
     const sticker = scene.getObjectByName('antipodal-core-stickers').material;
     expect(scene.getObjectByName('antipodal-core-style-5-checkerboard')).toBeUndefined();
-    expect(sticker).toMatchObject(CHROME_TILE_FINISH);
+    expect(sticker).toMatchObject(CORE_CHROME_FINISH);
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(1);
     expect(body.userData.portalCutout).toBe(sticker.userData.portalCutout);
     const room = scene.getObjectByName('anticube-mirror-room');
