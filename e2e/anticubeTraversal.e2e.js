@@ -6,7 +6,7 @@ import { writeFile } from 'node:fs/promises';
 // The approach was missing from the isolated mirror fixture: render the actual
 // chrome shell, patterned track, rails, curls and outer walls on the ride camera.
 const bundle = await build({ bundle: true, write: false, format: 'iife',
-  define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env.DEV': 'false' }, stdin: {
+  define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': JSON.stringify({DEV:false,PROD:true,BASE_URL:'/WORM-3/'}) }, stdin: {
     resolveDir: fileURLToPath(new URL('../', import.meta.url)), contents: `
 import React from 'react';
 import { createRoot, extend } from '@react-three/fiber';
@@ -106,8 +106,10 @@ async function verify(page, info, mobile) {
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-  await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;background:#05080e}canvas{display:block}</style>');
+  await page.route('http://127.0.0.1:4173/anticube-fixture', route => route.fulfill({contentType:'text/html',body:'<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;background:#05080e}canvas{display:block}</style>'}));
+  await page.goto('http://127.0.0.1:4173/anticube-fixture');
   await page.addScriptTag({content:bundle.outputFiles[0].text});
+  expect(errors).toEqual([]);
   for(const route of ['corner','return','straight']) {
     await page.evaluate(options=>window.startTraversal(options),{mobile,route,size:9});
     for(const t of [.30,.40,.50,.60,.70,.80,.90]) {
