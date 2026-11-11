@@ -11,8 +11,9 @@ import ModeDivePortal from './ModeDivePortal.jsx';
 import MenuLightSweep from './MenuLightSweep.jsx';
 import { DIVE_ZOOM_START, DIVE_ZOOM_TIME, DIVE_TOTAL, DIVE_REDUCED_TOTAL } from './menuDiveLeap.js';
 import { menuLeanInto, retainMenuPointer, wormTookTap } from './menuPointer.js';
+import { createMenuCubeSwipe } from './menuCubeSwipe.js';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { preloadFont } from 'troika-three-text';
 import * as THREE from 'three';
@@ -838,6 +839,7 @@ ModeFacePlates.displayName = 'ModeFacePlates';
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
 export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
+  const getThree = useThree(state => state.get);
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
@@ -851,6 +853,35 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   // instead of sampling an arbitrary point far along its animation path.
   const menuClockStart = useRef(null);
   const carouselWasActive = useRef(false);
+  const idleTime = useRef(0);
+  const wormOwnsPress = useRef(false);
+  const [swipe] = useState(() => createMenuCubeSwipe({
+    camera: () => getThree().camera,
+    span: () => Math.min(getThree().size.width, getThree().size.height),
+    canInteract: () => !isCarouselActive() && !shaking.current,
+    reducedMotion: () => prefersReducedMotion() || useGameStore.getState().settings?.reducedMotion,
+    onPress: () => {
+      wormOwnsPress.current = wormTookTap();
+      cubeTargetScale.current = MENU_PRESS_SCALE;
+    },
+    onRelease: () => { if (!shaking.current) cubeTargetScale.current = MENU_REST_SCALE; },
+    onTap: () => {
+      // A worm keeps its existing poke reaction instead of shaking the cube.
+      if (wormOwnsPress.current) return;
+      shaking.current = true;
+      shakeStart.current = Date.now();
+    },
+  }));
+  useEffect(() => {
+    const hidden = () => { if (document.hidden) swipe.cancel(); };
+    window.addEventListener('blur', swipe.cancel);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', swipe.cancel);
+      document.removeEventListener('visibilitychange', hidden);
+      swipe.cancel();
+    };
+  }, [swipe]);
 
   // ModeFacePlates is always mounted; this loop owns its visibility so the
   // plates and the cube's pose can never disagree.
@@ -877,6 +908,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     presentMenuCube(shufflingRef.current, platesRef.current, carouselActive);
 
     if (carouselActive) {
+      if (swipe.active) swipe.cancel();
       updateSharedTime(t);
       // Fit the physical cube to the transparent DOM stage, including scrolling
       // disclosures and landscape layouts. Both use the measured rectangle.
@@ -994,6 +1026,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     updateSharedTime(t);
 
     if (_externalShakeNeeded && !shaking.current) {
+      swipe.cancel();
       _externalShakeNeeded = false;
       shakeIsExternalRef.current = true;
       shaking.current = true;
@@ -1044,43 +1077,38 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // see the idle-spin constants. Replaces the old compound Euler wobble,
       // which tumbled the cube and never held a pose long enough for the lit
       // grid to read.
-      _spinQ.setFromAxisAngle(_DIAG_AXIS, t * DIAG_SPIN_RATE);
-      _driftEuler.set(Math.sin(t * DRIFT_NOD_RATE) * DRIFT_NOD_AMP, t * DRIFT_YAW_RATE, 0);
+      // Hold the automatic turn while the finger (or its short coast) owns
+      // the cube. Keep the accumulated orientation when idle motion resumes.
+      const held = swipe.active;
+      if (!held) idleTime.current += Math.min(delta, .05);
+      swipe.step(delta);
+      const poseT = idleTime.current;
+      _spinQ.setFromAxisAngle(_DIAG_AXIS, poseT * DIAG_SPIN_RATE);
+      _driftEuler.set(Math.sin(poseT * DRIFT_NOD_RATE) * DRIFT_NOD_AMP, poseT * DRIFT_YAW_RATE, 0);
       _driftQ.setFromEuler(_driftEuler);
       cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ).premultiply(_driftQ);
       // Lean toward the pointer (or the phone's tilt), as the carousel does.
       menuLeanInto(_leanTarget);
       const lean = 1 - Math.exp(-4 * delta);
-      _lean.x += (_leanTarget.x - _lean.x) * lean;
-      _lean.y += (_leanTarget.y - _lean.y) * lean;
+      if (!held) {
+        _lean.x += (_leanTarget.x - _lean.x) * lean;
+        _lean.y += (_leanTarget.y - _lean.y) * lean;
+      }
       if (!prefersReducedMotion()) {
         _driftEuler.set(-_lean.y * 0.16, _lean.x * 0.22, 0);
         cubeRef.current.quaternion.premultiply(_driftQ.setFromEuler(_driftEuler));
       }
+      cubeRef.current.quaternion.premultiply(swipe.offset);
       cubeRef.current.position.set(homeX, homeY, homeZ);
     }
   });
-
-  const handleCubeClick = (e) => {
-    e.stopPropagation();
-    // A tap on a worm pokes the worm; it doesn't shake the cube as well.
-    if (wormTookTap()) return;
-    if (shaking.current) return;
-    shaking.current = true;
-    shakeStart.current = Date.now();
-  };
-  const handleCubeDown = () => { cubeTargetScale.current = MENU_PRESS_SCALE; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = MENU_REST_SCALE; };
 
   return (
     <>
       <group
         ref={cubeRef}
         position={[0, 0.45, 0]}
-        onClick={handleCubeClick}
-        onPointerDown={handleCubeDown}
-        onPointerUp={handleCubeUp}
-        onPointerLeave={handleCubeUp}
+        {...swipe.handlers}
       >
         <group ref={shufflingRef}>
           <ShufflingCube onFlip={onFlip} />
