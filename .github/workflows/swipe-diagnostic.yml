@@ -1,0 +1,28 @@
+name: Focused mobile cube gesture verification
+on:
+  push:
+    branches: [diagnostic/mobile-cube-swipe]
+permissions:
+  contents: read
+jobs:
+  swipe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:install
+      - name: Verify native mobile swipes and taps
+        run: |
+          printf "import config from './playwright.config.js';\nexport default { ...config, webServer: undefined };\n" > swipe.ci.config.mjs
+          npx playwright test -c swipe.ci.config.mjs e2e/menuCubeSwipe.e2e.js --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focused-swipe-results
+          path: test-results/
+          retention-days: 3
