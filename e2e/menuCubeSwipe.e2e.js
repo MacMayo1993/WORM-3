@@ -40,7 +40,7 @@ test('mobile cube swipes follow all four directions and preserve taps @phone', a
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.setContent('<title>Mobile cube swipe</title><style>body{margin:0;background:#263c30}canvas{display:block;touch-action:none}</style>');
+  await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><title>Mobile cube swipe</title><style>body{margin:0;background:#263c30}canvas{display:block;touch-action:none}</style>');
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   await expect.poll(() => page.evaluate(() => window.swipeStats?.frames ?? 0)).toBeGreaterThan(2);
   const touch = await page.context().newCDPSession(page);
