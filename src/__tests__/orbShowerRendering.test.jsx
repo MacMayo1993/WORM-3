@@ -11,9 +11,17 @@ import { PROXIMITY_FAR } from '../worm/orbBeacon.js';
 
 extend(THREE);
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff'];
+// The band comets (orbComet.js) are one shared draw for the whole field,
+// counted on their own below.
+const isComet = o => o.name === 'ParityOrbComet';
 const visibleMeshes = scene => {
   const meshes = [];
-  scene.traverseVisible(o => { if (o.isMesh) meshes.push(o); });
+  scene.traverseVisible(o => { if (o.isMesh && !isComet(o)) meshes.push(o); });
+  return meshes;
+};
+const visibleComets = scene => {
+  const meshes = [];
+  scene.traverseVisible(o => { if (isComet(o)) meshes.push(o); });
   return meshes;
 };
 
@@ -78,6 +86,10 @@ it.each([6, 15])('batches a 144-pickup shower on a %s board while keeping its pa
     expect(food).toHaveLength(12);
     expect(food.every(o => o.isInstancedMesh && !o.material.transparent)).toBe(true);
     expect(food.reduce((n, o) => n + o.count, 0)).toBe(90 * 2);
+    // Every landed band carries its comet, all in one draw.
+    const comets = visibleComets(store.scene);
+    expect(comets).toHaveLength(1);
+    expect(comets[0].count).toBe(90);
     const rings = () => visibleMeshes(store.scene).filter(o => o.geometry === g.ringA || o.geometry === g.ringB)
       .reduce((n, o) => n + o.count, 0);
     expect(rings()).toBe(0);

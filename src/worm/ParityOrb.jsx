@@ -24,6 +24,7 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { PARITY_ORB_SCALE } from './healerWorm/constants.js';
 import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto, orbRingScale } from './orbBeacon.js';
+import { createOrbComets, stepCometHead, COMET_FADE_IN } from './orbComet.js';
 import { compileDistinct } from '../3d/compileDistinct.js';
 import { orbEntrance, orbEntranceT, orbWaveReach, orbWaveStart, orbRiseSeconds, orbRisePoseInto, orbRisePingInto } from './orbEntrance.js';
 
@@ -332,6 +333,9 @@ export default function ParityOrbs({
   // Every orb's tile beacon, in one additive draw (orbBeacon.js).
   const beacons = useMemo(() => createOrbBeacons(), []);
   useEffect(() => () => beacons.dispose(), [beacons]);
+  // The comet round every band (orbComet.js), one draw per band geometry.
+  const comets = useMemo(() => createOrbComets([_orbGeos.normal.core, _orbGeos.target.core]), []);
+  useEffect(() => () => comets.dispose(), [comets]);
   const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
   const unregisterAnim = useCallback((key) => { animMapRef.current.get(key)?.reveal?.dispose(); animMapRef.current.delete(key); }, []);
 
@@ -343,6 +347,9 @@ export default function ParityOrbs({
     if (cull) visibility.begin(state.camera, orbRootRef.current);
     batches.begin(orbRootRef.current);
     beacons.begin();
+    comets.begin(orbRootRef.current);
+    // The caustics under the gems hold still for reduced motion.
+    beacons.setTime(reducedMotion.current ? 0 : t);
     // The worm's head in the orbs' own frame, so each orb can perk up as it nears.
     const focus = focusRef?.current;
     if (focus && orbRootRef.current) {
@@ -471,16 +478,20 @@ export default function ParityOrbs({
       // falling, wear them whole.
       const rings = isTarget || (refs.shower && !refs.arrived) ? 1 : orbRingScale(refs.near, reducedMotion.current);
 
-      // ── Tile beacon: which tile collects this orb ──────────────────────────
+      // Parse the gem's colour once per change, not every frame.
+      if (refs.beaconHex !== refs.color) {
+        refs.beaconHex = refs.color;
+        (refs.beaconColor ??= new THREE.Color()).set(refs.color);
+      }
+      const color = refs.beaconColor;
+
+      // ── Tile beacon: which tile collects this orb, and the light its gem throws ──
       if (!refs.shower && !isTunnelMode) {
         beaconPoseInto(_beacon, time, refs.near, arrival, reducedMotion.current);
-        // Parse the orb's colour once per change, not every frame.
-        if (refs.beaconHex !== refs.color) {
-          refs.beaconHex = refs.color;
-          (refs.beaconColor ??= new THREE.Color()).set(refs.color);
-        }
-        const color = refs.beaconColor;
-        beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.ringScale, color, _beacon.ringIntensity);
+        // The caustic pool stands at full strength on every orb, far ones too:
+        // it is how a board of gems reads as glass, not how the worm's next one does.
+        beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.ringScale, color, _beacon.ringIntensity,
+          arrival * (0.8 + 0.2 * refs.near), timeOffset * 3);
         if (_beacon.pingVisible) beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.pingScale, color, _beacon.pingIntensity);
         // A rising orb sends one ring out across its tile as it clears it.
         if (refs.entering) {
@@ -639,6 +650,12 @@ export default function ParityOrbs({
       // Hidden proxy meshes retain the exact animated transforms. Shower orbs
       // batch their entire opaque silhouette; ordinary orbs batch core and poles.
       group.updateWorldMatrix(false, true);
+      // ── The comet round the band: the gem's colour, one side, two laps ─────
+      if (refs.arrived && !refs.reducedDetail) {
+        refs.cometIn = Math.min(1, (refs.cometIn ?? 0) + frameDelta / COMET_FADE_IN);
+        refs.cometHead = stepCometHead(refs.cometHead ?? timeOffset / Math.PI, frameDelta, refs.near, reducedMotion.current);
+        comets.add(core, color, refs.cometHead, refs.cometIn * (0.75 + 0.25 * refs.near));
+      }
       // Arriving parts dissolve in one common orb frame. Once formed, put the
       // opaque pieces back into their shared draw calls.
       if (refs.shower || refs.compact) {
@@ -666,6 +683,7 @@ export default function ParityOrbs({
     }
     batches.end();
     beacons.end();
+    comets.end();
     // Waiting orbs wear their reveal variants from their first frame, but hidden,
     // and the run's scene warm-up (WormEffectWarmup) can run before they mount:
     // the wave then linked them as it reached them, in the middle of the arrival.
@@ -734,6 +752,7 @@ export default function ParityOrbs({
     <group ref={orbRootRef}>
       <primitive object={batches.group} />
       <primitive object={beacons.mesh} />
+      <primitive object={comets.group} />
       {orbData.map((data) => (
         <SingleOrb
           key={data.key}
