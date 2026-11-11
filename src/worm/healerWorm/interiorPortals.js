@@ -14,6 +14,8 @@ export const INTERIOR_PORTAL_CAPACITY = 6 * INTERIOR_PORTAL_FACE_CAPACITY;
 const PORTAL_TEXTURE_HEIGHT = 2048;
 const INITIAL_MOUTHS = (MAX_ACTIVE_TUNNEL_PAIRS + 1) * 2;
 const Z = new THREE.Vector3(0, 0, 1);
+const inverseRotation = new THREE.Quaternion();
+export const INTERIOR_PORTAL_RIM_PLANE = -0.103;
 const sample = new THREE.Vector3();
 
 // The raised mouth and the unraised inner wall need not share a tile centre.
@@ -76,30 +78,43 @@ float portalDistance(vec3 point) {
 }`;
 
 const mouthVertex = `
+uniform vec2 uShear;
 varying vec2 vUv;
 void main() {
   vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  // Parallel circular sections match the cutout at every wall depth. Rotating
+  // a cone onto the tangent instead creates an ellipse and a mismatched lip.
+  vec3 p = position;
+  p.xy += uShear * p.z;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
 const mouthFragment = `
 uniform vec3 uColor;
-uniform float uTime;
 varying vec2 vUv;
 void main() {
-  float ribs = pow(0.5 + 0.5 * cos(vUv.y * 25.1327), 14.0);
-  float spiral = pow(0.5 + 0.5 * cos(vUv.x * 18.8496 - vUv.y * 7.0 + uTime * 1.5), 10.0);
-  float edge = 1.0 - smoothstep(0.0, 0.13, vUv.y);
-  vec3 pearl = mix(uColor, vec3(0.85, 0.97, 1.0), 0.45);
-  vec3 color = uColor * (0.10 + spiral * 0.34 + ribs * 0.22) + pearl * edge * 0.65;
+  // A recessed dark sleeve, narrow pearl lip and brushed outer bevel. No
+  // animated spiral competing with the worm or hiding the true circular edge.
+  float lip = smoothstep(0.31, 0.40, vUv.y) * (1.0 - smoothstep(0.47, 0.57, vUv.y));
+  float bevel = smoothstep(0.53, 0.65, vUv.y) * (1.0 - smoothstep(0.82, 1.0, vUv.y));
+  float light = 0.65 + 0.35 * cos(vUv.x * 6.283185 - 1.2);
+  vec3 pearl = mix(vec3(0.5, 0.65, 0.72), uColor, 0.18);
+  vec3 color = vec3(0.025, 0.038, 0.05) + uColor * 0.035
+    + pearl * (lip * 0.9 + bevel * light * 0.45);
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
 }`;
 
 export function makeInteriorPortals() {
-  // Open-ended frustum: the centre is empty geometry, not a dark painted disc.
-  const geometry = new THREE.CylinderGeometry(0.25, INTERIOR_PORTAL_RADIUS, 0.27, 40, 8, true);
+  // A shared open sleeve with a shallow machined lip. The face stays circular
+  // and centred on the real intersection through tile, dimmer and backing.
+  const r = INTERIOR_PORTAL_RADIUS;
+  const geometry = new THREE.LatheGeometry([
+    new THREE.Vector2(r, 0.045), new THREE.Vector2(r, -0.075),
+    new THREE.Vector2(r, INTERIOR_PORTAL_RIM_PLANE), new THREE.Vector2(r * 1.012, -0.109),
+    new THREE.Vector2(r * 1.05, -0.109), new THREE.Vector2(r * 1.10, -0.102),
+    new THREE.Vector2(r * 1.115, -0.092)
+  ], 64);
   geometry.rotateX(Math.PI / 2);
-  geometry.translate(0, 0, 0.125);
   const texture = new THREE.DataTexture(new Uint8Array(4 * PORTAL_TEXTURE_HEIGHT * 4), 4, PORTAL_TEXTURE_HEIGHT);
   texture.needsUpdate = true;
   const uniforms = {
@@ -114,7 +129,7 @@ export function makeInteriorPortals() {
   const ensureMouths = count => {
     while (mouths.length < count) {
       const material = new THREE.ShaderMaterial({
-        uniforms: { uColor: { value: new THREE.Color() }, uTime: time },
+        uniforms: { uColor: { value: new THREE.Color() }, uTime: time, uShear: { value: new THREE.Vector2() } },
         vertexShader: mouthVertex, fragmentShader: mouthFragment, side: THREE.DoubleSide
       });
       const mesh = new THREE.Mesh(geometry, material);
@@ -169,7 +184,11 @@ export function syncInteriorPortals(portals, routes, size, expansion) {
       interiorPortalFrameInto(center, axis, path, side, half);
       normal.copy(side === 0 ? path.nStart : path.nEnd);
       portals.mouths[index].position.copy(center);
-      portals.mouths[index].quaternion.setFromUnitVectors(Z, axis);
+      const mouth = portals.mouths[index];
+      mouth.quaternion.setFromUnitVectors(Z, normal);
+      inverseRotation.copy(mouth.quaternion).invert();
+      sample.copy(axis).applyQuaternion(inverseRotation);
+      mouth.material.uniforms.uShear.value.set(sample.x / sample.z, sample.y / sample.z);
       const faceAxis = Math.abs(normal.x) > 0.5 ? 0 : Math.abs(normal.y) > 0.5 ? 1 : 2;
       const face = faceAxis * 2 + (normal.getComponent(faceAxis) < 0 ? 1 : 0);
       const slot = faceCounts[face]++;

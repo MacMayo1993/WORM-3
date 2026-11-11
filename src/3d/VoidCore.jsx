@@ -36,8 +36,10 @@ import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
 import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
 import { makeCorePassage, updateCorePassage, updateCoreSightline, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
-import { mirrorSubjects, warmMirrorPrograms } from './mirrorSubjects.js';
+import { mirrorSubjects, warmMirrorPrograms, addMirrorSubject } from './mirrorSubjects.js';
+import { updateCoreMirrorCharge } from './coreMirrorCharge.js';
 import { createCoreMirrorRoom, createCoreMirrorProbe } from './coreMirrorRoom.js';
+import { createCorePortalRims } from './corePortalRims.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
@@ -101,6 +103,9 @@ function VoidCore({ cubieRefs = null }) {
 
   const glow = useMemo(() => ({ value: 0.08 }), []);
   const passage = useMemo(() => makeCorePassage(), []);
+  const portalRims = useMemo(() => createCorePortalRims(passage.uniforms), [passage]);
+  useEffect(() => () => portalRims.dispose(), [portalRims]);
+  useEffect(() => addMirrorSubject(portalRims.layers[1].mesh), [portalRims]);
   // The seams between the core's pieces are live lightning (coreLightning.js).
   const lightning = useMemo(() => makeCoreLightningUniforms(), []);
   useLayoutEffect(() => setCoreLightningSize(lightning, size, tunnelCoreScale(size)), [lightning, size]);
@@ -108,9 +113,9 @@ function VoidCore({ cubieRefs = null }) {
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
     chromeMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile, true), lightning, { haloOnly: true }),
-      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room'),
     stickerMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile), lightning, { haloOnly: true }),
-      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room')
   }), [glow, passage, lightning]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   // Every look's materials are kept for the core's life. A view power swaps the
@@ -125,7 +130,7 @@ function VoidCore({ cubieRefs = null }) {
   let bodyMaterial = looks.bodies.get(mode);
   if (!bodyMaterial) {
     bodyMaterial = withPortalCutout(withCoreLightning(createCoreBodyMaterial(isMobile, mode), lightning),
-      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true);
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room');
     looks.bodies.set(mode, bodyMaterial);
   }
   const antiverse = useMemo(() => createAntiverse(size), [size]);
@@ -159,7 +164,7 @@ function VoidCore({ cubieRefs = null }) {
       if (!look) {
         look = { geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER),
           material: withPortalCutout(createCoreTileStyle(style, color, antipode, tunnelCoreScale(size)),
-            passage.uniforms, coreRoomCutoutGLSL, 'core-room', true) };
+            passage.uniforms, coreRoomCutoutGLSL, 'core-room') };
         looks.styles.set(lookKey, look);
       }
       byColor.set(id, { key, id, style, ...look });
@@ -308,12 +313,13 @@ function VoidCore({ cubieRefs = null }) {
     // flip's colour. While held, nothing about it moves: a paused or dead worm keeps
     // the arcs exactly as they were, and reduced motion shows them steady at the
     // network's charge, with no surge or tint fading in and out.
-    const held = still || (wormMode && (state.wormPaused || !state.wormAlive));
+    const flashCalm = !!state.settings?.reduceFlashing;
+    const held = still || flashCalm || (wormMode && (state.wormPaused || !state.wormAlive));
     if (!held) {
       lightning.uCoreBoltTime.value += dt;
       lightning.uCoreBoltGain.value = (0.55 + 0.45 * charge) * (1 + f.flash * 0.8);
       lightning.uCoreBoltColor.value.copy(BOLT_BASE).lerp(f.tint, 0.6 * f.tintMix);
-    } else if (still) {
+    } else if (still || flashCalm) {
       lightning.uCoreBoltGain.value = 0.55 + 0.45 * charge;
       lightning.uCoreBoltColor.value.copy(BOLT_BASE);
     }
@@ -365,6 +371,14 @@ function VoidCore({ cubieRefs = null }) {
     passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
     tunnelCoreClipUniforms.uTunnelCoreHalf.value = wormMode ? CORE_HALF * f.zoom + .002 : 0;
     tunnelCoreClipUniforms.uTunnelCoreCenter.value.copy(passage.uniforms.uCoreRoomCenter.value);
+    portalRims.update(passage, size, f.zoom);
+    mirrors.updateLayout(passage, f.zoom);
+    updateCoreMirrorCharge(mirrors.charge, wormMode ? ride ?? tunnelState.portalTunnel : null,
+      size, faceColors, tunnelState.t, {
+        active: wormMode && tunnelState.active,
+        paused: wormMode && (state.wormPaused || !state.wormAlive),
+        reducedMotion: still, reduceFlashing: flashCalm, passageEnds: mirrors.passageEnds
+      });
     if (probe) {
       // Link the room's programs, and every program its capture draws with, while
       // the board is still hidden behind the scramble or briefing; never mid-ride.
@@ -374,6 +388,7 @@ function VoidCore({ cubieRefs = null }) {
         probeWarmed.current = warmKey;
         mirrors.group.visible = true;
         gl.compile?.(mirrors.group, camera, scene);
+        gl.compile?.(portalRims.group, camera, scene);
         // The capture draws into a render target, a program variant of its own.
         warmMirrorPrograms(gl, scene, [...mirrorSubjects(), mirrors.group]);
         probe.capture(gl, scene, mirrors);
@@ -409,6 +424,7 @@ function VoidCore({ cubieRefs = null }) {
 
   return (
     <group ref={rootRef} name="antipodal-core">
+      <primitive object={portalRims.group} dispose={null} />
       <group ref={zoomRef}>
         <primitive object={mirrors.group} dispose={null} />
         <instancedMesh

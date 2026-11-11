@@ -11,6 +11,8 @@ import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { coreCellIndex, coreLayout, coreZoomLimit } from '../3d/antipodalCore.js';
 import { CHROME_TILE_FINISH } from '../3d/cubeViewStyles.js';
+import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
+import { mirrorSubjects } from '../3d/mirrorSubjects.js';
 
 // jsdom has touch events, so it reads as mobile; the core's light is desktop-only.
 vi.mock('../utils/device.js', async (importOriginal) => ({ ...(await importOriginal()), isMobile: false }));
@@ -197,4 +199,60 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     await act(async () => root.unmount()); useGameStore.setState(before, true);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
+});
+
+it('updates bent opening geometry before its charge anchors and keeps calm modes steady in the real frame hook', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState(), bridge = { ...tunnelState };
+  const tunnel = { entry: { x: 1, y: 2, z: 1, dirKey: 'PY' }, exit: { x: 0, y: 1, z: 1, dirKey: 'NX' }, entryColor: 1, exitColor: 2 };
+  useGameStore.setState({ cubies: makeCubies(3), size: 3, wormHealerMode: true, wormAlive: true, wormPaused: false,
+    wormGamePhase: 'playing', wormStoryLevel: null, explosionT: 0, animState: null, perfReducedFX: false,
+    settings: { ...before.settings, colorScheme: 'standard', reducedMotion: false, reduceFlashing: false } });
+  Object.assign(tunnelState, { tunnel, portalTunnel: tunnel, active: true, t: .47, activeTunnelId: 'bent-charge-integration' });
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas);
+  root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 }, camera: { position: [0, .2, 0] } });
+  let inner;
+  try {
+    let store, time = 0;
+    await act(async () => { store = root.render(<VoidCore />); });
+    const frame = () => store.getState().advance(time += 1 / 60);
+    const scene = store.getState().scene;
+    const room = scene.getObjectByName('anticube-mirror-room'), tiles = scene.getObjectByName('anticube-mirror-tiles');
+    inner = scene.getObjectByName('anticube-inner-rims');
+    const u = tiles.material.uniforms, matrix = new THREE.Matrix4(), position = new THREE.Vector3();
+    expect(mirrorSubjects().has(inner)).toBe(true);
+    for (let frameIndex = 0; frameIndex < 30; frameIndex++) {
+      frame(); room.updateWorldMatrix(true, false);
+      for (const endpoint of [u.uChargeEntry.value, u.uChargeExit.value]) {
+        const world = endpoint.clone().multiplyScalar(CORE_MIRROR_HALF).applyMatrix4(room.matrixWorld);
+        let nearest = Infinity;
+        for (let i = 0; i < inner.count; i++) {
+          inner.getMatrixAt(i, matrix); position.setFromMatrixPosition(matrix);
+          nearest = Math.min(nearest, position.distanceTo(world));
+        }
+        // Rims sit 0.2% of the bore radius inward to avoid z-fighting.
+        expect(nearest).toBeLessThan(u.uPassageRadius.value * .003);
+      }
+    }
+    expect(room.parent.scale.x).toBeGreaterThan(1.1);
+    const held = u.uChargeProgress.value;
+    await act(async () => useGameStore.setState({ wormPaused: true }));
+    tunnelState.t = .56; frame(); frame(); expect(u.uChargeProgress.value).toBe(held);
+    for (const setting of ['reduceFlashing', 'reducedMotion']) {
+      await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings,
+        reducedMotion: setting === 'reducedMotion', reduceFlashing: setting === 'reduceFlashing' } }));
+      frame(); expect(u.uChargeDischarge.value).toBe(0); expect(u.uChargeCalm.value).toBe(1);
+      expect(u.uChargeLevel.value).toBe(.34);
+    }
+    await act(async () => useGameStore.setState({ wormHealerMode: false })); frame();
+    expect(room.visible).toBe(false); expect(inner.parent.visible).toBe(false); expect(u.uChargeLevel.value).toBe(0);
+  } finally {
+    Object.assign(tunnelState, bridge);
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+  expect(mirrorSubjects().has(inner)).toBe(false);
 });
