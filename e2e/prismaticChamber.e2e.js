@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
+import { writeFile } from 'node:fs/promises';
 
 // Actual production shaders in WebGL, with bounded reflection captures. This is
 // a rendering regression, not a hardware/mobile frame-rate claim.
@@ -20,7 +21,7 @@ window.checkPrismaticChamber = ({ mobile = false, size = 3 } = {}) => {
   document.body.replaceChildren(renderer.domElement);
   const scene = new THREE.Scene(), passage = makeCorePassage();
   const room = createCoreMirrorRoom(size, passage.uniforms);
-  const probe = createCoreMirrorProbe(mobile ? 32 : 64);
+  const probe = createCoreMirrorProbe(mobile ? 64 : 128);
   const rims = createCorePortalRims(passage.uniforms, room.lighting);
   scene.add(room.group, rims.group);
   const unregisterRims = addMirrorSubject(rims.layers[1].mesh);
@@ -106,8 +107,12 @@ async function verify(page, info, mobile) {
   for (const size of [3, 15]) {
     const result = await page.evaluate(options => window.checkPrismaticChamber(options), { mobile, size });
     const { images } = result; delete result.images;
-    for (const [phase, png] of Object.entries(images))
-      await info.attach('prismatic-chamber-' + size + '-' + phase + '.png', { body: Buffer.from(png, 'base64'), contentType: 'image/png' });
+    for (const [phase, png] of Object.entries(images)) {
+      const name = 'prismatic-chamber-' + size + '-' + phase + '.png';
+      const path = info.outputPath(name);
+      await writeFile(path, Buffer.from(png, 'base64'));
+      await info.attach(name, { path, contentType: 'image/png' });
+    }
     await info.attach('prismatic-chamber-' + size + '.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
     console.log('Mirror readability', JSON.stringify({ mobile, size, ...result }));
     expect(errors).toEqual([]);
