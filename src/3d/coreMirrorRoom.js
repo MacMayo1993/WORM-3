@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CORE_MIRROR_HALF, corePassageGLSL } from './corePassage.js';
 import { withPortalCutout } from './portalCutout.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
-import { makeCoreMirrorCharge, coreMirrorChargeGLSL } from './coreMirrorCharge.js';
+import { makeCoreChamberLight, coreChamberLightGLSL } from './coreChamberLight.js';
 import { MIRROR_LAYER, createMirrorCaptureScene } from './mirrorSubjects.js';
 import { coreWallCrossingsInto } from './corePortalRims.js';
 import { mirrorPanelIntervals } from './coreMirrorPanels.js';
@@ -11,7 +11,7 @@ import { mirrorPanelIntervals } from './coreMirrorPanels.js';
 // of real mirrors. Each wall starts as the core face's own size × size grid.
 // During a ride its panels fit around the actual openings; each panel takes
 // the nearest core sticker's live colour. What they reflect is captured live:
-// a cube camera at the room's centre renders the room (worm, bands, lightning
+// a cube camera at the room's centre renders the room (worm, pearl rims, light ribbons
 // and the other walls) on a bounded capture clock, and every mirror samples it
 // box-projected onto the room's own walls, so a reflection sits where a flat
 // mirror would put it rather than floating at infinity. The capture alternates
@@ -61,7 +61,7 @@ varying vec3 vMirrorNormal;
 varying vec3 vMirrorTint;
 varying vec2 vMirrorUv;
 
-${coreMirrorChargeGLSL}
+${coreChamberLightGLSL}
 
 // Where the reflected ray leaves the room, seen from the capture point.
 vec3 mirrorBoxProject(vec3 p, vec3 r) {
@@ -82,17 +82,17 @@ void main() {
   float fresnel = pow(1.0 - facing, 4.0);
   // Silvered glass stained by the tile's colour: the reflection is filtered
   // through it, and the tint itself shows a little where the room is dark.
-  vec3 stain = mix(vec3(0.86), vMirrorTint, 0.42);
-  vec3 color = reflection * stain * 0.9;
-  vec3 light = vMirrorTint * (uMirrorLive > 0.5 ? 0.07 : 0.3) + fresnel * 0.16;
+  vec3 stain = mix(vec3(0.86), vMirrorTint, 0.22);
+  vec3 color = reflection * stain * 0.88;
+  vec3 light = vMirrorTint * (uMirrorLive > 0.5 ? 0.045 : 0.18) + fresnel * 0.10;
   // A polished bevel round each mirror catches the light.
   float edge = min(min(vMirrorUv.x, 1.0 - vMirrorUv.x), min(vMirrorUv.y, 1.0 - vMirrorUv.y));
-  light += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.14;
-  light += mirrorCharge(vMirrorUv, vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
+  light += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.065;
+  light += chamberLight(vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
   // The LDR capture is fed back into the other mirrors. Unbounded addition
-  // clips the bevel and charge to white before the next reflection can tint
+  // clips the bevel and ribbons to white before the next reflection can tint
   // them. Roll local light into the remaining channel range in BOTH passes:
-  // weak light stays near-linear, while bright seams retain their detail.
+  // weak light stays near-linear, while bright ribbons retain their colour.
   color += (vec3(1.0) - color) * (vec3(1.0) - exp(-light));
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
@@ -119,9 +119,9 @@ export function createCoreMirrorRoom(size, uniforms) {
   group.name = 'anticube-mirror-room';
   const pitch = CORE_MIRROR_HALF * 2 / size;
   const geometry = createPlayStickerGeometry(.95);
-  const charge = makeCoreMirrorCharge();
+  const lighting = makeCoreChamberLight();
   const mirrorUniforms = {
-    ...charge.uniforms,
+    ...lighting.uniforms,
     uMirrorEnv: { value: null },
     uMirrorLive: { value: 0 },
     uMirrorBoxMin: { value: new THREE.Vector3(-1, -1, -1) },
@@ -178,7 +178,7 @@ export function createCoreMirrorRoom(size, uniforms) {
     tiles.instanceColor.needsUpdate = true;
   };
   return {
-    group, tiles, backing, material, charge, uniforms: mirrorUniforms, passageEnds,
+    group, tiles, backing, material, lighting, uniforms: mirrorUniforms, passageEnds,
     updateLayout(passage, zoom) {
       const active = uniforms.uPassageOpen.value > .5;
       const signature = active ? `${passage.signature}:${zoom}` : 'closed';
@@ -301,12 +301,12 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       const activeFace = renderer.getActiveCubeFace?.() ?? 0;
       const mip = renderer.getActiveMipmapLevel?.() ?? 0;
       const xr = renderer.xr.enabled;
-      const chargeCapture = room.uniforms.uChargeCapture.value;
+      const chamberCapture = room.uniforms.uChamberCapture.value;
       const end = Math.min(6, face + Math.max(1, faces));
       try {
         if (shadows) { shadows.autoUpdate = false; shadows.needsUpdate = false; }
         renderer.xr.enabled = false;
-        room.uniforms.uChargeCapture.value = 1;
+        room.uniforms.uChamberCapture.value = 1;
         for (; face < end; face++) {
           renderer.setRenderTarget(targets[next], face, 0);
           renderer.render(reflected, camera.children[face]);
@@ -315,7 +315,7 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
         if (shadows) { shadows.autoUpdate = autoShadow; shadows.needsUpdate = shadowDirty; }
         renderer.setRenderTarget(target, activeFace, mip);
         renderer.xr.enabled = xr;
-        room.uniforms.uChargeCapture.value = chargeCapture;
+        room.uniforms.uChamberCapture.value = chamberCapture;
       }
       if (face < 6) return;
       room.uniforms.uMirrorEnv.value = targets[next].texture;
