@@ -49,6 +49,7 @@ export default function TunnelTransitOverlay() {
   const vignetteRef = useRef(null);
   const fringeRef = useRef(null);
   const seamRef = useRef(null);
+  const mouthRef = useRef(null);
   const ampRef = useRef(0);
   const rafRef = useRef(null);
 
@@ -61,7 +62,8 @@ export default function TunnelTransitOverlay() {
         rafRef.current = requestAnimationFrame(animate);
         return;
       }
-      const reduced = prefersReducedMotion();
+      const settings = useGameStore.getState().settings;
+      const reduced = prefersReducedMotion() || settings?.reducedMotion || settings?.reduceFlashing;
       const target = isActive ? 1 : 0;
       ampRef.current += (target - ampRef.current) * (1 - Math.exp(-dt * (target > ampRef.current ? FADE_IN : FADE_OUT)));
       const amp = ampRef.current;
@@ -70,6 +72,7 @@ export default function TunnelTransitOverlay() {
         if (vignetteRef.current) vignetteRef.current.style.opacity = '0';
         if (fringeRef.current) fringeRef.current.style.opacity = '0';
         if (seamRef.current) seamRef.current.style.opacity = '0';
+        if (mouthRef.current) mouthRef.current.style.opacity = '0';
         if (!isActive) { rafRef.current = null; return; }
       } else {
         const t = tunnelState.t ?? 0;
@@ -90,9 +93,12 @@ export default function TunnelTransitOverlay() {
           // A brief bloom exactly at ½π — the identification moment — as the
           // lens itself passes the antipodal centre.
           const seam = Math.max(0, 1 - Math.abs(lens - 0.5) / 0.07);
-          // A smaller bloom accompanies the early dive through the outer mouth.
-          const punch = Math.max(0, 1 - Math.abs(t - 0.10) / 0.045);
-          seamRef.current.style.opacity = String(reduced ? 0 : amp * Math.max(seam, punch * punch * 0.65) * 0.08);
+          seamRef.current.style.opacity = String(reduced ? 0 : amp * seam * 0.08);
+        }
+        if (mouthRef.current) {
+          // A spatial fade at BOTH real mouths, held through the raised tile
+          // and backing. Never pulse at an unrelated percentage of the ride.
+          mouthRef.current.style.opacity = String(reduced ? 0 : amp * tunnelState.mouthGlow * 0.85);
         }
       }
       rafRef.current = requestAnimationFrame(animate);
@@ -149,7 +155,17 @@ export default function TunnelTransitOverlay() {
           mixBlendMode: 'screen',
         }}
       />
-
+      {/* Pearl light rolls across the lens as it enters/leaves the sleeve.
+          Keep the middle translucent so the worm remains visible throughout. */}
+      <div
+        ref={mouthRef}
+        data-testid="tunnel-mouth-glow"
+        style={{
+          ...base,
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(250,253,255,0.50) 0%, rgba(245,251,255,0.70) 48%, rgba(240,249,255,0.95) 100%)',
+          mixBlendMode: 'screen',
+        }}
+      />
     </>
   );
 }

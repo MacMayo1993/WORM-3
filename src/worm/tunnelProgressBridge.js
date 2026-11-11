@@ -11,6 +11,7 @@ export const tunnelState = {
   rideHead: null, // current camera subject in world coordinates, only during a ride
   lensT: 0,        // where the chase lens is, in the same t: it trails the head by most of a cubie
   lensLift: 0,     // how far the lens sits off the route (tunnelCameraRails): the band clears less round a raised lens
+  mouthGlow: 0,    // soft white crossing light at the lens, through the complete outer wall
   activeTunnelId: null, // pairId of the tunnel the worm is currently traversing (null when idle)
   tunnel: null,    // that tunnel's descriptor ({ entry, exit } grid tiles), for the core's approach zoom
   coreZoom: 1,     // cosmetic core growth (VoidCore); occupied tracks keep their simulation route
@@ -27,6 +28,7 @@ export function resetTunnelState() {
   tunnelState.rideHead = null;
   tunnelState.lensT = 0;
   tunnelState.lensLift = 0;
+  tunnelState.mouthGlow = 0;
   tunnelState.activeTunnelId = null;
   tunnelState.tunnel = null;
   tunnelState.coreZoom = 1;

@@ -47,6 +47,7 @@ const jumpRescueActive = () => {
 const _liveLayers = [];
 const _liveAngles = [];
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
+import { tunnelMouthGlow } from '../worm/tunnelMouthGlow.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { wormSegments } from '../worm/wormSegments.js';
 import InspectionViews from './InspectionViews.jsx';
@@ -166,6 +167,9 @@ const CubeAssembly = React.memo(({
     const state = useGameStore.getState();
     exteriorPortals.update(state.wormHealerMode ? tunnelState.portalTunnel : null, size, wormExpansion.amount,
       state.wormHealerMode ? tunnelState.fallOpening : null);
+    tunnelState.mouthGlow = state.wormHealerMode && state.wormAlive &&
+      ['entering', 'exiting', 'windout'].includes(state.wormPhase)
+      ? tunnelMouthGlow(camera.position, tunnelState.portalTunnel, size, wormExpansion.amount) : 0;
     if (exteriorRef.current) exteriorRef.current.visible = !state.wormHealerMode ||
       !tunnelCameraInside(camera.position, size, state.wormPhase, tunnelState.portalTunnel);
   }, -0.24); // after the chase camera (-0.25), before tile batches sample visibility

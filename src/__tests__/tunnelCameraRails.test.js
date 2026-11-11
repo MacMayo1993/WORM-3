@@ -494,7 +494,6 @@ describe('continuous surface emergence', () => {
   it.each([2, 3, 5, 15])('threads the outer bore on every exit face at size %s', size => {
     const pose = makeTunnelCamPose(), end = makeTunnelCamPose(), next = makeTunnelCamPose();
     const surface = makeTunnelCamPose(), mouth = new THREE.Vector3(), closest = new THREE.Vector3();
-    const segment = new THREE.Line3();
     const portals = createExteriorPortals();
     try {
       for (const [face, normal] of Object.entries(FACE_NORMALS)) for (const raised of [false, true]) {
@@ -520,7 +519,12 @@ describe('continuous surface emergence', () => {
           if (Math.abs(height - wall) > .06 && Math.abs(height - high) > .06) continue;
           let gap = Infinity;
           for (let j = 9; j < 17; j++) {
-            segment.set(bore[j], bore[j + 1]).closestPointToPoint(pose.cam, true, closest);
+            // The shader cuts circles in the face plane, not perpendicular
+            // to the route. A nearest-segment check misses oblique wall hits.
+            const a = bore[j].dot(normal), b = bore[j + 1].dot(normal);
+            const t = (height - a) / (b - a);
+            if (!Number.isFinite(t) || t < 0 || t > 1) continue;
+            closest.lerpVectors(bore[j], bore[j + 1], t);
             gap = Math.min(gap, closest.distanceTo(pose.cam));
           }
           expect(gap, `${size} ${face} ${raised} ${phase} ${i}`).toBeLessThan(.325);
