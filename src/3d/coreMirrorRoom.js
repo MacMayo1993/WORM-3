@@ -83,11 +83,17 @@ void main() {
   // Silvered glass stained by the tile's colour: the reflection is filtered
   // through it, and the tint itself shows a little where the room is dark.
   vec3 stain = mix(vec3(0.86), vMirrorTint, 0.42);
-  vec3 color = reflection * stain * 0.9 + vMirrorTint * (uMirrorLive > 0.5 ? 0.07 : 0.3) + fresnel * 0.16;
+  vec3 color = reflection * stain * 0.9;
+  vec3 light = vMirrorTint * (uMirrorLive > 0.5 ? 0.07 : 0.3) + fresnel * 0.16;
   // A polished bevel round each mirror catches the light.
   float edge = min(min(vMirrorUv.x, 1.0 - vMirrorUv.x), min(vMirrorUv.y, 1.0 - vMirrorUv.y));
-  color += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.14;
-  color += mirrorCharge(vMirrorUv, vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
+  light += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.14;
+  light += mirrorCharge(vMirrorUv, vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
+  // The LDR capture is fed back into the other mirrors. Unbounded addition
+  // clips the bevel and charge to white before the next reflection can tint
+  // them. Roll local light into the remaining channel range in BOTH passes:
+  // weak light stays near-linear, while bright seams retain their detail.
+  color += (vec3(1.0) - color) * (vec3(1.0) - exp(-light));
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
 }`;
