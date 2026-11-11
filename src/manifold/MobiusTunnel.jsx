@@ -1,5 +1,5 @@
 import { tunnelCoreClipUniforms } from './tunnelCoreClip.js';
-import { tunnelCameraUniforms, tunnelCameraClearRadius } from './tunnelCameraClearance.js';
+import { tunnelCameraUniforms, syncTunnelCamera } from './tunnelCameraClearance.js';
 import { vertexShader, fragmentShader, bumperVertexShader, bumperFragmentShader } from './mobiusTunnelShaders.js';
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
@@ -385,9 +385,7 @@ const MobiusTunnel = ({
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
     if (wormMode && tunnelState.active && _state.camera.getWorldDirection) {
-      _state.camera.getWorldDirection(tunnelCameraUniforms.uCameraAhead.value);
-      _state.camera.getWorldPosition(tunnelCameraUniforms.uTunnelCameraPosition.value);
-      tunnelCameraUniforms.uCameraClearRadius.value = tunnelCameraClearRadius(tunnelState.lensLift);
+      syncTunnelCamera(_state.camera, tunnelState.rideHead, tunnelState.lensLift);
     }
     syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
@@ -403,7 +401,7 @@ const MobiusTunnel = ({
       gl.compile?.(root, _state.camera, scene);
     }
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
-    if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
+    if (state.settings?.reducedMotion || state.settings?.reduceFlashing || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
     if (!mesh1 || !mesh2 || !meshRef.current) return;

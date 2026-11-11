@@ -81,6 +81,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const camera = store.getState().camera;
     camera.position.set(1.2, -0.4, 0.7);
     camera.rotation.set(0.4, -0.8, 1.1);
+    tunnelState.rideHead = new THREE.Vector3(-.4, .3, -.2);
     frame();
     const lens = halves[0].material.uniforms.uTunnelCameraPosition;
     const ahead = halves[0].material.uniforms.uCameraAhead;
@@ -89,6 +90,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     for (const part of halves[0].parent.children) {
       expect(part.material.uniforms.uTunnelCameraPosition).toBe(lens);
       expect(part.material.uniforms.uCameraAhead).toBe(ahead);
+      expect(part.material.uniforms.uTunnelSightEnd.value).toEqual(tunnelState.rideHead);
     }
     const intact = halves[0].geometry.attributes.position.version;
     tunnelState.active = false; frame();

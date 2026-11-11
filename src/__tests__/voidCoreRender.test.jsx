@@ -10,7 +10,7 @@ import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js'
 import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { coreCellIndex, coreLayout, coreZoomLimit } from '../3d/antipodalCore.js';
-import { CHROME_TILE_FINISH } from '../3d/cubeViewStyles.js';
+import { CORE_CHROME_FINISH } from '../3d/antipodalCore.js';
 import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { mirrorSubjects } from '../3d/mirrorSubjects.js';
 
@@ -89,7 +89,7 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
       manifoldStyles: { 5: 'checkerboard', 2: 'circuit' }
     } })); frame();
     expect(scene.getObjectByName('antipodal-core-style-5-checkerboard')).toBeUndefined();
-    expect(stickers.material).toMatchObject(CHROME_TILE_FINISH);
+    expect(stickers.material).toMatchObject(CORE_CHROME_FINISH);
     expect(stickers.count).toBe(54);
     expect(colour(own).getHexString()).toBe('b24bde');
     expect(universe.uPalette.value[4].getHexString()).toBe('b24bde');

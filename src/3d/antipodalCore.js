@@ -193,15 +193,19 @@ export function interiorExposure({ explosionT = 0, visualMode = 'classic', hollo
 // ── Materials ────────────────────────────────────────────────────────────────
 
 /**
- * Core stickers use the shared chrome finish, or plain plastic during Classic.
+ * Core stickers retain chrome colour reflections with a broader highlight.
+ * The outer cube's mirror-polished finish aliases across these tiny bevels
+ * during an approach, creating bright, lightning-like lines in the grooves.
  * Both glow a little in their own colour, so the
  * miniature stays readable deep inside the cube where the studio rig barely
  * reaches. `glow` is a shared uniform ({ value }).
  */
+export const CORE_CHROME_FINISH = { ...CHROME_TILE_FINISH, roughness: 0.28, envMapIntensity: 0.8 };
+
 export function createCoreStickerMaterial(glow, performanceMode = false, chrome = false) {
   const { Material, sticker } = rubiksFinish(performanceMode);
   const material = chrome
-    ? new THREE.MeshStandardMaterial(CHROME_TILE_FINISH)
+    ? new THREE.MeshStandardMaterial(CORE_CHROME_FINISH)
     : new Material({ ...sticker, envMapIntensity: 0.3 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCoreGlow = glow;
@@ -217,7 +221,8 @@ export function createCoreBodyMaterial(performanceMode = false, mode = 'classic'
   const Lit = performanceMode ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
   return new Lit({
     ...bodyMaterialProps(mode),
-    ...(!performanceMode && CLASSIC_BODY_MODES.has(mode) ? CLASSIC_BODY_COAT : {}),
+    ...(CLASSIC_BODY_MODES.has(mode) ? { roughness: 0.85, envMapIntensity: 0.08,
+      ...(!performanceMode ? { ...CLASSIC_BODY_COAT, clearcoat: 0 } : {}) } : {}),
     // The hidden crossing still needs an opaque shell, including glass view.
     transparent: false, opacity: 1, depthWrite: true
   });

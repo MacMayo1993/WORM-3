@@ -61,7 +61,7 @@ window.renderInterior = () => {
   });
   scene.add(mesh); camera.position.set(.6,.45,.7); camera.lookAt(0,0,0);
   renderer.render(scene,camera);
-  if(renderer.info.render.calls!==7 || material.metalness!==1 || material.roughness!==.06)throw Error('Chrome anticube did not render in one draw');
+  if(renderer.info.render.calls!==7 || material.metalness!==1 || material.roughness!==.28)throw Error('Chrome anticube did not render in one draw');
   // Inspect the core's actual passage shader from outside its +Z face.
   batches.group.visible=false; camera.position.set(0,0,.5); camera.lookAt(0,0,0);
   mesh.visible=false; const coreBackground=pixel(); mesh.visible=true; const coreClosed=pixel();

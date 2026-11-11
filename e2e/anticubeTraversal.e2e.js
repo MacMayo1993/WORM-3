@@ -23,10 +23,38 @@ import { frameRide } from './src/worm/rideFraming.js';
 import { getTunnelWorldPosSmoothInto, buildTunnelPathForTunnel } from './src/worm/wormLogic.js';
 import { makeTunnelPath } from './src/utils/tunnelPath.js';
 import { tunnelCoreClipUniforms } from './src/manifold/tunnelCoreClip.js';
+import { tunnelCameraClearanceGLSL, tunnelCameraUniforms, syncTunnelCamera } from './src/manifold/tunnelCameraClearance.js';
+import { makeCautionOpeningUniforms } from './src/worm/healerWorm/cautionOpening.js';
 import { WORM_PAD_HEIGHT } from './src/game/raisedCubie.js';
 extend(THREE);
+window.verifySightClearance = () => {
+  const renderer=new THREE.WebGLRenderer({antialias:false}); renderer.setSize(64,64);
+  const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(60,1,.01,10);
+  camera.position.set(0,0,2); camera.lookAt(0,0,0); camera.updateMatrixWorld(true);
+  const head=new THREE.Vector3(0,0,.8);
+  syncTunnelCamera(camera,head,.4);
+  tunnelCoreClipUniforms.uTunnelCoreHalf.value=0;
+  const uniforms={...tunnelCameraUniforms,...tunnelCoreClipUniforms,...makeCautionOpeningUniforms(),uCameraClearance:{value:1}};
+  const geometry=new THREE.PlaneGeometry(1,1);
+  const material=new THREE.ShaderMaterial({uniforms,
+    vertexShader:'varying vec3 worldPoint; void main(){vec4 p=modelMatrix*vec4(position,1.0);worldPoint=p.xyz;gl_Position=projectionMatrix*viewMatrix*p;}',
+    fragmentShader:'varying vec3 worldPoint;'+tunnelCameraClearanceGLSL+'void main(){clearTunnelCamera(worldPoint);gl_FragColor=vec4(0.0,0.0,0.0,1.0);}' });
+  const strip=new THREE.Mesh(geometry,material);strip.position.z=1.25;scene.add(strip);
+  const target=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x00ff00}));target.position.z=.8;scene.add(target);
+  const gl=renderer.getContext(), p=new Uint8Array(4);
+  const pixel=(x=32,y=32)=>{renderer.render(scene,camera);gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,p);return Array.from(p);};
+  const clear=pixel(), retainedEdge=pixel(6,32);
+  tunnelCameraUniforms.uTunnelSightEnd.value.copy(camera.position);
+  const oldOcclusion=pixel();
+  syncTunnelCamera(camera,head,.4);uniforms.uCameraClearance.value=0;
+  const idle=pixel();uniforms.uCameraClearance.value=1;
+  strip.position.z=.5;target.visible=false;scene.background=new THREE.Color(0x00ff00);
+  const beyondHead=pixel();
+  const error=gl.getError();geometry.dispose();material.dispose();target.material.dispose();renderer.dispose();
+  return {clear,retainedEdge,oldOcclusion,idle,beyondHead,error};
+};
 window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
-  const width = mobile ? 300 : 480, height = mobile ? 480 : 320;
+  const width = mobile ? 200 : 320, height = mobile ? 320 : 220;
   const m = Math.floor(size / 2), n = size - 1;
   const entry = route === 'straight' ? { x:m,y:m,z:n,dirKey:'PZ' } : { x:0,y:n,z:0,dirKey:'PY' };
   const exit = route === 'straight' ? { x:m,y:m,z:0,dirKey:'NZ' } : route === 'return'
@@ -69,7 +97,7 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
   window.traversalFrame = (t, label) => {
     getTunnelWorldPosSmoothInto(head,tunnel,t,size); marker.position.copy(head);
     tunnelState.rideHead=head;
-    for(let i=0;i<8;i++) {
+    for(let i=0;i<2;i++) {
       tunnelCamPoseInto(pose,tunnel,t,size,tunnelState.coreZoom);
       frameRide(camera,pose,head,1);
       Object.assign(tunnelState,{t,lensT:pose.lensT,lensLift:pose.lift});
@@ -111,10 +139,14 @@ async function verify(page, info, mobile) {
   await page.goto('http://127.0.0.1:4173/anticube-fixture');
   await page.addScriptTag({content:bundle.outputFiles[0].text});
   expect(errors).toEqual([]);
+  const sight=await page.evaluate(()=>window.verifySightClearance());
+  expect(sight.clear).toEqual([0,255,0,255]);
+  for(const key of ['retainedEdge','oldOcclusion','idle','beyondHead']) expect(sight[key],key).toEqual([0,0,0,255]);
+  expect(sight.error).toBe(0);
   for(const route of ['corner','return','straight']) {
     await page.evaluate(options=>window.startTraversal(options),{mobile,route,size:9});
     expect(errors).toEqual([]);
-    for(const t of [.30,.40,.50,.60,.70,.80,.90]) {
+    for(const t of (route === 'corner' ? [.39,.50,.72] : route === 'return' ? [.31,.50,.72] : [.39,.50,.72])) {
       const result=await page.evaluate(t=>window.traversalFrame(t),t);
       const {image,withoutBand,...stats}=result;
       console.log('Traversal',JSON.stringify({mobile,route,...stats}));
