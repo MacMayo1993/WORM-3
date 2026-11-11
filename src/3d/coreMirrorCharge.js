@@ -80,6 +80,13 @@ uniform float uChargeLevel, uChargeProgress, uChargeExchange, uChargeDischarge;
 uniform float uChargeCalm, uChargeCapture;
 varying vec3 vMirrorLocal;
 
+float chargeWireCoverage(float offset, float px) {
+  // Bound a wire in both screen pixels and tile space. A subpixel tile must
+  // not become a solid white emitter merely to keep its wire a pixel wide.
+  float width = min(px * .7, .012);
+  return clamp((min(offset + px * .5, width) - max(offset - px * .5, -width)) / px, 0.0, 1.0);
+}
+
 vec3 mirrorCharge(vec2 uv, vec3 roomPoint) {
   if (uChargeLevel <= 0.0) return vec3(0.0);
   vec2 rim = min(uv, 1.0 - uv);
@@ -94,7 +101,7 @@ vec3 mirrorCharge(vec2 uv, vec3 roomPoint) {
   // random strikes. It lives just inside the polished mirror bevel.
   float jag = abs(fract(along * 9.0) * 2.0 - 1.0);
   float wireAt = .018 + .015 * jag;
-  float wire = 1.0 - smoothstep(px * .55, px * 1.6, abs(edge - wireAt));
+  float wire = chargeWireCoverage(edge - wireAt, px);
   float halo = 1.0 - smoothstep(.025, .095, edge);
   // Distance from each dock spreads along every wall, including corner routes.
   float a = length(roomPoint - uChargeEntry), b = length(roomPoint - uChargeExit);
@@ -111,7 +118,7 @@ vec3 mirrorCharge(vec2 uv, vec3 roomPoint) {
   // spatial coverage and the broad envelope avoid strobe/full-field pulses.
   float branchGate = (1.0 - smoothstep(.0, .18, abs(along - .5))) * uChargeDischarge;
   float branchAt = wireAt + .07 * (1.0 - abs(along - .5) / .18);
-  float branch = (1.0 - smoothstep(px * .6, px * 1.4, abs(edge - branchAt))) * branchGate;
+  float branch = chargeWireCoverage(edge - branchAt, px) * branchGate;
   float middle = 1.0 - smoothstep(.08, .32, abs(route - .5));
   float discharge = uChargeDischarge * middle;
   // After the exchange, the exit colour takes the outward-moving front.

@@ -66,5 +66,7 @@ test('adaptive mirror opening and its concentric rim render with a genuinely emp
   expect(result.mouthInner).toEqual(result.center);
   expect(result.mouthRim).not.toEqual(result.center);
   expect(result.calls).toBeLessThanOrEqual(4);
-  await testInfo.attach('centred-bent-exit', { body: await page.screenshot(), contentType: 'image/png' });
+  const screenshot = testInfo.outputPath('centred-bent-exit.png');
+  await page.screenshot({ path: screenshot });
+  await testInfo.attach('centred-bent-exit', { path: screenshot, contentType: 'image/png' });
 });
