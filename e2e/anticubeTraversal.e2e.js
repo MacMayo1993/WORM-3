@@ -5,7 +5,7 @@ import { writeFile } from 'node:fs/promises';
 
 // The approach was missing from the isolated mirror fixture: render the actual
 // chrome shell, patterned track, rails, curls and outer walls on the ride camera.
-const bundle = await build({ bundle: true, write: false, format: 'iife',
+const bundle = await build({ bundle: true, write: false, format: 'iife', jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': JSON.stringify({DEV:false,PROD:true,BASE_URL:'/WORM-3/'}) }, stdin: {
     resolveDir: fileURLToPath(new URL('../', import.meta.url)), contents: `
 import React from 'react';
@@ -58,6 +58,7 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
     React.createElement('directionalLight',{position:[3,4,5],intensity:2.2})
   ));
   await new Promise(resolve=>setTimeout(resolve,60));
+  for(let i=0;!store.getState().scene.getObjectByName('ridden-band')&&i<50;i++) await new Promise(resolve=>setTimeout(resolve,20));
   const {scene,camera}=store.getState();
   const environment=new RoomEnvironment(), pmrem=new THREE.PMREMGenerator(renderer), env=pmrem.fromScene(environment);
   scene.environment=env.texture;
@@ -112,6 +113,7 @@ async function verify(page, info, mobile) {
   expect(errors).toEqual([]);
   for(const route of ['corner','return','straight']) {
     await page.evaluate(options=>window.startTraversal(options),{mobile,route,size:9});
+    expect(errors).toEqual([]);
     for(const t of [.30,.40,.50,.60,.70,.80,.90]) {
       const result=await page.evaluate(t=>window.traversalFrame(t),t);
       const {image,withoutBand,...stats}=result;
