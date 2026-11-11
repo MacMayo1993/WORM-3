@@ -24,6 +24,12 @@ The complete `npm run ci` passed on implementation commit `8559e8f9d014d4b09e012
 
 Chromium could not launch in the local execution environment because its required process socket was restricted. Hosted browser checks are therefore required for actual shader/pixel validation. CI now retains the new fixture screenshots on success as well as failure. These are controlled material fixtures, not gameplay screenshots or mobile GPU benchmarks. Consult the pull request's checks for hosted results.
 
+## Hosted highlight follow-up
+
+The first hosted run compiled and drew the shaders successfully, and the opening/sleeve pixel regression passed. It caught near-white coverage of 11.54% in the 15×15 charge fixture, above the unchanged 8% limit (the 3×3 case measured 4.96%). The coating, Fresnel and bevel self-light were being added at full strength at every recursive bounce. These local light terms now dim during captures without reducing reflected subjects. Wires also use pixel-area coverage with a bounded tile-space width, so distant subpixel tiles do not turn into solid bright emitters.
+
+The browser test now checks an independent settled charge-off baseline and a late-settled charged frame as well as the initial peak, all against the same 8% limit. Focused chamber tests run before the longer gameplay smoke cases; every remaining case is still retained. See the pull request for the latest hosted result.
+
 ## CPU-only measurement
 
 An earlier local Node microbenchmark of the combined implementation measured 2,000 changing-zoom updates on a 15×15 room after 200 warm-up updates. It included panel layout, both rim pools and charge uniforms. Mean time was 0.255 ms, median 0.166 ms and 95th percentile 0.592 ms. Active panels ranged from 1,335 to 1,365, compared with 1,350 in the original grid; the allocated pool holds 2,646. This is a helper benchmark, not gameplay FPS or a mobile GPU measurement.

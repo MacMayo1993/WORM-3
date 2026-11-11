@@ -146,10 +146,29 @@ jobs:
           name: production-build
           path: dist/
 
+      # Get the new shader/pixel result before the longer gameplay smoke cases.
+      # These exact files are excluded from the remaining suite below.
+      - name: Run charged chamber visual checks
+        if: matrix.shard == 1
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: chamber-report
+        run: npm run e2e -- --project="${{ matrix.project }}" --output=chamber-results e2e/chargedMirrorRoom.e2e.js e2e/corePortalRims.e2e.js
+
+      - name: Upload charged chamber visual checks
+        if: always() && matrix.shard == 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: charged-chamber-visual-check-${{ matrix.project }}
+          path: |
+            chamber-results/**/charged-mirrors-*.png
+            chamber-results/**/centred-bent-exit*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       # Publish the focused screenshot before unrelated long-running smoke tests.
       # Separate output folders keep its traces/report when the next run cleans up.
       - name: Run Mega Storm visual check
-        if: matrix.project == 'desktop' && matrix.shard == 1
+        if: ${{ !cancelled() && steps.production_build.outcome == 'success' && matrix.project == 'desktop' && matrix.shard == 1 }}
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: mega-storm-report
         run: npm run e2e -- e2e/megaStorm.e2e.js --output=mega-storm-results
@@ -169,7 +188,8 @@ jobs:
         if: ${{ !cancelled() && steps.production_build.outcome == 'success' }}
         run: |
           mapfile -d '' -t tests < <(
-            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
+            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' \
+              ! -path 'e2e/chargedMirrorRoom.e2e.js' ! -path 'e2e/corePortalRims.e2e.js' -print0 | sort -z
           )
           if ((${#tests[@]})); then npm run e2e -- --project="${{ matrix.project }}" --fully-parallel --workers=1 --shard="${{ matrix.shard }}/2" "${tests[@]}"; fi
 
@@ -191,17 +211,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload charged chamber visual checks
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: charged-chamber-visual-check-${{ matrix.project }}-${{ matrix.shard }}
-          path: |
-            test-results/**/charged-mirrors-*.png
-            test-results/**/centred-bent-exit*.png
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Upload failure artifacts
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4
@@ -212,6 +221,8 @@ jobs:
             test-results/
             mega-storm-report/
             mega-storm-results/
+            chamber-report/
+            chamber-results/
           retention-days: 7
 
   # Retain the existing required-check name and block releases unless every

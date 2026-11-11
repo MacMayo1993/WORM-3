@@ -20,7 +20,7 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
   document.body.replaceChildren(renderer.domElement);
   const scene = new THREE.Scene(), passage = makeCorePassage();
   const room = createCoreMirrorRoom(size, passage.uniforms);
-  const probe = createCoreMirrorProbe(mobile ? 32 : 64);
+  let probe = createCoreMirrorProbe(mobile ? 32 : 64);
   const rims = createCorePortalRims(passage.uniforms);
   scene.add(room.group, rims.group);
   const unregisterRims = addMirrorSubject(rims.layers[1].mesh);
@@ -58,7 +58,17 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
     return pixels;
   };
   const diff = (a, b) => a.reduce((total, v, i) => total + (i % 4 !== 3 && Math.abs(v - b[i]) > 2 ? 1 : 0), 0);
+  const whiteFraction = pixels => {
+    let white = 0;
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) white++;
+    return white / (width * height);
+  };
   try {
+    // Measure base mirror feedback independently, before any charge is drawn.
+    for (let i = 0; i < 8; i++) take();
+    const baseline = take();
+    probe.dispose(); probe = createCoreMirrorProbe(mobile ? 32 : 64);
+    room.uniforms.uMirrorEnv.value = null; room.uniforms.uMirrorLive.value = 0;
     update(.42); const entry = take();
     update(.5); const centre = take();
     update(.58); const exit = take();
@@ -72,13 +82,13 @@ window.checkChargedMirrors = ({ mobile = false, size = 3 } = {}) => {
     update(.57, { paused: true }); const paused = take(false);
     update(.5); const direct = take();
     room.uniforms.uChargeLevel.value = 0; const uncharged = take(false);
-    // The center subject should remain distinguishable, not a white flare.
-    let white = 0;
-    for (let i = 0; i < centre.length; i += 4) if (centre[i] > 245 && centre[i + 1] > 245 && centre[i + 2] > 245) white++;
-    update(.5); take();
+    // Also test many recursive bounces, not just the initial charge crest.
+    update(.5); for (let i = 0; i < 8; i++) take();
+    const settled = take();
     return { entryToCentre: diff(entry, centre), centreToExit: diff(centre, exit),
       staticReducedMotion: diff(calm, calmLater), staticReducedFlashing: diff(flashCalm, flashCalmLater), staticPaused: diff(beforePause, paused),
-      visibleCharge: diff(direct, uncharged), whiteFraction: white / (width * height),
+      visibleCharge: diff(direct, uncharged), whiteFraction: whiteFraction(centre),
+      baselineWhiteFraction: whiteFraction(baseline), settledWhiteFraction: whiteFraction(settled),
       error: renderer.getContext().getError(), programs: renderer.info.programs.length,
       meshes: room.group.children.length, rimPools: rims.group.children.length, rimCount: rims.layers[1].mesh.count };
   } finally {
@@ -96,6 +106,8 @@ async function verify(page, info, mobile) {
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   for (const size of [3, 15]) {
     const result = await page.evaluate(options => window.checkChargedMirrors(options), { mobile, size });
+    console.log('Charged mirror metrics:', JSON.stringify({ mobile, size, ...result }));
+    await page.screenshot({ path: info.outputPath('charged-mirrors-' + size + '.png') });
     expect(errors).toEqual([]);
     expect(result.error).toBe(0);
     expect(result.entryToCentre, JSON.stringify(result)).toBeGreaterThan(100);
@@ -104,12 +116,13 @@ async function verify(page, info, mobile) {
     expect(result.staticReducedMotion).toBe(0);
     expect(result.staticPaused).toBe(0);
     expect(result.staticReducedFlashing).toBe(0);
-    expect(result.whiteFraction).toBeLessThan(.08);
+    expect(result.whiteFraction, JSON.stringify(result)).toBeLessThan(.08);
+    expect(result.baselineWhiteFraction, JSON.stringify(result)).toBeLessThan(.08);
+    expect(result.settledWhiteFraction, JSON.stringify(result)).toBeLessThan(.08);
     expect(result.meshes).toBe(2);
     expect(result.rimPools).toBe(2);
     expect(result.rimCount).toBe(2);
     expect(result.programs).toBeLessThanOrEqual(7);
-    await page.screenshot({ path: info.outputPath('charged-mirrors-' + size + '.png') });
   }
 }
 
