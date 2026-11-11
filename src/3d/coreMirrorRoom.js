@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { CORE_MIRROR_HALF, corePassageGLSL } from './corePassage.js';
 import { withPortalCutout } from './portalCutout.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
+import { makeCoreMirrorCharge, coreMirrorChargeGLSL } from './coreMirrorCharge.js';
 import { MIRROR_LAYER, createMirrorCaptureScene } from './mirrorSubjects.js';
+import { coreWallCrossingsInto } from './corePortalRims.js';
+import { mirrorPanelIntervals } from './coreMirrorPanels.js';
 
 // The hollow inside the antipodal core that a WORM ride passes through is a room
-// of real mirrors. Each wall is the core face's own grid, size × size, and each
-// mirror is stained with the colour of the core sticker it sits behind (the
-// cube's live state, as the core shows it). What they reflect is captured live:
+// of real mirrors. Each wall starts as the core face's own size × size grid.
+// During a ride its panels fit around the actual openings; each panel takes
+// the nearest core sticker's live colour. What they reflect is captured live:
 // a cube camera at the room's centre renders the room (worm, bands, lightning
 // and the other walls) on a bounded capture clock, and every mirror samples it
 // box-projected onto the room's own walls, so a reflection sits where a flat
@@ -23,6 +26,7 @@ varying vec3 vMirrorWorld;
 varying vec3 vMirrorNormal;
 varying vec3 vMirrorTint;
 varying vec2 vMirrorUv;
+varying vec3 vMirrorLocal;
 void main() {
   vec4 local = vec4(position, 1.0);
   mat3 toWorld = mat3(modelMatrix);
@@ -30,9 +34,15 @@ void main() {
   local = instanceMatrix * local;
   toWorld = toWorld * mat3(instanceMatrix);
 #endif
+  vMirrorLocal = local.xyz;
   vec4 world = modelMatrix * local;
   vMirrorWorld = world.xyz;
-  vMirrorNormal = normalize(toWorld * normal);
+  // Adaptive panels stretch each tile nonuniformly. Correct each orthogonal
+  // TRS column before transforming bevel normals (the core has uniform scale).
+  // This is the instancing normal correction used by Three, without inverse()
+  // so it also works in WebGL1.
+  vec3 normalScale = vec3(dot(toWorld[0], toWorld[0]), dot(toWorld[1], toWorld[1]), dot(toWorld[2], toWorld[2]));
+  vMirrorNormal = normalize(toWorld * (normal / normalScale));
 #ifdef USE_INSTANCING_COLOR
   vMirrorTint = instanceColor;
 #else
@@ -50,6 +60,8 @@ varying vec3 vMirrorWorld;
 varying vec3 vMirrorNormal;
 varying vec3 vMirrorTint;
 varying vec2 vMirrorUv;
+
+${coreMirrorChargeGLSL}
 
 // Where the reflected ray leaves the room, seen from the capture point.
 vec3 mirrorBoxProject(vec3 p, vec3 r) {
@@ -75,6 +87,7 @@ void main() {
   // A polished bevel round each mirror catches the light.
   float edge = min(min(vMirrorUv.x, 1.0 - vMirrorUv.x), min(vMirrorUv.y, 1.0 - vMirrorUv.y));
   color += (1.0 - smoothstep(0.0, 0.07, edge)) * 0.14;
+  color += mirrorCharge(vMirrorUv, vMirrorLocal / ${CORE_MIRROR_HALF.toFixed(8)});
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -100,7 +113,9 @@ export function createCoreMirrorRoom(size, uniforms) {
   group.name = 'anticube-mirror-room';
   const pitch = CORE_MIRROR_HALF * 2 / size;
   const geometry = createPlayStickerGeometry(.95);
+  const charge = makeCoreMirrorCharge();
   const mirrorUniforms = {
+    ...charge.uniforms,
     uMirrorEnv: { value: null },
     uMirrorLive: { value: 0 },
     uMirrorBoxMin: { value: new THREE.Vector3(-1, -1, -1) },
@@ -109,8 +124,9 @@ export function createCoreMirrorRoom(size, uniforms) {
   };
   const material = withPortalCutout(new THREE.ShaderMaterial({
     name: 'anticube-mirror', uniforms: mirrorUniforms, vertexShader, fragmentShader, toneMapped: false,
-  }), uniforms, corePassageGLSL, 'core-mirror', true);
-  const tiles = new THREE.InstancedMesh(geometry, material, 6 * size * size);
+    extensions: { derivatives: true },
+  }), uniforms, corePassageGLSL, 'core-mirror');
+  const tiles = new THREE.InstancedMesh(geometry, material, 6 * (size + 6) * (size + 6));
   tiles.name = 'anticube-mirror-tiles';
   tiles.frustumCulled = false;
   // Lay each wall out in the same (col, row) order coreMirrorTileKeys names them.
@@ -131,30 +147,90 @@ export function createCoreMirrorRoom(size, uniforms) {
       pose.updateMatrix(); tiles.setMatrixAt(index++, pose.matrix);
     }
   }
+  tiles.count = index;
   tiles.instanceMatrix.needsUpdate = true;
   // The mirrors reflect each other; the backing behind them never shows.
   tiles.layers.enable(MIRROR_LAYER);
-  tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(tiles.count * 3).fill(0.7), 3);
+  tiles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(tiles.instanceMatrix.count * 3).fill(0.7), 3);
   const backingGeometry = new THREE.BoxGeometry(CORE_MIRROR_HALF * 2 + .001, CORE_MIRROR_HALF * 2 + .001, CORE_MIRROR_HALF * 2 + .001);
   const backingMaterial = withPortalCutout(new THREE.MeshBasicMaterial({ color: '#10161f', side: THREE.BackSide }),
     uniforms, corePassageGLSL, 'core-mirror-backing');
   const backing = new THREE.Mesh(backingGeometry, backingMaterial);
   group.add(backing, tiles);
-  const keys = coreMirrorTileKeys(size);
+  let keys = coreMirrorTileKeys(size), layoutSignature = '', tintIndex = null, tintRgb = null;
+  const crossings = [], localCenter = new THREE.Vector3();
+  const passageEnds = { entry: new THREE.Vector3(), exit: new THREE.Vector3(), active: false };
+  const applyTints = () => {
+    if (!tintIndex || !tintRgb) return;
+    const out = tiles.instanceColor.array;
+    keys.forEach((key, i) => {
+      const at = tintIndex.get(key);
+      if (at === undefined) return;
+      out[i * 3] = tintRgb[at * 3]; out[i * 3 + 1] = tintRgb[at * 3 + 1]; out[i * 3 + 2] = tintRgb[at * 3 + 2];
+    });
+    tiles.instanceColor.clearUpdateRanges(); tiles.instanceColor.addUpdateRange(0, tiles.count * 3);
+    tiles.instanceColor.needsUpdate = true;
+  };
   return {
-    group, tiles, backing, material, uniforms: mirrorUniforms,
-    /** Stain each mirror with its core sticker's colour (rgb: linear, 3 per sticker). */
-    setTints(stickerIndex, rgb) {
-      const out = tiles.instanceColor.array;
-      keys.forEach((key, i) => {
-        const at = stickerIndex.get(key);
-        if (at === undefined) return;
-        out[i * 3] = rgb[at * 3]; out[i * 3 + 1] = rgb[at * 3 + 1]; out[i * 3 + 2] = rgb[at * 3 + 2];
-      });
-      tiles.instanceColor.needsUpdate = true;
+    group, tiles, backing, material, charge, uniforms: mirrorUniforms, passageEnds,
+    updateLayout(passage, zoom) {
+      const active = uniforms.uPassageOpen.value > .5;
+      const signature = active ? `${passage.signature}:${zoom}` : 'closed';
+      if (signature === layoutSignature) return;
+      layoutSignature = signature;
+      const center = uniforms.uCoreRoomCenter.value;
+      const count = active ? coreWallCrossingsInto(crossings, uniforms.uPassagePoints.value, center, CORE_MIRROR_HALF * zoom) : 0;
+      passageEnds.active = count >= 2;
+      if (count) {
+        let first = crossings[0], last = crossings[0];
+        for (let i = 1; i < count; i++) {
+          if (crossings[i].routeOrder < first.routeOrder) first = crossings[i];
+          if (crossings[i].routeOrder > last.routeOrder) last = crossings[i];
+        }
+        passageEnds.entry.copy(first.center).sub(center).divideScalar(zoom);
+        passageEnds.exit.copy(last.center).sub(center).divideScalar(zoom);
+      }
+      keys = []; let index = 0;
+      for (let face = 0; face < NORMALS.length; face++) {
+        const faceNormal = NORMALS[face];
+        const axis = faceNormal.findIndex(value => value !== 0), sign = faceNormal[axis];
+        const others = [0, 1, 2].filter(i => i !== axis);
+        const centers = [[], []];
+        for (let i = 0; i < count; i++) {
+          const crossing = crossings[i];
+          if (crossing.axis !== axis || crossing.sign !== sign) continue;
+          localCenter.copy(crossing.center).sub(center).divideScalar(zoom);
+          centers[0].push(localCenter.getComponent(others[0])); centers[1].push(localCenter.getComponent(others[1]));
+        }
+        const radius = uniforms.uPassageRadius.value / zoom;
+        const columns = mirrorPanelIntervals(CORE_MIRROR_HALF, size, centers[0], radius);
+        const rows = mirrorPanelIntervals(CORE_MIRROR_HALF, size, centers[1], radius);
+        normal.fromArray(faceNormal).negate();
+        pose.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        // A face's local geometry axes may be swapped by its orientation.
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(pose.quaternion);
+        const rightAxis = Math.abs(right.getComponent(others[0])) > .5 ? 0 : 1;
+        for (const row of rows) for (const column of columns) {
+          point.set(0, 0, 0).setComponent(axis, sign * CORE_MIRROR_HALF)
+            .setComponent(others[0], column.center).setComponent(others[1], row.center);
+          pose.position.copy(point);
+          pose.scale.set(rightAxis === 0 ? column.width : row.width, rightAxis === 0 ? row.width : column.width, pitch);
+          pose.updateMatrix(); tiles.setMatrixAt(index++, pose.matrix);
+          const grid = [0, 0, 0]; grid[axis] = sign > 0 ? size - 1 : 0;
+          grid[others[0]] = column.index; grid[others[1]] = row.index;
+          keys.push(`${grid[0]},${grid[1]},${grid[2]},${FACES[face]}`);
+        }
+      }
+      if (index > tiles.instanceMatrix.count) throw new RangeError('Mirror panel layout exceeds pooled capacity');
+      tiles.count = index;
+      tiles.instanceMatrix.clearUpdateRanges(); tiles.instanceMatrix.addUpdateRange(0, index * 16);
+      tiles.instanceMatrix.needsUpdate = true;
+      applyTints();
     },
+    /** Stain each panel with its nearest core sticker's colour (linear rgb). */
+    setTints(stickerIndex, rgb) { tintIndex = stickerIndex; tintRgb = rgb; applyTints(); },
     dispose() {
-      geometry.dispose(); material.dispose(); backingGeometry.dispose(); backingMaterial.dispose();
+      tiles.dispose(); geometry.dispose(); material.dispose(); backingGeometry.dispose(); backingMaterial.dispose();
     }
   };
 }
@@ -219,10 +295,12 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
       const activeFace = renderer.getActiveCubeFace?.() ?? 0;
       const mip = renderer.getActiveMipmapLevel?.() ?? 0;
       const xr = renderer.xr.enabled;
+      const chargeCapture = room.uniforms.uChargeCapture.value;
       const end = Math.min(6, face + Math.max(1, faces));
       try {
         if (shadows) { shadows.autoUpdate = false; shadows.needsUpdate = false; }
         renderer.xr.enabled = false;
+        room.uniforms.uChargeCapture.value = 1;
         for (; face < end; face++) {
           renderer.setRenderTarget(targets[next], face, 0);
           renderer.render(reflected, camera.children[face]);
@@ -231,6 +309,7 @@ export function createCoreMirrorProbe(resolution, type = THREE.UnsignedByteType)
         if (shadows) { shadows.autoUpdate = autoShadow; shadows.needsUpdate = shadowDirty; }
         renderer.setRenderTarget(target, activeFace, mip);
         renderer.xr.enabled = xr;
+        room.uniforms.uChargeCapture.value = chargeCapture;
       }
       if (face < 6) return;
       room.uniforms.uMirrorEnv.value = targets[next].texture;

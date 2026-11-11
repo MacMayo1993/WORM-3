@@ -55,7 +55,7 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     for (const side of [0, 1]) {
       const mouth = scene.getObjectByName(`tunnel-interior-mouth-${side}`);
       expect(mouth.visible).toBe(true);
-      expect(mouth.geometry.parameters.openEnded).toBe(true);
+      expect(mouth.geometry.parameters.points.every(point => point.x > 0)).toBe(true);
     }
     const body = scene.getObjectByName('antipodal-core-body').material;
     const sticker = scene.getObjectByName('antipodal-core-stickers').material;

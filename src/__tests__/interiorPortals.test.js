@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_PASSAGE_EXTENT } from '../3d/corePassage.js';
-import { makeInteriorPortals, syncInteriorPortals, INTERIOR_PORTAL_FACE_CAPACITY } from '../worm/healerWorm/interiorPortals.js';
+import { makeInteriorPortals, syncInteriorPortals, INTERIOR_PORTAL_FACE_CAPACITY, INTERIOR_PORTAL_RADIUS } from '../worm/healerWorm/interiorPortals.js';
 import { tunnelPathArcPointInto } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
@@ -51,9 +51,11 @@ describe('interior portal openings', () => {
           expect(center.dot(normal)).toBeCloseTo(half, 7);
           expect(portals.mouths[side].position.distanceTo(center)).toBe(0);
           expect(new THREE.Vector3(0, 0, 1).applyQuaternion(portals.mouths[side].quaternion)
-            .distanceTo(portals.axes[side])).toBeLessThan(1e-10);
+            .distanceTo(portals.normals[side])).toBeLessThan(1e-10);
         }
-        expect(portals.mouths[0].geometry.parameters.openEnded).toBe(true);
+        const profile = portals.mouths[0].geometry.parameters.points;
+        expect(profile.every(point => point.x >= INTERIOR_PORTAL_RADIUS)).toBe(true); // no cap or narrower throat
+        expect(profile.some(point => point.y < -.10)).toBe(true); // lip sits in front of the dimmer
       }
       syncInteriorPortals(portals, null, 3, 0);
       expect(portals.uniforms.uInteriorOpen.value).toBe(0);
