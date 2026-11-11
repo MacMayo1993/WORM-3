@@ -199,6 +199,7 @@ jobs:
           path: |
             test-results/**/charged-mirrors-*.png
             test-results/**/centred-bent-exit*.png
+            test-results/**/traversal-*.png
           if-no-files-found: ignore
           retention-days: 7
 
