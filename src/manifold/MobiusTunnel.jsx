@@ -572,7 +572,7 @@ const MobiusTunnel = ({
     let whipAmp = 0;
     let whipPhase = 0;
     if (formationState.wormHealerMode) {
-      const reduced = formationState.settings?.reducedMotion || prefersReducedMotion();
+      const reduced = formationState.settings?.reducedMotion || formationState.settings?.reduceFlashing || prefersReducedMotion();
       if (reduced) formationAge.current = PLATFORM_FORMATION_SECONDS;
       else if (!platformFormationHeld(formationState)) formationAge.current += Math.min(delta, .05);
       const progress = Math.min(1, formationAge.current / PLATFORM_FORMATION_SECONDS);

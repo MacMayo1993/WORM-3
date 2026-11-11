@@ -20,8 +20,7 @@ import { makeCubies } from './src/game/cubeState.js';
 import { tunnelState } from './src/worm/tunnelProgressBridge.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from './src/worm/tunnelCameraRails.js';
 import { frameRide } from './src/worm/rideFraming.js';
-import { getTunnelWorldPosSmoothInto, buildTunnelPathForTunnel } from './src/worm/wormLogic.js';
-import { makeTunnelPath } from './src/utils/tunnelPath.js';
+import { getTunnelWorldPosSmoothInto } from './src/worm/wormLogic.js';
 import { tunnelCoreClipUniforms } from './src/manifold/tunnelCoreClip.js';
 import { tunnelCameraClearanceGLSL, tunnelCameraUniforms, syncTunnelCamera } from './src/manifold/tunnelCameraClearance.js';
 import { makeCautionOpeningUniforms } from './src/worm/healerWorm/cautionOpening.js';
@@ -100,7 +99,7 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
   store.getState().advance(time+=1/30);
   useGameStore.setState({settings:{...useGameStore.getState().settings,reducedMotion:false}});
   const take = () => { renderer.setRenderTarget(null); renderer.render(scene,camera); return canvas.toDataURL('image/png').split(',')[1]; };
-  window.traversalFrame = (t, label) => {
+  window.traversalFrame = t => {
     getTunnelWorldPosSmoothInto(head,tunnel,t,size); marker.position.copy(head);
     tunnelState.rideHead=head;
     for(let i=0;i<2;i++) {
@@ -111,34 +110,22 @@ window.startTraversal = async ({ mobile, route = 'corner', size = 9 }) => {
     }
     const pixels=new Uint8Array(width*height*4), gl=renderer.getContext();
     const image=take();
+    const screen=head.clone().project(camera), sample=new Uint8Array(4);
+    const headPixel=()=>{gl.readPixels(Math.round((screen.x+1)*width/2),Math.round((screen.y+1)*height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,sample);return Array.from(sample);};
+    const shown=headPixel();
     const visibleBand=band.getObjectByName('tunnel-styled-half-0');
     const grown=visibleBand.material.uniforms.uGrowT.value;
     gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
     let white=0; for(let i=0;i<pixels.length;i+=4) if(pixels[i]>245&&pixels[i+1]>245&&pixels[i+2]>245)white++;
     // Separate the occupied band's geometry from the chrome/mirror shell.
-    band.visible=false; const withoutBand=take(); band.visible=true;
+    band.visible=false; const withoutBand=take(), unobstructed=headPixel(); band.visible=true;
     // Counterfactual: render this same frame with only the old short lens
     // capsule, so the screenshot records the previously occluding strip.
     tunnelCameraUniforms.uTunnelSightEnd.value.copy(camera.position);
-    const oldClearance=take();
+    const oldClearance=take(), oldHead=headPixel();
     tunnelCameraUniforms.uTunnelSightEnd.value.copy(head);
-    const path=buildTunnelPathForTunnel(makeTunnelPath(),tunnel,size);
-    const shell=tunnelCoreClipUniforms;
-    const meshes=[]; band.traverse(o=>{if(o.isMesh&&o.visible&&o.name.startsWith('tunnel-styled'))meshes.push(o);});
-    let exposedCrossing=0;
-    for(const mesh of meshes.slice(0,1)) {
-      const g=mesh.geometry, p=g.attributes.position, uv=g.attributes.uv, idx=g.index;
-      const lo=path.armALen/path.total, hi=1-path.armBLen/path.total;
-      const point=new THREE.Vector3();
-      for(let i=0;i<idx.count;i+=3) {
-        const ids=[idx.getX(i),idx.getX(i+1),idx.getX(i+2)];
-        if(!ids.every(v=>uv.getY(v)>=lo-1e-6&&uv.getY(v)<=hi+1e-6))continue;
-        for(const v of ids){point.fromBufferAttribute(p,v).sub(shell.uTunnelCoreCenter.value);
-          if(Math.max(...point.toArray().map(Math.abs))>shell.uTunnelCoreHalf.value)exposedCrossing++;}
-      }
-    }
-    return {label,image,withoutBand,oldClearance,grown,t,lensT:pose.lensT,zoom:tunnelState.coreZoom,exposedCrossing,
-      whiteFraction:white/(width*height),error:gl.getError()};
+    return {image,withoutBand,oldClearance,grown,t,lensT:pose.lensT,zoom:tunnelState.coreZoom,
+      shown,unobstructed,oldHead,whiteFraction:white/(width*height),error:gl.getError()};
   };
   window.stopTraversal = async () => { root.unmount(); await new Promise(resolve=>setTimeout(resolve,20)); env.dispose();pmrem.dispose();environment.dispose();marker.geometry.dispose();marker.material.dispose();renderer.dispose(); };
 };` }
@@ -156,10 +143,11 @@ async function verify(page, info, mobile) {
   expect(sight.clear).toEqual([0,255,0,255]);
   for(const key of ['retainedEdge','oldOcclusion','idle','beyondHead']) expect(sight[key],key).toEqual([0,0,0,255]);
   expect(sight.error).toBe(0);
+  let checkedHeads=0, formerlyHidden=0;
   for(const route of ['corner','return','straight']) {
     await page.evaluate(options=>window.startTraversal(options),{mobile,route,size:9});
     expect(errors).toEqual([]);
-    for(const t of (route === 'corner' ? [.39,.50,.72] : route === 'return' ? [.31,.50,.72] : [.39,.50,.72])) {
+    for(const t of (route === 'return' ? [.31,.50,.72] : [.39,.50,.72])) {
       const result=await page.evaluate(t=>window.traversalFrame(t),t);
       const {image,withoutBand,oldClearance,...stats}=result;
       console.log('Traversal',JSON.stringify({mobile,route,...stats}));
@@ -167,12 +155,20 @@ async function verify(page, info, mobile) {
       await writeFile(info.outputPath(name+'.png'),Buffer.from(image,'base64'));
       await writeFile(info.outputPath(name+'-no-band.png'),Buffer.from(withoutBand,'base64'));
       await writeFile(info.outputPath(name+'-old-clearance.png'),Buffer.from(oldClearance,'base64'));
+      const green=p=>p[1]>p[0]+45 && p[1]>p[2]+45;
+      if(green(result.unobstructed)) {
+        checkedHeads++;
+        expect(result.shown,'the patterned band must not hide the head').toEqual(result.unobstructed);
+        if(!green(result.oldHead)) formerlyHidden++;
+      }
       expect(result.grown).toBe(1);
       expect(result.error).toBe(0);
       expect(errors).toEqual([]);
     }
     await page.evaluate(()=>window.stopTraversal());
   }
+  expect(checkedHeads).toBeGreaterThan(1);
+  expect(formerlyHidden,'the production scene must reproduce the old obstruction').toBeGreaterThan(0);
 }
 test('patterned traversal approaches and crosses the anticube without render artifacts',async({page},info)=>verify(page,info,false));
 test('patterned traversal approaches and crosses the anticube without render artifacts @phone',async({page},info)=>verify(page,info,true));

@@ -120,6 +120,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
       ...useGameStore.getState().settings, reduceFlashing: true
     } })); frame(); frame();
     expect(sharedTime.value).toBe(held);
+    expect(halves[0].material.uniforms.uGrowT.value).toBe(1);
     await act(async () => useGameStore.setState({ wormPaused: true, settings: {
       ...useGameStore.getState().settings, reduceFlashing: false
     } }));
