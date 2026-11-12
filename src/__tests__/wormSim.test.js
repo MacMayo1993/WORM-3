@@ -27,6 +27,7 @@ import {
 } from '../worm/healerWorm/wormSim.js';
 import {
   MAX_TICK_DELTA,
+  MAX_TAIL,
   BOOST_DURATION,
   BOOST_COOLDOWN,
   MAX_JUMPS,
@@ -1099,6 +1100,21 @@ describe('flipped tiles and tunnel traversal', () => {
 });
 
 describe('orb pickup', () => {
+  it('counts a collected orb at the tail cap without crediting material or a color', () => {
+    const sim = makeSim();
+    sim.tailLength = MAX_TAIL;
+    sim.powerups = [{ x: 1, y: 2, z: 2, dirKey: 'PZ', type: 'apple', respawn: false }];
+    const ctx = makeCtx({ getCubies: () => makeCubies(SIZE) });
+    run(sim, ctx, 1.1);
+    expect(sim.tailLength).toBe(MAX_TAIL);
+    expect(sim.orbPickupColors).toEqual([]);
+    expect(sim.orbPickupSegments).toEqual([]);
+    const pickups = eventsOf(ctx, 'pickup');
+    expect(pickups).toHaveLength(1);
+    expect(pickups[0].args[4]).toBe(0);
+    expect(pickups[0].args[5]).toBe(false);
+    expect(sim.powerups).toHaveLength(0);
+  });
   it.each([false, true])('collects a settled cascade orb once with normal growth (story=%s)', story => {
     const sim = makeSim();
     const cubies = makeCubies(SIZE);
@@ -1132,6 +1148,7 @@ describe('orb pickup', () => {
     run(sim, ctx, 1.1);
     expect(sim.tailLength).toBe(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH);
     expect(sim.orbPickupColors).toHaveLength(1);
+    expect(sim.orbPickupSegments).toEqual([ORB_SEGMENT_GROWTH]);
     expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
     expect(eventsOf(ctx, 'powerups')).toHaveLength(1); // replacement orb published
     expect(sim.powerups).toHaveLength(1); // respawned elsewhere

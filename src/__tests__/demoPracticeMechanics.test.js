@@ -34,6 +34,21 @@ function fixture(lesson) {
 }
 beforeEach(resetLiveRotation);
 
+it('seeds healing practice with exactly two tracked three-segment pickups', () => {
+  const { sim, practice } = fixture({ id: 'heal' });
+  expect(sim.orbPickupSegments).toEqual([3, 3]);
+  expect(Object.values(practice.inventory).reduce((sum, n) => sum + n, 0)).toBe(6);
+});
+
+it('does not turn a long plain demo body into orb material on its first pickup', () => {
+  const f = fixture({ id: 'core-pass' });
+  const before = f.sim.tailLength;
+  f.sim.powerups = [{ ...f.sim.pos, y: f.sim.pos.y + 1, type: 'apple', respawn: false }];
+  f.until(() => f.state.wormSessionOrbs === 1);
+  expect(f.sim.tailLength).toBe(before + 3);
+  expect(f.sim.orbPickupSegments).toEqual([3]);
+});
+
 it.each(SPECIAL_TYPES)('stages %s through the canonical real pickup path', id => {
   const { sim } = fixture({ id });
   expect(sim.specials[0]).toMatchObject({ type: id, y: 2 });

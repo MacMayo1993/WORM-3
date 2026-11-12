@@ -50,6 +50,7 @@ export function stageDemoSignature(sim, size, lesson, practice, cubies, inventor
     colors.forEach(id => { inventory[id] = ORB_SEGMENT_GROWTH; });
     sim.tailLength = BASE_TAIL_LENGTH + 2 * ORB_SEGMENT_GROWTH;
     sim.orbPickupFaceIds = colors; sim.orbPickupColors = colors.map(orbColor);
+    sim.orbPickupSegments = Array(2).fill(ORB_SEGMENT_GROWTH);
     practice.target = target;
     practice.signature.inventory = { ...inventory };
     practice.signature.entryFace = face;

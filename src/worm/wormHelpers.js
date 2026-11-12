@@ -1,3 +1,4 @@
+import { ensureOrbSegments, cutCarriedOrbs } from './healerWorm/carriedOrbs.js';
 import * as THREE from 'three';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { ANTIPODAL_COLOR, DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
@@ -14,7 +15,7 @@ import {
     ORB_SEGMENT_GROWTH,
     WORM_LIFT,
 } from './healerWorm/constants.js';
-import { orbsCarried, splitRemovedSegments } from './healerWorm/economy.js';
+import { orbsCarried } from './healerWorm/economy.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { findSlicePathHit, clipSliceHistory } from './healerWorm/sliceBodyPath.js';
 import { trampolineSupport } from './healerWorm/trampoline.js';
@@ -308,10 +309,11 @@ export function resolveSliceHits(worm, axis, layers, size, opts) {
 }
 
 // Remove all worm segments at and beyond cutTrailIdx.
-export function reconcileOrbInventoryAfterCut(inventory, removedFaceIds, segmentCapacity) {
+export function reconcileOrbInventoryAfterCut(inventory, removedFaceIds, segmentCapacity, removedSegments) {
     const nextInventory = { ...(inventory ?? {}) };
-    for (const faceId of removedFaceIds) {
-        nextInventory[faceId] = Math.max(0, (nextInventory[faceId] ?? 0) - ORB_SEGMENT_GROWTH);
+    for (let i = 0; i < removedFaceIds.length; i++) {
+        const faceId = removedFaceIds[i];
+        nextInventory[faceId] = Math.max(0, (nextInventory[faceId] ?? 0) - (removedSegments?.[i] ?? ORB_SEGMENT_GROWTH));
     }
     let excess = Object.values(nextInventory).reduce((sum, n) => sum + (n || 0), 0) - segmentCapacity;
     for (const faceId of [1, 2, 3, 4, 5, 6]) {
@@ -340,26 +342,21 @@ export function cutWormTail(worm, cut) {
         worm.tailLength.current = Math.min(worm.tailLength.current, Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING)));
     }
     const orbsLeft = orbsCarried(worm.tailLength.current);
-    const removedFaceIds = worm.orbPickupFaceIdsRef?.current?.slice(orbsLeft) ?? [];
-    const removedColors = worm.orbPickupColorsRef.current.slice(orbsLeft);
-    const droppedVisualOrbs = worm.orbPickupColorsRef.current.length > orbsLeft;
-    if (droppedVisualOrbs) {
-        worm.orbPickupColorsRef.current.length = orbsLeft;
-        worm.colorEpochRef.current++;
-    }
-    if (worm.orbPickupFaceIdsRef?.current?.length > orbsLeft) {
-        worm.orbPickupFaceIdsRef.current.length = orbsLeft;
-    }
-    // The reserve is spendable body material, not a lifetime pickup counter. Remove
-    // the sliced-off orbs by face, then cap the total to the tail's exact remaining
-    // segment capacity (also repairs partial-orb cuts and Prism deposit ordering).
+    const carried = {
+        orbPickupColors: worm.orbPickupColorsRef.current,
+        orbPickupFaceIds: worm.orbPickupFaceIdsRef?.current ?? [],
+        orbPickupSegments: worm.orbPickupSegmentsRef?.current,
+    };
+    ensureOrbSegments(carried, lengthBefore - BASE_TAIL_LENGTH);
     const segmentCapacity = Math.max(0, worm.tailLength.current - BASE_TAIL_LENGTH);
+    const lost = cutCarriedOrbs(carried, segmentCapacity);
+    if (worm.orbPickupSegmentsRef) worm.orbPickupSegmentsRef.current = carried.orbPickupSegments;
+    if (lost.colors.length) worm.colorEpochRef.current++;
     useGameStore.setState((state) => ({
         wormBodyTiles: orbsLeft,
         wormOrbInventory: reconcileOrbInventoryAfterCut(
-            state.wormOrbInventory, removedFaceIds, segmentCapacity
+            state.wormOrbInventory, lost.faceIds, segmentCapacity, lost.segments
         ),
     }));
-    const segments = splitRemovedSegments(lengthBefore - worm.tailLength.current, removedColors.length);
-    return { faceIds: removedFaceIds, colors: removedColors, segments };
+    return lost;
 }

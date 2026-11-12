@@ -11,7 +11,8 @@ import { wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { makeTunnelBodyProfile, blendTunnelBodyProfile, fitTunnelBodyInto, tunnelBodyDistance } from './tunnelBodyFit.js';
 import { MOBI_RADIUS } from '../mobiModel.js';
-import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
+import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
+import { resetCarriedOrbCursor, advanceCarriedOrbCursor } from '../carriedOrbAppearance.js';
 import { SPRING_COIL_SECONDS } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
@@ -167,7 +168,12 @@ export function WormBody({ worm, size }) {
     const mobiCoreRef = useRef();
     const mobiGasRef = useRef();
     const mobiFrameRef = useRef();
-    const characterGeometry = useMemo(() => createCharacterGeometry(wormCharacterId), [wormCharacterId]);
+    const characterGeometry = useMemo(() => {
+        const geometry = createCharacterGeometry(wormCharacterId);
+        geometry.setAttribute('wormOrbAccent', new THREE.InstancedBufferAttribute(new Float32Array(MAX_TAIL), 1));
+        return geometry;
+    }, [wormCharacterId]);
+    const orbCursor = useMemo(() => resetCarriedOrbCursor({}), []);
     const bindingMaterial = useMemo(() => createBookBindingMaterial(), []);
     useEffect(() => () => characterGeometry.dispose(), [characterGeometry]);
     useEffect(() => () => bindingMaterial.dispose(), [bindingMaterial]);
@@ -178,7 +184,7 @@ export function WormBody({ worm, size }) {
     // flatShading + body-surface displacement) — one material shared by every
     // instance of the sphere body, since only one skin is ever equipped at once.
     const haloRef = useRef();       // soft additive glow billboards (glow worm only)
-    const skinMaterial = useMemo(() => createWormSkinMaterial(), []);
+    const skinMaterial = useMemo(() => createWormSkinMaterial({ carriedOrbColors: true }), []);
     useEffect(() => {
         applySkinMaterialProfile(skinMaterial, getSkinFX(wormSkinId), 0);
         // After the profile, which resets emissiveIntensity from the skin.
@@ -470,6 +476,8 @@ export function WormBody({ worm, size }) {
         const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + 8) / BODY_BALL_SPACING) + 1) : tLen);
 
         const orbColors = worm.orbPickupColorsRef.current;
+        const orbSegments = worm.orbPickupSegmentsRef?.current;
+        resetCarriedOrbCursor(orbCursor);
         const baseColor = wormColorRef.current;
         const bellyCol = bellyColorRef.current;
 
@@ -504,10 +512,11 @@ export function WormBody({ worm, size }) {
         if (_isWiggle) _wiggleForward.fromArray(DIR_FORWARD[worm.pos.current.dirKey][worm.moveDir.current]);
         const skinDetail = _isWiggle ? getSkinFX(wormSkinId).bump?.amp ?? 0 : 0;
         for (let i = 0; i < visibleCount; i++) {
+            const hasOrbColor = advanceCarriedOrbCursor(orbCursor, i, orbColors, orbSegments);
             // A collected orb grows three simulation segments. MOBI renders one
             // larger block for each three, preventing overlapping glass boxes
             // from washing out the orb inside. Length/collision history is unchanged.
-            if (isMobi && i !== 0 && !isMobiBlockSegment(i, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH)) continue;
+            if (isMobi && i !== 0 && !(hasOrbColor ? orbCursor.block : isMobiBlockSegment(i, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH))) continue;
             // Every segment is drawn, however long the worm. There used to be a distance
             // LOD (every 2nd bead past 200, every 4th past 600), but beads sit
             // BODY_BALL_SPACING (0.09) apart at radius 0.105: every 4th left 0.36 gaps, and
@@ -834,7 +843,7 @@ export function WormBody({ worm, size }) {
             }
             if (isMobi) {
                 mobiFrameRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
-                const face = mobiCarriedFace(i, orbColors.length, worm.orbPickupFaceIdsRef.current);
+                const face = hasOrbColor ? worm.orbPickupFaceIdsRef.current[orbCursor.index] || 0 : 0;
                 const appearance = mobiPalette[face];
                 // Every capsule has gas. Only surviving collected capsules contain an orb.
                 mobiGasRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
@@ -886,40 +895,27 @@ export function WormBody({ worm, size }) {
 
             // Color per segment — only recomputed when colorDirty (see above)
             if (colorDirty) {
-                const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-                const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
-                if (_isPrism) {
+                if (orbCursor.accent) {
+                    // Inventory takes priority over every character's decorative
+                    // pattern, including Prism's moving rainbow and Glow's light.
+                    _bodyColor.set(orbColors[orbCursor.index]);
+                } else if (_isPrism) {
                     // Spectrum: a rainbow that flows down the body and scrolls over time.
                     prismColor(_bodyColor, i, reducedPickupMotion ? 0 : time);
-                } else if (i === 0 && _isGlow) {
-                    // Glow head — use base worm color; GlowWormAura point light IS the
-                    // bioluminescence. There was also an additive sphere at 1.4x the
-                    // bead on every other segment; a halo wider than its bead cannot
-                    // hide behind it, so the parts occluded by neighbouring beads were
-                    // depth-rejected and the surviving crescents squeezed out of every
-                    // joint as spikes growing off the body. Removed — the light carries
-                    // the character on its own, and the overlay was a whole instanced
-                    // mesh of up to MAX_TAIL instances per frame.
-                    _bodyColor.set(baseColor);
                 } else if (hasOrbColor) {
-                    // Each orb grows a trio of segments (ORB_SEGMENT_GROWTH): 2 in the worm's
-                    // own colour + 1 accent in the picked-up orb's colour — e.g. an emerald
-                    // worm that eats a yellow orb grows 2 emerald + 1 yellow. The accent sits
-                    // on the middle segment of the trio so each orb reads as one clean band
-                    // separated from its neighbours by the worm's base colour.
-                    const trioOffset = (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH;
-                    _bodyColor.set(trioOffset === 1 ? orbColors[orbPickupIndex] : baseColor);
+                    _bodyColor.set(baseColor);
                 } else {
                     // The character's pattern: the Brute's belly bands, the Dancer's
                     // stripes, the Ranger's saddle. Keyed on the segment, not its draw slot,
                     // so a bead culled near the lens in a tunnel never shifts the bands.
                     characterSegmentPattern(_bodyColor.set(baseColor), patternRef.current.character, patternRef.current.skin, i, _bookPageColor);
                 }
-                if (experience) {
+                if (experience && !orbCursor.accent) {
                     const shimmer = elementalBodyWave(element, characterTimeRef.current, i, tLen);
                     _bodyColor.lerp(elementalBodyRef.current.color, elementStrength * (0.12 + 0.38 * shimmer));
                 }
                 _bodyColor.lerp(pickupColor, pickupWave * 0.95);
+                characterGeometry.attributes.wormOrbAccent.setX(writeIdx, orbCursor.accent ? 1 : 0);
                 // Keep every glass exterior clear; carried parity colors live inside it.
                 if (!isMobi) mesh.setColorAt(writeIdx, _bodyColor);
                 if (_isBook) {
@@ -970,6 +966,7 @@ export function WormBody({ worm, size }) {
             }
         }
         if (mesh.instanceColor && colorDirty) uploadInstancePrefix(mesh.instanceColor, mesh.count);
+        if (colorDirty) uploadInstancePrefix(characterGeometry.attributes.wormOrbAccent, mesh.count);
 
         // Book worm boards share the spine's slots (meshes are only mounted when isBook).
         if (_isBook) {

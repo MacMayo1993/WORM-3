@@ -68,6 +68,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     sim.tailLength += 2 * ORB_SEGMENT_GROWTH;
     sim.orbPickupFaceIds = Array(2).fill(face);
     sim.orbPickupColors = Array(2).fill(orbColor(face));
+    sim.orbPickupSegments = Array(2).fill(ORB_SEGMENT_GROWTH);
   }
   if (lessonId === 'collect-heal') {
     // On the front face, growth cores have the antipodal colour: exactly the

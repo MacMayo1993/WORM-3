@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { makeWormSim, resetWormSim, stepWormSim } from '../worm/healerWorm/wormSim.js';
-import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
+import { makeWormSim, resetWormSim, stepWormSim, applyRotationToSim } from '../worm/healerWorm/wormSim.js';
+import { advanceTunnelHead, tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { resetLiveRotation, liveRotation } from '../worm/liveRotation.js';
 import { TUNNEL_HEAL_HOLD, DOUBLE_HEAL_HOLD, HEAL_PAUSE_DURATION } from '../worm/healerWorm/constants.js';
 import { makeHealBeat, stepHealBeat, healKickFov, HEAL_KICK_SECONDS, HEAL_KICK_FOV } from '../worm/healBeat.js';
@@ -103,6 +103,62 @@ describe('the tunnel heal beat in the sim', () => {
     expect(sim.healed).toBe(1);
     expect(sim.healPauseT).toBe(0);
     expect(sim.healBeatSeq).toBe(1); // the sound, the rings and the seal still play
+  });
+
+  it('keeps a paid reverse visit open through its whole exit flourish', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    const reverse = { entry: tunnelA.exit, exit: tunnelA.entry, padHeight: 0.5 };
+    sim.phase = sim.prevPhase = 'windout';
+    sim.activeTunnel = reverse;
+    // Exiting clears the current key before windout starts. The first visit
+    // owns the queued heal, while the latest visit still owns the landing.
+    sim.currentTunnelKey = null;
+    const first = passage(tunnelA, 'A', cleared(sim));
+    const latest = { tunnel: reverse, tunnelKey: 'A', exitDistance: cleared(sim), heal: null, clearFrame: false };
+    sim.tunnelPassages.push(first, latest);
+    settle(sim, ctx);
+    expect(sim.healed).toBe(0);
+    expect(sim.tunnelPassages).toHaveLength(2);
+
+    sim.activeTunnel = null;
+    sim.phase = sim.prevPhase = 'crawling';
+    settle(sim, ctx);
+    expect(sim.healed).toBe(1);
+    expect(sim.tunnelPassages).toHaveLength(0);
+  });
+
+  it('seals a paid pair once instead of collapsing its later unpaid passage first', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    const first = passage(tunnelA, 'A', cleared(sim));
+    const latest = { tunnel: { entry: tunnelA.exit, exit: tunnelA.entry }, tunnelKey: 'A',
+      exitDistance: cleared(sim), heal: null, clearFrame: false };
+    sim.tunnelPassages.push(first, latest);
+    sim.tunnelUseCounts.set('A', 3);
+    settle(sim, ctx);
+    expect(sim.healed).toBe(1);
+    expect(ctx.events.filter(e => e.type === 'feel' && e.args[0] === 'collapse')).toEqual([]);
+    expect(sim.voidTunnelKeys.size).toBe(0);
+    expect(sim.tunnelPassages).toHaveLength(0);
+  });
+
+  it('keeps the current exit passage attached through a slice turn', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.tailLength = 10;
+    sim.phase = sim.prevPhase = 'windout';
+    sim.activeTunnel = { ...tunnelA, padHeight: 0.3, padExpansion: 0 };
+    sim.pos = { ...tunnelA.exit };
+    advanceTunnelHead(sim, 'windout', 0, SIZE);
+    sim.tunnelPassages.push(passage(sim.activeTunnel, 'A', sim.stepHistory.distance));
+    stepWormSim(sim, 0.1, SIZE, ctx);
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'row', sliceIndex: 0, dir: 1 }, { inOpeningScramble: false, paused: false });
+    // The moved mouth can add enough recorded distance to clear a short tail,
+    // but it still must not seal while the head is finishing its exit flourish.
+    for (let i = 0; i < 5; i++) {
+      stepWormSim(sim, 0.05, SIZE, ctx);
+      expect(sim.phase).toBe('windout');
+      expect(sim.healed).toBe(0);
+    }
+    expect(sim.tunnelPassages[0].tunnel).toBe(sim.activeTunnel);
   });
 
   it('starts every run back at the bottom of the ladder', () => {

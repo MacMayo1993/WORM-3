@@ -200,6 +200,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         sev.count = sampleSeveredTail(worm, fromBead, sev.pieces);
         for (let i = 0; i < sev.count; i++) sev.pieces[i].ring = false;
         sev.orbColors = worm.orbPickupColorsRef.current.slice();
+        sev.orbSegments = worm.orbPickupSegmentsRef?.current?.slice();
         sev.active = sev.count > 0;
     };
     // A cut the worm survives: sever the tail, then burst the orbs it carried out
@@ -212,13 +213,15 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         captureSeveredTail(cut);
         const lost = cutWormTail(worm, cut);
         if (!lost?.faceIds.length && !lost?.colors.length) return;
-        // Lost orb j rode the middle bead of its trio; it bursts out of the severed
-        // piece nearest that bead, which then stays hidden (it became the orb).
+        // The first lost pickup may be a partial cut, and bonuses can be longer
+        // than three beads. Burst each payload from its actual removed material.
         const sev = severedRef.current;
-        const orbsLeft = worm.orbPickupColorsRef.current.length;
+        let firstBead = worm.tailLength.current;
         const froms = [];
         for (let j = 0; j < lost.colors.length; j++) {
-            const bead = BASE_TAIL_LENGTH + (orbsLeft + j) * ORB_SEGMENT_GROWTH + 1;
+            const count = lost.segments[j] ?? ORB_SEGMENT_GROWTH;
+            const bead = firstBead + Math.min(1, count - 1);
+            firstBead += count;
             let best = null;
             for (let i = 0; i < sev.count; i++) {
                 if (!best || Math.abs(sev.pieces[i].bead - bead) < Math.abs(best.bead - bead)) best = sev.pieces[i];

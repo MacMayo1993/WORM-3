@@ -71,12 +71,19 @@ const DISPLACE_GLSL = `
  * color/emissive tweaks (prism cycling, glow pulses) keep working untouched.
  */
 export function createWormSkinMaterial(options = {}) {
+  const { carriedOrbColors = false, ...materialOptions } = options;
   const material = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
     toneMapped: false,
-    ...options,
+    ...materialOptions,
   });
+  if (carriedOrbColors) {
+    material.defines = { ...material.defines, WORM_CARRIED_ORBS: '' };
+    // The separate Book head has no carried beads. Missing attributes must read
+    // as zero instead of inheriting the previous body's instanced buffer.
+    material.defaultAttributeValues = { wormOrbAccent: [0] };
+  }
   const contour = { value: 1 };
   material.userData.wormContour = contour;
 
@@ -94,18 +101,32 @@ export function createWormSkinMaterial(options = {}) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${NOISE_GLSL}\nuniform float uTime;\nuniform float uAmp;\nuniform float uFreq;\nuniform float uSpeed;\nuniform float uStyle;\nuniform float uSeed;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${DISPLACE_GLSL}`);
+    if (carriedOrbColors) {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float wormOrbAccent;\nvarying float vWormOrbAccent;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWormOrbAccent = wormOrbAccent;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vWormOrbAccent;');
+    }
     // The body's self-light takes the bead's own colour (instance or segment
     // colour included). A plain white emissive lifted every skin toward the
     // same pastel; tinted, Slime stays slime-green and Lava stays hot. The Glow
     // Worm untints it: its emissive is its bioluminescence colour.
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uEmissiveTint;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= mix(vec3(1.0), diffuseColor.rgb, uEmissiveTint);');
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance *= mix(vec3(1.0), diffuseColor.rgb, uEmissiveTint);
+        #ifdef WORM_CARRIED_ORBS
+          // Glow's skin-coloured self-light must not repaint an inventory band.
+          // Keep the normal body glow, but let each carried orb emit its own hue.
+          totalEmissiveRadiance = mix(totalEmissiveRadiance, diffuseColor.rgb,
+            vWormOrbAccent * (1.0 - uEmissiveTint));
+        #endif`);
 
     finishWormBodyShader(shader, contour);
     material.userData.shader = shader;
   };
-  material.customProgramCacheKey = () => 'worm-skin-contour-1';
+  material.customProgramCacheKey = () => `worm-skin-contour-2-${carriedOrbColors ? 'orbs' : 'plain'}`;
 
   return material;
 }

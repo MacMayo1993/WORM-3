@@ -163,13 +163,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Run carried orb color visual check
+        if: matrix.shard == 1
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: orb-color-report
+        run: npm run e2e -- e2e/orbColors.e2e.js --project="${{ matrix.project }}" --output=orb-color-results
+
+      - name: Upload carried orb color visual checks
+        if: always() && matrix.shard == 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: carried-orb-colors-${{ matrix.project }}
+          path: orb-color-results/**/glow-orb-colors.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       # Preserve every remaining test exactly once, even if the focused test
       # failed. Neither invocation allows failures; either makes this job red.
       - name: Run remaining browser tests
         if: ${{ !cancelled() && steps.production_build.outcome == 'success' }}
         run: |
           mapfile -d '' -t tests < <(
-            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' -print0 | sort -z
+            find e2e -type f -name '*.e2e.js' ! -path 'e2e/megaStorm.e2e.js' ! -path 'e2e/orbColors.e2e.js' -print0 | sort -z
           )
           if ((${#tests[@]})); then npm run e2e -- --project="${{ matrix.project }}" --fully-parallel --workers=1 --shard="${{ matrix.shard }}/2" "${tests[@]}"; fi
 
@@ -213,6 +228,8 @@ jobs:
             test-results/
             mega-storm-report/
             mega-storm-results/
+            orb-color-report/
+            orb-color-results/
           retention-days: 7
 
   # Retain the existing required-check name and block releases unless every
