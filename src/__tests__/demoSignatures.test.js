@@ -35,6 +35,8 @@ describe('optional character laboratory', () => {
   it('requires actual wildcard expenditure, healing, and a clear tail for Prism', () => {
     const w = setup('prism'), face = w.practice.signature.entryFace;
     expect(w.inventory[face]).toBe(0);
+    expect(w.sim.orbPickupSegments).toEqual([3, 3]);
+    expect(w.sim.orbPickupSegments.reduce((sum, n) => sum + n, 0)).toBe(Object.values(w.inventory).reduce((sum, n) => sum + n, 0));
     const args = { inventory: w.inventory, deposited: 0, entryFaceId: face, tailLength: w.sim.tailLength };
     expect(computeOrbDeposit({ ...args, isPrism: false })).toBeNull();
     const deposit = computeOrbDeposit({ ...args, isPrism: true });

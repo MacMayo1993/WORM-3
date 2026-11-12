@@ -5,7 +5,7 @@
 // (impactFx.jsx) only read these; nothing here writes back to the sim.
 import * as THREE from 'three';
 import { shAt } from '../circularBuffers.js';
-import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from './constants.js';
+import { carriedOrbAccentColor } from '../carriedOrbAppearance.js';
 import { bodyDistanceAt, bodyPathHeadInto } from './sliceBodyPath.js';
 import { tunnelBodyDistance } from './tunnelBodyFit.js';
 
@@ -205,11 +205,9 @@ export const SEVERED_RIPPLE = 0.28; // seconds for the pop to run from the cut t
 export const SEVERED_HOLD = 0.08;   // the cut tail sits still for a beat before it pops
 export const SEVERED_LIFE = 1.05;   // seconds a piece flies after its pop
 
-/** Body colour of bead `i`, by the same rule WormBody uses (the middle of each orb's trio wears the orb). */
-export function severedBeadColor(i, orbColors, base) {
-  if (i < BASE_TAIL_LENGTH) return base;
-  const orb = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-  return (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH === 1 ? (orbColors?.[orb] ?? base) : base;
+/** Body colour of bead `i`, including partial and bonus pickup material. */
+export function severedBeadColor(i, orbColors, base, orbSegments) {
+  return carriedOrbAccentColor(i, orbColors, orbSegments, base);
 }
 
 const _head = new THREE.Vector3();

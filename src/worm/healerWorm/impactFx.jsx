@@ -288,7 +288,7 @@ export function SeveredTail({ severedRef }) {
                 piece.normal[0] = src.normal[0]; piece.normal[1] = src.normal[1]; piece.normal[2] = src.normal[2];
                 piece.rank = st.count > 1 ? i / (st.count - 1) : 0;
                 piece.spin[0] = (rand() - 0.5) * 1.4; piece.spin[1] = (rand() - 0.5) * 1.4; piece.spin[2] = (rand() - 0.5) * 1.4;
-                piece.color.set(severedBeadColor(src.bead, pending.orbColors, baseColor));
+                piece.color.set(severedBeadColor(src.bead, pending.orbColors, baseColor, pending.orbSegments));
                 // A bead that burst into a dropped orb (DroppedOrbs) is not drawn here.
                 piece.hidden = !!src.ring;
             }

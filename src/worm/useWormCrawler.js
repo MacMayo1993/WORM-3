@@ -566,7 +566,13 @@ export function useWormCrawler(size, cubies) {
                     [`${exitTile.x},${exitTile.y},${exitTile.z}`]: { startMs: now, durationMs: 500 },
                 };
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
-                const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
+                // Either direction can have an earlier partial deposit. The pair
+                // seals together, so neither mouth may carry credit into a re-open.
+                const healedProgressKeys = [
+                    ...(Array.isArray(stableKey) ? stableKey : [stableKey]),
+                    getStableKey(entry.x, entry.y, entry.z, entry.dirKey, st.cubies),
+                    getStableKey(exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey, st.cubies),
+                ];
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];
                 useGameStore.setState(state => {
                     const event = wormEventChanges(state, 'healed', healedCount, null, state.wormRunId);
@@ -1035,6 +1041,7 @@ export function useWormCrawler(size, cubies) {
             stepHistory: f('stepHistory'),
             orbPickupColorsRef: f('orbPickupColors'),
             orbPickupFaceIdsRef: f('orbPickupFaceIds'),
+            orbPickupSegmentsRef: f('orbPickupSegments'),
             colorEpochRef: f('colorEpoch'),
             voidTunnelKeysRef: f('voidTunnelKeys'),
             chargedTunnels: f('chargedTunnels'),

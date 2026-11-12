@@ -3,6 +3,10 @@ import { rotateTilePosition, ensureOrbContrast, getAntipodalOrbColor, checkWormH
 import { makeTileTrail, ttPush, ttReset } from '../worm/circularBuffers.js';
 
 describe('reconcileOrbInventoryAfterCut', () => {
+  it('deducts exact partial and bonus material only from the faces cut off', () => {
+    expect(reconcileOrbInventoryAfterCut({ 1: 5, 2: 2, 3: 3 }, [1, 2], 7, [1, 2]))
+      .toEqual({ 1: 4, 2: 0, 3: 3 });
+  });
   it('removes sliced orb colors and caps the reserve to current tail capacity', () => {
     const inventory = { 1: 3, 2: 6, 3: 0, 4: 0, 5: 0, 6: 0 };
     expect(reconcileOrbInventoryAfterCut(inventory, [2], 4)).toEqual({

@@ -1,3 +1,4 @@
+import { ensureOrbSegments, spendCarriedOrbs } from './carriedOrbs.js';
 import { smeltToll, tunnelRideWears, riptideReach, regrowsCut, overgrowthTiles, takeGale, ELEMENT_ABILITIES } from './elementalAbilities.js';
 import { makeElementalAbilities, claimElementalAbility, startFlameDash, elementalStep, elementalLanding, elementalDrift, spendIceShield, fireOrbBonus, elementalPickupReach, tickElementalAbilities, tickAbilityVisuals, airJumpAdvance, elementalSpeedBonus, abilityEvent, ripeOrb } from './elementalAbilities.js';
 import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
@@ -372,6 +373,7 @@ export function makeWormSim(size) {
         pathHistory: makeTileTrail(TRAIL_HISTORY_CAP),
         orbPickupColors: [],
         orbPickupFaceIds: [],
+        orbPickupSegments: [],
         colorEpoch: 0,
 
         // ── Session counters ───────────────────────────────────────────────────
@@ -532,6 +534,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.peakTailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
     sim.orbPickupFaceIds = [];
+    sim.orbPickupSegments = [];
     sim.colorEpoch++;
     shReset(sim.stepHistory);
     sim.lastRecordedT = 0;
@@ -1119,9 +1122,9 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
         });
 
         if (deposit) {
+            ensureOrbSegments(sim, sim.tailLength - BASE_TAIL_LENGTH);
+            spendCarriedOrbs(sim, ctx.getOrbInventory(), deposit.nextInventory);
             sim.tailLength = deposit.nextTailLength;
-            sim.orbPickupColors.length = Math.max(0, sim.orbPickupColors.length - deposit.colorsToDrop);
-            sim.orbPickupFaceIds.length = Math.max(0, sim.orbPickupFaceIds.length - deposit.colorsToDrop);
             sim.colorEpoch++;
             ctx.applyDeposit(deposit, stableKey, entryFaceId);
         }
@@ -1164,10 +1167,18 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 }
 
 function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GROWTH, recovered = false) {
-    sim.tailLength = Math.min(sim.tailLength + segments, MAX_TAIL);
+    ensureOrbSegments(sim, sim.tailLength - BASE_TAIL_LENGTH);
+    segments = Math.max(0, Math.min(segments, MAX_TAIL - sim.tailLength));
+    if (segments === 0) {
+        // Still a collected orb for lifetime/story totals, but no spendable material.
+        ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo, 0, recovered);
+        return;
+    }
+    sim.tailLength += segments;
     sim.peakTailLength = Math.max(sim.peakTailLength ?? 0, sim.tailLength);
     sim.orbPickupColors.push(color);
     sim.orbPickupFaceIds.push(faceId);
+    sim.orbPickupSegments.push(segments);
     sim.colorEpoch++;
     // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
     // Colour and combo ride along so the HUD can confirm the pickup on screen at the
@@ -2964,16 +2975,21 @@ export function stepWormSim(sim, delta, size, ctx) {
     // queued tail clearance must not heal tiles or spawn rewards afterward.
     if (!sim.alive) return;
     if (currentPhase === 'crawling') tickGlowTrail(sim, delta);
+    // The entry key is retired before windout, but its recorded passage still
+    // owns that landing. Protect every visit to the same pair until the current
+    // exit flourish finishes, including a heal queued by an earlier reverse visit.
+    const occupiedTunnelKey = sim.currentTunnelKey ?? (sim.activeTunnel &&
+        sim.tunnelPassages.find(passage => passage.tunnel === sim.activeTunnel)?.tunnelKey);
     for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
         const passage = sim.tunnelPassages[i];
         // Re-entering a still-occupied pair must not close it around the new
         // traversal. Keep one heal, and wait for the newest tail through it.
-        const reused = passage.heal && (sim.currentTunnelKey === passage.tunnelKey ||
-            sim.tunnelPassages.some(other => other !== passage && other.tunnelKey === passage.tunnelKey &&
-                !tunnelTailCleared(other, sim.stepHistory, sim.tailLength)));
+        const reused = passage.heal && sim.tunnelPassages.some(other => other !== passage &&
+            other.tunnelKey === passage.tunnelKey && !tunnelTailCleared(other, sim.stepHistory, sim.tailLength));
+        const ridingPair = occupiedTunnelKey && occupiedTunnelKey === passage.tunnelKey;
         // Keep the landing tile intact until its reverse orbit has finished.
         const orbitingExit = sim.phase === 'windout' && sim.activeTunnel === passage.tunnel;
-        if (reused || orbitingExit || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
+        if (ridingPair || reused || orbitingExit || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
             passage.clearFrame = false;
             continue;
         }
@@ -3009,10 +3025,13 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.healBeatTier = tier;
             if (doubled) ctx.onSkill?.('double');
             ctx.feel('seal', { combo: sim.healed - 1, tier });
-        } else if (rideExhausted(sim, passage.tunnelKey) && !sim.voidTunnelKeys.has(passage.tunnelKey)) {
+        } else if (rideExhausted(sim, passage.tunnelKey) && !sim.voidTunnelKeys.has(passage.tunnelKey) &&
+            !sim.tunnelPassages.some(other => other.heal?.tunnelKey === passage.tunnelKey)) {
             // That was its last ride: the tunnel collapses behind the worm, and both
             // pads drop into their slots as pits. Never onto the worm: a body still
             // lying on (or under) either mouth holds the collapse until it moves off.
+            // A prior visit may own this pair's paid heal; let that seal the pair
+            // instead of briefly collapsing it first while draining newest-first.
             const reach = Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1;
             if (mouthOccupied(sim, passage.tunnel, reach)) { passage.clearFrame = false; continue; }
             collapseBehind(sim, ctx, passage);
@@ -3360,7 +3379,11 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     }
 
     for (const passage of sim.tunnelPassages) {
-        passage.tunnel = rotateTunnel(passage.tunnel);
+        // Windout and tail cleanup must still identify the same landing after
+        // a turn. Separate clones lose that ownership and can seal mid-exit.
+        passage.tunnel = passage.tunnel === preRotationTunnel
+            ? sim.activeTunnel
+            : rotateTunnel(passage.tunnel);
         if (passage.heal) passage.heal = { ...passage.heal, tunnel: passage.tunnel };
     }
     // Wear, collapse and charge are keyed by the mouths' cells: carry them too.

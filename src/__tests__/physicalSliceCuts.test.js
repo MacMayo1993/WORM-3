@@ -28,12 +28,16 @@ function fixture(points, size = 7, count = 100, normal = new THREE.Vector3(0, 0,
   ttPush(sim.tileTrail, `3,3,${size - 1},PZ`);
   ttPush(sim.tileTrail, `2,3,${size - 1},PZ`);
   ttPush(sim.tileTrail, `${sim.pos.x},${sim.pos.y},${size - 1},PZ`);
-  sim.orbPickupColors = Array(32).fill('#ffdd44');
-  sim.orbPickupFaceIds = Array(32).fill(1);
+  const capacity = Math.max(0, count - BASE_TAIL_LENGTH);
+  const pickups = Math.ceil(capacity / 3);
+  sim.orbPickupColors = Array(pickups).fill('#ffdd44');
+  sim.orbPickupFaceIds = Array(pickups).fill(1);
+  sim.orbPickupSegments = Array.from({ length: pickups }, (_, i) => Math.min(3, capacity - i * 3));
+  useGameStore.setState({ wormOrbInventory: { 1: capacity, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 } });
   const worm = Object.fromEntries(Object.keys(sim).map(key => [key, {
     get current() { return sim[key]; }, set current(value) { sim[key] = value; },
   }]));
-  for (const key of ['orbPickupColors', 'orbPickupFaceIds', 'colorEpoch']) worm[`${key}Ref`] = worm[key];
+  for (const key of ['orbPickupColors', 'orbPickupFaceIds', 'orbPickupSegments', 'colorEpoch']) worm[`${key}Ref`] = worm[key];
   worm.jumpLift = () => jumpLiftOf(sim);
   return { sim, worm };
 }
@@ -96,9 +100,9 @@ describe('physical slice cuts', () => {
     const removed = cutWormTail(worm, hit);
     // The lost orbs come back to be scattered (droppedOrbs.js), carrying exactly
     // the segments the cut removed between them.
-    expect(removed.colors).toHaveLength(30);
-    expect(removed.faceIds).toHaveLength(30);
-    expect(removed.segments).toHaveLength(30);
+    expect(removed.colors).toHaveLength(28);
+    expect(removed.faceIds).toHaveLength(28);
+    expect(removed.segments).toHaveLength(28);
     expect(removed.segments.reduce((a, b) => a + b, 0)).toBe(100 - 16);
     expect(sim.tailLength).toBe(16);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).pos.x).toBeCloseTo(-0.5);
@@ -203,6 +207,8 @@ describe('physical slice cuts', () => {
     expect(hit).toMatchObject({ type: 'cut', keepCount: 11 });
     const removed = cutWormTail(worm, hit);
     expect(sim.tailLength).toBe(11);
+    expect(sim.orbPickupSegments).toEqual([1]);
+    expect(useGameStore.getState().wormOrbInventory[1]).toBe(1);
     expect(removed).toEqual({ faceIds: [1], colors: ['#ff0000'], segments: [2] });
   });
 
