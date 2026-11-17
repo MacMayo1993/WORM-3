@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { makeWormSim, resetWormSim, stepWormSim, applyRotationToSim } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, stepWormSim, applyRotationToSim, killWormSim } from '../worm/healerWorm/wormSim.js';
 import { advanceTunnelHead, tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { resetLiveRotation, liveRotation } from '../worm/liveRotation.js';
 import { TUNNEL_HEAL_HOLD, DOUBLE_HEAL_HOLD, HEAL_PAUSE_DURATION } from '../worm/healerWorm/constants.js';
@@ -63,6 +63,30 @@ describe('the tunnel heal beat in the sim', () => {
     expect(sim.healPauseT).toBe(0);
   });
 
+  it('only signals an actual tail clearance, for unpaid rides too, and clears on death and retry', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    const trailing = { ...passage(tunnelA, 'A', sim.stepHistory.distance), heal: null };
+    sim.tunnelPassages.push(trailing);
+    stepWormSim(sim, 0, SIZE, ctx);
+    expect(sim.tailClearCueT).toBe(0);
+    sim.stepHistory.distance += tunnelTailReach(sim.tailLength) + 1;
+    stepWormSim(sim, 0, SIZE, ctx);
+    expect(trailing.clearFrame).toBe(true);
+    expect(sim.tailClearCueT).toBeGreaterThan(0);
+    const prior = sim.tailClearCueT;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.tailClearCueT).toBeLessThan(prior); // retirement does not restart it
+    ctx.isPaused = () => true;
+    const held = sim.tailClearCueT;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.tailClearCueT).toBe(held);
+    killWormSim(sim, ctx, { reason: 'test' });
+    expect(sim.tailClearCueT).toBe(0);
+    sim.tailClearCueT = .5;
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.tailClearCueT).toBe(0);
+  });
+
   it('climbs one rung per heal, and a double heal rings and holds bigger', () => {
     const sim = makeSim(), ctx = makeCtx();
     sim.tunnelPassages.push(passage(tunnelA, 'A', cleared(sim)), passage(tunnelB, 'B', sim.stepHistory.distance));
@@ -119,12 +143,14 @@ describe('the tunnel heal beat in the sim', () => {
     settle(sim, ctx);
     expect(sim.healed).toBe(0);
     expect(sim.tunnelPassages).toHaveLength(2);
+    expect(sim.tailClearCueT).toBe(0);
 
     sim.activeTunnel = null;
     sim.phase = sim.prevPhase = 'crawling';
     settle(sim, ctx);
     expect(sim.healed).toBe(1);
     expect(sim.tunnelPassages).toHaveLength(0);
+    expect(sim.tailClearCueT).toBeGreaterThan(0);
   });
 
   it('seals a paid pair once instead of collapsing its later unpaid passage first', () => {

@@ -39,7 +39,7 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
   const deposited = ctx.getHealingProgress()?.[key]?.deposited ?? 0;
   const isPrism = ctx.isPrismCharacter();
   const traversalTrial = !!ctx.isStoryTunnelTrial?.();
-  return { key, pos: { ...pos }, distance, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
+  return { key, pos: { ...pos }, distance, exit: resolved.tunnel?.exit, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
     // Funding alone does not satisfy story objectives that gate tunnel healing.
     healingAllowed: ctx.allowTunnelHeal?.(resolved.tunnel) !== false,
     locked: isParityLocked(sim, pos, ctx), lockSeconds: Math.ceil(sim.signature.mobiTunnel?.reentryT ?? 0),
@@ -51,7 +51,7 @@ export function tunnelReadout(sim, size, ctx) {
   if (!sim.alive || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || liveRotation.active || sim.restRead) return null;
   if (sim.phase !== 'crawling') {
     const need = sim.activeTunnel && tunnelAt(sim, ctx, sim.activeTunnel.entry);
-    return need ? { ...need, inTransit: true, collapsing: !!sim.pendingVoidKill } : null;
+    return need ? { ...need, exit: sim.activeTunnel.exit, inTransit: true, collapsing: !!sim.pendingVoidKill } : null;
   }
   let pos = sim.pos, direction = sim.moveDir;
   for (let distance = 0; distance <= 3; distance++) {
@@ -62,4 +62,31 @@ export function tunnelReadout(sim, size, ctx) {
     pos = next; direction = next.moveDir ?? direction;
   }
   return null;
+}
+
+const DIRECTIONS = { PX: 'right', NX: 'left', PY: 'top', NY: 'bottom', PZ: 'front', NZ: 'back' };
+
+// The in-world marker and pause dock use the same oriented route as the sim.
+export function readableTunnelExit(need) {
+  return need?.exit && !need.locked && !tunnelDanger(need) ? need.exit : null;
+}
+
+export function traversalCue(need, pending, cleared, crossing = false) {
+  if (!crossing && cleared) return { icon: 'clear', text: 'Tail clear', short: 'Clear', status: undefined };
+  if (!crossing && pending) return {
+    icon: pending.heals ? 'heal' : 'ride', text: 'Tail exiting', short: 'Tail', status: pending.heals ? 'heal' : 'no-heal',
+  };
+  if (!need) return null;
+  const danger = tunnelDanger(need);
+  const heals = need.ready && need.healingAllowed !== false && !danger && !need.locked;
+  const exit = readableTunnelExit(need);
+  const face = DIRECTIONS[exit?.dirKey];
+  return {
+    icon: danger || need.locked ? 'stop' : heals ? 'heal' : 'ride',
+    text: danger ? (need.inTransit ? 'Dangerous tunnel' : 'Unsafe tunnel')
+      : need.locked ? 'Tunnel locked' : face ? `Exit: cube ${face}` : heals ? 'Heal ready' : 'Travel only',
+    short: danger ? 'Unsafe' : need.locked ? 'Locked' : face ? face[0].toUpperCase() + face.slice(1) : heals ? 'Heal' : 'Ride',
+    status: heals ? 'heal' : 'no-heal',
+    detail: danger || need.locked ? undefined : heals ? 'Tunnel will heal after your tail clears.' : 'Tunnel will not heal.',
+  };
 }

@@ -396,6 +396,7 @@ export function makeWormSim(size) {
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
+        tailClearCueT: 0,         // short render-only acknowledgment, on the sim clock
         healBeatSeq: 0,           // counts tunnel heals this run; the camera kicks when it moves
         healBeatTier: 0,          // 1 for a heal, 2 for a double heal
         droppedOrbs: [],          // a cut tail's orbs, scattered to be taken back (droppedOrbs.js)
@@ -559,6 +560,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
     sim.healFocusTile = null;
+    sim.tailClearCueT = 0;
     sim.healBeatSeq = 0;
     sim.healBeatTier = 0;
     sim.cutFocusT = 0;
@@ -1007,6 +1009,7 @@ export function killWormSim(sim, ctx, details = null) {
     clearJumpRescue(sim, ctx);
     sim.alive = false;
     sim.phase = 'dead';
+    sim.tailClearCueT = 0;
     sim.signature = makeSignature();
     sim.signatureRequested = false;
     ctx.feel('death');
@@ -1146,6 +1149,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     // Split the ride's seconds by the distances the player sees (tunnelTiming.js).
     Object.assign(rideTunnel, tunnelRideTiming(rideTunnel, size, sim.expansionAmount,
         defaultTunnelArmSeconds(rideTunnel), TUNNEL_CROSSING_SECONDS));
+    sim.tailClearCueT = 0;
     sim.activeTunnel = rideTunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -2599,6 +2603,7 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
     }
     if (paused) { sim.signatureRequested = false; return; }
+    if (sim.tailClearCueT > 0) sim.tailClearCueT = Math.max(0, sim.tailClearCueT - Math.min(delta, MAX_TICK_DELTA));
 
     if (sim.phase === 'falling') {
         sim.jumpRescueHeld = true;
@@ -2980,6 +2985,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // exit flourish finishes, including a heal queued by an earlier reverse visit.
     const occupiedTunnelKey = sim.currentTunnelKey ?? (sim.activeTunnel &&
         sim.tunnelPassages.find(passage => passage.tunnel === sim.activeTunnel)?.tunnelKey);
+    const newestPassage = sim.tunnelPassages.at(-1);
     for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
         const passage = sim.tunnelPassages[i];
         // Re-entering a still-occupied pair must not close it around the new
@@ -2992,6 +2998,13 @@ export function stepWormSim(sim, delta, size, ctx) {
         if (ridingPair || reused || orbitingExit || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
             passage.clearFrame = false;
             continue;
+        }
+        // Notify at physical clearance, not when the head exits or the pad later
+        // heals/collapses. Only the newest visible passage owns the cue; don't
+        // restart it while a clear passage still waits for a safe collapse.
+        if (!passage.clearCueSent) {
+            passage.clearCueSent = true;
+            if (passage === newestPassage && !sim.activeTunnel) sim.tailClearCueT = 0.9;
         }
         // One rendered frame with the tail clear before healing changes the tiles.
         if (!passage.clearFrame) { passage.clearFrame = true; continue; }
