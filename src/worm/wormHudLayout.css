@@ -520,6 +520,22 @@
 /* One status dock: healing colors the existing pause bar, not another banner. */
 .worm-instrument .worm-hud-bar[data-traversal=heal] { background:#dcefd3 !important; border-color:#28713d !important; box-shadow:0 3px 0 #28713d; }
 .worm-instrument .worm-hud-bar[data-traversal=no-heal] { background:#f7d2d0 !important; border-color:#a52b37 !important; box-shadow:0 3px 0 #a52b37; }
+.worm-traversal-demo { display:flex; align-items:center; gap:3px; }
+.worm-traversal-cue { display:inline-flex; align-items:center; justify-content:center; flex:none; gap:3px;
+  padding:3px 5px; min-height:25px; border:1px solid currentColor; border-radius:8px; white-space:nowrap;
+  font:800 10px/1 var(--heading-font,system-ui); color:#81232f; background:#fff5ef; pointer-events:none; }
+.worm-traversal-cue[data-cue=heal] { color:#166136; background:#f1faed; }
+.worm-traversal-cue[data-cue=clear] { color:#233b31; background:#fffcef; }
+.worm-traversal-short { display:none; }
+.worm-traversal-demo .worm-traversal-cue { padding:3px; }
+.worm-traversal-demo .worm-traversal-long { display:none; }
+.worm-traversal-demo .worm-traversal-short { display:inline; }
+@media (max-width:390px) {
+  .worm-traversal-cue { padding-inline:3px; gap:2px; }
+  .worm-traversal-cue svg { width:13px; height:13px; }
+  .worm-traversal-long { display:none; }
+  .worm-traversal-short { display:inline; }
+}
 .worm-hud-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .worm-rotation-clock { position:static; inset:auto; z-index:auto; flex:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:43px; min-height:40px; padding:2px 3px; box-sizing:border-box; border-radius:9px; background:#fffcf1; color:#26372d; font-variant-numeric:tabular-nums; }
 .worm-rotation-label,.worm-rotation-held { font:800 8px/1.1 var(--heading-font,system-ui); }

@@ -74,6 +74,7 @@ import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
 import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
 import { warmUpElementalSkins } from './healerWorm/elementalWarmup.js';
+import { TunnelReadability } from './healerWorm/TunnelReadability.jsx';
 import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { JumpLandingMarker } from './healerWorm/JumpLandingMarker.jsx';
 import { GuideBeams } from './healerWorm/GuideBeams.jsx';
@@ -1203,6 +1204,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
                 </group>
             </StoryArrival>
+            <TunnelReadability worm={worm} size={size} />
             <CautionFallFX worm={worm} body={reflectionSource} />
             <WormEffectWarmup body={reflectionSource} />
             {/* Mounted for the mode's life, hidden until the worm is out: mounting it

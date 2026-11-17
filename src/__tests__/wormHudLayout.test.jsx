@@ -4,7 +4,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import CaptureChrome from '../components/capture/CaptureChrome.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { wormBuffs } from '../worm/wormBuffs.js';
+import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { feel } from '../utils/feel.js';
@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => root.unmount()); host.remove();
-  wormBuffs.tunnelNeeds = null; wormBuffs.signature = null; rotationClock.armed = false;
+  resetWormBuffs(); rotationClock.armed = false;
   vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 it('clears unavailable surface controls for every transit phase and restores them on exit', () => {
@@ -548,4 +548,40 @@ it('colors the pause dock red for unfunded or dangerous tunnels and clears it on
   wormBuffs.tunnelNeeds = null;
   act(() => vi.advanceTimersByTime(110));
   expect(bar.dataset.traversal).toBeUndefined();
+});
+
+it('shows distinct non-color symbols beside Pause and signals clearance only after the trailing state', () => {
+  const read = () => act(() => vi.advanceTimersByTime(110));
+  const cue = () => host.querySelector('.worm-traversal-cue');
+  const narration = () => host.querySelector('.worm-hud-bar [role="status"]').textContent;
+  wormBuffs.tunnelNeeds = { ready: true, exit: { dirKey: 'NX' } };
+  renderPhase('crawling');
+  expect(cue().dataset.cue).toBe('heal');
+  expect(narration()).toContain('Exit: cube left');
+  expect(cue().querySelector('.worm-traversal-short').textContent).toBe('Left');
+  const healShape = cue().querySelector('path').getAttribute('d');
+  wormBuffs.tunnelNeeds = { ...wormBuffs.tunnelNeeds, ready: false };
+  read();
+  expect(cue().dataset.cue).toBe('ride');
+  expect(cue().querySelector('path').getAttribute('d')).not.toBe(healShape);
+
+  wormBuffs.tunnelNeeds = null;
+  wormBuffs.tunnelTail = { heals: false };
+  renderPhase('windout');
+  read();
+  expect(narration()).toBe('Tail exiting');
+  wormBuffs.tunnelTail = null;
+  wormBuffs.tunnelTailClear = true;
+  renderPhase('crawling');
+  read();
+  expect(cue().dataset.cue).toBe('clear');
+  expect(narration()).toBe('Tail clear');
+  expect(cue().querySelector('.worm-traversal-short').textContent).toBe('Clear');
+  expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(false);
+
+  act(() => {
+    resetWormBuffs();
+    useGameStore.setState({ wormRunId: useGameStore.getState().wormRunId + 1 });
+  });
+  expect(cue()).toBeNull();
 });

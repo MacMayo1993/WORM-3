@@ -16,7 +16,7 @@ import RotationCountdownHUD from './RotationCountdownHUD.jsx';
 import CaptureVisual from '../components/capture/CaptureVisual.jsx';
 import WormCountdownOverlay from './WormCountdownOverlay.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
-import { tunnelDanger } from './healerWorm/tunnelReadout.js';
+import { traversalCue } from './healerWorm/tunnelReadout.js';
 import SignatureButton from './SignatureButton.jsx';
 import { SIGNATURES } from './healerWorm/signatures.js';
 import JumpRescueCue from './JumpRescueCue.jsx';
@@ -1357,19 +1357,46 @@ function PauseKey({ label, icon, onClick, pressed }) {
     </button>;
 }
 
-function TraversalBar({ children }) {
-    const [need, setNeed] = useState(wormBuffs.tunnelNeeds);
+function readTraversalCue() {
+    return traversalCue(wormBuffs.tunnelNeeds, wormBuffs.tunnelTail, wormBuffs.tunnelTailClear, wormBuffs.tunnelCrossing);
+}
+
+const TRAVERSAL_ICONS = {
+    heal: 'M8 2v8m-4-4h8',
+    ride: 'M2 8h11m-4-4 4 4-4 4',
+    stop: 'M8 2v6m0 4v.2',
+    clear: 'm2 8 4 4 8-8',
+};
+
+function TraversalBar({ children, demo = false }) {
+    const [cue, setCue] = useState(readTraversalCue);
     const active = useGameStore(s => s.wormAlive && ['active', 'finalHealing'].includes(s.wormGamePhase));
-    useEffect(() => {
-        const id = setInterval(() => setNeed(wormBuffs.tunnelNeeds), 100);
+    const runId = useGameStore(s => s.wormRunId);
+    useLayoutEffect(() => {
+        const read = () => {
+            const next = active ? readTraversalCue() : null;
+            setCue(current => current?.icon === next?.icon && current?.text === next?.text &&
+                current?.detail === next?.detail && current?.status === next?.status ? current : next);
+        };
+        read();
+        const id = setInterval(read, 100);
         return () => clearInterval(id);
-    }, []);
-    const status = active && need ? (need.ready && need.healingAllowed !== false && !tunnelDanger(need) ? 'heal' : 'no-heal') : undefined;
-    const description = status === 'heal' ? 'Tunnel will heal after your tail clears.'
-        : status ? (tunnelDanger(need) ? 'Dangerous tunnel. Pause for details.' : 'Tunnel will not heal. Pause for details.') : undefined;
-    return <div className="worm-hud-bar" data-traversal={status} style={HUD_BAR_STYLE} title={description}>
-        <span className="worm-hud-sr-only" role="status">{description}</span>
-        {children}
+    }, [active, runId]);
+    const visible = active ? cue : null;
+    const summary = visible && [visible.text, visible.detail].filter(Boolean).join('. ');
+    const chip = <>
+        <span className="worm-hud-sr-only" role="status">{summary}</span>
+        {visible && <span className="worm-traversal-cue" data-cue={visible.icon} title={summary} aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d={TRAVERSAL_ICONS[visible.icon]} />
+            </svg>
+            <span className="worm-traversal-long">{visible.text}</span>
+            <span className="worm-traversal-short">{visible.short}</span>
+        </span>}
+    </>;
+    if (demo) return <div className="worm-traversal-demo" data-traversal={visible?.status}>{chip}{children}</div>;
+    return <div className="worm-hud-bar" data-traversal={visible?.status} style={HUD_BAR_STYLE} title={summary || undefined}>
+        {children(chip)}
     </div>;
 }
 
@@ -1555,7 +1582,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {/* Hangs just under the dock (absolute), so showing it never moves the bar. */}
                 {wormAlive && phase === 'crawling' && <ComboMeter />}
                 {phase === 'crawling' && <FreePlayProgress />}
-                {!demoLesson && <TraversalBar>
+                {!demoLesson && <TraversalBar>{chip =>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && (
                             <div className="worm-hud-reserve">
@@ -1571,6 +1598,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                 onClick={toggleQuests} title={questsMinimized ? 'Show quests' : 'Minimize quests'}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m3 6 2 2 3-4M11 6h10M3 13h4m4 0h10M3 20h4m4 0h10" /></svg>
                             </button>}
+                            {chip}
                             <button
                                 onPointerDown={handlePause}
                                 onClick={e => { if (e.detail === 0) handlePause(); }}
@@ -1584,12 +1612,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                </TraversalBar>}
+                }</TraversalBar>}
                 {demoLesson && <WormDemoLessonCard
                     onSkipStep={onDemoSkipStep} onExit={onDemoExit}
-                    pauseControl={<button onPointerDown={handlePause}
+                    pauseControl={<TraversalBar demo><button onPointerDown={handlePause}
                         onClick={e => { if (e.detail === 0) handlePause(); }}
-                        disabled={!canPause} className="worm-hud-key" style={PAUSE_BTN_STYLE} aria-label="Pause"><PauseIcon /></button>}
+                        disabled={!canPause} className="worm-hud-key" style={PAUSE_BTN_STYLE} aria-label="Pause"><PauseIcon /></button></TraversalBar>}
                     length={wormLengthTiles}
                     telemetry={wormAlive && phase === 'crawling' && (demoRotation || ['orbs', 'heal', 'collect-heal'].includes(lessonId)) && <div className="worm-hud-reserve">
                             {showRotationCountdown && <RotationCountdownHUD />}

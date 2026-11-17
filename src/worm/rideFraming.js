@@ -21,8 +21,8 @@ import * as THREE from 'three';
 /** Where the rail may leave the head: this share of each half-extent from the centre. */
 export const RIDE_FRAME = 0.5;
 /** More tolerance during the narrow crossing close-up, while the aim catches
- *  the head and the core's bounded sight corridor keeps its silhouette clear. */
-export const CLOSE_UP_FRAME = 0.92;
+ *  the head without pushing its silhouette off the edge of a phone. */
+export const CLOSE_UP_FRAME = 0.75;
 /** The smoothed lens never lets the head past this share, whatever it lags. */
 export const RIDE_FRAME_LIMIT = 0.8;
 

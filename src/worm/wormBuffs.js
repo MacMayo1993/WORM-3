@@ -19,6 +19,9 @@ export const wormBuffs = {
   jumpRescueT: 0,
   signature: null,
   tunnelNeeds: null,
+  tunnelTail: null,
+  tunnelTailClear: false,
+  tunnelCrossing: false,
   // The guide's lit items and the nearest one's turn and distance
   // (guideTargets.js), or null. Read by the beams and the final-heal chip.
   guide: null,
@@ -70,6 +73,9 @@ export function resetWormBuffs() {
   wormBuffs.jumpRescueT = 0;
   wormBuffs.signature = null;
   wormBuffs.tunnelNeeds = null;
+  wormBuffs.tunnelTail = null;
+  wormBuffs.tunnelTailClear = false;
+  wormBuffs.tunnelCrossing = false;
   wormBuffs.guide = null;
   wormBuffs.elementalAbilities = null;
   wormBuffs.waterMomentum = 0;

@@ -775,6 +775,13 @@ export function useWormCrawler(size, cubies) {
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
         // per-frame refresh costs nothing and freezes whenever the sim does.
         wormBuffs.tunnelNeeds = tunnelReadout(sim, sizeRef.current, ctxRef.current);
+        const trailing = sim.tunnelPassages.at(-1);
+        wormBuffs.tunnelTail = sim.alive && trailing && !trailing.clearCueSent ? {
+            exit: trailing.tunnel?.exit,
+            heals: !!trailing.heal || sim.tunnelPassages.some(p => p.tunnelKey === trailing.tunnelKey && p.heal),
+        } : null;
+        wormBuffs.tunnelTailClear = sim.alive && sim.tailClearCueT > 0;
+        wormBuffs.tunnelCrossing = sim.alive && !!sim.activeTunnel && sim.phase !== 'windout';
         wormBuffs.signature = sim.alive ? signatureReadout(sim, sizeRef.current, ctxRef.current) : null;
         wormBuffs.elementalAbilities = sim.alive ? sim.elementalAbilities : null;
         wormBuffs.waterMomentum = sim.waterMomentum;
