@@ -51,3 +51,28 @@ it('has a Motion toggle that every prefersReducedMotion() caller honours', async
   setReducedMotionSetting(false);
   expect(prefersReducedMotion()).toBe(false);
 });
+
+it('lets players switch the camera in Scene settings without enabling the separate reduced-motion flag', async () => {
+  const { useGameStore } = await import('../hooks/useGameStore.js');
+  const original = useGameStore.getState().settings;
+  function Harness() {
+    const settings = useGameStore(s => s.settings);
+    return <ScenePanel settings={settings} onSettingsChange={useGameStore.getState().setSettings} />;
+  }
+  act(() => root.render(<Harness />));
+  const select = host.querySelector('select');
+  expect(select.labels[0].textContent).toBe('Camera mode');
+  expect([...select.options].map(option => option.textContent)).toEqual(['Follow worm', 'Steady Follow', 'Stationary']);
+  expect(host.querySelector('input[type="range"]')).not.toBeNull();
+  try {
+    act(() => {
+      select.value = 'stationary';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(useGameStore.getState().settings).toMatchObject({ wormCameraMode: 'stationary',
+      reducedMotion: original.reducedMotion });
+    expect(host.querySelector('input[type="range"]')).toBeNull();
+  } finally {
+    act(() => useGameStore.getState().setSettings(original));
+  }
+});

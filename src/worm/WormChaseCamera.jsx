@@ -1,4 +1,7 @@
 import useDemoPlayfield from './useDemoPlayfield.js';
+import StationaryWormCamera from './StationaryWormCamera.jsx';
+import SteadyWormCamera from './SteadyWormCamera.jsx';
+import { normalizeWormCameraMode, STATIONARY_WORM_CAMERA, STEADY_FOLLOW_WORM, FOLLOW_WORM } from './wormCameraMode.js';
 import { storyArrivalPose } from './healerWorm/storyArrival.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
 import { victoryViewport, victoryView, victoryCameraFrame, VICTORY_FOV } from './story/victoryFrame.js';
@@ -207,9 +210,18 @@ const _handoffQuat = new THREE.Quaternion();
 // Seconds the lens takes to glide from a tunnel's exit shot onto the chase.
 const TUNNEL_HANDOFF_GLIDE = 1.6;
 
-export default function WormChaseCamera({ worm, size, arrivalElapsed }) {
+export default function WormChaseCamera(props) {
+    const mode = useGameStore(s => normalizeWormCameraMode(s.settings?.wormCameraMode));
+    useDemoPlayfield(mode === FOLLOW_WORM);
+    // Remount on camera mode changes: never replay the old lens handoff,
+    // shake or saved inside-tunnel pose after switching back to following.
+    if (mode === STATIONARY_WORM_CAMERA) return <StationaryWormCamera {...props} />;
+    if (mode === STEADY_FOLLOW_WORM) return <SteadyWormCamera {...props} />;
+    return <ChaseWormCamera {...props} />;
+}
+
+function ChaseWormCamera({ worm, size, arrivalElapsed }) {
     const { camera, gl, size: viewportSize } = useThree();
-    useDemoPlayfield();
     const mobile = useIsMobile();
     const platformFrame = useRef(makePlatformFrame());
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));

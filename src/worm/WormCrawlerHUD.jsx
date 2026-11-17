@@ -57,6 +57,8 @@ import ChallengeToast from './ChallengeToast.jsx';
 import { useCountUp } from './useCountUp.js';
 import { useRunBestsBeaten, useNewBestChime } from './runBests.js';
 import WormCameraZoomControl from './WormCameraZoomControl.jsx';
+import WormCameraModeControl from './WormCameraModeControl.jsx';
+import { hasStationaryWormCamera, hasSteadyWormCamera } from './wormCameraMode.js';
 import {
     overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS, StatTiles,
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
@@ -1196,6 +1198,8 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
         card.scrollTop = 0;
         card.focus?.({ preventScroll: true });
     }, [page]);
+    const stationaryCamera = useGameStore(s => hasStationaryWormCamera(s.settings));
+    const steadyCamera = useGameStore(s => hasSteadyWormCamera(s.settings));
     const cameraHorizon = useGameStore(s => s.wormCameraHorizon ?? 'face');
     const toggleCameraHorizon = useGameStore(s => s.toggleWormCameraHorizon);
     const questsMinimized = useGameStore(s => s.settings?.wormQuestsMinimized ?? false);
@@ -1281,18 +1285,21 @@ function PauseMenu({ page = 'main', setPage, onResume, onHome, onRetry, onSettin
                         </button>
                     </div>
 
-                    {/* Which way is up while crawling: FACE rolls the horizon with the
-                        cube face you are on, Keep level keeps it world-up. */}
-                    <div style={SETTING_ROW_STYLE}>
-                        <span style={SETTING_LABEL_STYLE}>Horizon</span>
-                        <button onClick={() => toggleCameraHorizon?.()} style={togglePillStyle(cameraHorizon === 'face', blue)}>
-                            {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
-                        </button>
-                    </div>
+                    <WormCameraModeControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
+                    {!stationaryCamera && <>
+                        {/* Which way is up while crawling: FACE rolls the horizon with the
+                            cube face you are on, Keep level keeps it world-up. */}
+                        {!steadyCamera && <div style={SETTING_ROW_STYLE}>
+                            <span style={SETTING_LABEL_STYLE}>Horizon</span>
+                            <button onClick={() => toggleCameraHorizon?.()} style={togglePillStyle(cameraHorizon === 'face', blue)}>
+                                {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
+                            </button>
+                        </div>}
 
-                    {/* How far back the chase camera stands. Judged against the run
-                        behind the menu; the mouse wheel sets it too while crawling. */}
-                    <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
+                        {/* How far back the chase camera stands. Judged against the run
+                            behind the menu; the mouse wheel sets it too while crawling. */}
+                        <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
+                    </>}
 
                     {/* The guide (guideTargets.js): beams of light out of the cube from the
                         items worth crawling to next, or in Story from the level's own target.
@@ -1560,6 +1567,24 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
     const showRotationCountdown = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || demoRotation);
 
+    const alternateView = hasStationaryWormCamera(settings) && canPause && <button type="button"
+        className="worm-hud-key worm-far-side-key" style={PAUSE_BTN_STYLE} data-game-input="ui" aria-label="Far side: switch to the opposite cube view"
+        title="Far side" onClick={() => useGameStore.getState().flipWormStationaryView()}>
+        <span>Far side</span>
+    </button>;
+
+    const steadyViewControls = hasSteadyWormCamera(settings) && canPause && <div className="worm-steady-view-controls" role="group" data-game-input="ui" aria-label="Rotate cube view">
+        {['left', 'right'].map(direction => <button key={direction} type="button"
+            className="worm-hud-key worm-far-side-key" style={PAUSE_BTN_STYLE}
+            aria-label={`Rotate view ${direction}`} title={`Rotate view ${direction}`}
+            onClick={() => useGameStore.getState().turnWormSteadyView(direction)}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={direction === 'right' ? { transform: 'scaleX(-1)' } : undefined} aria-hidden="true">
+                <path d="M3 8h5M3 8V3m0 5 3-3a8 8 0 1 1-2 10" />
+            </svg>
+        </button>)}
+    </div>;
+
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
     const steerVars = { position: 'relative' };
@@ -1626,6 +1651,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 />}
                 <div className="worm-hud-status-row worm-hud-telemetry">
                     {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={demoLesson} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
+                    {alternateView}
+                    {steadyViewControls}
                 </div>
                 {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                 {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}

@@ -7,10 +7,10 @@ import { useGameStore } from '../hooks/useGameStore.js';
 vi.mock('@react-three/fiber', () => ({ useThree: () => ({ camera: {} }) }));
 let root, host, turn;
 const finger = (x = 10, y = 10, id = 1) => ({ clientX: x, clientY: y, identifier: id });
-const touch = (type, touches, changedTouches = touches) => {
+const touch = (type, touches, changedTouches = touches, target = window) => {
   const e = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(e, { touches: { value: touches }, changedTouches: { value: changedTouches } });
-  act(() => window.dispatchEvent(e));
+  act(() => target.dispatchEvent(e));
 };
 beforeEach(() => {
   vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -79,4 +79,16 @@ it('holds Air flight independently of fire and releases it on Space-up or blur',
   act(() => window.dispatchEvent(new Event('blur')));
   expect(turn).toHaveBeenCalledWith('jump-release');
   expect(turn).toHaveBeenCalledWith('fire-stop');
+});
+
+it('leaves touch gestures on camera buttons to the UI without taking cube swipes', () => {
+  const panel = document.createElement('div'); panel.dataset.gameInput = 'ui';
+  const button = document.createElement('button'); panel.append(button); host.append(panel);
+  turn.mockClear();
+  touch('touchstart', [finger()], undefined, button);
+  act(() => vi.advanceTimersByTime(400));
+  touch('touchend', [], [finger()], button);
+  expect(turn).not.toHaveBeenCalled();
+  touch('touchstart', [finger()]); touch('touchend', [], [finger(50)]);
+  expect(turn).toHaveBeenCalledWith('right');
 });

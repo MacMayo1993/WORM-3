@@ -577,3 +577,8 @@
   .worm-action-center > .worm-primary-actions { flex: 0 1 230px; }
 }
 @media (prefers-reduced-motion: reduce) { .worm-mission-glance::after { transition: none; } }
+
+.worm-hud-key.worm-far-side-key { flex-shrink: 0; margin-inline-start: auto; font: 800 10px/1.1 var(--heading-font, system-ui); touch-action: manipulation; }
+.worm-hud-key.worm-far-side-key:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+
+.worm-steady-view-controls { display:flex; gap:4px; margin-inline-start:auto; flex-shrink:0; align-items:center; }

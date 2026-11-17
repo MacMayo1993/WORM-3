@@ -85,3 +85,18 @@ it('blooms the identification beat when the lens reaches the centre, not when th
   tunnelState.t = 0.62; tunnelState.lensT = 0.5; frame(100);
   expect(seam()).toBeGreaterThan(0);
 });
+
+it.each(['stationary', 'steady'])('skips camera-lens overlays in %s mode and keeps the Follow effect reversible', mode => {
+  const setMode = wormCameraMode => useGameStore.getState().setSettings(s => ({ ...s, wormCameraMode }));
+  act(() => root.render(<TunnelTransitOverlay />)); frame(100);
+  expect(host.children).toHaveLength(4);
+  try {
+    act(() => setMode(mode)); frame(100);
+    expect(host.children).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    act(() => setMode('follow'));
+  }
+  frame(100);
+  expect(Number(host.children[2].style.opacity)).toBeGreaterThan(0);
+});

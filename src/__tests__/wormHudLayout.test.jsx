@@ -585,3 +585,68 @@ it('shows distinct non-color symbols beside Pause and signals clearance only aft
   });
   expect(cue()).toBeNull();
 });
+
+it('offers Stationary from the in-run Settings and keeps far-side changes player controlled', () => {
+  const previous = useGameStore.getState();
+  const farSide = () => host.querySelector('.worm-far-side-key');
+  try {
+    renderPhase('crawling');
+    expect(farSide()).toBeNull();
+    act(() => host.querySelector('[aria-label="Pause"]').click());
+    act(() => [...host.querySelectorAll('.worm-pause-key')].find(b => b.textContent === 'Settings').click());
+    const select = host.querySelector('select');
+    expect(select.labels[0].textContent).toBe('Camera mode');
+    expect(select.value).toBe('follow');
+    expect(host.querySelector('input[type="range"]')).not.toBeNull();
+    act(() => {
+      select.value = 'stationary';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(useGameStore.getState().settings.wormCameraMode).toBe('stationary');
+    expect(host.querySelector('input[type="range"]')).toBeNull();
+    act(() => host.querySelector('.worm-pause-card').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    act(() => host.querySelector('.worm-pause-resume').click());
+    const count = useGameStore.getState().wormStationaryViewRequest;
+    act(() => farSide().click());
+    expect(useGameStore.getState().wormStationaryViewRequest).toBe(count + 1);
+    renderPhase('tunnel');
+    expect(farSide()).not.toBeNull();
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it('offers three camera choices, and Steady Follow touch view turns are separate from worm steering', () => {
+  const previous = useGameStore.getState();
+  const steer = vi.fn();
+  setWormTurnCallback(steer);
+  try {
+    renderPhase('crawling');
+    act(() => host.querySelector('[aria-label="Pause"]').click());
+    act(() => [...host.querySelectorAll('.worm-pause-key')].find(b => b.textContent === 'Settings').click());
+    const select = host.querySelector('select');
+    expect([...select.options].map(option => option.textContent)).toEqual(['Follow worm', 'Steady Follow', 'Stationary']);
+    act(() => {
+      select.value = 'steady';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(host.querySelector('.worm-pause-card').textContent).not.toContain('Follow the face');
+    act(() => host.querySelector('.worm-pause-card').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    act(() => host.querySelector('.worm-pause-resume').click());
+    const right = host.querySelector('[aria-label="Rotate view right"]');
+    const start = useGameStore.getState().wormSteadyViewStep;
+    act(() => {
+      right.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      right.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    expect(useGameStore.getState().wormSteadyViewStep).toBe((start + 1) % 8);
+    expect(steer).not.toHaveBeenCalled();
+    act(() => host.querySelector('.worm-steer-key').dispatchEvent(new Event('pointerdown', { bubbles: true })));
+    expect(steer).toHaveBeenCalledTimes(1);
+    expect(useGameStore.getState().wormSteadyViewStep).toBe((start + 1) % 8);
+    expect(host.querySelector('.worm-far-side-key[title="Far side"]')).toBeNull();
+  } finally {
+    setWormTurnCallback(null);
+    act(() => useGameStore.setState(previous));
+  }
+});

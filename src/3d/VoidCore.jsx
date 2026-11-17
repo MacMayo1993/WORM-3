@@ -1,3 +1,4 @@
+import { usesWormRideCamera } from '../worm/wormCameraMode.js';
 import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
 /**
  * VoidCore
@@ -309,7 +310,7 @@ function VoidCore({ cubieRefs = null }) {
     // tile the worm is diving into, then let it go once the rider is through.
     let zoomTarget = 1;
     const ride = tunnelState.tunnel;
-    if (wormMode && !still && tunnelState.active && ride?.entry && rootRef.current) {
+    if (wormMode && !still && usesWormRideCamera(state.settings) && tunnelState.active && ride?.entry && rootRef.current) {
       if (f.rideId !== tunnelState.activeTunnelId) {
         const { entry } = ride;
         f.rideId = tunnelState.activeTunnelId;
