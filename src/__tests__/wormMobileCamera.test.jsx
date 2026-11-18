@@ -755,3 +755,173 @@ it('frames victory closer than the former bounding sphere on a phone', () => {
   const formerDistance = Math.sqrt(3) * (7 / 2 + .6) / Math.sin(narrow) * 1.08;
   expect(victoryCameraFrame(7, 412, 915, bounds).distance).toBeLessThan(formerDistance * .9);
 });
+
+it.each([[390, 844], [1280, 800]])('holds the stationary view through motion and follows only explicit view changes at %sx%s', (width, height) => {
+  const size = 15, worm = makeWorm(size);
+  scene.size = { width, height };
+  scene.camera.aspect = width / height;
+  const previous = useGameStore.getState();
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'stationary' },
+    wormGamePhase: 'active', wormStationaryViewRequest: 0 }));
+  const original = () => [scene.camera.position.toArray(), scene.camera.quaternion.toArray(), scene.camera.fov, scene.camera.near, scene.camera.zoom];
+  try {
+    render(worm, size); tick();
+    const fixed = original();
+    const h = size / 2 + .24;
+    for (const x of [-h, h]) for (const y of [-h, h]) for (const z of [-h, h]) {
+      const corner = new Vector3(x, y, z).project(scene.camera);
+      expect(Math.abs(corner.x)).toBeLessThan(.95);
+      expect(Math.abs(corner.y)).toBeLessThan(.95);
+    }
+    const entry = tileOnFace(size, 'PZ'), exit = tileOnFace(size, 'NZ');
+    const ride = { entry, exit, pairId: 'steady-route' };
+    worm.activeTunnel.current = ride;
+    for (const phase of ['crawling', 'windup', 'entering', 'tunnel', 'exiting', 'windout']) {
+      worm.phase.current = phase;
+      worm.headInterpPos.current.addScalar(5);
+      worm.tunnelProgress.current = .5;
+      worm.rocketActive.current = true;
+      worm.rocketT.current = .5;
+      tick();
+      expect(original()).toEqual(fixed);
+      if (phase !== 'crawling') {
+        expect(tunnelState).toMatchObject({ active: true, tunnel: ride, activeTunnelId: 'steady-route',
+          t: tunnelTraversalT(phase, .5), rideHead: null, lensT: 0 });
+      }
+    }
+    worm.phase.current = 'crawling'; worm.activeTunnel.current = null;
+    for (const flags of [
+      { wormGamePhase: 'active', animState: { axis: 'row', layer: 2 }, explosionT: 1 },
+      { wormGamePhase: 'active', wormAlive: false, wormDeathDetails: { reason: 'slice-rotation' } },
+      { wormGamePhase: 'solved' },
+      { wormGamePhase: 'spawning', wormRunId: (previous.wormRunId ?? 0) + 1, wormAlive: true },
+    ]) {
+      act(() => useGameStore.setState(flags)); tick();
+      expect(original()).toEqual(fixed);
+    }
+    expect(tunnelState.active).toBe(false);
+    act(() => useGameStore.setState({ wormGamePhase: 'solved' }));
+    rotateVictoryView(36, 10); tick(); expect(original()).not.toEqual(fixed);
+    resetVictoryView(); tick(); expect(original()).toEqual(fixed);
+    act(() => useGameStore.getState().flipWormStationaryView());
+    tick();
+    const opposite = original();
+    expect(opposite[0]).toEqual(fixed[0].map(n => -n));
+    expect(opposite.slice(2)).toEqual(fixed.slice(2));
+    tick(); expect(original()).toEqual(opposite);
+    act(() => useGameStore.getState().flipWormStationaryView());
+    tick(); expect(original()).toEqual(fixed);
+
+    worm.rocketActive.current = false;
+    act(() => useGameStore.setState({ settings: previous.settings, wormGamePhase: 'active',
+      wormDeathDetails: null, animState: null, explosionT: 0 }));
+    tick();
+    expect(original()).not.toEqual(fixed);
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it.each([true, false])('Steady Follow tracks the head without facing its turns, then reframes for the next face (mobile=%s)', mobile => {
+  const size = 5, worm = makeWorm(size);
+  const previous = useGameStore.getState();
+  scene.mobile = mobile;
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'steady' },
+    wormGamePhase: 'active', wormPaused: false, wormSteadyViewStep: 0 }));
+  try {
+    render(worm, size); tick();
+    const faceView = scene.camera.quaternion.toArray();
+    const first = scene.camera.position.clone();
+    ['left', 'down', 'right', 'up'].forEach((direction, i) => {
+      worm.moveDir.current = direction;
+      worm.headInterpPos.current.x = 1.3 - i * .6;
+      worm.headInterpPos.current.y = i * .4;
+      tick();
+      expect(scene.camera.quaternion.toArray()).toEqual(faceView);
+      expectCentered(worm, size);
+    });
+    expect(scene.camera.position.distanceTo(first)).toBeGreaterThan(.3);
+    worm.pos.current = tileOnFace(size, 'PX');
+    worm.headInterpPos.current.set(size / 2 + .06, .3, -1.2);
+    worm.currentNormal.current = FACE_NORMALS.PX.clone();
+    for (let i = 0; i < 95; i++) {
+      const frame = scene.camera.quaternion.clone();
+      tick();
+      expect(scene.camera.quaternion.angleTo(frame)).toBeLessThan(.037);
+      expect(new Vector3(1, 0, 0).applyQuaternion(scene.camera.quaternion).y).toBeCloseTo(0, 8);
+      expectCentered(worm, size);
+    }
+    expect(scene.camera.position.clone().sub(worm.headInterpPos.current).normalize().dot(FACE_NORMALS.PX)).toBeGreaterThan(.8);
+    const newFaceView = scene.camera.quaternion.clone();
+    act(() => useGameStore.getState().turnWormSteadyView('right'));
+    for (let i = 0; i < 75; i++) tick();
+    expect(scene.camera.quaternion.angleTo(newFaceView)).toBeGreaterThan(.12);
+    expectCentered(worm, size);
+    const manualView = scene.camera.quaternion.toArray();
+    worm.moveDir.current = 'left'; tick();
+    expect(scene.camera.quaternion.toArray()).toEqual(manualView);
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it('Steady Follow stays outside an opposite-side tunnel and catches the head at its real exit', () => {
+  const size = 9, worm = makeWorm(size);
+  const previous = useGameStore.getState();
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'steady' },
+    wormGamePhase: 'active', wormPaused: false, wormSteadyViewStep: 0 }));
+  try {
+    render(worm, size); tick();
+    const tile = (dirKey, z) => ({ x: 4, y: 4, z, dirKey });
+    const route = { entry: tile('PZ', 8), exit: tile('NZ', 0), pairId: 'steady-antipodal' };
+    worm.activeTunnel.current = route;
+    for (const [phase, count] of [['windup', 30], ['entering', 48], ['tunnel', 120], ['exiting', 48], ['windout', 30]]) {
+      worm.phase.current = phase;
+      for (let i = 0; i <= count; i++) {
+        worm.tunnelProgress.current = i / count;
+        const t = tunnelTraversalT(phase, worm.tunnelProgress.current);
+        getTunnelWorldPosInto(worm.headInterpPos.current, route, t, size, 0);
+        const quat = scene.camera.quaternion.clone();
+        tick();
+        expect(scene.camera.quaternion.angleTo(quat)).toBeLessThan(.037);
+        expect(new Vector3(1, 0, 0).applyQuaternion(scene.camera.quaternion).y).toBeCloseTo(0, 8);
+        expect(Math.max(...scene.camera.position.toArray().map(Math.abs))).toBeGreaterThan(size / 2);
+        expect(tunnelState).toMatchObject({ active: true, t, activeTunnelId: route.pairId, rideHead: null, lensT: 0 });
+      }
+    }
+    worm.phase.current = 'crawling'; worm.pos.current = route.exit;
+    worm.currentNormal.current = FACE_NORMALS.NZ.clone(); worm.activeTunnel.current = null;
+    tick();
+    expectCentered(worm, size);
+    expect(scene.camera.position.z).toBeLessThan(-size / 2);
+    expect(tunnelState.active).toBe(false);
+
+    act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'stationary' } })); tick();
+    const stationary = scene.camera.position.clone();
+    worm.headInterpPos.current.x += 1; tick(); expect(scene.camera.position.equals(stationary)).toBe(true);
+    act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'follow' } })); tick();
+    expect(scene.camera.position.equals(stationary)).toBe(false);
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it('approaches the top in Steady Follow without arbitrarily swivelling to a northern bearing', () => {
+  const size = 5, worm = makeWorm(size, 'NZ');
+  const previous = useGameStore.getState();
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'steady' },
+    wormGamePhase: 'active', wormPaused: false, wormSteadyViewStep: 0 }));
+  try {
+    render(worm, size); tick();
+    const backView = scene.camera.quaternion.clone();
+    worm.pos.current = tileOnFace(size, 'PY');
+    worm.headInterpPos.current.set(2, size / 2 + .1, -2);
+    worm.currentNormal.current = FACE_NORMALS.PY.clone();
+    for (let i = 0; i < 95; i++) tick();
+    expect(scene.camera.quaternion.angleTo(backView)).toBeLessThan(.8);
+    expect(scene.camera.position.clone().sub(worm.headInterpPos.current).normalize().dot(FACE_NORMALS.PY)).toBeGreaterThan(.8);
+    expectCentered(worm, size);
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});

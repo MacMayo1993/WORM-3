@@ -55,9 +55,9 @@ for (const phone of [false, true]) {
     const pause = page.getByRole('dialog', { name: 'Game paused', exact: true });
     await pause.getByRole('button', { name: 'Resume', exact: true }).press('Enter');
     await expect(card).toContainText('Clock pauses during help');
-    const heldProgress = await card.getByRole('status').textContent();
+    const heldProgress = await card.getByRole('status', { name: 'Challenge progress', exact: true }).textContent();
     await page.waitForTimeout(1200);
-    await expect(card.getByRole('status')).toHaveText(heldProgress);
+    await expect(card.getByRole('status', { name: 'Challenge progress', exact: true })).toHaveText(heldProgress);
     await card.getByRole('button', { name: 'Resume', exact: true }).press('Enter');
     await expectCompact(card);
     expect(errors).toEqual([]);

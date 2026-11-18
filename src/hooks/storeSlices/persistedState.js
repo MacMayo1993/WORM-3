@@ -9,6 +9,7 @@ import { readPlayerSave, newProgress } from '../../progression/model.js';
  */
 
 import { DEFAULT_SETTINGS } from '../../utils/colorSchemes.js';
+import { normalizeWormCameraMode } from '../../worm/wormCameraMode.js';
 import { migrateTileStyle, migrateTileItem } from '../../utils/tileStyleMigration.js';
 import { newChestWallet } from '../../economy/chests.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
@@ -41,6 +42,7 @@ const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
 
   const settings = { ...DEFAULT_SETTINGS, ...rawSettings };
+  settings.wormCameraMode = normalizeWormCameraMode(settings.wormCameraMode);
   // v2: the first portal release persisted its expensive default-on value.
   // Existing players also get the safe default; a new opt-in persists normally.
   if (version < 2) settings.livePortalViews = false;

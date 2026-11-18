@@ -1,3 +1,4 @@
+import { usesWormRideCamera } from './worm/wormCameraMode.js';
 import { MODAL_SURFACES } from './hooks/uiSurfaces.js';
 import GraphicsRecovery, { GraphicsContextMonitor } from './3d/GraphicsRecovery.jsx';
 import AntipodalCameraPanel from './components/overlays/AntipodalCameraPanel.jsx';
@@ -483,12 +484,13 @@ export default function WORM3() {
     setPerfReducedFX(adaptiveReducedFXRef.current);
   }, [setPerfReducedFX, applyEffectiveDpr]);
 
-  const { wormHealerMode, wormPhase } = useGameStore(useShallow((s) => ({
+  const { wormHealerMode, wormPhase, wormRideCamera } = useGameStore(useShallow((s) => ({
     wormHealerMode: s.wormHealerMode,
     wormPhase: s.wormPhase,
+    wormRideCamera: usesWormRideCamera(s.settings),
   })));
 
-  const wormholePhaseActive = wormHealerMode && (
+  const wormholePhaseActive = wormHealerMode && wormRideCamera && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
   // A tunnel ride rests the far-side window rather than removing it: the tunnel

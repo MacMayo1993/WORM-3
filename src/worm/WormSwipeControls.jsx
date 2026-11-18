@@ -71,6 +71,7 @@ export default function WormSwipeControls({ onTurn, worm }) {
         const cancelFire = () => { clearTimeout(fireTimer); fireTimer = null; };
         const onTouchStart = (e) => {
             cancelFire();
+            if (e.target?.closest?.('[data-game-input="ui"]')) { touchStart.current = null; return; }
             if (e.touches.length !== 1) { touchStart.current = null; firing = false; onTurn('fire-stop'); return; }
             const t = e.touches[0];
             touchStart.current = { x: t.clientX, y: t.clientY };

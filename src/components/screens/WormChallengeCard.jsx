@@ -16,7 +16,7 @@ export default function WormChallengeCard({ lesson, state: s, index, count, advi
     <div className="worm-challenge-strip">
       <div>
         <strong>{index + 1}/{count} · {lesson.title}</strong>
-        <span role="status">{s.complete ? lesson.success : dead ? 'Attempt ended' : s.progress || `${lesson.goal} ${lesson.timeLimit}s`}</span>
+        <span role="status" aria-label="Challenge progress">{s.complete ? lesson.success : dead ? 'Attempt ended' : s.progress || `${lesson.goal} ${lesson.timeLimit}s`}</span>
       </div>
       {pauseControl}
       {!dead && !s.complete && <button type="button" aria-label="Challenge options" aria-expanded={details} onClick={toggle}>?</button>}

@@ -24,6 +24,7 @@ import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/back
 import TurnGuide from '../teach/TurnGuide.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
+import { usesWormRideCamera } from '../worm/wormCameraMode.js';
 import AntipodalPiP from './AntipodalPiP.jsx';
 import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 import BackgroundAmbience from './BackgroundAmbience.jsx';
@@ -176,6 +177,7 @@ export default function GameScene({
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
+  const rideCameraActive = wormholePhaseActive && usesWormRideCamera(settings);
   // AO shares the shadow capability gate. Its half-resolution pass is for opaque
   // cubie seams. Inside the translucent bore
   // it adds speckled shadows from surfaces that the camera is looking through.
@@ -187,7 +189,7 @@ export default function GameScene({
   // Antipodal PiP is shown only when the player toggles it on (in any mode), and is
   // suppressed during wormhole travel where the dedicated tunnel camera takes over.
   // (Previously worm mode force-showed it, which made the HUD toggle a no-op there.)
-  const shouldShowAntipodalPiP = showAntipodalPiP && !wormholePhaseActive;
+  const shouldShowAntipodalPiP = showAntipodalPiP && !rideCameraActive;
 
   // Memoize the BACKGROUNDS array search — avoids re-iterating on every render.
   // Only recomputes when the user actually changes their background theme.
@@ -328,7 +330,7 @@ export default function GameScene({
         <TeachViewOffset />
 
         <WormholeWarpFX
-          enabled={wormholePhaseActive}
+          enabled={rideCameraActive}
           wormPhase={wormPhase}
           healMoment={wormHealedCount}
         />

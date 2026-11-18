@@ -23,6 +23,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { prefersReducedMotion } from '../utils/device.js';
 import { tunnelState } from './tunnelProgressBridge.js';
+import { usesWormRideCamera } from './wormCameraMode.js';
 
 // Intensity ramps in fast on entry and releases slower on exit, so the release
 // reads as the ride ending rather than the effect being switched off.
@@ -30,12 +31,13 @@ const FADE_IN = 10;
 const FADE_OUT = 4;
 
 export default function TunnelTransitOverlay() {
-  const { wormHealerMode, wormPhase, tunnelColors, wormAlive } = useGameStore(
+  const { wormHealerMode, wormPhase, tunnelColors, wormAlive, exteriorView } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode ?? false,
       wormPhase: s.wormPhase ?? 'crawling',
       wormAlive: s.wormAlive ?? true,
       tunnelColors: s.wormActiveTunnelColors,
+      exteriorView: !usesWormRideCamera(s.settings),
     }))
   );
 
@@ -54,6 +56,9 @@ export default function TunnelTransitOverlay() {
   const rafRef = useRef(null);
 
   useEffect(() => {
+    // This is the lens itself entering the bore, not gameplay feedback. The
+    // exterior camera never enters, so leave only the ordinary HUD/portals.
+    if (exteriorView) { ampRef.current = 0; return undefined; }
     let lastFrame = null;
     const animate = now => {
       const dt = lastFrame == null ? 1 / 60 : Math.min(0.05, (now - lastFrame) / 1000);
@@ -108,9 +113,9 @@ export default function TunnelTransitOverlay() {
     return () => {
       if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     };
-  }, [isActive]);
+  }, [isActive, exteriorView]);
 
-  if (!wormHealerMode) return null;
+  if (!wormHealerMode || exteriorView) return null;
 
   const entryColor = tunnelColors?.entryColor ?? '#00bbff';
   const exitColor = tunnelColors?.exitColor ?? '#ff7700';

@@ -11,8 +11,8 @@ export function demoPlayfieldOffset(height, topBottom = 0, trayTop = height) {
   return Math.round((bottom - top) / 2);
 }
 
-export default function useDemoPlayfield() {
-  const active = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal' && !s.captureMode);
+export default function useDemoPlayfield(enabled = true) {
+  const active = useGameStore(s => enabled && s.demoMode && s.demoStep === 'worm-traversal' && !s.captureMode);
   const { camera, size: { width, height } } = useThree();
   useEffect(() => {
     if (!active) return undefined;

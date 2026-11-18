@@ -95,6 +95,17 @@ export const createWormSlice = (set, get) => ({
     set({ wormShowTrail: v });
   },
 
+  // The stationary view changes only on an explicit player request.
+  wormStationaryViewRequest: 0,
+  flipWormStationaryView: () => set(s => ({ wormStationaryViewRequest: s.wormStationaryViewRequest + 1 })),
+
+  // Eight deliberate viewing angles around the tracked face. The puzzle
+  // position/heading and ordinary touch input do not consume this control.
+  wormSteadyViewStep: 0,
+  turnWormSteadyView: direction => set(s => ({
+    wormSteadyViewStep: (s.wormSteadyViewStep + (direction === 'left' ? 7 : 1)) % 8
+  })),
+
   // Which way is up while crawling. 'face' builds the camera's roll from the face
   // the worm is on, 'level' from world Y. See WormChaseCamera for why this is a
   // choice at all: a world-up camera has to flip its up vector under the cube and

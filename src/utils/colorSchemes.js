@@ -357,6 +357,7 @@ export const DEFAULT_SETTINGS = {
   // Lightning strikes and storm coats swell and fade instead of flashing.
   reduceFlashing: false,
   reducedMotion: false,
+  wormCameraMode: 'follow',
   colorScheme: 'standard',
   customColors: null,
   backgroundTheme: 'blackhole',

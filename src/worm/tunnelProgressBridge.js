@@ -1,3 +1,5 @@
+import { tunnelTraversalT } from '../utils/tunnelPath.js';
+
 // Shared mutable state written by WormChaseCamera (Three.js RAF) and
 // read by MobiusHUD (DOM RAF). A plain object is fine — no need for
 // React state since the consumer does its own requestAnimationFrame.
@@ -33,4 +35,22 @@ export function resetTunnelState() {
   tunnelState.tunnel = null;
   tunnelState.coreZoom = 1;
   tunnelState.coreZoomAnchor = null;
+}
+
+
+// Exterior cameras keep the route live for the worm, apertures and HUD, but
+// never report an in-bore lens position to camera-relative effects.
+const RIDE_PHASES = new Set(['windup', 'entering', 'tunnel', 'exiting', 'windout']);
+export function syncExteriorTunnelView(worm) {
+  const phase = worm.phase.current;
+  const route = RIDE_PHASES.has(phase) ? worm.activeTunnel?.current : null;
+  tunnelState.active = !!route;
+  tunnelState.t = route ? tunnelTraversalT(phase, worm.tunnelProgress?.current) : 0;
+  tunnelState.tunnel = route;
+  tunnelState.activeTunnelId = route?.pairId ?? null;
+  tunnelState.fallOpening = worm.cautionFall?.current ?? null;
+  tunnelState.rideHead = null;
+  tunnelState.lensT = 0;
+  tunnelState.lensLift = 0;
+  return route;
 }
