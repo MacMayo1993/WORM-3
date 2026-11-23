@@ -95,6 +95,19 @@ describe('the dive', () => {
     expect(scene.retimes.at(-1)).toBe(1);
   });
 
+  it('re-times the layers drawn round the scene (tunnel, sticker storm) with it', () => {
+    const scene = fakeScene(3);
+    const tunnel = fakeScene(4);
+    const play = createLoadingPlay({ scene, layers: [tunnel, null], line: fakeText(), badge: fakeText() });
+    let at = run(play, { from: { now: 0, t: 0 }, ms: 300 });
+    play.press();
+    at = run(play, { from: at, ms: 1000 });
+    play.release();
+    run(play, { from: at, ms: 1000 });
+    expect(tunnel.retimes.length / 4).toBe(scene.retimes.length / 3);
+    expect(tunnel.retimes.at(-1)).toBe(1);
+  });
+
   it('does nothing with reduced motion', () => {
     const scene = fakeScene();
     const play = createLoadingPlay({ scene, line: fakeText(), badge: fakeText(), reduced: true });

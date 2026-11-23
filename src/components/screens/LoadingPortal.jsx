@@ -455,7 +455,7 @@ function drawHalo(ctx, well, pulse) {
   ctx.restore();
 }
 
-export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, playRef, translucent = false }) {
+export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, playRef, translucent = false, children = null }) {
   const paperRef = useRef(null);
   const vortexRef = useRef(null);
   const frontRef = useRef(null);
@@ -644,6 +644,8 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
   return (
     <>
       <canvas ref={paperRef} className="wl-backdrop wl-live wl-paper" aria-hidden="true" />
+      {/* Drawn on the paper, under the portals: the tunnel and the far stickers. */}
+      {children}
       <canvas ref={vortexRef} className="wl-backdrop wl-live" aria-hidden="true" />
       <canvas ref={frontRef} className="wl-backdrop wl-live wl-portal-lips" aria-hidden="true" />
     </>
