@@ -20,9 +20,9 @@ export default function WormCameraModeControl({ labelStyle, style }) {
       </select>
     </div>
     <p id={`${id}-help`} style={HELP_STYLE}>{mode === STATIONARY_WORM_CAMERA
-      ? 'Stationary holds a whole-cube view. Tap “Far side” to change views without an animated turn.'
+      ? 'Stationary holds a whole-cube view. Use the view arrows or “Far side” to see more of the cube without an animated turn.'
       : mode === STEADY_FOLLOW_WORM
-        ? 'Tracks your worm without turning when it steers. View arrows change your angle; the camera stays outside during tunnels.'
+        ? 'Tracks your worm without following its turns. Gameplay events can briefly move the camera; it stays outside during tunnels. Use the view arrows to change your angle.'
         : 'Follows the worm’s turns and rides through tunnels.'}</p>
   </>;
 }

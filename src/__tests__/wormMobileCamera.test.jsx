@@ -20,7 +20,7 @@ import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeCautionFall, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { CAUTION_OPENING_RADIUS } from '../worm/healerWorm/cautionOpening.js';
-import { CUT_FOCUS_DURATION, CUT_FOCUS_IN, CUT_FOCUS_HOLD } from '../worm/healerWorm/constants.js';
+import { CUT_FOCUS_DURATION, CUT_FOCUS_IN, CUT_FOCUS_HOLD, ELEMENTAL_FOCUS_DURATION, HEAL_PAUSE_DURATION } from '../worm/healerWorm/constants.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -762,7 +762,7 @@ it.each([[390, 844], [1280, 800]])('holds the stationary view through motion and
   scene.camera.aspect = width / height;
   const previous = useGameStore.getState();
   act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'stationary' },
-    wormGamePhase: 'active', wormStationaryViewRequest: 0 }));
+    wormGamePhase: 'active', wormStationaryViewRequest: 0, wormStationaryViewStep: 0 }));
   const original = () => [scene.camera.position.toArray(), scene.camera.quaternion.toArray(), scene.camera.fov, scene.camera.near, scene.camera.zoom];
   try {
     render(worm, size); tick();
@@ -812,6 +812,25 @@ it.each([[390, 844], [1280, 800]])('holds the stationary view through motion and
     act(() => useGameStore.getState().flipWormStationaryView());
     tick(); expect(original()).toEqual(fixed);
 
+    act(() => useGameStore.getState().turnWormStationaryView('right'));
+    tick();
+    const right = original();
+    expect(right[0]).not.toEqual(fixed[0]);
+    expect(scene.camera.position.length()).toBeCloseTo(new Vector3(...fixed[0]).length(), 8);
+    expect(right[0][1]).toBeCloseTo(fixed[0][1], 8);
+    worm.headInterpPos.current.x += 3;
+    worm.moveDir.current = 'right';
+    worm.elementalFocusT = ref(ELEMENTAL_FOCUS_DURATION / 2);
+    tick(); expect(original()).toEqual(right);
+    act(() => useGameStore.getState().flipWormStationaryView());
+    tick(); expect(original()[0]).toEqual(right[0].map(n => -n));
+    act(() => {
+      useGameStore.getState().flipWormStationaryView();
+      useGameStore.getState().turnWormStationaryView('left');
+    });
+    tick(); expect(original()).toEqual(fixed);
+    worm.elementalFocusT.current = 0;
+
     worm.rocketActive.current = false;
     act(() => useGameStore.setState({ settings: previous.settings, wormGamePhase: 'active',
       wormDeathDetails: null, animState: null, explosionT: 0 }));
@@ -860,6 +879,90 @@ it.each([true, false])('Steady Follow tracks the head without facing its turns, 
     const manualView = scene.camera.quaternion.toArray();
     worm.moveDir.current = 'left'; tick();
     expect(scene.camera.quaternion.toArray()).toEqual(manualView);
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it.each([true, false])('Steady Follow shows event shots and returns to its steady heading (mobile=%s)', mobile => {
+  const size = 5, worm = makeWorm(size);
+  const previous = useGameStore.getState();
+  scene.mobile = mobile;
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'steady', reducedMotion: false },
+    wormGamePhase: 'active', wormPaused: false, wormSteadyViewStep: 0 }));
+  try {
+    render(worm, size); tick();
+    const original = scene.camera.position.clone();
+    const heading = scene.camera.quaternion.clone();
+    const assertReturned = () => {
+      expect(scene.camera.position.distanceTo(original)).toBeLessThan(1e-8);
+      expect(scene.camera.quaternion.angleTo(heading)).toBeLessThan(1e-6);
+      expectCentered(worm, size);
+    };
+
+    worm.elementalFocusT = ref(ELEMENTAL_FOCUS_DURATION);
+    tick();
+    assertReturned();
+    worm.elementalFocusT.current /= 2;
+    tick();
+    expect(scene.camera.position.clone().normalize().dot(original.clone().normalize())).toBeLessThan(0);
+    expect(scene.camera.quaternion.angleTo(heading)).toBeGreaterThan(1);
+    const held = scene.camera.position.clone();
+    act(() => useGameStore.setState({ wormPaused: true }));
+    for (let i = 0; i < 4; i++) tick();
+    expect(scene.camera.position.distanceTo(held)).toBeLessThan(1e-8);
+    act(() => useGameStore.setState({ wormPaused: false }));
+    worm.elementalFocusT.current = 0;
+    worm.moveDir.current = 'down';
+    tick(); assertReturned();
+
+    const impact = new Vector3(-1, 1, size / 2 + .08);
+    worm.cutFocusPos = ref(impact.toArray());
+    worm.cutFocusSlice = ref({ axis: 'row', layer: 3 });
+    worm.cutFocusT = ref(CUT_FOCUS_DURATION);
+    tick();
+    worm.cutFocusT.current -= CUT_FOCUS_IN + CUT_FOCUS_HOLD / 2;
+    tick();
+    const screenHit = impact.clone().project(scene.camera);
+    expect(screenHit.x).toBeCloseTo(0, 6);
+    expect(screenHit.y).toBeCloseTo(0, 6);
+    expect(scene.camera.quaternion.angleTo(heading)).toBeGreaterThan(.05);
+    worm.cutFocusT.current = 0;
+    tick(); assertReturned();
+
+    worm.healFocusTile = ref({ x: 2, y: 2, z: size - 1, dirKey: 'PZ' });
+    worm.healPauseT = ref(HEAL_PAUSE_DURATION - .32);
+    tick();
+    expect(scene.camera.quaternion.angleTo(heading)).toBeGreaterThan(.05);
+    worm.healPauseT.current = 0;
+    tick(); assertReturned();
+  } finally {
+    act(() => useGameStore.setState(previous));
+  }
+});
+
+it.each(['game', 'device'])('Steady Follow honors %s reduced-motion during gameplay events', preference => {
+  const size = 5, worm = makeWorm(size);
+  const previous = useGameStore.getState();
+  vi.mocked(prefersReducedMotion).mockReturnValue(preference === 'device');
+  act(() => useGameStore.setState({ settings: { ...previous.settings, wormCameraMode: 'steady', reducedMotion: preference === 'game' },
+    wormGamePhase: 'active', wormPaused: false, wormSteadyViewStep: 0 }));
+  try {
+    render(worm, size); tick();
+    const position = scene.camera.position.toArray();
+    const heading = scene.camera.quaternion.toArray();
+    worm.elementalFocusT = ref(ELEMENTAL_FOCUS_DURATION);
+    tick();
+    worm.elementalFocusT.current /= 2;
+    tick();
+    expect(scene.camera.position.toArray()).toEqual(position);
+    expect(scene.camera.quaternion.toArray()).toEqual(heading);
+    worm.elementalFocusT.current = 0;
+    worm.cutFocusT = ref(CUT_FOCUS_DURATION / 2);
+    worm.cutFocusPos = ref([0, 0, 2.6]);
+    tick();
+    expect(scene.camera.position.toArray()).toEqual(position);
+    expect(scene.camera.quaternion.toArray()).toEqual(heading);
   } finally {
     act(() => useGameStore.setState(previous));
   }
