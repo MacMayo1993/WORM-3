@@ -112,7 +112,7 @@ const EXPECTED_KEYS = [
   // Collapsed tunnels' pits (tunnelPits.js) and Mobi's in-play first-time lines.
   'wormPitGrids', 'wormMobiLine',
   'wormSpeed', 'wormTimeAlive', 'wormTunnelCount',
-  'wormStationaryViewRequest', 'flipWormStationaryView', 'wormSteadyViewStep', 'turnWormSteadyView', 'wormholeInterval'
+  'wormStationaryViewRequest', 'flipWormStationaryView', 'wormStationaryViewStep', 'turnWormStationaryView', 'wormSteadyViewStep', 'turnWormSteadyView', 'wormholeInterval'
 ];
 
 describe('useGameStore surface', () => {

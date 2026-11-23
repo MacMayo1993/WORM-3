@@ -8,6 +8,8 @@ import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
 import { syncExteriorTunnelView, tunnelState } from './tunnelProgressBridge.js';
 import { clampWormCameraZoom } from './wormCameraZoom.js';
 import { victoryView, VICTORY_PITCH } from './story/victoryFrame.js';
+import { prefersReducedMotion } from '../utils/device.js';
+import { makeSteadyCameraEvents, stepSteadyCameraEvents } from './steadyCameraEvents.js';
 
 const FOV = 55;
 const MIN_DISTANCE_OUTSIDE = Math.sqrt(3) / 2;
@@ -36,6 +38,7 @@ export default function SteadyWormCamera({ worm, size }) {
   const scratch = useRef(null);
   if (!scratch.current) scratch.current = {
     head: new Vector3(), eye: new Vector3(), basis: new Matrix4(), yaw: 0, pitch: 0, polarYaw: 0,
+    events: makeSteadyCameraEvents(),
   };
   const pose = scratch.current;
 
@@ -53,6 +56,12 @@ export default function SteadyWormCamera({ worm, size }) {
   useFrame((_, delta) => {
     const state = useGameStore.getState();
     const route = syncExteriorTunnelView(worm);
+    // Scripted pickup, cut and ring-heal beats temporarily own the lens. They
+    // use frozen simulation clocks, not ordinary turns or movement. Hold the
+    // underlying angle until a shot is done so play returns to the same bearing.
+    if (!initial.current && stepSteadyCameraEvents(pose.events, camera, worm, size, state, pose.head,
+      state.settings?.reducedMotion || prefersReducedMotion())) return;
+    if (initial.current) pose.events.run = state.wormRunId;
     // No arrival sweeps, victory orbits, death shots or camera kicks.
     const inspecting = !initial.current && state.wormGamePhase === 'solved';
     if (!initial.current && state.wormAlive === false && !inspecting) return;

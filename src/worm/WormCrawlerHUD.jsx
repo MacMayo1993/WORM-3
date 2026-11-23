@@ -1567,22 +1567,28 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const showQuestToggle = !combatMode && !demoLesson && (!storyId || storyStarted);
     const showRotationCountdown = !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || demoRotation);
 
-    const alternateView = hasStationaryWormCamera(settings) && canPause && <button type="button"
+    const stationaryView = hasStationaryWormCamera(settings);
+    const alternateView = stationaryView && <button type="button"
         className="worm-hud-key worm-far-side-key" style={PAUSE_BTN_STYLE} data-game-input="ui" aria-label="Far side: switch to the opposite cube view"
         title="Far side" onClick={() => useGameStore.getState().flipWormStationaryView()}>
         <span>Far side</span>
     </button>;
 
-    const steadyViewControls = hasSteadyWormCamera(settings) && canPause && <div className="worm-steady-view-controls" role="group" data-game-input="ui" aria-label="Rotate cube view">
+    const viewControls = (stationaryView || hasSteadyWormCamera(settings)) && canPause && <div className="worm-steady-view-controls" role="group" data-game-input="ui" aria-label="Rotate cube view">
         {['left', 'right'].map(direction => <button key={direction} type="button"
             className="worm-hud-key worm-far-side-key" style={PAUSE_BTN_STYLE}
             aria-label={`Rotate view ${direction}`} title={`Rotate view ${direction}`}
-            onClick={() => useGameStore.getState().turnWormSteadyView(direction)}>
+            onClick={() => {
+                const view = useGameStore.getState();
+                if (stationaryView) view.turnWormStationaryView(direction);
+                else view.turnWormSteadyView(direction);
+            }}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 style={direction === 'right' ? { transform: 'scaleX(-1)' } : undefined} aria-hidden="true">
                 <path d="M3 8h5M3 8V3m0 5 3-3a8 8 0 1 1-2 10" />
             </svg>
         </button>)}
+        {alternateView}
     </div>;
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
@@ -1651,8 +1657,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 />}
                 <div className="worm-hud-status-row worm-hud-telemetry">
                     {wormAlive && (!demoLesson || ['tunnel', 'heal', 'collect-heal'].includes(lessonId)) && <HudContext surface={phase === 'crawling'} demo={demoLesson} onInspect={handlePause} onPowerInspect={handlePowerInspect} />}
-                    {alternateView}
-                    {steadyViewControls}
+                    {viewControls}
                 </div>
                 {!questsMinimized && !combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                 {!questsMinimized && !combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}

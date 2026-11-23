@@ -588,7 +588,9 @@ it('shows distinct non-color symbols beside Pause and signals clearance only aft
 
 it('offers Stationary from the in-run Settings and keeps far-side changes player controlled', () => {
   const previous = useGameStore.getState();
-  const farSide = () => host.querySelector('.worm-far-side-key');
+  const farSide = () => host.querySelector('[title="Far side"]');
+  const steer = vi.fn();
+  setWormTurnCallback(steer);
   try {
     renderPhase('crawling');
     expect(farSide()).toBeNull();
@@ -609,9 +611,19 @@ it('offers Stationary from the in-run Settings and keeps far-side changes player
     const count = useGameStore.getState().wormStationaryViewRequest;
     act(() => farSide().click());
     expect(useGameStore.getState().wormStationaryViewRequest).toBe(count + 1);
+    const view = useGameStore.getState();
+    const right = host.querySelector('[aria-label="Rotate view right"]');
+    act(() => {
+      right.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      right.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    expect(useGameStore.getState().wormStationaryViewStep).toBe((view.wormStationaryViewStep + 1) % 8);
+    expect(useGameStore.getState().wormSteadyViewStep).toBe(view.wormSteadyViewStep);
+    expect(steer).not.toHaveBeenCalled();
     renderPhase('tunnel');
     expect(farSide()).not.toBeNull();
   } finally {
+    setWormTurnCallback(null);
     act(() => useGameStore.setState(previous));
   }
 });

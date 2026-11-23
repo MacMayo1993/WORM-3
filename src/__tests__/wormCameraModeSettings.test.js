@@ -9,16 +9,19 @@ it.each([undefined, 'obsolete'])('defaults to Follow worm for a missing or inval
   expect(persistedState.settings).toMatchObject({ wormCameraMode: 'follow', sfx: false });
 });
 
-it('remembers Stationary after reload and does not save the temporary far-side view', async () => {
+it('remembers Stationary after reload and does not save temporary manual views', async () => {
   const { useGameStore } = await import('../hooks/useGameStore.js');
-  const { setSettings, flipWormStationaryView } = useGameStore.getState();
+  const { setSettings, flipWormStationaryView, turnWormStationaryView } = useGameStore.getState();
   setSettings(s => ({ ...s, wormCameraMode: 'stationary' }));
   flipWormStationaryView();
+  turnWormStationaryView('right');
+  expect(useGameStore.getState().wormStationaryViewStep).toBe(1);
   expect(useGameStore.getState().wormStationaryViewRequest).toBe(1);
   vi.resetModules();
   const { useGameStore: reloaded } = await import('../hooks/useGameStore.js');
   expect(reloaded.getState().settings.wormCameraMode).toBe('stationary');
   expect(reloaded.getState().wormStationaryViewRequest).toBe(0);
+  expect(reloaded.getState().wormStationaryViewStep).toBe(0);
   reloaded.getState().setSettings(s => ({ ...s, wormCameraMode: 'follow' }));
   expect(JSON.parse(localStorage.getItem('worm3_settings')).wormCameraMode).toBe('follow');
 });

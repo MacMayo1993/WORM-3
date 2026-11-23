@@ -98,6 +98,10 @@ export const createWormSlice = (set, get) => ({
   // The stationary view changes only on an explicit player request.
   wormStationaryViewRequest: 0,
   flipWormStationaryView: () => set(s => ({ wormStationaryViewRequest: s.wormStationaryViewRequest + 1 })),
+  wormStationaryViewStep: 0,
+  turnWormStationaryView: direction => set(s => ({
+    wormStationaryViewStep: (s.wormStationaryViewStep + (direction === 'left' ? 7 : 1)) % 8,
+  })),
 
   // Eight deliberate viewing angles around the tracked face. The puzzle
   // position/heading and ordinary touch input do not consume this control.
