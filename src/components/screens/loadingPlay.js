@@ -240,7 +240,7 @@ const NAME = { tip: 'MOBI · TIP', hint: 'MOBI', say: 'MOBI' };
  * one, and `opening` the line the cover was rendered with (`openingLine`). LoadingPortal calls `frame(t, now)` once per drawn frame, then
  * reads `warp`, `kick`, `kickSince` and `spin` to draw.
  */
-export function createLoadingPlay({ scene, veil, line, badge, name, clock, opening = null, reduced = false }) {
+export function createLoadingPlay({ scene, layers = [], veil, line, badge, name, clock, opening = null, reduced = false }) {
   const play = {
     tiltX: 0,
     tiltY: 0,
@@ -288,9 +288,13 @@ export function createLoadingPlay({ scene, veil, line, badge, name, clock, openi
 
   const retime = (rate) => {
     play.rate = rate;
-    for (const anim of scene?.getAnimations?.({ subtree: true }) ?? []) {
-      if (anim.updatePlaybackRate) anim.updatePlaybackRate(rate);
-      else anim.playbackRate = rate;
+    // The scene and the layers drawn round it (the tunnel, the sticker storm)
+    // dive together.
+    for (const el of [scene, ...layers]) {
+      for (const anim of el?.getAnimations?.({ subtree: true }) ?? []) {
+        if (anim.updatePlaybackRate) anim.updatePlaybackRate(rate);
+        else anim.playbackRate = rate;
+      }
     }
   };
 

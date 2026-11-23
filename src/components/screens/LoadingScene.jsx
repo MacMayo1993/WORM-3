@@ -33,6 +33,7 @@ import { shaftClipPath } from './loadingWormhole.js';
 import { createLoadingPlay, openingLine, orientationAim, pointerAim } from './loadingPlay.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
+import { RING_COLORS, RING_SECONDS, TUNNEL_RINGS, stormLayout } from './loadingDepths.js';
 import './LoadingScene.css';
 
 function Face({ face }) {
@@ -99,6 +100,54 @@ const Airflow = React.memo(function Airflow() {
   );
 });
 
+// The tunnel the cube falls down (loadingDepths.js).
+const Tunnel = React.memo(function Tunnel() {
+  return (
+    <div className="wl-tunnel" aria-hidden="true">
+      {Array.from({ length: TUNNEL_RINGS }, (_, i) => (
+        <i
+          key={i}
+          className="wl-ring"
+          style={{
+            '--wl-ring-c': `var(--wl-${RING_COLORS[i % RING_COLORS.length]})`,
+            animationDelay: `${(-(i * RING_SECONDS) / TUNNEL_RINGS).toFixed(3)}s`
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+
+// The sticker storm (loadingDepths.js), laid out once.
+const STORM = stormLayout();
+
+const Storm = React.memo(function Storm({ near }) {
+  return (
+    <div className={`wl-storm${near ? ' wl-storm-near' : ''}`} aria-hidden="true">
+      {STORM.filter((layer) => (layer.depth === 'near') === near).map((layer) =>
+        layer.chips.map((chip) => (
+          <i
+            key={chip.key}
+            className={`wl-chip wl-chip-${layer.depth}`}
+            style={{
+              left: `${chip.x}%`,
+              '--wl-chip': `calc(var(--wl-cube) * ${layer.size})`,
+              '--wl-chip-c': `var(--wl-${chip.color})`,
+              '--wl-tz': `${chip.tz}deg`,
+              '--wl-tx': `${chip.tx}deg`,
+              '--wl-sway': `${chip.sway}px`,
+              '--wl-y': chip.y,
+              opacity: layer.opacity,
+              animationDuration: `${layer.seconds}s`,
+              animationDelay: `${chip.delay}s`
+            }}
+          />
+        ))
+      )}
+    </div>
+  );
+});
+
 // Between the two portals' near lips.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
 const MOBI_STYLE = { '--wl-mobi': `url("${import.meta.env.BASE_URL}Mobi.webp")` };
@@ -114,6 +163,8 @@ export default function LoadingScene({ translucent = false }) {
   const veilRef = useRef(null);
   const nameRef = useRef(null);
   const clockRef = useRef(null);
+  const backRef = useRef(null);
+  const nearRef = useRef(null);
   // MOBI's first line is rendered with the cover, so it is there in the first
   // paint even if the main thread then stalls before any frame callback runs.
   const [opening] = useState(() => openingLine(prefersReducedMotion()));
@@ -126,6 +177,7 @@ export default function LoadingScene({ translucent = false }) {
     if (!scene || !root) return undefined;
     const play = createLoadingPlay({
       scene,
+      layers: [backRef.current, nearRef.current],
       veil: veilRef.current,
       line: lineRef.current,
       badge: badgeRef.current,
@@ -192,13 +244,41 @@ export default function LoadingScene({ translucent = false }) {
     };
   }, [opening]);
 
+  // Where the shaft sits on the cover, for the tunnel's centre and the exit's
+  // zoom (LoadingScene.css). Read on layout changes only.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const root = scene?.parentElement;
+    if (!scene || !root) return undefined;
+    const place = () => {
+      const s = scene.getBoundingClientRect();
+      const r = root.getBoundingClientRect();
+      root.style.setProperty('--wl-sx', `${(s.left + s.width / 2 - r.left).toFixed(1)}px`);
+      root.style.setProperty('--wl-sy', `${(s.top + s.height / 2 - r.top).toFixed(1)}px`);
+    };
+    place();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    observer?.observe(root);
+    observer?.observe(scene);
+    if (!observer) window.addEventListener('resize', place);
+    return () => {
+      observer?.disconnect();
+      if (!observer) window.removeEventListener('resize', place);
+    };
+  }, []);
+
   // The cube falls from the first paint, on the compositor, whatever the main
   // thread is doing. CSS stand-ins hold the portals' places until LoadingPortal
   // has drawn them once and adds `wl-ready`; the canvases then run off the
   // fall's own clock, so they are in step with the cube however late they start.
   return (
     <>
-      <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} playRef={playRef} translucent={translucent} />
+      <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} playRef={playRef} translucent={translucent}>
+        <div className="wl-depths" ref={backRef}>
+          <Tunnel />
+          <Storm near={false} />
+        </div>
+      </LoadingPortal>
       <div className="wl-scene" ref={sceneRef}>
         <div className="wl-well" ref={topRef} />
         <div className="wl-gap" />
@@ -220,6 +300,10 @@ export default function LoadingScene({ translucent = false }) {
             </div>
           </div>
         </div>
+      </div>
+      {/* The nearest stickers fly past in front of the scene, at the sides. */}
+      <div className="wl-depths wl-depths-near" ref={nearRef}>
+        <Storm near />
       </div>
       {/* Speed lines round the shaft while diving. */}
       <i className="wl-veil" ref={veilRef} aria-hidden="true" />

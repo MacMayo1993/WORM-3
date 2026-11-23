@@ -29,7 +29,7 @@
      screens so the scene, the status line, MOBI's line (LoadingScene.css; not
      shown below 561px tall) and some air still fit. */
   --wl-reserve: 250px;
-  --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100vh - var(--wl-reserve)) / 3.9));
+  --wl-cube: min(clamp(80px, 30vmin, 172px), calc((100vh - var(--wl-reserve)) / 3.9));
   --wl-well-w: min(calc(var(--wl-cube) * 2.4), 88vw);
   /* The drop between the portals' centres (loadingWormhole.js FALL.drop). */
   --wl-drop: calc(var(--wl-cube) * 2.8);
@@ -103,7 +103,7 @@
 
 /* Phones measure against the visible viewport, not the one behind the toolbars. */
 @supports (height: 100dvh) {
-  .wl-root { --wl-cube: min(clamp(80px, 26vmin, 136px), calc((100dvh - var(--wl-reserve)) / 3.9)); }
+  .wl-root { --wl-cube: min(clamp(80px, 30vmin, 172px), calc((100dvh - var(--wl-reserve)) / 3.9)); }
 }
 
 /* === Scene: two portals and the cube falling between them === */

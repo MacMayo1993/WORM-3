@@ -554,6 +554,100 @@
   }
 }
 
+/* === Depth: the tunnel and the sticker storm ===
+ * Everything here animates transform and opacity only, so it runs on the
+ * compositor with the cube while the main thread parses. Both layers are
+ * retimed with the scene when the player holds to dive (loadingPlay.js). */
+.wl-depths {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  animation: wl-depths-in 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* The nearest stickers pass in front of the scene (z 2) and the portals' lips (3). */
+.wl-depths-near {
+  z-index: 3;
+}
+
+@keyframes wl-depths-in {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The tunnel: rounded-square hoops in the sticker colours, each born small at
+   the shaft and swept out past the viewer, turning as it goes. An ink keyline
+   keeps the white one on the paper. */
+.wl-ring {
+  position: absolute;
+  left: var(--wl-sx, 50%);
+  top: var(--wl-sy, 42%);
+  width: calc(var(--wl-well-w) * 1.2);
+  height: calc(var(--wl-well-w) * 1.2);
+  margin: calc(var(--wl-well-w) * -0.6) 0 0 calc(var(--wl-well-w) * -0.6);
+  box-sizing: border-box;
+  border-radius: 24%;
+  border: calc(var(--wl-cube) * 0.055) solid var(--wl-ring-c);
+  box-shadow:
+    0 0 0 1.5px rgba(38, 55, 45, 0.3),
+    inset 0 0 0 1.5px rgba(38, 55, 45, 0.3),
+    0 0 calc(var(--wl-cube) * 0.3) var(--wl-ring-c);
+  opacity: 0;
+  animation: wl-ring 4s linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes wl-ring {
+  0% { transform: scale(0.22) rotate(0deg); opacity: 0; }
+  14% { opacity: 0.55; }
+  65% { opacity: 0.32; }
+  100% { transform: scale(3.8) rotate(50deg); opacity: 0; }
+}
+
+/* The storm: each sticker is one cubie face, a glossy colour on black plastic,
+   rising from below the screen to above it, tumbling in 3D as it goes. */
+.wl-storm {
+  position: absolute;
+  inset: 0;
+  perspective: 700px;
+}
+
+.wl-chip {
+  position: absolute;
+  top: 0;
+  width: var(--wl-chip);
+  height: var(--wl-chip);
+  margin-left: calc(var(--wl-chip) / -2);
+  border-radius: 24%;
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 46%),
+    var(--wl-chip-c);
+  box-shadow: 0 0 0 calc(var(--wl-chip) * 0.11) #15171c;
+  animation: wl-rise linear infinite;
+  will-change: transform;
+}
+
+.wl-chip-far {
+  box-shadow: 0 0 0 calc(var(--wl-chip) * 0.11) #3a3f44;
+}
+
+@keyframes wl-rise {
+  from { transform: translate3d(var(--wl-sway), calc(100vh + var(--wl-chip)), 0) rotateZ(0deg) rotateX(0deg); }
+  to { transform: translate3d(calc(var(--wl-sway) * -1), calc(var(--wl-chip) * -2), 0) rotateZ(var(--wl-tz)) rotateX(var(--wl-tx)); }
+}
+
+/* === The exit: the cover dives into what it was loading ===
+ * As it fades (LoadingScreen.css), the whole cover swells toward the viewer
+ * about the shaft, so the next screen arrives through the portal. */
+.wl-root.wl-leaving {
+  transform-origin: var(--wl-sx, 50%) var(--wl-sy, 42%);
+  scale: 1.45;
+  transition:
+    opacity 0.45s ease,
+    scale 0.45s cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+
 /* === Reduced motion: the cube still, in the open between the portals === */
 @media (prefers-reduced-motion: reduce) {
   .wl-airflow { display: none; }
@@ -576,6 +670,29 @@
   }
   .wl-twin {
     display: none;
+  }
+  /* The tunnel and storm hold still: a few hoops and stickers at rest. */
+  .wl-depths,
+  .wl-ring,
+  .wl-chip {
+    animation: none;
+  }
+  .wl-ring {
+    opacity: 0.22;
+  }
+  .wl-ring:nth-child(1) { transform: scale(0.7) rotate(8deg); }
+  .wl-ring:nth-child(2) { transform: scale(1.3) rotate(16deg); }
+  .wl-ring:nth-child(3) { transform: scale(2.1) rotate(24deg); }
+  .wl-ring:nth-child(n + 4),
+  .wl-storm-near {
+    display: none;
+  }
+  .wl-chip {
+    top: calc(var(--wl-y, 50) * 1%);
+    transform: rotateZ(var(--wl-tz));
+  }
+  .wl-root.wl-leaving {
+    scale: none;
   }
 }
 
