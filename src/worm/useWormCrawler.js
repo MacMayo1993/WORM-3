@@ -10,6 +10,7 @@ import { storyLevel, storyOutcome } from './story/levels.js';
 import { shouldFinishStory } from './story/starGoals.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
 import { offerStoryBonus, offerStoryPower, recordStoryMechanic, storyTunnelHealGate } from './story/mastery.js';
+import { queuedTunnelHeals } from './healerWorm/healReservations.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
 import { stageStory, storyMetrics, replenishStoryTunnel, replenishStoryOrbs } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
@@ -285,8 +286,11 @@ export function useWormCrawler(size, cubies) {
             tunnelHealGate: tunnel => {
                 const level = storyLevel(useGameStore.getState().wormStoryLevel);
                 if (!level?.mechanics) return null;
-                const healsLeft = Math.max(1, (level.target ?? 1) - (simRef.current.healed ?? 0));
-                return storyTunnelHealGate(level.mechanics, storyPracticeRef.current?.mechanics, simRef.current.signature.mobiTunnel, tunnel, healsLeft);
+                // Heals already promised to other rides in flight are spent too
+                // (healReservations.js); this tunnel's own is not counted against it.
+                const sim = simRef.current;
+                const healsLeft = Math.max(1, (level.target ?? 1) - (sim.healed ?? 0) - queuedTunnelHeals(sim, tunnel));
+                return storyTunnelHealGate(level.mechanics, storyPracticeRef.current?.mechanics, sim.signature.mobiTunnel, tunnel, healsLeft);
             },
             allowTunnelHeal: tunnel => !ctxRef.current.tunnelHealGate(tunnel),
             // A skill moment (skillMoments.js): a callout in the HUD and a bright sting.
