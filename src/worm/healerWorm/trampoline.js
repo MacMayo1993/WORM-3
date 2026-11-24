@@ -1,7 +1,7 @@
 // Shared dimensions, movement and identity for the pickup and Earth's pads.
 export const TRAMPOLINE = Object.freeze({
     radius: 0.39, deck: 0.18, span: 2.2, height: 1.8,
-    rim: '#f4c65a', mat: '#123e38', light: '#baffda', metal: '#c4ddd5',
+    rim: '#ffb942', mat: '#12343e', light: '#d1ffde', metal: '#d2e6ef',
     iconPath: 'M2 12a10 4 0 1 1 20 0 10 4 0 1 1-20 0m3 0a7 2 0 1 0 14 0 7 2 0 1 0-14 0M4 15h3v6H4zm13 0h3v6h-3zM8 16h2v3H8zm6 0h2v3h-2z',
     iconAccent: 'M12 1l-5 5h3v4h4V6h3z',
 });

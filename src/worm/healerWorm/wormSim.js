@@ -86,7 +86,7 @@ import {
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
 import { isSurfaceTilePos, randomFreeTile, getAllSurfaceTiles } from './surfaceTiles.js';
-import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady, orbCreditFace } from './economy.js';
+import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady, orbCreditFace, tunnelDeposit } from './economy.js';
 import { rotationClock } from './rotationClockBridge.js';
 import { chooseSafeLane, isTileOnLane } from './safeLane.js';
 import {
@@ -1096,29 +1096,33 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     const entrySticker = liveCubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
     const entryFaceId = entrySticker?.curr ?? 0;
     const stableKey = getStableKey(x, y, z, dirKey, liveCubies);
+    const partner = tunnel.exit;
+    const partnerKey = getStableKey(partner.x, partner.y, partner.z, partner.dirKey, liveCubies);
     sim.currentTunnelStableKey = stableKey;
     sim.currentTunnelKey = tunnelKey;
 
     if (!skipDeposit && stableKey && entryFaceId) {
         const healingProgress = ctx.getHealingProgress() ?? {};
-        let progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
+        let entryDeposited = healingProgress[stableKey]?.deposited ?? 0;
+        let deposited = tunnelDeposit(healingProgress, stableKey, partnerKey);
         // A charged tunnel (opened by lightning) pays part of its own toll: the first
         // CHARGED_TOLL segments of the heal are free, the worm's orbs and tail untouched.
-        const charged = sim.chargedTunnels.has(tunnelKey) ? Math.min(CHARGED_TOLL, HEAL_COST - progress.deposited) : 0;
+        const charged = sim.chargedTunnels.has(tunnelKey) ? Math.min(CHARGED_TOLL, Math.max(0, HEAL_COST - deposited)) : 0;
         // Fire's Smelter pays more of it from the Fire pickup's budget.
-        const smelted = smeltToll(sim, HEAL_COST - progress.deposited - charged);
+        const smelted = smeltToll(sim, HEAL_COST - deposited - charged);
         if (smelted) abilityEvent(sim, 'fire', [{ x, y, z, dirKey }]);
         const free = charged + smelted;
         if (free > 0) {
-            progress = { ...progress, deposited: progress.deposited + free };
-            ctx.applyDeposit({ orbsLeft: orbsCarried(sim.tailLength), nextInventory: ctx.getOrbInventory(), nextDeposited: progress.deposited },
+            deposited += free;
+            entryDeposited += free;
+            ctx.applyDeposit({ orbsLeft: orbsCarried(sim.tailLength), nextInventory: ctx.getOrbInventory(), nextDeposited: entryDeposited },
                 stableKey, entryFaceId);
         }
         // Deposit rules (caps + Prism Worm wildcard drain) are pure functions in
         // economy.js; here we only apply the result to the sim + (via ctx) the store.
         const deposit = computeOrbDeposit({
             inventory: ctx.getOrbInventory(),
-            deposited: progress.deposited,
+            deposited,
             entryFaceId,
             tailLength: sim.tailLength,
             isPrism: ctx.isPrismCharacter(),
@@ -1129,14 +1133,14 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
             spendCarriedOrbs(sim, ctx.getOrbInventory(), deposit.nextInventory);
             sim.tailLength = deposit.nextTailLength;
             sim.colorEpoch++;
-            ctx.applyDeposit(deposit, stableKey, entryFaceId);
+            ctx.applyDeposit({ ...deposit, nextDeposited: entryDeposited + deposit.n }, stableKey, entryFaceId);
         }
     }
     // ── END DEPOSIT ───────────────────────────────────────────────────────
 
     // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
-    const postDepositProgress = ctx.getHealingProgress()?.[stableKey];
-    sim.willHeal = isHealReady(postDepositProgress?.deposited) && ctx.allowTunnelHeal?.(tunnel) !== false;
+    const postDeposit = tunnelDeposit(ctx.getHealingProgress(), stableKey, partnerKey);
+    sim.willHeal = (isHealReady(postDeposit) || ctx.isStoryTunnelTrial?.()) && ctx.allowTunnelHeal?.(tunnel) !== false;
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
@@ -2508,8 +2512,10 @@ const PHASE_HANDLERS = {
 
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
-                const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
-                const didHeal = (isHealReady(exitProgress?.deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.(exitedTunnel) !== false;
+                const partner = exitedTunnel?.exit;
+                const partnerKey = partner && getStableKey(partner.x, partner.y, partner.z, partner.dirKey, ctx.getCubies());
+                const deposited = tunnelDeposit(ctx.getHealingProgress(), exitStableKey, partnerKey);
+                const didHeal = (isHealReady(deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.(exitedTunnel) !== false;
                 if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,
@@ -2760,6 +2766,10 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling' && sim.elementalT > 0) {
         sim.elementalT -= delta;
         if (sim.elementalT <= 0) {
+            // A purely visual cooldown payoff. The Fire buff already ended;
+            // this does not ignite tiles or damage the worm or enemies.
+            if (sim.elementalType === 'fire' || sim.elementalPair === 'fire')
+                postFusionBurst(sim, { kind: 'fire-expire', tile: { ...sim.pos } });
             sim.elementalT = 0;
             sim.elementalMaxT = 0;
             sim.elementalType = null;

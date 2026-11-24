@@ -119,6 +119,24 @@ function runUntil(sim, ctx, predicate, maxSeconds = 30, dt = 0.05) {
 
 const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
 
+it('posts one cosmetic Fire cooldown beat only when the live timer expires', () => {
+  const sim = makeSim();
+  const ctx = makeCtx({ onElementalTheme: () => {} });
+  sim.elementalType = 'fire';
+  sim.elementalT = 0.02;
+  sim.elementalMaxT = 12;
+  stepWormSim(sim, 0.01, SIZE, ctx);
+  expect(sim.fusionBursts).toHaveLength(0);
+  const expiredAt = { ...sim.pos };
+  stepWormSim(sim, 0.02, SIZE, ctx);
+  expect(sim.fusionBursts).toEqual([expect.objectContaining({ kind: 'fire-expire', tile: expiredAt })]);
+  expect(sim.elementalPatches.size).toBe(0);
+  expect(sim.alive).toBe(true);
+  expect(sim.elementalType).toBeNull();
+  stepWormSim(sim, 0.02, SIZE, ctx);
+  expect(sim.fusionBursts).toHaveLength(1);
+});
+
 describe('ring healing waits for visible tile contact', () => {
   function setup(speed = 1) {
     const size = 5;
@@ -940,6 +958,48 @@ describe('flipped tiles and tunnel traversal', () => {
     }
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
     expect(elapsed.tunnel).toBeCloseTo(tunnelCrossingSeconds(ride), 6);
+  });
+
+  it('combines two mouth deposits without spending mismatched orbs or sealing on head exit', () => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const reverse = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+    const sim = makeSim();
+    const colors = [4, 1, ...Array(10).fill(2)];
+    sim.tailLength = BASE_TAIL_LENGTH + colors.length * ORB_SEGMENT_GROWTH;
+    sim.orbPickupFaceIds = [...colors];
+    sim.orbPickupColors = colors.map(() => '#ffffff');
+    sim.orbPickupSegments = colors.map(() => ORB_SEGMENT_GROWTH);
+    let inventory = { 4: 3, 1: 3, 2: 30 };
+    const progress = {};
+    const ctx = makeCtx({
+      getCubies: () => cubies,
+      resolveTunnel: (_x, _y, _z, dirKey) => ({ tunnel: dirKey === tunnel.exit.dirKey ? reverse : tunnel, tunnelKey }),
+      getOrbInventory: () => inventory,
+      getHealingProgress: () => progress,
+      applyDeposit: (deposit, key, faceId) => {
+        inventory = deposit.nextInventory;
+        progress[key] = { deposited: deposit.nextDeposited, faceId };
+      },
+    });
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling' && sim.tunnelPassages.length === 1)).toBe(true);
+    expect(inventory).toEqual({ 4: 0, 1: 3, 2: 30 });
+    expect(Object.values(progress).map(p => p.deposited)).toEqual([3]);
+    expect(sim.tunnelPassages[0].heal).toBeNull();
+    queueTurn(sim, 'jump');
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.activeTunnel).toBe(reverse);
+    expect(inventory).toEqual({ 4: 0, 1: 2, 2: 30 });
+    expect(Object.values(progress).map(p => p.deposited)).toEqual([3, 1]);
+    expect(sim.willHeal).toBe(true);
+    expect(runUntil(sim, ctx, () => sim.phase === 'windout')).toBe(true);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    expect(sim.tunnelPassages.filter(p => p.heal)).toHaveLength(1);
+    ctx.getCubies = () => null;
+    ctx.resolveTunnel = () => null;
+    expect(runUntil(sim, ctx, () => sim.healed === 1)).toBe(true);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
   });
 
   it('resumes crawling with a long tail inside and heals only after it clears', () => {

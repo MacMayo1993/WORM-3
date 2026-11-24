@@ -454,8 +454,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const flameAt = (t, delay) => {
         const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
         const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
-        const u = DIR_FORWARD[t.dirKey]?.up ?? [0, 1, 0];
-        return { pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay };
+        return { pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], normal: [n.x, n.y, n.z], delay };
     };
 
     // A bomb put out by a fusion (Current's arc): the same reward and credit as a disarm.
@@ -486,6 +485,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         for (const burst of fresh) resolveFusionBurst(burst);
     };
     const resolveFusionBurst = burst => {
+        if (burst.kind === 'fire-expire') {
+            blastApiRef.current?.spawn([{ ...flameAt(burst.tile, 0), epicenter: true }], 'fire');
+            return;
+        }
         // A fusion's ignition (fusionIgnition.js): its ground is already laid in the sim;
         // here the enemies in reach take its hit and fire recipes put flames up.
         if (burst.kind === 'ignite' || burst.kind === 'air-reaction' || burst.kind === 'element-discharge') {
@@ -1007,26 +1010,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // Detonate: shoot fire out along the arms, then resolve the hit.
                     // All arms ignite on the damage frame so a distant hit never
                     // kills before its flame appears.
-                    const { keys, arms, center } = computeBlastTiles(bomb, size);
+                    const { keys, center } = computeBlastTiles(bomb, size);
+                    const centerKey = tileKeyOf(center);
                     const flames = [];
-                    const pushFlame = (t, delay) => {
-                        if (isFirebreakTile(worm.elementalPatches.current, t)) return;
-                        const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
-                        const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
-                        // Flames sit just off the surface (along the normal) but lick UP
-                        // along the face's "up" so they read as flames, not blobs.
-                        const u = DIR_FORWARD[t.dirKey]?.up ?? [0, 1, 0];
-                        flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay });
-                    };
-                    pushFlame(center, 0);
-                    for (const arm of arms) arm.forEach(t => pushFlame(t, 0));
-                    blastApiRef.current?.spawn(flames);
-                    worm.feel('cut');
-
-                    // The hot route is a firebreak, not blanket blast immunity.
+                    // Use the exact hit set for the visualization too. Wrapped
+                    // arms may reach the same tile, but it only detonates once.
                     for (const key of keys) {
                         if (isFirebreakTile(worm.elementalPatches.current, key)) keys.delete(key);
+                        else flames.push({ ...flameAt(tileOf(key), 0), epicenter: key === centerKey });
                     }
+                    blastApiRef.current?.spawn(flames, 'bomb');
+                    worm.feel('cut');
                     const hit = checkBlastHitWorm(worm, keys, size);
                     if (hit) {
                         const histEntry = hit.type === 'cut'

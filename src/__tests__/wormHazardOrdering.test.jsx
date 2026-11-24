@@ -13,7 +13,7 @@ import { stageStory } from '../worm/story/runtime.js';
 import { WORM_STORY_LEVELS, storyLevel, storyRotationCycle } from '../worm/story/levels.js';
 import { recordStoryMechanic } from '../worm/story/mastery.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
-import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
+import { addElementalPatch, postFusionBurst } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
 import { combatBridge, makeCombat, makeEnemy } from '../worm/combat/portalCombat.js';
 import { tickElementalAbilities } from '../worm/healerWorm/elementalAbilities.js';
@@ -508,6 +508,21 @@ it('completes the demo rotation only after the warned live layer has committed',
 });
 
 
+it('renders one harmless Fire expiration even when paused across its delivery', () => {
+  const { blastApiRef } = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  const spawn = vi.fn();
+  blastApiRef.current = { spawn };
+  postFusionBurst(sim, { kind: 'fire-expire', tile: { ...sim.pos } });
+  act(() => useGameStore.setState({ wormPaused: true }));
+  tick();
+  expect(spawn).not.toHaveBeenCalled();
+  act(() => useGameStore.setState({ wormPaused: false }));
+  tick(2);
+  expect(spawn).toHaveBeenCalledExactlyOnceWith([expect.objectContaining({ delay: 0, epicenter: true })], 'fire');
+  expect(checkBlastHitWorm).not.toHaveBeenCalled();
+  expect(useGameStore.getState().wormAlive).toBe(true);
+});
+
 it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once', effect => {
   const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   sim.elementalPair = effect === 'steam' ? 'fire' : 'water';
@@ -528,12 +543,20 @@ it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once
     expect(bomb.fuse).toBeCloseTo(3.9); // ordinary 1× fuse, not hot-tile 3×
     expect(useGameStore.getState().parityPoints).toBe(coins);
     checkBlastHitWorm.mockReturnValue(null);
+    const spawn = vi.fn();
+    props.blastApiRef.current = { spawn };
     bomb.fuse = 0.01;
     tick();
     expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
     const blast = checkBlastHitWorm.mock.calls[0][1];
     expect(blast.has(`${sim.pos.x},${sim.pos.y},${sim.pos.z},${sim.pos.dirKey}`)).toBe(false);
     expect(blast.size).toBeGreaterThan(0); // neighbouring unprotected tiles still burn
+    expect(spawn).toHaveBeenCalledOnce();
+    const [points, kind] = spawn.mock.calls[0];
+    expect(kind).toBe('bomb');
+    expect(points).toHaveLength(blast.size);
+    expect(points.every(p => p.delay === 0 && !p.epicenter)).toBe(true);
+    expect(new Set(points.map(p => p.pos.join(','))).size).toBe(blast.size);
   }
 });
 

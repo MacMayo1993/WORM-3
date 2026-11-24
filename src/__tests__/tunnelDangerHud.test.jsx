@@ -52,7 +52,7 @@ it('shows safe entry separately from unaffordable healing', () => {
   wormBuffs.tunnelNeeds = { uses: 1, ready: false, pickupsNeeded: 2, color: '#fff' };
   act(() => root.render(<TunnelNeedsCard compact />));
   expect(host.textContent).toContain('2 safe passes left');
-  expect(host.textContent).toContain('Need 2 orbs to heal');
+  expect(host.textContent).toContain('Need 2 matching orbs to heal');
   expect(host.querySelector('[data-tunnel-danger="true"]')).toBeNull();
 });
 

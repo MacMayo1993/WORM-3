@@ -1,3 +1,4 @@
+import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import TunnelNeedsCard from '../worm/TunnelNeedsCard.jsx';
 import { flipStickerPair } from '../game/manifoldLogic.js';
@@ -98,13 +99,16 @@ it('shows correct pickup requirements through the real tunnel lookup and store',
   const state = useGameStore.getState();
   const cubies = flipStickerPair(state.cubies, 5, 2, 3, 4, 'PZ', getManifoldMap(state.cubies, 5, state.rotationEpoch));
   act(() => useGameStore.setState({ cubies })); frame();
-  expect(host.textContent).toContain('Need 2 orbs to heal');
+  expect(host.textContent).toContain('Need 2 matching orbs to heal');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('false');
   const face = cubies[2][3][4].stickers.PZ.curr;
   act(() => { worm.tailLength.current = BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH; useGameStore.setState({ wormOrbInventory: { [face]: 3 } }); }); frame();
-  expect(host.textContent).toContain('Need 1 orb to heal');
-  const key = getStableKey(2, 3, 4, 'PZ', cubies);
-  act(() => useGameStore.setState({ wormHealingProgress: { [key]: { deposited: 1, faceId: face } } })); frame();
+  expect(host.textContent).toContain('Need 1 matching orb to heal');
+  const entryKey = getStableKey(2, 3, 4, 'PZ', cubies);
+  const tile = getWormTunnelSnapshot(cubies, 5, state.rotationEpoch).positions.find(t => t.stableKey === entryKey);
+  expect(tile.partnerKey).toBeTruthy();
+  expect(tile.partnerKey).not.toBe(entryKey);
+  act(() => useGameStore.setState({ wormHealingProgress: { [tile.partnerKey]: { deposited: 1 } } })); frame();
   expect(host.textContent).toContain('Heal ready');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('true');
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('25');

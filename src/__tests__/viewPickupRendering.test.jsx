@@ -18,6 +18,7 @@ it('renders every view as its own cube, reserves elemental rendering for element
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const previous = useGameStore.getState().wormSpecials;
   const previousPaused = useGameStore.getState().wormPaused;
+  const previousSettings = useGameStore.getState().settings;
   const previousLive = { ...liveCubies };
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
@@ -80,13 +81,15 @@ it('renders every view as its own cube, reserves elemental rendering for element
     expect(spring.getObjectByName('trampoline-springs').isInstancedMesh).toBe(true);
     expect(new THREE.Vector3(0, 0, 1).applyQuaternion(spring.parent.parent.quaternion).z).toBeCloseTo(1);
     const press = mat.geometry.attributes.bouncePress;
-    const before = press.getX(0);
-    advance(90);
-    expect(press.getX(0)).not.toBeCloseTo(before);
+    const samples = Array.from({ length: 90 }, () => { advance(1); return press.getX(0); });
+    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.5);
     useGameStore.setState({ wormPaused: true });
     const paused = press.getX(0);
     advance(12);
     expect(press.getX(0)).toBe(paused);
+    useGameStore.setState({ wormPaused: false, settings: { ...previousSettings, reducedMotion: true } });
+    advance(1);
+    expect(press.getX(0)).toBe(0);
     expect(store.scene.getObjectByName('elemental-fire')).toBeDefined();
     expect(store.scene.getObjectByName('elemental-view-lego')).toBeUndefined();
     expect(store.scene.getObjectByName('elemental-orb-shower')).toBeUndefined();
@@ -116,7 +119,7 @@ it('renders every view as its own cube, reserves elemental rendering for element
     expect(store.scene.getObjectByName('view-pickup-lego')).toBe(lego);
   } finally {
     await act(async () => root.unmount());
-    useGameStore.setState({ wormSpecials: previous, wormPaused: previousPaused });
+    useGameStore.setState({ wormSpecials: previous, wormPaused: previousPaused, settings: previousSettings });
     Object.assign(liveCubies, previousLive);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

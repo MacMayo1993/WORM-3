@@ -10,9 +10,10 @@ extend(THREE);
 
 it('moves the mounted bomb, ring, fuse and countdown without membership changes or React rerenders', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const arc = vi.fn(), stroke = vi.fn(), fillText = vi.fn();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     beginPath() {}, moveTo() {}, bezierCurveTo() {}, closePath() {}, fill() {},
-    clearRect() {}, strokeText() {}, fillText() {},
+    clearRect() {}, strokeText() {}, arc, stroke, fillText,
     createLinearGradient: () => ({ addColorStop() {} }),
   });
   const { HealerBombs } = await import('../worm/healerWorm/HealerBombs.jsx');
@@ -33,6 +34,9 @@ it('moves the mounted bomb, ring, fuse and countdown without membership changes 
     state.advance(2 / 60);
     const bomb = state.scene.getObjectByName('worm-bomb-1');
     expect(bomb.position.z).toBeGreaterThan(2);
+    expect(arc).toHaveBeenCalledExactlyOnceWith(64, 64, 58, 0, Math.PI * 2);
+    expect(stroke).toHaveBeenCalledOnce();
+    expect(fillText).toHaveBeenCalledExactlyOnceWith('4', 64, 70);
     const initial = bomb.position.clone();
     const xAxis = new THREE.Vector3(1, 0, 0);
     setLiveRotation('col', [2], [Math.PI / 4], 2, Math.PI / 4);
@@ -56,6 +60,12 @@ it('moves the mounted bomb, ring, fuse and countdown without membership changes 
       expect(child.getWorldPosition(new THREE.Vector3()).distanceTo(positions[i])).toBeLessThan(1e-8);
     });
     expect(state.scene.getObjectByName('worm-bomb-1')).toBe(bomb);
+    expect(arc).toHaveBeenCalledOnce(); // rotating does not redraw the unchanged number
+    bombsRef.current[0].fuse = 0.99;
+    state.advance(6 / 60);
+    expect(arc).toHaveBeenCalledTimes(2);
+    expect(stroke).toHaveBeenCalledTimes(2);
+    expect(fillText).toHaveBeenLastCalledWith('1', 64, 70);
   } finally {
     stop();
     await act(async () => root.unmount());

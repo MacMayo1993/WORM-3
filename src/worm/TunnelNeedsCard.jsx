@@ -26,18 +26,19 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const warning = danger === 'collapsing' ? 'Tunnel collapsing'
     : padRoute ? (danger === 'collapsed' ? "Pit · don't go in" : 'Caving in · stay off it')
     : danger === 'collapsed' ? 'Collapsed · do not enter' : 'Fatal tunnel · turn away';
-  const title = danger ? warning : need.ready ? (need.inTransit ? 'Heals when you exit' : 'Ready to heal') : `Collect ${need.pickupsNeeded} more ${need.pickupsNeeded === 1 ? 'orb' : 'orbs'}`;
+  const gated = need.healingAllowed === false;
+  const ready = need.ready && !gated;
   const location = need.inTransit ? 'This tunnel' : need.distance === 0 ? 'Tunnel here' : need.aroundCorner ? 'Around the corner' : 'Tunnel ahead';
   const dangerCaption = danger === 'collapsing' ? 'Traversal limit exceeded · collapse ahead'
     : !padRoute ? 'Entering this tunnel will kill you · take another route'
     : danger === 'collapsed' ? 'A collapsed tunnel · go around it or jump clear' : "Worn out · it caves in once you're clear";
-  const caption = danger ? dangerCaption : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? (need.ready ? 'Last ride · it heals as your tail clears' : 'Last ride · it caves in behind you') : lastRide && !need.ready ? 'Ride it once more and it caves in behind you' : need.ready ? (need.inTransit ? 'Let your tail clear the exit' : padRoute ? 'Jump on to spend your carried orbs' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any color counts · carried orbs included' : need.saved > 0 ? 'Progress saved · match this color' : 'Match this color · carried orbs included';
-  const funded = need.ready && !danger;
+  const caption = danger ? dangerCaption : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? (ready ? 'Last ride · it heals as your tail clears' : 'Last ride · it caves in behind you') : gated ? 'Complete the level requirement first' : lastRide && !ready ? 'Ride it once more and it caves in behind you' : ready ? (need.inTransit ? 'Let your tail clear the exit' : padRoute ? 'Jump on to spend your carried orbs' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any carried color counts · run totals don’t' : need.saved > 0 ? 'Both mouths share deposits · match this mouth' : 'Match the entry color with carried orbs, not run totals';
+  const funded = ready && !danger && !need.locked;
   const safety = danger ? warning : need.locked ? `Locked ${need.lockSeconds}s` : need.inTransit
     ? (passes === 0 ? 'Last ride' : 'Safe traversal')
     : lastRide ? 'Last ride · then it collapses' : `${passes} safe passes left`;
-  const healing = need.traversalTrial ? 'Clears after your tail' : need.ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
-    : `Need ${need.pickupsNeeded} ${need.pickupsNeeded === 1 ? 'orb' : 'orbs'} to heal`;
+  const healing = gated ? 'Level objective required to heal' : need.traversalTrial ? 'Clears after your tail' : ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
+    : `Need ${need.pickupsNeeded} ${need.isPrism ? '' : 'matching '}${need.pickupsNeeded === 1 ? 'orb' : 'orbs'} to heal`;
 
   if (compact) return <button type="button" onClick={onInspect} className="worm-tunnel-needs worm-tunnel-glance worm-hud-chip"
     data-heal-ready={funded} data-tunnel-danger={!!danger} aria-label={`${safety}. ${danger ? caption : healing}. Pause for details.`} aria-haspopup="dialog">
@@ -49,10 +50,10 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   return <aside className="worm-tunnel-needs" data-heal-ready={funded} data-tunnel-danger={!!danger} aria-label="Tunnel healing requirements" style={{ color: GAME_HUD.text, background: funded ? 'rgba(22,65,39,0.94)' : 'rgba(76,27,32,0.94)', border: `1px solid ${funded ? '#8ee5a6' : '#f08d91'}`, borderRadius: 16, padding: '8px 10px', width: '100%', boxSizing: 'border-box', pointerEvents: 'none', boxShadow: '0 6px 20px #0005' }}>
 
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span aria-hidden="true" style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: need.isPrism ? 'conic-gradient(#ff739a,#ffdc72,#93e59c,#7cdaff,#b996ff,#ff739a)' : need.color, border: '2px solid #ffffffc0', boxShadow: `0 0 12px ${need.color}70`, display: 'grid', placeItems: 'center', color: '#16201a', fontWeight: 900 }}>{danger ? '!' : need.ready ? '✓' : need.pickupsNeeded}</span>
+      <span aria-hidden="true" style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: need.isPrism ? 'conic-gradient(#ff739a,#ffdc72,#93e59c,#7cdaff,#b996ff,#ff739a)' : need.color, border: '2px solid #ffffffc0', boxShadow: `0 0 12px ${need.color}70`, display: 'grid', placeItems: 'center', color: '#16201a', fontWeight: 900 }}>{danger || gated ? '!' : ready ? '✓' : need.pickupsNeeded}</span>
       <div>
         <div style={{ fontSize: 9, letterSpacing: 1.1, opacity: 0.72 }}>{location}</div>
-        <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.5 }}>{danger ? title : safety}</div>
+        <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.5 }}>{safety}</div>
         {!danger && <div style={{ fontSize: 12 }}>{healing}</div>}
       </div>
     </div>
@@ -60,6 +61,6 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
       <span style={{ width: `${need.savedFraction * 100}%`, background: need.color }} />
       <span style={{ width: `${need.payableFraction * 100}%`, background: 'repeating-linear-gradient(120deg,#ffffff70 0 3px,#ffffff25 3px 6px)' }} />
     </div>}
-    <div style={{ fontSize: 10, opacity: 0.85, marginTop: need.voided ? 5 : 0 }}>{need.traversalTrial && !danger ? 'Cross once to clear this route' : caption}</div>
+    <div style={{ fontSize: 10, opacity: 0.85, marginTop: need.voided ? 5 : 0 }}>{need.traversalTrial && !danger && !gated ? 'Cross once to clear this route' : caption}</div>
   </aside>;
 }
