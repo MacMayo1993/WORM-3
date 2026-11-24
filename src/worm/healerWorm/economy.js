@@ -51,6 +51,13 @@ export function splitRemovedSegments(total, count) {
 }
 
 /** A tunnel heals on exit once enough orb segments have been deposited into it. */
+// Both mouths seal as one tunnel. The stable sticker keys keep earlier payments
+// attached through cube rotations; the entering mouth still sets the toll color.
+export function tunnelDeposit(progress, key, partnerKey) {
+  return (progress?.[key]?.deposited ?? 0) +
+    (partnerKey && partnerKey !== key ? (progress?.[partnerKey]?.deposited ?? 0) : 0);
+}
+
 export const isHealReady = (deposited) => (deposited ?? 0) >= HEAL_COST;
 
 /**

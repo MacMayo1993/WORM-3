@@ -19,7 +19,7 @@ import { FACE_COLORS } from '../../utils/constants.js';
 import { portalSparkPose, PORTAL_SPARKS, DANGER_SPARKS, sparkVertexShader, sparkFragmentShader } from './portalSparks.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
 import { healingNeed } from './tunnelReadout.js';
-import { getStableKey } from '../wormLogic.js';
+import { tunnelDeposit } from './economy.js';
 import { isParityLocked } from './signatures.js';
 import { BASE_TAIL_LENGTH, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
@@ -271,9 +271,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
             const faceColor = faceColorObjs.get(faceId) ?? _faceColorFallback;
-            const stableKey = getStableKey(tile.x, tile.y, tile.z, tile.dirKey, cubies);
             const ready = !isVoid && !isCritical && !!tunnelKey && !isParityLocked({ signature }, tile, { getCubies: () => cubies }) && healingNeed({
-                deposited: state.wormHealingProgress?.[stableKey]?.deposited ?? 0,
+                deposited: tunnelDeposit(state.wormHealingProgress, tile.stableKey, tile.partnerKey),
                 inventory: state.wormOrbInventory ?? {}, faceId, tailLength,
                 isPrism: state.wormCharacter === 'prism',
             }).ready;

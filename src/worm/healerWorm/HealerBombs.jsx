@@ -21,6 +21,8 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { FACE_NORMALS, DIR_FORWARD } from './constants.js';
+import DetonationBurst from './DetonationBurst.jsx';
+import { BLAST_MAX_ACTIVE, BLAST_MAX_TILES } from './blastVisuals.js';
 import { BOMB_FUSE_SECONDS } from './bombs.js';
 import { BOMB_LIFT, createBombPose, updateBombPose } from './bombRotation.js';
 import { addFrameDissolve } from '../../components/intro/introDissolve.js';
@@ -31,6 +33,7 @@ import {
   BOMB_FIELD_MID, bombDissolveProgress, bombFleck,
 } from './bombDissolve.js';
 
+const WARM_BLAST = [{ pos: [0, 0, 0.35], normal: [0, 0, 1], delay: 0 }];
 const _UP = new THREE.Vector3(0, 1, 0);
 const DISSOLVE_FIELD = new THREE.Matrix4().makeScale(BOMB_FIELD_SCALE, BOMB_FIELD_SCALE, BOMB_FIELD_SCALE)
   .setPosition(0, -BOMB_FIELD_SCALE * BOMB_FIELD_MID, 0);
@@ -58,9 +61,7 @@ function makeFlameTexture() {
   tex.anisotropy = 2;
   return tex;
 }
-// Exported so the FIRE element's cube skin burns with the same flame the bombs do
-// (see ElementalFireSkin) rather than carrying a second, differently-shaped one.
-export const FLAME_TEX = makeFlameTexture();
+const FLAME_TEX = makeFlameTexture();
 
 // ─── Shared geometries (created once, reused by every bomb + flame) ─────────────
 const GEO = {
@@ -71,7 +72,6 @@ const GEO = {
   fuse: new THREE.CylinderGeometry(0.03, 0.045, 0.32, 8),
   spark: new THREE.SphereGeometry(0.09, 10, 10),
   ember: new THREE.SphereGeometry(0.05, 6, 6),
-  flameCore: new THREE.SphereGeometry(0.3, 14, 14),
   fleck: new THREE.PlaneGeometry(1, 0.62)
 };
 // Static (non-animated) shared materials — safe to reuse; R3F never disposes
@@ -172,7 +172,14 @@ function makeCountdownCanvas() {
 function drawCountdown(canvas, sec, urgency) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '900 92px sans-serif';
+  ctx.beginPath();
+  ctx.arc(64, 64, 58, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(29,17,22,0.9)';
+  ctx.fill();
+  ctx.strokeStyle = urgency > 0.66 ? '#ff7040' : '#ffc66a';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.font = '900 84px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const color = urgency > 0.66 ? '#ff3b30' : urgency > 0.33 ? '#ffcc33' : '#ffffff';
@@ -194,6 +201,7 @@ function Bomb({ bomb, size }) {
   const ringRef = useRef();
   const ringMatRef = useRef();
   const glowMatRef = useRef();
+  const squeezeRef = useRef();
   const fuseSparkRef = useRef();
   const fuseFlameRef = useRef();
   const emberRefs = useRef([]);
@@ -213,6 +221,7 @@ function Bomb({ bomb, size }) {
 
   useFrame((_, delta) => {
     updateBombPose(pose, bomb, size);
+    if (!rootRef.current) return;
     rootRef.current.position.copy(pose.position);
     rootRef.current.quaternion.copy(pose.rotation);
     flatRef.current.quaternion.copy(pose.flat);
@@ -222,17 +231,23 @@ function Bomb({ bomb, size }) {
     const maxFuse = bomb.maxFuse ?? BOMB_FUSE_SECONDS;
     const frac = Math.max(0, Math.min(1, (bomb.fuse ?? 0) / maxFuse)); // 1 at spawn → 0 at blast
     const urgency = 1 - frac;
+    const reduced = prefersReducedMotion() || useGameStore.getState().settings?.reducedMotion;
     bomb._blink = (bomb._blink ?? 0) + delta * (2 + urgency * 14);
-    const pulse = 0.5 + 0.5 * Math.sin(bomb._blink);
+    const pulse = reduced ? 0.4 : 0.5 + 0.5 * Math.sin(bomb._blink);
 
     if (ringRef.current) ringRef.current.scale.setScalar(1 + pulse * (0.08 + urgency * 0.3));
     if (ringMatRef.current) {
       ringMatRef.current.color.setRGB(0.35 + urgency * 0.65, Math.max(0.06, frac * 0.7), 0.12);
       ringMatRef.current.opacity = 0.5 + pulse * 0.4;
     }
+    if (squeezeRef.current) {
+      const size = 0.42 + frac * 0.55;
+      squeezeRef.current.scale.setScalar(size);
+      squeezeRef.current.material.opacity = 0.24 + 0.5 * urgency;
+    }
     if (glowMatRef.current) glowMatRef.current.opacity = 0.1 + urgency * 0.28 * (0.6 + 0.4 * pulse);
 
-    const flick = 0.7 + 0.5 * Math.sin(bomb._blink * 2.7);
+    const flick = reduced ? 0.7 : 0.7 + 0.5 * Math.sin(bomb._blink * 2.7);
     if (fuseSparkRef.current) fuseSparkRef.current.scale.setScalar(0.5 + flick * (0.5 + urgency * 0.6));
     if (fuseFlameRef.current) {
       fuseFlameRef.current.scale.set(0.18 + 0.05 * flick, 0.3 + 0.14 * flick, 1);
@@ -241,7 +256,7 @@ function Bomb({ bomb, size }) {
     emberRefs.current.forEach((e, i) => {
       if (!e) return;
       const t = (bomb._blink * (0.5 + i * 0.13) + i * 1.7) % 3;
-      const k = t / 3;
+      const k = reduced ? 1 : t / 3;
       e.position.set((i - 1) * 0.05 * flick, fuseTipY + k * 0.5, 0);
       e.scale.setScalar((1 - k) * 0.06);
       e.material.opacity = (1 - k) * 0.9;
@@ -263,6 +278,9 @@ function Bomb({ bomb, size }) {
       <group ref={flatRef}>
         <mesh ref={ringRef} geometry={GEO.ring} position={[0, -BOMB_LIFT + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <meshBasicMaterial ref={ringMatRef} color="#ff8a1e" transparent opacity={0.8} toneMapped={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={squeezeRef} geometry={GEO.ring} position={[0, -BOMB_LIFT + 0.036, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <meshBasicMaterial color="#fff2a6" transparent opacity={0.24} toneMapped={false} depthWrite={false} />
         </mesh>
         <mesh geometry={GEO.disc} position={[0, -BOMB_LIFT + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <meshBasicMaterial ref={glowMatRef} color="#ff5a1e" transparent opacity={0.2} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
@@ -290,88 +308,6 @@ function Bomb({ bomb, size }) {
   );
 }
 
-// ─── Detonation fire ─────────────────────────────────────────────────────────
-const FLAME_LIFE = 0.85; // seconds each flame cluster burns after it ignites
-const TONGUES = 4;
-
-// A cluster of flame tongues + a hot core over one blast tile. Ignites after
-// `delay` (so the blast reads as shooting outward from the centre), flashes
-// bright, licks upward off the surface, then flickers down to nothing.
-function FlameCluster({ position, up, delay }) {
-  const groupRef = useRef();
-  const ageRef = useRef(0);
-  const upV = useMemo(() => new THREE.Vector3(up[0], up[1], up[2]).normalize(), [up]);
-  const tongues = useMemo(
-    () => Array.from({ length: TONGUES }, () => ({
-      ph: Math.random() * 6.28,
-      sp: 0.8 + Math.random() * 0.8,
-      jx: (Math.random() - 0.5) * 0.4,
-      jz: (Math.random() - 0.5) * 0.4,
-      w: 0.42 + Math.random() * 0.25,
-      h: 0.7 + Math.random() * 0.5
-    })),
-    []
-  );
-
-  useFrame((_, dt) => {
-    ageRef.current += dt;
-    const g = groupRef.current;
-    if (!g) return;
-    const t = ageRef.current - delay;
-    if (t < 0) { g.visible = false; return; }
-    g.visible = true;
-    const life = Math.min(1, t / FLAME_LIFE);
-    const fade = 1 - life;
-    const grow = t < 0.08 ? t / 0.08 : 1;
-    g.position.set(
-      position[0] + upV.x * life * 0.5,
-      position[1] + upV.y * life * 0.5,
-      position[2] + upV.z * life * 0.5
-    );
-    let si = 0;
-    g.children.forEach((child) => {
-      if (child.isSprite) {
-        const s = tongues[si++];
-        const flick = 0.7 + 0.55 * Math.sin((t + s.ph) * 20 * s.sp);
-        child.scale.set(s.w * grow * (0.85 + 0.25 * flick), s.h * grow * (1.25 - life * 0.5) * (0.8 + 0.4 * flick), 1);
-        child.material.opacity = fade * 0.92;
-      } else if (child.material) {
-        child.scale.setScalar(grow * (1.25 - life * 0.7) * (0.9 + 0.15 * Math.sin(t * 34)));
-        child.material.opacity = fade * 0.95;
-      }
-    });
-  });
-
-  return (
-    <group ref={groupRef} position={position}>
-      {/* hot white-orange core */}
-      <mesh geometry={GEO.flameCore}>
-        <meshBasicMaterial color="#ffdf9a" transparent blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
-      </mesh>
-      {/* flame tongues */}
-      {tongues.map((s, i) => (
-        <sprite key={i} position={[s.jx, 0.28, s.jz]} scale={[s.w, s.h, 1]}>
-          <spriteMaterial map={FLAME_TEX} transparent opacity={0.9} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
-        </sprite>
-      ))}
-    </group>
-  );
-}
-
-function BlastBurst({ points, onDone }) {
-  const ageRef = useRef(0);
-  const ttl = useMemo(() => Math.max(0, ...points.map((p) => p.delay)) + FLAME_LIFE + 0.15, [points]);
-  useFrame((_, dt) => {
-    ageRef.current += dt;
-    if (ageRef.current >= ttl) onDone();
-  });
-  return (
-    <>
-      {points.map((p, i) => <FlameCluster key={i} position={p.pos} up={p.up} delay={p.delay} />)}
-    </>
-  );
-}
-
 // Hidden, tiny group rendered for the first ~1.2s so the GPU compiles every
 // bomb/flame shader program and uploads the flame texture during the frozen
 // scramble phase — not the first time a bomb pops up next to the crawling worm.
@@ -385,10 +321,8 @@ function WarmUp() {
   return (
     <group position={[0, 0, 0]} scale={0.02} frustumCulled={false}>
       <mesh geometry={GEO.body} material={MAT.body} />
+      <DetonationBurst points={WARM_BLAST} kind="bomb" warm />
       <DisarmedBomb bomb={{ id: 0, tile: { x: 1, y: 1, z: 2, dirKey: 'PZ' } }} size={3} warmup />
-      <mesh geometry={GEO.flameCore}>
-        <meshBasicMaterial color="#ffdf9a" transparent blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
-      </mesh>
       <mesh geometry={GEO.ring}>
         <meshBasicMaterial color="#ff8a1e" transparent opacity={0.01} toneMapped={false} depthWrite={false} />
       </mesh>
@@ -414,7 +348,7 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
   const burstSeq = useRef(0);
 
   // Register the imperative blast-spawn handle for the mode's frame loop.
-  // `flamePoints` is [{ pos:[x,y,z], up:[x,y,z], delay:number }] — the covered
+  // `flamePoints` is [{ pos:[x,y,z], normal:[x,y,z], delay:number }] — the covered
   // blast tiles, ordered so arms ignite outward from the centre.
   useEffect(() => {
     if (!blastApiRef) return undefined;
@@ -425,16 +359,18 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
         setDisarmed(list => [...list.filter(b => b.id !== bomb.id), { ...bomb, tile: { ...bomb.tile } }].slice(-6));
       },
       clear: () => { setDisarmed([]); setBursts([]); },
-      spawn: (flamePoints) => {
+      spawn: (flamePoints, kind = 'fire') => {
+        if (!flamePoints.length) return;
         const id = burstSeq.current++;
         setBursts((b) => [...b, {
-          id,
-          points: flamePoints.map((p) => ({
+          id, kind,
+          points: flamePoints.slice(0, BLAST_MAX_TILES).map((p) => ({
             pos: [p.pos[0], p.pos[1], p.pos[2]],
-            up: p.up ? [p.up[0], p.up[1], p.up[2]] : [0, 1, 0],
+            normal: p.normal ? [...p.normal] : [0, 1, 0],
+            epicenter: !!p.epicenter,
             delay: p.delay ?? 0
           }))
-        }]);
+        }].slice(-BLAST_MAX_ACTIVE));
       }
     };
     return () => { if (blastApiRef.current) blastApiRef.current = null; };
@@ -465,9 +401,10 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
       {disarmed.map(bomb => <DisarmedBomb key={bomb.id} bomb={bomb} size={size} hidden={hidden}
         onDone={() => setDisarmed(list => list.filter(b => b.id !== bomb.id))} />)}
       {bursts.map((burst) => (
-        <BlastBurst
+        <DetonationBurst
           key={burst.id}
           points={burst.points}
+          kind={burst.kind}
           onDone={() => setBursts((b) => b.filter((x) => x.id !== burst.id))}
         />
       ))}

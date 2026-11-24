@@ -2,7 +2,7 @@
 // publishing a new snapshot must never mutate a lookup retained by a renderer.
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { buildTunnelLookup, getStableKey, updateTunnelLookupIncremental } from './wormLogic.js';
 import { FACE_NORMALS } from './healerWorm/constants.js';
 
 let snapshots = new WeakMap();
@@ -56,8 +56,12 @@ export function getWormTunnelSnapshot(cubies, size, epoch) {
     for (const cell of surfaceCells(size)) {
         const sticker = cubies[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
         if (!sticker || sticker.curr === sticker.orig) continue;
+        const hit = lookup.get(cell.key);
+        const partner = hit && (hit.reversed ? hit.tunnel.entry : hit.tunnel.exit);
         positions.push({ ...cell, faceId: sticker.curr,
-            tunnelKey: lookup.get(cell.key)?.tunnelKey ?? null });
+            stableKey: getStableKey(cell.x, cell.y, cell.z, cell.dirKey, cubies),
+            partnerKey: partner && getStableKey(partner.x, partner.y, partner.z, partner.dirKey, cubies),
+            tunnelKey: hit?.tunnelKey ?? null });
     }
     const snapshot = { size, epoch, lookup, tunnels, positions };
     snapshots.set(cubies, snapshot);

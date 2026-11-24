@@ -1,5 +1,6 @@
 import { isParityLocked } from './signatures.js';
 import { getNextSurfacePosition, getStableKey } from '../wormLogic.js';
+import { tunnelDeposit } from './economy.js';
 import { liveRotation } from '../liveRotation.js';
 import { BASE_TAIL_LENGTH, HEAL_COST, ORB_SEGMENT_GROWTH, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
@@ -36,7 +37,9 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
   const resolved = ctx.resolveTunnel(pos.x, pos.y, pos.z, pos.dirKey);
   if (!resolved) return null;
   const key = getStableKey(pos.x, pos.y, pos.z, pos.dirKey, cubies);
-  const deposited = ctx.getHealingProgress()?.[key]?.deposited ?? 0;
+  const exit = resolved.tunnel?.exit;
+  const partnerKey = exit && getStableKey(exit.x, exit.y, exit.z, exit.dirKey, cubies);
+  const deposited = tunnelDeposit(ctx.getHealingProgress(), key, partnerKey);
   const isPrism = ctx.isPrismCharacter();
   const traversalTrial = !!ctx.isStoryTunnelTrial?.();
   return { key, pos: { ...pos }, distance, exit: resolved.tunnel?.exit, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
