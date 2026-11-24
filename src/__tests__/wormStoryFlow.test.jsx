@@ -491,7 +491,10 @@ it('enables Story enemies independently of the Free Play option and rejects stal
   begin(40); expect(worm.storyBombsNeeded()).toBe(true);
 });
 
-it('keeps deposited tunnels open until the ring and signature objectives are met', () => {
+// storyTunnelHealGate: a paid tunnel heals early in the level; only the heals the
+// surround and ability tasks need are held back (mastery.js), so the first ride
+// pays and seals instead of taking the orbs and staying red.
+it('heals a paid tunnel early in a level with surround and ability tasks', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 8 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(9);
   expect(state().size).toBe(6);
@@ -512,9 +515,8 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
   expect(state().wormHealedCount).toBe(0);
   seek(mouth, () => state().wormTunnelCount > 0);
   travelUntil(() => worm.phase.current === 'crawling' && worm.tunnelPassages.current.length === 0);
-  expect(state().wormHealedCount).toBe(0);
-  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(2);
-  expect(Object.values(state().wormHealingProgress).some(p => isHealReady(p.deposited))).toBe(true);
+  expect(state().wormHealedCount).toBe(1);
+  expect(Object.values(state().wormHealingProgress).some(p => isHealReady(p.deposited))).toBe(false);
 });
 
 it('stages the same Story orbs and tunnel objective for Classic as for any worm', () => {
@@ -638,6 +640,30 @@ it('Prism earns level 79 Spectrum credit from real distinct-color pickups and re
   begin(79); frame(); expect(goal()).toMatchObject({ value: 0, done: false });
 });
 
+// healReservations.js: a heal waiting behind a tail is spent from the level's
+// budget, so a second paid ride can't take the heal the surround needs.
+it('counts a heal still waiting for tail clearance against the Story heal budget', () => {
+  const steps = vi.spyOn(wormSimulation, 'stepWormSim');
+  const metrics = vi.spyOn(storyRuntime, 'storyMetrics');
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 8 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(9); frame();
+  const [sim] = metrics.mock.calls.at(-1);
+  const ctx = steps.mock.calls.at(-1)[3];
+  const level = storyLevel(9), queued = { pairId: 'queued' }, other = { pairId: 'other' };
+  // One heal short of the surround's reserve, with nothing in flight: a ride may heal.
+  sim.healed = level.target - level.mechanics.ringHeals - 1;
+  expect(ctx.allowTunnelHeal(other)).toBe(true);
+  // The same heal already promised to a ride whose tail is still out: the next ride waits,
+  sim.tunnelPassages.push({ tunnel: queued, tunnelKey: 'queued', heal: { tunnel: queued, tunnelKey: 'queued' } });
+  expect(ctx.allowTunnelHeal(other)).toBe(false);
+  expect(ctx.tunnelHealGate(other)).toMatchObject({ ringHeals: level.mechanics.ringHeals });
+  // while the queued ride's own heal still stands.
+  expect(ctx.allowTunnelHeal(queued)).toBe(true);
+  sim.tunnelPassages.length = 0;
+});
+
 it('Mobi can retire its own Story tunnel before the repeated-use quota, without opening unrelated heals', () => {
   const steps = vi.spyOn(wormSimulation, 'stepWormSim');
   const metrics = vi.spyOn(storyRuntime, 'storyMetrics');
@@ -651,6 +677,9 @@ it('Mobi can retire its own Story tunnel before the repeated-use quota, without 
   const owned = sim.signature.mobiTunnel;
   expect(owned).toBeTruthy();
   expect(practice.mechanics.signatures).toBe(1);
+  // Earlier heals are free (storyTunnelHealGate); the rule bites at the last one.
+  expect(ctx.allowTunnelHeal({ pairId: 'unrelated' })).toBe(true);
+  sim.healed = storyLevel(79).target - 1;
   expect(ctx.allowTunnelHeal({ pairId: owned.pairId })).toBe(false);
   practice.mechanics.ringHeals = storyLevel(79).mechanics.ringHeals;
   expect(ctx.allowTunnelHeal({ pairId: owned.pairId })).toBe(true);

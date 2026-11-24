@@ -68,8 +68,11 @@ export function storyGoalText(level, character = null) {
   if (m.selfPasses) notes.push('A pass counts when you dive into a tunnel while your tail is still inside one.');
   if (m.multiHeals) notes.push(`For a double heal, heal two different pairs within ${STORY_DOUBLE_HEAL_WINDOW} seconds of surface time. Tunnel travel pauses the clock; overlapping paid rides also count.`);
   if (m.selfPasses || m.multiHeals) notes.push('Missed a chain? Retry doors open after the last pair and your tail clear.');
-  if ((m.ringHeals || m.signatures) && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnel deposits seal only after the surround and ability tasks.');
-  if (m.signatures && character === 'mobi') notes.push('Your own tunnel can heal before the ability task is complete, after the surround task.');
+  // storyTunnelHealGate: tunnels leave room for the surrounds, and the last heal
+  // waits for the ability task. A held tunnel never takes the worm's orbs.
+  if (m.ringHeals && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnels leave enough heals for your surrounds.');
+  if (m.signatures && TUNNEL_KINDS.includes(level.kind)) notes.push(character === 'mobi'
+    ? 'Your last heal waits for the ability task, except your own tunnel.' : 'Your last heal waits for the ability task.');
   if (level.rotateEvery && (level.kind === 'rotation' || level.rotations)) notes.push(`Turns come every ${level.rotateEvery} seconds.`);
   if (m.elements) notes.push('Picking up an element activates it and counts as one use. Each required type counts once.');
   if (level.tip) notes.push(level.tip);

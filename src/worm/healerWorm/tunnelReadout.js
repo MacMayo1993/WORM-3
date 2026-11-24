@@ -24,6 +24,15 @@ export function nearSignScale(distance) {
   const u = Math.max(0, Math.min(1, (distance - SIGN_HIDE_DISTANCE) / (SIGN_FULL_DISTANCE - SIGN_HIDE_DISTANCE)));
   return u * u * (3 - 2 * u);
 }
+/** What a Story tunnel heal is waiting for, in the player's words (storyTunnelHealGate). */
+export function healGateText(gate) {
+  if (!gate) return 'Complete the level requirement first';
+  const parts = [];
+  if (gate.ringHeals) parts.push(`surround ${gate.ringHeals} ${gate.ringHeals === 1 ? 'tunnel' : 'tunnels'}`);
+  if (gate.signatures) parts.push(`use your ability ${gate.signatures === 1 ? 'once' : `${gate.signatures} more times`}`);
+  const what = parts.join(' and ');
+  return `${what.charAt(0).toUpperCase()}${what.slice(1)} first · your orbs stay on you`;
+}
 export function tunnelDanger(need) {
   if (need.voided) return 'collapsed';
   if (need.inTransit) return need.collapsing ? 'collapsing' : null;
@@ -45,6 +54,7 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
   return { key, pos: { ...pos }, distance, exit: resolved.tunnel?.exit, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
     // Funding alone does not satisfy story objectives that gate tunnel healing.
     healingAllowed: ctx.allowTunnelHeal?.(resolved.tunnel) !== false,
+    healGate: ctx.tunnelHealGate?.(resolved.tunnel) ?? null,
     locked: isParityLocked(sim, pos, ctx), lockSeconds: Math.ceil(sim.signature.mobiTunnel?.reentryT ?? 0),
     voided: sim.voidTunnelKeys.has(resolved.tunnelKey), uses: sim.tunnelUseCounts.get(resolved.tunnelKey) ?? 0,
     ...healingNeed({ deposited, inventory: ctx.getOrbInventory(), faceId: sticker.curr, tailLength: sim.tailLength, isPrism }),
