@@ -16,7 +16,7 @@ import CaptureVisual from './capture/CaptureVisual.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MONO_FONT, UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, TEXT_SM, RADIUS_PILL, Z } from '../utils/uiTheme.js';
 import { TOUCH_TARGET, ScreenFallback } from './ui/index.js';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore, selectChaosFlipLocked } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import ScreenTransition from './ScreenTransition.jsx';
 
@@ -146,6 +146,9 @@ export default function UILayer({
 
   // Core game data — changes on every move
   const { size, cubies } = useGameStore(useShallow(s => ({ size: s.size, cubies: s.cubies })));
+  // A Chaos round owns the flips (the storm flips, the player heals), so its
+  // Flip key goes dim rather than lighting up and doing nothing.
+  const chaosFlipLocked = useGameStore(selectChaosFlipLocked);
 
   // UI visibility flags — change rarely, batched to minimise subscriptions
   const {
@@ -378,7 +381,7 @@ export default function UILayer({
               if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode);
               onDemoNavTap?.('flip');
             }}
-            flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
+            flipLocked={chaosFlipLocked || !!(currentLevelData && !currentLevelData.features.flips)}
             hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
             onToggleViews={() => {
               // The view showcase runs its own scripted sequence, so there the

@@ -156,10 +156,10 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
   ];
 
 
-  const handleNext = () => {
-    if (step < categories.length - 1) setStep(step + 1);
-    else onStart({ ...settings, cubeSize: cos.cubeSize });
-  };
+  // One tap from any page to the prediction, with the defaults (or whatever was
+  // chosen so far): five pages before the bet was a long walk on a phone.
+  const finish = () => onStart({ ...settings, cubeSize: cos.cubeSize });
+  const handleNext = () => (step < categories.length - 1 ? setStep(step + 1) : finish());
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
@@ -174,6 +174,7 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
       onPrimary={handleNext}
       finishLabel="Make your prediction"
       mobile={isMobile}
+      quickPlay={finish}
     >
       <WizardImageInput cos={cos} />
     </WizardShell>

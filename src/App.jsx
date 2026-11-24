@@ -21,6 +21,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
 import { CUBE_LIGHT_RIG } from './3d/cubeLighting.js';
+import { heroDistanceScale, heroPositionInto, heroSwingInto } from './3d/cubeHeroView.js';
 const SceneEffects = React.lazy(() => import('./3d/SceneEffects.jsx'));
 import './App.css';
 import CaptureChrome from './components/capture/CaptureChrome.jsx';
@@ -101,7 +102,7 @@ const ModeCarousel = React.lazy(() =>
   import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.ModeCarousel }))
 );
 import { useTeachMode } from './teach/useTeachMode.js';
-import { isMobile, setReducedMotionSetting } from './utils/device.js';
+import { isMobile, setReducedMotionSetting, prefersReducedMotion as motionReduced } from './utils/device.js';
 import { preloadAppAssets, preloadMobiPortrait } from './utils/preloadAssets.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
@@ -174,8 +175,9 @@ function ClockContinuity({ paused }) {
  * CameraManager — teleports the camera when transitioning intro → menu → game.
  * Must live inside the Canvas to access useThree().
  */
-function CameraManager({ showWelcome, showMainMenu, cameraZ, previewScene }) {
-  const { camera } = useThree();
+function CameraManager({ showWelcome, showMainMenu, cameraZ, previewScene, hero = false }) {
+  const { camera, gl, size } = useThree();
+  const swing = useRef(null);
   useEffect(() => {
     if (showWelcome) return; // the intro cinematic flies the camera itself
     // Everything in the shared Canvas borrows this one camera, and modes are
@@ -187,10 +189,31 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ, previewScene }) {
     camera.fov = DEFAULT_CAMERA_FOV;
     camera.zoom = 1;
     camera.up.set(0, 1, 0);
-    camera.position.set(0, showMainMenu ? 3 : 0, showMainMenu ? 12 : cameraZ);
+    swing.current = null;
+    if (hero) {
+      // Flip Cube and Chaos open at three-quarters (cubeHeroView.js), swinging in.
+      const distance = cameraZ * heroDistanceScale(size.width / Math.max(1, size.height));
+      if (motionReduced()) heroPositionInto(camera.position, distance);
+      else { swing.current = { t: 0, distance }; heroSwingInto(camera.position, 0, distance); }
+    } else {
+      camera.position.set(0, showMainMenu ? 3 : 0, showMainMenu ? 12 : cameraZ);
+    }
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
-  }, [showWelcome, showMainMenu, camera, cameraZ, previewScene]);
+  }, [showWelcome, showMainMenu, camera, cameraZ, previewScene, hero]);
+  // A touch on the canvas hands the camera to the player at once.
+  useEffect(() => {
+    const stop = () => { swing.current = null; };
+    gl.domElement.addEventListener('pointerdown', stop);
+    return () => gl.domElement.removeEventListener('pointerdown', stop);
+  }, [gl]);
+  useFrame((_, delta) => {
+    const s = swing.current;
+    if (!s) return;
+    s.t += Math.min(delta, 0.05);
+    if (heroSwingInto(camera.position, s.t, s.distance)) swing.current = null;
+    camera.lookAt(0, 0, 0);
+  });
   return null;
 }
 
@@ -1494,7 +1517,8 @@ export default function WORM3() {
           />
           <ClockContinuity paused={pageHidden} />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ}
-            previewScene={showMobiIntro && mobiPreviewScene} />
+            previewScene={showMobiIntro && mobiPreviewScene}
+            hero={!showMainMenu && !demoMode && !teachMode.active && !wormHealerMode} />
           <TilePreviewHost />
           <DirectWormPreviewHost />
           {showWelcome ? (
