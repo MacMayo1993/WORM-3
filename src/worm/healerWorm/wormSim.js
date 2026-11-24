@@ -1101,7 +1101,9 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     sim.currentTunnelStableKey = stableKey;
     sim.currentTunnelKey = tunnelKey;
 
-    if (!skipDeposit && stableKey && entryFaceId) {
+    // A Story tunnel that may not heal yet (storyTunnelHealGate) keeps the worm's
+    // orbs: paying it took the orbs and healed nothing, which read as a broken heal.
+    if (!skipDeposit && stableKey && entryFaceId && ctx.allowTunnelHeal?.(tunnel) !== false) {
         const healingProgress = ctx.getHealingProgress() ?? {};
         let entryDeposited = healingProgress[stableKey]?.deposited ?? 0;
         let deposited = tunnelDeposit(healingProgress, stableKey, partnerKey);

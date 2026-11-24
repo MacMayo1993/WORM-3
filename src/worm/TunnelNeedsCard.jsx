@@ -1,5 +1,5 @@
 import { ACTION_CUES } from '../game/actionCues.js';
-import { tunnelDanger } from './healerWorm/tunnelReadout.js';
+import { tunnelDanger, healGateText } from './healerWorm/tunnelReadout.js';
 import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './healerWorm/constants.js';
 import { useEffect, useState } from 'react';
@@ -32,12 +32,12 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const dangerCaption = danger === 'collapsing' ? 'Traversal limit exceeded · collapse ahead'
     : !padRoute ? 'Entering this tunnel will kill you · take another route'
     : danger === 'collapsed' ? 'A collapsed tunnel · go around it or jump clear' : "Worn out · it caves in once you're clear";
-  const caption = danger ? dangerCaption : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? (ready ? 'Last ride · it heals as your tail clears' : 'Last ride · it caves in behind you') : gated ? 'Complete the level requirement first' : lastRide && !ready ? 'Ride it once more and it caves in behind you' : ready ? (need.inTransit ? 'Let your tail clear the exit' : padRoute ? 'Jump on to spend your carried orbs' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any carried color counts · run totals don’t' : need.saved > 0 ? 'Both mouths share deposits · match this mouth' : 'Match the entry color with carried orbs, not run totals';
+  const caption = danger ? dangerCaption : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? (ready ? 'Last ride · it heals as your tail clears' : 'Last ride · it caves in behind you') : gated ? healGateText(need.healGate) : lastRide && !ready ? 'Ride it once more and it caves in behind you' : ready ? (need.inTransit ? 'Let your tail clear the exit' : padRoute ? 'Jump on to spend your carried orbs' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any carried color counts · run totals don’t' : need.saved > 0 ? 'Both mouths share deposits · match this mouth' : 'Match the entry color with carried orbs, not run totals';
   const funded = ready && !danger && !need.locked;
   const safety = danger ? warning : need.locked ? `Locked ${need.lockSeconds}s` : need.inTransit
     ? (passes === 0 ? 'Last ride' : 'Safe traversal')
     : lastRide ? 'Last ride · then it collapses' : `${passes} safe passes left`;
-  const healing = gated ? 'Level objective required to heal' : need.traversalTrial ? 'Clears after your tail' : ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
+  const healing = gated ? (need.healGate?.ringHeals ? 'Heals after your surrounds' : 'Heals after your ability task') : need.traversalTrial ? 'Clears after your tail' : ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
     : `Need ${need.pickupsNeeded} ${need.isPrism ? '' : 'matching '}${need.pickupsNeeded === 1 ? 'orb' : 'orbs'} to heal`;
 
   if (compact) return <button type="button" onClick={onInspect} className="worm-tunnel-needs worm-tunnel-glance worm-hud-chip"

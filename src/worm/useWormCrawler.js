@@ -9,7 +9,7 @@ import { orbsCarried } from './healerWorm/economy.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
 import { shouldFinishStory } from './story/starGoals.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
-import { offerStoryBonus, offerStoryPower, recordStoryMechanic, canStoryTunnelHeal } from './story/mastery.js';
+import { offerStoryBonus, offerStoryPower, recordStoryMechanic, storyTunnelHealGate } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
 import { stageStory, storyMetrics, replenishStoryTunnel, replenishStoryOrbs } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
@@ -279,11 +279,16 @@ export function useWormCrawler(size, cubies) {
                 return !(level?.mechanics?.signatures && simRef.current.healed >= level.target - 1 &&
                     (p?.mechanics.signatures ?? 0) < level.mechanics.signatures);
             },
-            allowTunnelHeal: tunnel => {
-                const m = storyLevel(useGameStore.getState().wormStoryLevel)?.mechanics;
-                const counts = storyPracticeRef.current?.mechanics;
-                return canStoryTunnelHeal(m, counts, simRef.current.signature.mobiTunnel, tunnel);
+            // A Story level holds a tunnel heal back only when it would take a heal
+            // the level must keep for a surround, or the last one before the
+            // ability task is done (storyTunnelHealGate); the HUD names what's owed.
+            tunnelHealGate: tunnel => {
+                const level = storyLevel(useGameStore.getState().wormStoryLevel);
+                if (!level?.mechanics) return null;
+                const healsLeft = Math.max(1, (level.target ?? 1) - (simRef.current.healed ?? 0));
+                return storyTunnelHealGate(level.mechanics, storyPracticeRef.current?.mechanics, simRef.current.signature.mobiTunnel, tunnel, healsLeft);
             },
+            allowTunnelHeal: tunnel => !ctxRef.current.tunnelHealGate(tunnel),
             // A skill moment (skillMoments.js): a callout in the HUD and a bright sting.
             onSkill: (kind) => {
                 if (!SKILL_CALLOUTS[kind]) return;

@@ -419,10 +419,29 @@ function offerStoryQuestPower(sim, p, level, size, cubies, centerElements = fals
   return true;
 }
 
-// Keep the surround prerequisite, but let Mobi retire its own door so another
-// activation is possible. Unrelated tunnels still wait for all ability credit.
-export function canStoryTunnelHeal(mechanics, counts, ownedTunnel, tunnel) {
-  return (counts?.ringHeals ?? 0) >= (mechanics?.ringHeals ?? 0) &&
-    ((!!ownedTunnel && ownedTunnel.pairId === tunnel?.pairId) ||
-      (counts?.signatures ?? 0) >= (mechanics?.signatures ?? 0));
+/**
+ * What still holds a Story tunnel heal back, or null when it may heal.
+ * `healsLeft` is how many heals the level still needs, this one included
+ * (level.target − heals made). A tunnel heal is held only when it would take a
+ * heal the level must keep: one owed to a surround (`ringHeals`), or the last
+ * one while the ability task (`signatures`) is unfinished, as `allowRingHeal`
+ * holds the last surround. Holding every tunnel heal from the start until both
+ * tasks were done left the tunnel red for most of a level, and players read it
+ * as broken. Mobi may still retire its own door before the ability task, so
+ * another activation is possible. Without `healsLeft` every heal is treated as
+ * the last one (the strict rule).
+ * @returns {null | { ringHeals: number, signatures: number }} tasks still owed
+ */
+export function storyTunnelHealGate(mechanics, counts, ownedTunnel, tunnel, healsLeft = 1) {
+  const ringHeals = Math.max(0, (mechanics?.ringHeals ?? 0) - (counts?.ringHeals ?? 0));
+  const signatures = Math.max(0, (mechanics?.signatures ?? 0) - (counts?.signatures ?? 0));
+  const after = Math.max(0, healsLeft - 1);
+  const ringBlocks = after < ringHeals;
+  const ownDoor = !!ownedTunnel && ownedTunnel.pairId === tunnel?.pairId;
+  const signatureBlocks = after === 0 && signatures > 0 && !ownDoor;
+  return ringBlocks || signatureBlocks ? { ringHeals, signatures: signatureBlocks ? signatures : 0 } : null;
+}
+
+export function canStoryTunnelHeal(mechanics, counts, ownedTunnel, tunnel, healsLeft = 1) {
+  return !storyTunnelHealGate(mechanics, counts, ownedTunnel, tunnel, healsLeft);
 }
