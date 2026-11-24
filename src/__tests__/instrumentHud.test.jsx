@@ -26,6 +26,9 @@ it('keeps Undo gated by history and Flip gated by the level', () => {
   expect(undo).toHaveBeenCalledTimes(1); expect(more).toHaveBeenCalledTimes(1);
   expect(host.querySelector('[aria-label="Flip"]').getAttribute('aria-pressed')).toBe('true');
   expect(host.querySelector('[aria-label="Reset"]')).toBeNull();
+  // A locked Flip key (a Chaos round, a no-flip level) never shows as pressed.
+  render({ canUndo: true, flipLocked: true, flipMode: true });
+  expect(host.querySelector('[aria-label="Flip"]').getAttribute('aria-pressed')).toBe('false');
 });
 it('preserves the guided reset and shuffle actions when spotlighted', () => {
   for (const label of ['Reset', 'Shuffle']) {
