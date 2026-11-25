@@ -333,6 +333,20 @@
 .wl-top { transform: rotateX(90deg) translateZ(calc(var(--wl-c) / 2)); }
 .wl-bottom { transform: rotateX(-90deg) translateZ(calc(var(--wl-c) / 2)); --wl-shade: 0.4; }
 
+/* One static backing per stickered face fills the wells while the stickers
+   lift. Its rounded cells sit inside the resting stickers (84% of a cell),
+   preserving the plastic seams and leaving the interior cap plain black. */
+.wl-sticker-bed::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backface-visibility: hidden;
+  background: var(--wl-sc);
+  --wl-bed-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='4' y='4' width='32' height='32' rx='5' fill='white'/%3E%3C/svg%3E");
+  mask: var(--wl-bed-mask) 0 0 / var(--wl-c) var(--wl-c) repeat;
+}
+
 /* Light from the upper left: a shade over each face by where it points. */
 .wl-face::after {
   content: '';
