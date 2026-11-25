@@ -38,6 +38,7 @@ import {
   THROAT,
   WORM_SEGMENTS,
   FALL,
+  EXIT_RIM_DEPTH,
   crossing,
   funnelLean,
   funnelPoint,
@@ -61,7 +62,14 @@ const ARMS = 12;
 const SWIRL = 2.6; // how far an arm winds between rim and throat, radians
 const RIM = 0.045; // half the lip's width, as a fraction of the mouth
 const STILL_TIME = 2.8; // the reduced-motion frame: between passes, worm half out
-const PAPER_INTERVAL = 1000 / 24; // The slow paper drift needs fewer redraws than the cube.
+// These are decorative screen-size layers; a DPR-3 phone would otherwise
+// repeatedly raster all three at four times the CSS pixel budget even at DPR 2.
+const PORTAL_MAX_DPR = 1.5;
+const PAPER_MAX_DPR = 1;
+const PAPER_INTERVAL = 1000 / 24;
+// Slow-moving tunnel art can render every other 60 Hz frame. The cut glow
+// and entrance lip stay at paint rate, alongside the compositor-driven cube.
+const VORTEX_INTERVAL = 32;
 // The paper canvas overhangs the screen by this much (LoadingScene.css), so a
 // tilt can slide it without showing an edge.
 const PAPER_PAD = 16;
@@ -419,7 +427,7 @@ function drawMembrane(ctx, well, cutPx, strength) {
   glow.addColorStop(1, 'rgba(255,253,242,0)');
   const halo = ctx.createLinearGradient(cx - a, 0, cx + a, 0);
   halo.addColorStop(0, 'rgba(120,214,255,0)');
-  halo.addColorStop(0.5, `rgba(120,214,255,${0.45 * strength})`);
+  halo.addColorStop(0.5, `rgba(120,214,255,${0.58 * strength})`);
   halo.addColorStop(1, 'rgba(120,214,255,0)');
   for (const [style, width] of [
     [halo, 7],
@@ -483,11 +491,13 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
     let W = 0;
     let H = 0;
     let dpr = 1;
+    let paperDpr = 1;
     let raf = 0;
-    // The paper drifts a few pixels a second, so it lives on its own canvas and
-    // is redrawn at half rate (or at once when the mouth moves); only the
-    // portals above it are drawn every frame.
+    // Redraw the slow paper and tunnel separately from the in-front cut glow.
     let paperAt = -Infinity;
+    let vortexAt = -Infinity;
+    let rimSpin = 0;
+    let rimPulse = 0;
     let cubePx = 0; // the cube's size, for the depth of the portals' cut
     const paperWell = { cx: 0, cy: 0, a: 1, b: 1 };
     let paperKey = '';
@@ -538,41 +548,46 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       }
       const key = lens ? `${Math.round(lens.cx)},${Math.round(lens.cy)},${Math.round(lens.a)}` : '';
       if (key !== paperKey || now - paperAt >= PAPER_INTERVAL) {
-        paper.setTransform(dpr, 0, 0, dpr, PAPER_PAD * dpr, PAPER_PAD * dpr);
+        paper.setTransform(paperDpr, 0, 0, paperDpr, PAPER_PAD * paperDpr, PAPER_PAD * paperDpr);
         paper.clearRect(-PAPER_PAD, -PAPER_PAD, W + 2 * PAPER_PAD, H + 2 * PAPER_PAD);
-        drawPaper(paper, W, H, t, reduced ? 0 : 1, lens, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, dpr, PAPER_PAD, (now - mountedAt) / 1000);
+        drawPaper(paper, W, H, t, reduced ? 0 : 1, lens, Math.max(pulse, 0.8 * boost), translucent ? 0.84 : 1, paperDpr, PAPER_PAD, (now - mountedAt) / 1000);
         paperAt = now;
         paperKey = key;
       }
-      for (const layer of [ctx, front]) {
-        layer.setTransform(dpr, 0, 0, dpr, 0, 0);
-        layer.clearRect(0, 0, W, H);
-      }
       const spin = spinAngle(t) + (play?.spin ?? 0);
-      const kickSince = play?.kickSince ?? Infinity;
-      // Behind the cube: both tunnels and their far lips. The cube is seen
-      // from above, so it falls in front of each mouth's far side.
-      if (top) {
-        drawHalo(ctx, top, pulse);
-        drawKickRing(ctx, top, kickSince, play?.kicks ?? 0);
-        // The ceiling tunnel recedes UP from its exit, not down like the floor.
-        ctx.save();
-        ctx.translate(0, top.cy * 2);
-        ctx.scale(1, -1);
-        drawFunnel(ctx, top, t, spin, pulse, false, boost);
-        ctx.restore();
-        drawRim(ctx, top, spin, pulse, 'back');
-        drawRim(ctx, top, spin, pulse, 'front');
-      }
-      if (well) {
-        drawKickRing(ctx, well, kickSince, play?.kicks ?? 0);
-        drawFunnel(ctx, well, t, spin, pulse, true, boost);
-        drawRim(ctx, well, spin, pulse, 'back');
-        drawMotes(ctx, well, t, true);
+      front.setTransform(dpr, 0, 0, dpr, 0, 0);
+      front.clearRect(0, 0, W, H);
+      if (reduced || now - vortexAt >= VORTEX_INTERVAL) {
+        vortexAt = now;
+        rimSpin = spin;
+        rimPulse = pulse;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        const kickSince = play?.kickSince ?? Infinity;
+        // Behind the cube: both tunnels and their far lips. The cube is seen
+        // from above, so it falls in front of each mouth's far side.
+        if (top) {
+          drawHalo(ctx, top, pulse);
+          drawKickRing(ctx, top, kickSince, play?.kicks ?? 0);
+          // The ceiling tunnel recedes UP from its exit, not down like the floor.
+          ctx.save();
+          ctx.translate(0, top.cy * 2);
+          ctx.scale(1, -1);
+          drawFunnel(ctx, top, t, spin, pulse, false, boost);
+          ctx.restore();
+          drawRim(ctx, top, spin, pulse, 'back');
+          drawRim(ctx, top, spin, pulse, 'front');
+        }
+        if (well) {
+          drawKickRing(ctx, well, kickSince, play?.kicks ?? 0);
+          drawFunnel(ctx, well, t, spin, pulse, true, boost);
+          drawRim(ctx, well, spin, pulse, 'back');
+          drawMotes(ctx, well, t, true);
+        }
       }
       // The upper rim must stay BEHIND the exiting cube. Only the floor's
       // near lip covers it; both cut lines can glow over the breaking surface.
-      if (well) drawRim(front, well, spin, pulse, 'front');
+      if (well) drawRim(front, well, rimSpin, rimPulse, 'front');
       if (!reduced) {
         if (!cubePx) cubePx = fallRef?.current?.offsetHeight ?? 0;
         const through = crossing(t);
@@ -588,25 +603,30 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
       // in every animation frame. Cube and canvases translate by the same amount.
       top = measure(topRef, rect);
       well = measure(wellRef, rect);
+      vortexAt = -Infinity;
       cubePx = fallRef?.current?.offsetHeight ?? 0;
-      // Match the exit ellipse to the shaft cut: no tunnel wall hangs below
-      // the emission edge and covers the emerging cube. Keep the floor deep.
-      if (top && cubePx) top.b = cubePx * FALL.cut;
-      const nextDpr = Math.min(2, window.devicePixelRatio || 1);
-      if (W === rect.width && H === rect.height && dpr === nextDpr) {
+      // The upper lip is behind the cube and extends past the interior cut,
+      // so the first exposed stickers overlap the opening instead of sliding
+      // out below the silhouette of the portal.
+      if (top && cubePx) top.b = Math.min(top.b, cubePx * EXIT_RIM_DEPTH);
+      const deviceDpr = window.devicePixelRatio || 1;
+      const nextDpr = Math.min(PORTAL_MAX_DPR, deviceDpr);
+      const nextPaperDpr = Math.min(PAPER_MAX_DPR, deviceDpr);
+      if (W === rect.width && H === rect.height && dpr === nextDpr && paperDpr === nextPaperDpr) {
         paperKey = null;
         if (reduced) draw(STILL_TIME, performance.now());
         return;
       }
       dpr = nextDpr;
+      paperDpr = nextPaperDpr;
       W = rect.width;
       H = rect.height;
       for (const layer of [canvas, frontCanvas]) {
         layer.width = Math.max(1, Math.round(W * dpr));
         layer.height = Math.max(1, Math.round(H * dpr));
       }
-      paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * dpr));
-      paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * dpr));
+      paperCanvas.width = Math.max(1, Math.round((W + 2 * PAPER_PAD) * paperDpr));
+      paperCanvas.height = Math.max(1, Math.round((H + 2 * PAPER_PAD) * paperDpr));
       paperKey = null; // resizing blanked the paper
       if (reduced) draw(STILL_TIME, performance.now());
     };

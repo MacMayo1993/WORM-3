@@ -5,6 +5,7 @@ import { PAPER_GRID, glslFloat, glslVec3, paperShiftX, paperShiftY } from '../ut
 import { LOADING_CUBE, RING, WAVE_SPREAD } from '../components/screens/loadingCube.js';
 import {
   FALL,
+  EXIT_RIM_DEPTH,
   PASS_AT,
   crossing,
   THROAT,
@@ -80,11 +81,15 @@ describe('loading screen timing', () => {
     expect(shellCss).toContain(`--wl-drop: calc(var(--wl-cube) * ${FALL.drop});`);
     const fall = keyframes('wl-fall');
     expect(fall).toContain(`from { transform: translateY(calc(var(--wl-cube) * -${FALL.lead})); }`);
-    expect(fall).toContain(`to { transform: translateY(calc(var(--wl-cube) * -${FALL.lead} + var(--wl-drop))); }`);
+    expect(fall).toContain(`to { transform: translateY(calc(var(--wl-cube) * -${FALL.lead} + 2 * var(--wl-drop))); }`);
+    expect(css).toContain('animation: wl-fall calc(var(--wl-beat) * 2) linear infinite backwards;');
+    expect(css).toMatch(/\.wl-twin \{\s*animation-delay: var\(--wl-beat\);/);
+    expect(css).not.toContain('wl-first-fall');
   });
 
   it('ripples the paper as the cube passes through, when the vortex kicks', () => {
     const passPercent = (PASS_AT / FALL.period) * 100;
+    expect(FALL.lead + FALL.cut).toBeCloseTo(FALL.drop / 2, 6);
     expect(passPercent).toBeCloseTo(50, 6);
     const cssPassPercent = keyframes('wl-shock').match(/0%, ([\d.]+)% \{[^}]*opacity: 0; \}/);
     expect(cssPassPercent).not.toBeNull();
@@ -128,7 +133,8 @@ describe('the shaft between the portals', () => {
     // lip, which lies the mouth's half-height (0.18 of a mouth 2.4 cubes wide)
     // in front of the centre.
     expect(FALL.cut).toBeGreaterThan(0);
-    expect(FALL.cut).toBeLessThan(2.4 * 0.18 - 0.15);
+    expect(FALL.cut).toBeLessThan(EXIT_RIM_DEPTH - 0.1);
+    expect(EXIT_RIM_DEPTH).toBeLessThan(2.4 * 0.18);
     expect(shaftClipPath()).toContain(`calc(var(--wl-cube) * ${FALL.cut})`);
   });
 
@@ -147,13 +153,13 @@ describe('the shaft between the portals', () => {
     expect(PASS_AT / FALL.period).toBeCloseTo(0.5, 6);
   });
 
-  it('restarts the fall with the cube hidden inside the top portal and its twin sunk into the paper', () => {
+  it('keeps each cube hidden at both track endpoints, with no mid-shaft reset', () => {
     // Conservative projected half-height of the tilted CSS cube, in cubes.
     const halfCube = 0.9;
     // The cube starting the fall is wholly above the upper portal's cut ...
     expect(-FALL.lead + halfCube).toBeLessThan(FALL.cut - 0.4);
-    // ... and the twin ending it wholly below the floor portal's.
-    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.cut + 0.4);
+    // ... and the same cube ending it wholly below the floor portal's.
+    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.cut + 0.3);
   });
 
   it("lights the portals' surfaces while the cube breaks through them, and not at the restart", () => {

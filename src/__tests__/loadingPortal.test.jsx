@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LoadingPortal from '../components/screens/LoadingPortal.jsx';
 import { introPaperTintInto } from '../components/intro/introPaper.js';
-import { FALL } from '../components/screens/loadingWormhole.js';
+import { EXIT_RIM_DEPTH, FALL } from '../components/screens/loadingWormhole.js';
 import { RUBIKS_FACE_COLORS } from '../utils/constants.js';
 
 const motion = vi.hoisted(() => ({ reduced: false }));
@@ -89,8 +89,11 @@ describe('loading portal drawing', () => {
     expect(front.every(fill => fill.path[0][1] === 516)).toBe(true);
     // No spring from zero width that disagrees with the fixed CSS shaft clip.
     expect(back.every(fill => fill.path[0][2] === 104.5)).toBe(true);
-    // The exit edge and emission clip coincide, without a low-hanging wall.
-    expect(back.filter(fill => fill.path[0][1] === 236).every(fill => fill.path[0][3] === 80 * FALL.cut * 1.045)).toBe(true);
+    // The outer rim is behind the cube and extends beyond the cut: the
+    // first exposed stickers are visible inside the exit, not below its rim.
+    const exitRim = back.filter(fill => fill.path[0][1] === 236);
+    expect(exitRim.every(fill => fill.path[0][3] === 80 * EXIT_RIM_DEPTH * 1.045)).toBe(true);
+    expect(exitRim.every(fill => fill.path[1][3] > 80 * FALL.cut)).toBe(true);
     expect(contexts.get(canvases[1]).scale).toHaveBeenCalledWith(1, -1);
     expect([...canvases].every(canvas => canvas.classList.contains('wl-ready'))).toBe(true);
   });
@@ -120,16 +123,31 @@ describe('loading portal drawing', () => {
     expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
 
-  it('does not force layout reads or redraw the paper on every startup frame', () => {
+  it('caps decorative canvas raster cost independently of the CSS cube on high-DPR phones', () => {
+    vi.stubGlobal('devicePixelRatio', 3);
+    act(() => window.dispatchEvent(new Event('resize')));
+    const [paper, vortex, lips] = host.querySelectorAll('canvas');
+    expect([paper.width, paper.height]).toEqual([432, 832]);
+    expect([vortex.width, vortex.height]).toEqual([600, 1200]);
+    expect([lips.width, lips.height]).toEqual([600, 1200]);
+  });
+
+  it('does not force layout reads or redraw the paper and tunnel on every startup frame', () => {
     act(() => raf(0));
     topMeasure.mockClear();
     wellMeasure.mockClear();
-    const paper = contexts.get(host.querySelector('canvas'));
+    const [paper, vortex, lips] = [...host.querySelectorAll('canvas')].map(canvas => contexts.get(canvas));
     const clear = vi.spyOn(paper, 'clearRect');
+    const clearVortex = vi.spyOn(vortex, 'clearRect');
+    const clearLips = vi.spyOn(lips, 'clearRect');
     animation.currentTime = 16;
     act(() => raf(16));
+    expect(clearVortex).not.toHaveBeenCalled();
+    expect(clearLips).toHaveBeenCalledTimes(1);
     animation.currentTime = 32;
     act(() => raf(32));
+    expect(clearVortex).toHaveBeenCalledTimes(1);
+    expect(clearLips).toHaveBeenCalledTimes(2);
     expect(topMeasure).not.toHaveBeenCalled();
     expect(wellMeasure).not.toHaveBeenCalled();
     expect(clear).not.toHaveBeenCalled();

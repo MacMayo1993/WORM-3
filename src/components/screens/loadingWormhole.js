@@ -26,12 +26,16 @@
  * above, and the two pieces always add up to one cube. The cube passes through,
  * half of it in each portal, when its centre crosses the cut, `lead + cut` cubes
  * into each fall, which this `lead` puts at mid-beat. That also leaves the
- * restart (cube wholly inside the top portal, twin wholly sunk) as far from
- * either cut as the cube's height allows.
+ * two-beat track's restart (cube wholly below the floor to wholly above the
+ * exit) as far from either cut as the cube's height allows.
  */
-export const FALL = { period: 2, drop: 2.8, cut: 0.2, lead: 1.2 };
-/** Seconds into each fall at which the cube passes through the portals. */
-export const PASS_AT = (FALL.period * (FALL.lead + FALL.cut)) / FALL.drop;
+export const FALL = { period: 2, drop: 2.8, cut: 0.05, lead: 1.35 };
+// Ceiling ellipse half-depth in cube units, wider than the interior cut so
+// you can see the first stickers against the inside of the exit itself.
+export const EXIT_RIM_DEPTH = 0.34;
+// The lead plus cut is half the drop. Use the exact half-beat for pulse
+// comparisons at the seam (decimal geometry adds a rounding error).
+export const PASS_AT = FALL.period / 2;
 
 const fmt = (v) => +v.toFixed(4);
 
