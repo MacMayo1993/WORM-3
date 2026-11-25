@@ -10,6 +10,7 @@ import {
   arrivalHeadInto, arrivalPathPointInto, arrivalTuck, storyArrivalPose,
 } from './storyArrival.js';
 import { runStart } from './runStart.js';
+import { HATCH_SHARDS, hatchDone, hatchesHere, shardPoseInto, shellRock } from './arrivalHatch.js';
 
 const Z = new Vector3(0, 0, 1);
 const SPARKS = 32;
@@ -59,10 +60,10 @@ const smooth = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
 // and draws the portal it climbs out of.
 export function StoryArrival({ worm, elapsed, children }) {
   const body = useRef(), portal = useRef(), aperture = useRef(), beam = useRef(), arcs = useRef([]),
-    sparks = useRef(), shock = useRef(), ripple = useRef();
+    sparks = useRef(), shock = useRef(), ripple = useRef(), shell = useRef(), shards = useRef();
   const scratch = useMemo(() => ({
     dummy: new Object3D(), head: { grow: 1, lift: 0, pitch: 0 }, ahead: new Vector3(), n: new Vector3(),
-    side: new Vector3(), breachAt: null,
+    side: new Vector3(), breachAt: null, shard: { x: 0, y: 0, z: 0, scale: 0, spin: 0 },
     aperture: { uTime: { value: 0 }, uOpen: { value: 0 }, uPower: { value: 0 }, uFlash: { value: 0 } },
     beam: { uTime: { value: 0 }, uPower: { value: 0 } },
   }), []);
@@ -90,6 +91,9 @@ export function StoryArrival({ worm, elapsed, children }) {
       // portal at a speck so its programs link then, not as it opens.
       portal.current.visible = hidden;
       portal.current.scale.setScalar(1e-4);
+      // The hatch's shell and shards link with the rest of the portal.
+      shell.current.visible = hidden;
+      shards.current.visible = hidden;
       return;
     }
 
@@ -182,6 +186,30 @@ export function StoryArrival({ worm, elapsed, children }) {
       sparks.current.setMatrixAt(i, d.matrix);
     }
     sparks.current.instanceMatrix.needsUpdate = true;
+
+    // ── The hatch (arrivalHatch.js): a new player's first arrival comes out of
+    // an eggshell, which rocks as the head pushes up and bursts as it breaks out.
+    const hatch = hatchesHere(state, runStart.quick);
+    const rock = shellRock(pose.rise);
+    shell.current.visible = hatch && sinceBreach < 0 && iris > 0.01;
+    if (shell.current.visible) {
+      const wobble = Math.sin(now * 30) * 0.16 * rock;
+      shell.current.rotation.set(Math.PI / 2 + wobble, 0, Math.sin(now * 23 + 1) * 0.1 * rock);
+      shell.current.scale.set(R * 0.82 * iris, R * (1.75 + 0.1 * rock) * iris, R * 0.82 * iris);
+      shell.current.position.z = 0.01 + 0.03 * rock;
+    }
+    shards.current.visible = hatch && sinceBreach >= 0 && !hatchDone(sinceBreach);
+    if (shards.current.visible) {
+      for (let i = 0; i < HATCH_SHARDS; i++) {
+        const p = shardPoseInto(scratch.shard, i, sinceBreach, R);
+        d.position.set(p.x, p.y, p.z);
+        d.rotation.set(p.spin, p.spin * 0.7, p.spin * 0.3);
+        d.scale.setScalar(Math.max(p.scale, 1e-4));
+        d.updateMatrix();
+        shards.current.setMatrixAt(i, d.matrix);
+      }
+      shards.current.instanceMatrix.needsUpdate = true;
+    }
   }, -0.3);
 
   return <>
@@ -209,6 +237,15 @@ export function StoryArrival({ worm, elapsed, children }) {
         <ringGeometry args={[0.86, 1, 64]} />
         <meshBasicMaterial color="#e6fffb" transparent depthWrite={false} blending={AdditiveBlending} toneMapped={false} side={DoubleSide} />
       </mesh>
+      {/* The hatch: an eggshell over the mouth, then its shards. */}
+      <mesh ref={shell} frustumCulled={false} name="story-arrival-shell">
+        <sphereGeometry args={[1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#fbf1dc" roughness={0.55} metalness={0} />
+      </mesh>
+      <instancedMesh ref={shards} args={[undefined, undefined, HATCH_SHARDS]} frustumCulled={false} name="story-arrival-shards">
+        <sphereGeometry args={[1, 4, 3, 0, 1.1, 0.6, 0.9]} />
+        <meshStandardMaterial color="#fbf1dc" roughness={0.55} metalness={0} side={DoubleSide} />
+      </instancedMesh>
       <instancedMesh ref={sparks} args={[undefined, undefined, SPARKS]} frustumCulled={false} renderOrder={3}>
         <octahedronGeometry args={[1, 0]} />
         <meshBasicMaterial color="#d6fbff" transparent depthWrite={false} blending={AdditiveBlending} toneMapped={false} />

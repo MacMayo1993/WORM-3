@@ -22,6 +22,7 @@ import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
 import { CUBE_LIGHT_RIG } from './3d/cubeLighting.js';
 import { heroDistanceScale, heroPositionInto, heroSwingInto } from './3d/cubeHeroView.js';
+import { introStartTime } from './components/intro/introBeats.js';
 const SceneEffects = React.lazy(() => import('./3d/SceneEffects.jsx'));
 import './App.css';
 import CaptureChrome from './components/capture/CaptureChrome.jsx';
@@ -703,7 +704,10 @@ export default function WORM3() {
   useEffect(() => {
     if (!showWelcome) return;
     let previous = performance.now();
-    let elapsed = 0;
+    // A returning player starts at the snap-shut, title and dive (introBeats.js).
+    let seen = false;
+    try { seen = localStorage.getItem('worm3_intro_seen') === '1'; } catch { /* storage blocked: play it all */ }
+    let elapsed = introStartTime(seen, motionReduced());
     let raf;
     const resetTick = () => { previous = performance.now(); };
     document.addEventListener('visibilitychange', resetTick);
