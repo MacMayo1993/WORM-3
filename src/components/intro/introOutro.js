@@ -50,3 +50,42 @@ export function introOutro(t, reducedMotion = false) {
 /** Word `index` of the tagline's first clause dissolving, left to right. */
 export const outroWordFade = (t, index) =>
   ramp(t, LEAD_WORD_START + index * LEAD_WORD_STAGGER, LEAD_WORD_START + index * LEAD_WORD_STAGGER + LEAD_WORD_FADE);
+
+// ── The dive ──────────────────────────────────────────────────────────────
+// Instead of crumbling on the paper, the cube leaves through a portal: one opens
+// in the paper under it, the cube hops, then sinks through, turning and drawn
+// narrow, and the portal stays open under the last phrase until the phrase pushes
+// through, so the loading cover's falling cube reads as the same cube. Reduced
+// motion keeps the dissolve (introOutro's `cube`).
+export const DIVE_OPEN = [DISSOLVE_START - 0.05, DISSOLVE_START + 0.5];
+export const DIVE_HOP = [DISSOLVE_START + 0.2, DISSOLVE_START + 0.55];
+export const DIVE_SINK = [DISSOLVE_START + 0.5, DISSOLVE_END - 0.1];
+export const DIVE_CLOSE = [INTRO_FINISH - OUTRO_EXIT - 0.25, INTRO_FINISH - 0.05];
+/** How far the cube sinks, in units of its own half-height plus the floor gap. */
+export const DIVE_DEPTH = 4.4;
+export const DIVE_HOP_HEIGHT = 0.45;
+export const DIVE_TURNS = 0.6;
+
+/**
+ *   portal — 0→1 the portal's opening (and 1→0 its close at the exit);
+ *   lift   — the cube's height change (the hop, then the sink, negative);
+ *   spin   — extra turn about the vertical, radians;
+ *   narrow — the cube's width as it is drawn in (1 → 0.65);
+ *   sink   — 0→1 progress of the sink; gone once it is all the way through.
+ */
+export function introDive(t, reducedMotion = false) {
+  if (reducedMotion) return { portal: 0, lift: 0, spin: 0, narrow: 1, sink: 0, gone: false };
+  const open = ramp(t, ...DIVE_OPEN) * (1 - ramp(t, ...DIVE_CLOSE));
+  const hop = Math.sin(Math.PI * clamp01((t - DIVE_HOP[0]) / (DIVE_HOP[1] - DIVE_HOP[0])));
+  // Accelerates in, as if pulled.
+  const s = clamp01((t - DIVE_SINK[0]) / (DIVE_SINK[1] - DIVE_SINK[0]));
+  const sink = s * s;
+  return {
+    portal: open,
+    lift: DIVE_HOP_HEIGHT * hop - DIVE_DEPTH * sink,
+    spin: Math.PI * 2 * DIVE_TURNS * sink,
+    narrow: 1 - 0.35 * sink,
+    sink,
+    gone: s >= 1
+  };
+}
