@@ -37,7 +37,7 @@ import { RING_COLORS, RING_SECONDS, TUNNEL_RINGS, stormLayout } from './loadingD
 import './LoadingScene.css';
 
 function Face({ face }) {
-  const cls = `wl-face wl-${face.side}${face.cap ? ' wl-cap' : ''}`;
+  const cls = `wl-face wl-sticker-bed wl-${face.side}${face.cap ? ' wl-cap' : ''}`;
   const colors = { '--wl-sc': RUBIKS_FACE_COLORS[face.color], '--wl-ac': RUBIKS_FACE_COLORS[face.antipode] };
   return (
     <div className={cls} style={colors}>

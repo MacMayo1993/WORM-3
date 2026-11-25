@@ -51,6 +51,16 @@ describe('loading cube', () => {
     for (let id = 1; id <= 6; id++) expect(stickers.filter((s) => s.face.color === id)).toHaveLength(9);
   });
 
+  it('gives only the exterior sticker faces a static, inset colour backing', () => {
+    const scene = readFileSync('src/components/screens/LoadingScene.jsx', 'utf8');
+    expect(scene).toContain('wl-face wl-sticker-bed');
+    expect(scene).toContain('wl-face wl-cap wl-${side}');
+    const backing = css.match(/\.wl-sticker-bed::before\s*\{([^}]+)\}/)?.[1];
+    expect(backing).toContain('background: var(--wl-sc)');
+    expect(backing).toContain('var(--wl-c) var(--wl-c) repeat');
+    expect(backing).not.toContain('animation');
+  });
+
   it('flips every sticker to its antipodal colour', () => {
     for (const face of faces) expect(face.antipode).toBe(ANTIPODAL_COLOR[face.color]);
   });
