@@ -27,7 +27,9 @@ export function tapTile(taps, index, t) {
   const twin = TWIN_OF[index];
   for (const [tile, at] of [[index, t], [twin, t + TWIN_DELAY]]) {
     const list = taps[tile];
-    if (list.length >= MAX_TAPS) list.shift();
+    // Forget the oldest flip's timing, never its effect: it counts as settled,
+    // so the tile's resting colour still follows every tap.
+    if (list.length >= MAX_TAPS) { list.shift(); list.settled = (list.settled ?? 0) + 1; }
     list.push(at);
   }
   return [index, twin];
@@ -40,7 +42,9 @@ export function tapTile(taps, index, t) {
  * Reduced motion flips the colour at once, without the turn.
  */
 export function tapFlip(list, t, reducedMotion = false) {
-  let angle = 0, halves = 0, lift = 0, last = -Infinity;
+  // Evicted flips (tapTile) are whole turns already made: they keep their parity.
+  const settled = list.settled ?? 0;
+  let angle = reducedMotion ? 0 : Math.PI * (settled % 2), halves = settled, lift = 0, last = -Infinity;
   for (const at of list) {
     if (t < at) continue;
     const u = reducedMotion ? 1 : ramp(t, at, at + TAP_FLIP_TIME);

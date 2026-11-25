@@ -60,6 +60,22 @@ describe('tapping the opening cube', () => {
     expect(tapTile(taps, 1, TAP_UNTIL)).toEqual([]);
   });
 
+  it('keeps every flip in the resting colour past the eight it remembers', () => {
+    const taps = createTaps();
+    for (let k = 0; k < 12; k++) {
+      const at = 0.5 * k;
+      // Before this tap reaches its midpoint the tile still shows the last k flips.
+      expect(tapFlip(taps[0], at).halves % 2, `before tap ${k + 1}`).toBe(k % 2);
+      tapTile(taps, 0, at);
+      expect(tapFlip(taps[0], at + TAP_FLIP_TIME * 0.2).halves % 2, `just after tap ${k + 1}`).toBe(k % 2);
+      expect(tapFlip(taps[0], at + TAP_FLIP_TIME).halves % 2, `after tap ${k + 1}`).toBe((k + 1) % 2);
+      // The slab's turn agrees with the colour: an odd count shows its back.
+      const settledAngle = tapFlip(taps[0], at + TAP_FLIP_TIME).angle;
+      expect(Math.round(settledAngle / Math.PI) % 2).toBe((k + 1) % 2);
+    }
+    expect(taps[0]).toHaveLength(8);
+  });
+
   it('flips the colour at once, without the turn, for reduced motion', () => {
     const taps = createTaps();
     tapTile(taps, 3, 2);
@@ -103,6 +119,18 @@ describe('IntroScene', () => {
     await render(at + TWIN_DELAY + TAP_FLIP_TIME + 0.05);
     expect(colorOf(stickers, i)).not.toEqual(before[0]);
     expect(colorOf(stickers, twin)).not.toEqual(before[1]);
+  });
+
+  it('gives a tapped sticker’s portal a finite seed under reduced motion', async () => {
+    const at = 7.6;
+    const { render, scene } = await mount(at, true);
+    const stickers = find(scene, o => o.isInstancedMesh && o.__r3f?.handlers?.onPointerDown);
+    stickers.__r3f.handlers.onPointerDown({ instanceId: 0, stopPropagation() {} });
+    await render(at + 0.1);
+    const portals = find(scene, o => o.name === 'IntroFlipPortals');
+    expect(portals.count).toBeGreaterThan(0);
+    const seeds = portals.geometry.attributes.aInstanceSeed.array.slice(0, portals.count);
+    for (const seed of seeds) expect(Number.isFinite(seed)).toBe(true);
   });
 
   it('sinks the cube through an open portal at the ending, and hides it once through', async () => {

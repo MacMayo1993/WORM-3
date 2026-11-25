@@ -197,7 +197,10 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
         portals.current.setMatrixAt(portalCount, dummy.matrix);
         portals.current.setColorAt(portalCount, assets.colors[FLIPPED[i].curr]);
         const home = assets.colors[ORIGINAL[i].curr];
-        assets.portal.attributes.aInstanceSeed.setX(portalCount, Math.max(flip.portalStart, tap.last + 0.21));
+        // Reduced motion's scripted flip has no start; the portal's phase still
+        // reads this seed, so it must always be finite.
+        const opened = Math.max(flip.portalStart ?? -Infinity, tap.last + 0.21);
+        assets.portal.attributes.aInstanceSeed.setX(portalCount, Number.isFinite(opened) ? opened : 0);
         assets.portal.attributes.aInstanceData.setXYZW(portalCount, home.r, home.g, home.b, 0);
         portalCount++;
       }
