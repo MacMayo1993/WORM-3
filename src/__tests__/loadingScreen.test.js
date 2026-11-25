@@ -98,11 +98,11 @@ describe('loading screen timing', () => {
     expect(css).not.toContain('wl-first-fall');
   });
 
-  it('shows both halves of the first real transfer well before a fast cover can fade', () => {
+  it('shows both halves of the first real transfer in the first fraction of a second', () => {
     const sharedPass = FALL.period + PASS_AT - LOADING_START_PHASE;
     expect(LOADING_START_PHASE).toBeGreaterThan(FALL.period);
     expect(sharedPass).toBeGreaterThan(0);
-    expect(sharedPass).toBeLessThan(0.3); // Opening the cube… min hold
+    expect(sharedPass).toBeLessThan(0.3);
     expect(crossing(LOADING_START_PHASE)).toBeGreaterThan(0.5);
     expect(crossing(sharedPass + LOADING_START_PHASE)).toBeCloseTo(1, 6);
     expect(css.match(/animation-delay: calc\(0s - var\(--wl-start-phase\)\);/g)).toHaveLength(3);

@@ -449,15 +449,12 @@ export default function WORM3() {
   const [sceneGateToken, setSceneGateToken] = useState(0);
   const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
   const [sceneGateEager, setSceneGateEager] = useState(false);
-  // The loading cover's floor: long enough for a full loop and one of MOBI's tips.
-  const [sceneGateHold, setSceneGateHold] = useState(2400);
   const [sceneGateZ, setSceneGateZ] = useState(9996);
-  // opts.eager shows the cube at once and holds for opts.holdMs (vs. the default
+  // opts.eager shows the cube at once (vs. the default
   // probe that only shows if a decode registers); opts.z overrides the layer.
   const armSceneGate = useCallback((label = 'Loading', opts = {}) => {
     setSceneGateLabel(label);
     setSceneGateEager(!!opts.eager);
-    setSceneGateHold(opts.holdMs ?? 2400);
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
@@ -776,8 +773,8 @@ export default function WORM3() {
         return;
       }
     }
-    // Only cover a real asset load; an eager cover flashes over a ready menu.
-    armSceneGate('Opening the cube…', { eager: false, holdMs: 300, z: 10000 });
+    // Play the portal animation even when the returning player's menu is cached.
+    armSceneGate('Opening the cube…', { eager: true, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
   }, [setShowWelcome, markIntroSeen, armSceneGate]);
@@ -1470,7 +1467,7 @@ export default function WORM3() {
       {/* WORM prepares the scene and portrait under this cover, then reveals
           Mobi over the finished backdrop as the cover dissolves. */}
       {!graphicsFailed && <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager}
-        minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }}
+        style={{ zIndex: sceneGateZ }}
         ready={!mobiIntroLoading || (mobiSceneReadyToken === mobiLoadToken && mobiPortraitReadyToken === mobiLoadToken)}
         onReveal={mobiIntroLoading ? revealMobiIntro : undefined} />}
       <ScreenTransition show={showTutorial && !showWelcome}>

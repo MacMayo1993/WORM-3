@@ -26,7 +26,7 @@
  * initial route; preloadAssets.js warms the chunk during the opening.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
 import { EXIT_RIM_DEPTH, LOADING_START_PHASE, shaftClipPath } from './loadingWormhole.js';
@@ -153,7 +153,7 @@ const SHAFT_STYLE = { clipPath: shaftClipPath() };
 const SCENE_STYLE = { '--wl-exit-rim': EXIT_RIM_DEPTH, '--wl-start-phase': `${LOADING_START_PHASE}s` };
 const MOBI_STYLE = { '--wl-mobi': `url("${import.meta.env.BASE_URL}Mobi.webp")` };
 
-export default function LoadingScene({ translucent = false }) {
+export default function LoadingScene({ translucent = false, onAnimationStart }) {
   const sceneRef = useRef(null);
   const fallRef = useRef(null);
   const wellRef = useRef(null);
@@ -169,6 +169,10 @@ export default function LoadingScene({ translucent = false }) {
   // MOBI's first line is rendered with the cover, so it is there in the first
   // paint even if the main thread then stalls before any frame callback runs.
   const [opening] = useState(() => openingLine(prefersReducedMotion()));
+
+  useLayoutEffect(() => {
+    onAnimationStart?.();
+  }, [onAnimationStart]);
 
   // The toy: a press dives and kicks, letting go (anywhere) eases off. The whole
   // cover is the touch surface; nothing here sets React state.
