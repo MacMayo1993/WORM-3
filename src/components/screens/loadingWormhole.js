@@ -13,7 +13,7 @@
  * LoadingScene.css and LoadingScreen.css: `--wl-beat` is the period, `--wl-drop`
  * the drop between the portals' centres (in cubes), and the `wl-fall` keyframes
  * start the cube `lead` cubes above the top portal's centre. Time 0 is that
- * start, as the scene's animations begin.
+ * start of the track. The cover joins that track during the first shared crossing.
  *
  * Both portals cut the cube on their own surface, the way a portal slices what
  * goes through it: along the front half of a flat ellipse across the mouth,
@@ -36,6 +36,10 @@ export const EXIT_RIM_DEPTH = 0.34;
 // The lead plus cut is half the drop. Use the exact half-beat for pulse
 // comparisons at the seam (decimal geometry adds a rounding error).
 export const PASS_AT = FALL.period / 2;
+// Join the loop with both mouths already in use. The first shared crossing
+// peaks 280ms in, within even the short 300ms opening cover, without adding
+// a minimum wait or accelerating the rest of the descent.
+export const LOADING_START_PHASE = 2.72;
 
 const fmt = (v) => +v.toFixed(4);
 

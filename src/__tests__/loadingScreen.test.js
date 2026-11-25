@@ -6,6 +6,7 @@ import { LOADING_CUBE, RING, WAVE_SPREAD } from '../components/screens/loadingCu
 import {
   FALL,
   EXIT_RIM_DEPTH,
+  LOADING_START_PHASE,
   PASS_AT,
   crossing,
   THROAT,
@@ -93,8 +94,18 @@ describe('loading screen timing', () => {
     expect(fall).toContain(`from { transform: translateY(calc(var(--wl-cube) * -${FALL.lead})); }`);
     expect(fall).toContain(`to { transform: translateY(calc(var(--wl-cube) * -${FALL.lead} + 2 * var(--wl-drop))); }`);
     expect(css).toContain('animation: wl-fall calc(var(--wl-beat) * 2) linear infinite backwards;');
-    expect(css).toMatch(/\.wl-twin \{\s*animation-delay: var\(--wl-beat\);/);
+    expect(css).toMatch(/\.wl-twin \{\s*animation-delay: calc\(var\(--wl-beat\) - var\(--wl-start-phase\)\);/);
     expect(css).not.toContain('wl-first-fall');
+  });
+
+  it('shows both halves of the first real transfer well before a fast cover can fade', () => {
+    const sharedPass = FALL.period + PASS_AT - LOADING_START_PHASE;
+    expect(LOADING_START_PHASE).toBeGreaterThan(FALL.period);
+    expect(sharedPass).toBeGreaterThan(0);
+    expect(sharedPass).toBeLessThan(0.3); // Opening the cube… min hold
+    expect(crossing(LOADING_START_PHASE)).toBeGreaterThan(0.5);
+    expect(crossing(sharedPass + LOADING_START_PHASE)).toBeCloseTo(1, 6);
+    expect(css.match(/animation-delay: calc\(0s - var\(--wl-start-phase\)\);/g)).toHaveLength(3);
   });
 
   it('ripples the paper as the cube passes through, when the vortex kicks', () => {
