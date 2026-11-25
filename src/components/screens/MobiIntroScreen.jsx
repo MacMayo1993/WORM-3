@@ -90,9 +90,10 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
   const dismissTimer = useRef(null);
   const dismissed = useRef(false);
   const speech = useMobiSpeech(lines[index] ?? '');
-  // Level previews deliberately blur even on touch screens, where the general
-  // paper-panel token disables blur. Mobi and his sheet stay above this layer.
-  const backdropBlur = blurScene ? 'blur(8px)' : PAPER_BACKDROP_BLUR;
+  // A level preview stays sharp: it is the player's first look at the level (on a
+  // new save, at the game itself), and an 8px blur turned the cube into a smear.
+  // The gradient below keeps the card's foot readable; Mobi and the sheet sit above.
+  const backdropBlur = blurScene ? 'none' : PAPER_BACKDROP_BLUR;
   useEffect(() => {
     return () => clearTimeout(dismissTimer.current);
   }, []);

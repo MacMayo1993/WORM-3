@@ -139,7 +139,7 @@ export const MOBI_TIPS = [
   'Every tile has a twin straight through the middle. Flip one and its twin flips too.',
   "Tiles wear out: every flip spends some of a tile's life, so keep an eye on its health bar.",
   'Jump onto a raised flip pad to dive into its tunnel.',
-  'Ride a tunnel and you come out at your twin, mirrored.',
+  'Ride a tunnel and you come out of its twin, on the far side of the cube.',
   'Riding a turning layer is safe, but it cuts your tail at the seam. Never cross it head-first.',
   'Lost some tail? Your orbs scatter. Grab them back within 5 seconds, before they blink out.',
   "An orb pays out in its tile's twin colour: one on a white tile gives you a yellow bead.",
