@@ -11,15 +11,17 @@
  * Arm it by bumping `armToken` when preparing a scene. On arm it PROBES briefly: it only
  * commits to showing if a decode is genuinely in flight (or starts within
  * probeMs). A transition whose assets are already cached therefore never flashes
- * a redundant cover. Once shown it holds until the decode settles (with a
- * min-show floor so it reads as intentional) or maxVisibleMs elapses — a hard
- * cap for ordinary transitions. An explicit `ready` latch also waits for the
+ * a redundant cover. Eager covers always show. Once shown, the cover plays at
+ * least three seconds of the animation and waits for the decode to settle (or
+ * the asset timeout). An explicit `ready` latch also waits for the
  * caller's scene/portrait preparation; `onReveal` runs as the cover fades out.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useProgress } from '@react-three/drei';
 import LoadingScreen from './LoadingScreen.jsx';
+
+const MIN_ANIMATION_MS = 3000;
 
 export default function SceneLoadingGate({
   armToken,
@@ -31,8 +33,6 @@ export default function SceneLoadingGate({
   // frames, DOM image decode). It must release before even the timeout can exit.
   ready = true,
   onReveal,
-  // Long enough to see the cube through a full loop and read one of MOBI's tips.
-  minVisibleMs = 2400,
   probeMs = 500,
   maxVisibleMs = 12000,
   fadeMs = 480,
@@ -48,7 +48,11 @@ export default function SceneLoadingGate({
 
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const sess = useRef({ token: undefined, poll: null, fade: null, armedAt: 0, shownAt: 0, shown: false });
+  const sess = useRef({ token: undefined, poll: null, fade: null, armedAt: 0, shown: false });
+  const animation = useRef(null);
+  const onAnimationStart = useCallback(() => {
+    animation.current = { token: armToken, startedAt: performance.now() };
+  }, [armToken]);
 
   useEffect(() => {
     const s = sess.current;
@@ -60,7 +64,6 @@ export default function SceneLoadingGate({
     if (s.fade) clearTimeout(s.fade);
     s.fade = null;
     s.armedAt = performance.now();
-    s.shownAt = 0;
     s.shown = false;
     setLeaving(false);
     setVisible(false);
@@ -80,12 +83,11 @@ export default function SceneLoadingGate({
     };
 
     if (eager) {
-      // Guaranteed cover: show at once and hold for at least minVisibleMs whether
+      // Guaranteed cover: show at once and hold for at least three seconds whether
       // or not a decode registers (used where the work — e.g. a demo step's cube
       // rebuild — isn't a clean asset load). It still extends until any decode
       // settles. An explicit readiness latch can extend beyond maxVisibleMs.
       s.shown = true;
-      s.shownAt = s.armedAt;
       setVisible(true);
     } else {
       // If a decode is already in flight at arm time (the common case — the env
@@ -94,7 +96,6 @@ export default function SceneLoadingGate({
       const { active, progress } = progRef.current;
       if (active && progress < 100) {
         s.shown = true;
-        s.shownAt = s.armedAt;
         setVisible(true);
       }
     }
@@ -108,16 +109,18 @@ export default function SceneLoadingGate({
         if (active && progress < 100) {
           // A real decode is in flight — commit to covering it.
           s.shown = true;
-          s.shownAt = now;
           setVisible(true);
         } else if (readyRef.current && now - s.armedAt >= probeMs) {
           end(); // nothing to wait for; never flash the cover
         }
         return;
       }
-      const elapsed = now - s.shownAt;
+      // Don't count the lazy scene's placeholder as animation time, and don't
+      // let the asset timeout shorten a late-starting animation.
+      const playback = animation.current;
+      const playedMinimum = playback?.token === armToken && now - playback.startedAt >= MIN_ANIMATION_MS;
       const settled = !active || progress >= 100;
-      if (readyRef.current && ((settled && elapsed >= minVisibleMs) || now - s.armedAt >= maxVisibleMs)) end();
+      if (playedMinimum && readyRef.current && (settled || now - s.armedAt >= maxVisibleMs)) end();
     }, 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armToken]);
@@ -138,6 +141,8 @@ export default function SceneLoadingGate({
   const { active, progress } = prog;
   return (
     <LoadingScreen
+      key={armToken}
+      onAnimationStart={onAnimationStart}
       label={label}
       showTitle={showTitle}
       transparent={transparent}

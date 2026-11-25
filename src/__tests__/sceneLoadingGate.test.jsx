@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import React, { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -7,14 +7,20 @@ import SceneLoadingGate from '../components/screens/SceneLoadingGate.jsx';
 const progress = vi.hoisted(() => ({ active: false, progress: 100 }));
 vi.mock('@react-three/drei', () => ({ useProgress: () => progress }));
 vi.mock('../components/screens/LoadingScreen.jsx', () => ({
-  default: ({ leaving }) => <div data-loading data-leaving={String(leaving)} />,
+  default: function MockLoadingScreen({ leaving, onAnimationStart }) {
+    useEffect(() => {
+      const timer = setTimeout(onAnimationStart, progress.animationDelay);
+      return () => clearTimeout(timer);
+    }, [onAnimationStart]);
+    return <div data-loading data-leaving={String(leaving)} />;
+  },
 }));
 
 let root, host;
 beforeEach(() => {
   vi.useFakeTimers();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  Object.assign(progress, { active: false, progress: 100 });
+  Object.assign(progress, { active: false, progress: 100, animationDelay: 0 });
   host = document.createElement('div');
   root = createRoot(host);
 });
@@ -29,6 +35,29 @@ const cover = () => host.querySelector('[data-loading]');
 
 it('covers an eager transition on its first render, before effects run', () => {
   expect(renderToString(<SceneLoadingGate armToken={1} eager ready={false} />)).toContain('data-loading');
+});
+
+it('shows three full seconds even if the assets are already ready', () => {
+  const reveal = vi.fn();
+  show({ onReveal: reveal });
+  tick(2999);
+  expect(cover().dataset.leaving).toBe('false');
+  expect(reveal).not.toHaveBeenCalled();
+  tick(1);
+  expect(cover().dataset.leaving).toBe('true');
+  expect(reveal).toHaveBeenCalledOnce();
+});
+
+it('counts from animation mount, not the placeholder, even on asset timeout', () => {
+  const reveal = vi.fn();
+  Object.assign(progress, { animationDelay: 1000, active: true, progress: 30 });
+  show({ maxVisibleMs: 1500, onReveal: reveal });
+  tick(3999);
+  expect(cover().dataset.leaving).toBe('false');
+  expect(reveal).not.toHaveBeenCalled();
+  tick(1);
+  expect(cover().dataset.leaving).toBe('true');
+  expect(reveal).toHaveBeenCalledOnce();
 });
 
 it('waits beyond the timeout for the scene and portrait, then reveals once', () => {
@@ -62,11 +91,11 @@ it('keeps the cover through a late texture load and the minimum animation time',
 
 it('cancels an outgoing fade when another level starts loading', () => {
   const first = vi.fn(), second = vi.fn();
-  show({ minVisibleMs: 0, onReveal: first });
-  tick(100);
+  show({ onReveal: first });
+  tick(3000);
   expect(first).toHaveBeenCalledTimes(1);
   show({ armToken: 2, ready: false, onReveal: second });
-  tick(3000);
+  tick(2900);
   expect(cover().dataset.leaving).toBe('false');
   expect(second).not.toHaveBeenCalled();
   show({ armToken: 2, ready: true, onReveal: second });

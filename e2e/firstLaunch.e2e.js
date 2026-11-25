@@ -9,6 +9,28 @@ test.afterEach(async ({ page, errors }) => {
   expect(await page.locator('[data-testid="app-error"]').count()).toBe(0);
 });
 
+async function expectOpeningPlayback(page) {
+  // Measure from the actual cube (not its lazy placeholder) to the fade.
+  const playback = await page.evaluateHandle(() => {
+    let startedAt;
+    let fadedAfter;
+    const observer = new MutationObserver(() => {
+      const cover = document.querySelector('.wl-root[aria-label^="Opening the cube"]');
+      if (!cover?.querySelector('.wl-fall')) return;
+      startedAt ??= performance.now();
+      if (cover.classList.contains('wl-leaving')) {
+        fadedAfter = performance.now() - startedAt;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    return { get fadedAfter() { return fadedAfter; } };
+  });
+  await page.getByRole('button', { name: /skip intro/i }).click();
+  // Small tolerance for when the browser delivers the DOM observation.
+  await expect.poll(() => playback.evaluate(result => result.fadedAfter)).toBeGreaterThanOrEqual(2900);
+}
+
 test('first launch goes from the intro to Story level 1, once', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: /skip intro/i }).click();
@@ -24,11 +46,19 @@ test('first launch goes from the intro to Story level 1, once', async ({ page })
 
   // The second launch is an ordinary one: the intro ends at the menu.
   await page.reload();
-  await page.getByRole('button', { name: /skip intro/i }).click();
+  await expectOpeningPlayback(page);
   await expect(page.locator('button:visible', { hasText: /^\s*play\b/i }).first()).toBeVisible();
   await press(page, /^\s*play\b/i);
   await expect(page.locator('.lc-play')).toBeEnabled();   // WORM is open
   await page.getByRole('button', { name: 'Show CHAOS mode' }).click();
   await expect(page.locator('.lc-play')).toBeDisabled();
   await expect(page.locator('.lc-play')).toContainText(/Clear 5 more WORM levels/i);
+});
+
+test('a returning phone gets three seconds of portal animation @phone', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('worm3_mode_gate', 'gated'));
+  await page.goto('./');
+  await expectOpeningPlayback(page);
+  await press(page, /^\s*play\b/i);
+  await expect(page.locator('.lc-play')).toBeEnabled();
 });

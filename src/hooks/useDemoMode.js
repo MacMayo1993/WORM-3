@@ -517,7 +517,7 @@ export function useDemoMode({
     applyDemoSettings();
     setDemoColdOpenVisible(false);
     setDemoStepIntroVisible(false);
-    armSceneGate?.(challenges ? 'Worm challenges' : 'Worm Mode', { eager: true, holdMs: 0, z: 10600 });
+    armSceneGate?.(challenges ? 'Worm challenges' : 'Worm Mode', { eager: true, z: 10600 });
     applyDemoStepConfig('worm-traversal');
   }, [clearDemoWatchTimers, applyDemoSettings, cancelShuffle, cancelDisparityRun, armSceneGate, applyDemoStepConfig]);
 
@@ -640,9 +640,9 @@ export function useDemoMode({
       return;
     }
 
-    // Keep the real asset-loading gate, with no artificial minimum hold.
+    // Cover the Worm scene rebuild with the portal animation.
     if (step === 'worm-traversal') {
-      armSceneGate?.('Worm Mode', { eager: true, holdMs: 0, z: 10600 });
+      armSceneGate?.('Worm Mode', { eager: true, z: 10600 });
     }
 
     applyDemoStepConfig(step);
@@ -773,7 +773,7 @@ export function useDemoMode({
     tourCompletedRef.current = false;
     setDemoColdOpenVisible(false);
     setDemoStepIntroVisible(false);
-    armSceneGate?.('Worm Mode', { eager: true, holdMs: 0, z: 10600 });
+    armSceneGate?.('Worm Mode', { eager: true, z: 10600 });
     applyDemoStepConfig('worm-traversal');
   }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig, armSceneGate]);
 

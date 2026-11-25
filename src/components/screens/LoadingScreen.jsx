@@ -18,6 +18,7 @@
  *   showTitle   — render the WORM³ title card (default false).
  *   transparent — let the scene behind show through the paper (default false).
  *   leaving     — fade the cover out (parent drives this before unmount).
+ *   onAnimationStart — called when the lazy animated scene mounts.
  *   style       — extra styles merged onto the root (z-index overrides, etc.).
  */
 
@@ -48,6 +49,7 @@ export default function LoadingScreen({
   showTitle = false,
   transparent = false,
   leaving = false,
+  onAnimationStart,
   style
 }) {
   const hasProgress = typeof progress === 'number' && Number.isFinite(progress);
@@ -78,7 +80,7 @@ export default function LoadingScreen({
       )}
 
       <Suspense fallback={<ScenePlaceholder />}>
-        <LoadingScene translucent={transparent} />
+        <LoadingScene translucent={transparent} onAnimationStart={onAnimationStart} />
       </Suspense>
 
       <div className="wl-status">
