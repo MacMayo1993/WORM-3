@@ -14,18 +14,12 @@
  *    are, so the fall, the shadow and the ripple here line up with them.
  *  - Fully respects prefers-reduced-motion (a still 3/4 pose between portals).
  *
- * The fall: the cube drops a drop (--wl-drop, the gap between the portals'
- * centres) every --wl-beat, at a steady terminal speed, starting 1.2 cubes up
- * inside the top portal. A twin one drop below makes the loop: as the cube sinks
- * into the paper its twin is the same cube coming out of the top, and when the
- * fall repeats the two swap places unseen. The shaft is clipped at each
- * portal's surface, a flat arc inside the mouth (shaftClipPath), so the cube
- * comes out of the upper mouth and sinks into the lower one in plain view, and
- * LoadingPortal lights the cut as it breaks through. Cube and twin are cut on
- * the same line, so exactly as much comes out of the top as has gone into the
- * paper. loadingWormhole.js (FALL)
- * holds the same numbers and kicks both portals as the cube passes through,
- * half in each, 50% into each fall.
+ * The fall: each cube drops the gap between the portals' centres (--wl-drop)
+ * every --wl-beat. A second cube starts a beat later, so the same amount that
+ * sinks into the floor emerges above. Each track wraps only offscreen. The
+ * shaft cuts through the interior of both mouths (shaftClipPath); LoadingPortal
+ * lights those cuts as the stickers break through. loadingWormhole.js (FALL)
+ * holds the same numbers and times the passes halfway into each beat.
  *
  * The cover is also a toy (loadingPlay.js): holding anywhere dives (`wl-warp`
  * on the scene: every animation in it plays faster together, the cube
@@ -138,7 +132,8 @@
   pointer-events: none;
 }
 
-/* The cube, centred on the top portal and falling one drop per beat. */
+/* Each cube crosses the full shaft uninterrupted, one drop per beat. At the
+   wrap both endpoints are clipped, so a track never resets in open air. */
 .wl-fall {
   position: absolute;
   left: 50%;
@@ -147,12 +142,12 @@
   height: var(--wl-cube);
   margin: calc(var(--wl-cube) / -2) 0 0 calc(var(--wl-cube) / -2);
   will-change: transform;
-  animation: wl-fall var(--wl-beat) linear infinite;
+  animation: wl-fall calc(var(--wl-beat) * 2) linear infinite backwards;
 }
 
 @keyframes wl-fall {
-  from { transform: translateY(calc(var(--wl-cube) * -1.2)); }
-  to { transform: translateY(calc(var(--wl-cube) * -1.2 + var(--wl-drop))); }
+  from { transform: translateY(calc(var(--wl-cube) * -1.35)); }
+  to { transform: translateY(calc(var(--wl-cube) * -1.35 + 2 * var(--wl-drop))); }
 }
 
 .wl-view {
@@ -206,15 +201,10 @@
   45% { transform: translateY(-6%) scaleX(1); opacity: 0.6; }
 }
 
-/* The twin waits out the first fall, so the cube's first entrance is out of
-   the portal above rather than halfway into the paper. */
+/* Hold the twin at the hidden start pose for one beat, then follow the
+   first cube at the same speed. No visibility toggle/raster on the seam. */
 .wl-twin {
-  transform: translateY(var(--wl-drop));
-  animation: wl-first-fall var(--wl-beat);
-}
-
-@keyframes wl-first-fall {
-  from, to { visibility: hidden; }
+  animation-delay: var(--wl-beat);
 }
 
 .wl-cube {
@@ -696,14 +686,14 @@
   }
 }
 
-/* The ceiling exit's lower edge is the shaft's emission curve (FALL.cut).
-   Match the canvas even before its first frame, with the same centre. */
+/* Like the live ceiling aperture, the stand-in rim extends past the cut:
+   the emerging stickers must overlap the mouth, not begin below its edge. */
 .wl-well:first-child::before {
-  top: calc(50% - var(--wl-cube) * 0.209);
-  bottom: calc(50% - var(--wl-cube) * 0.209);
+  top: calc(50% - min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, 0.34))) * 1.045);
+  bottom: calc(50% - min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, 0.34))) * 1.045);
 }
 .wl-well:first-child::after {
-  top: calc(50% - var(--wl-cube) * 0.191);
-  bottom: calc(50% - var(--wl-cube) * 0.191);
+  top: calc(50% - min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, 0.34))) * 0.955);
+  bottom: calc(50% - min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, 0.34))) * 0.955);
   background: radial-gradient(ellipse 85% 85% at 50% 28%, #101729 0 14%, #2f3a44 34%, #8f9486 66%, #d9d3bf 100%);
 }

@@ -29,7 +29,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
-import { shaftClipPath } from './loadingWormhole.js';
+import { EXIT_RIM_DEPTH, shaftClipPath } from './loadingWormhole.js';
 import { createLoadingPlay, openingLine, orientationAim, pointerAim } from './loadingPlay.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
@@ -150,6 +150,7 @@ const Storm = React.memo(function Storm({ near }) {
 
 // Between the two portals' near lips.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
+const SCENE_STYLE = { '--wl-exit-rim': EXIT_RIM_DEPTH };
 const MOBI_STYLE = { '--wl-mobi': `url("${import.meta.env.BASE_URL}Mobi.webp")` };
 
 export default function LoadingScene({ translucent = false }) {
@@ -267,10 +268,8 @@ export default function LoadingScene({ translucent = false }) {
     };
   }, []);
 
-  // The cube falls from the first paint, on the compositor, whatever the main
-  // thread is doing. CSS stand-ins hold the portals' places until LoadingPortal
-  // has drawn them once and adds `wl-ready`; the canvases then run off the
-  // fall's own clock, so they are in step with the cube however late they start.
+  // The cubes fall on the compositor, without waiting for the canvases to paint.
+  // CSS stand-ins hold the mouths' places until LoadingPortal adds `wl-ready`.
   return (
     <>
       <LoadingPortal sceneRef={sceneRef} fallRef={fallRef} wellRef={wellRef} topRef={topRef} playRef={playRef} translucent={translucent}>
@@ -279,22 +278,24 @@ export default function LoadingScene({ translucent = false }) {
           <Storm near={false} />
         </div>
       </LoadingPortal>
-      <div className="wl-scene" ref={sceneRef}>
+      <div className="wl-scene" ref={sceneRef} style={SCENE_STYLE}>
         <div className="wl-well" ref={topRef} />
         <div className="wl-gap" />
         <div className="wl-well" ref={wellRef}>
           <i className="wl-shadow" />
           <i className="wl-shock" />
         </div>
-        {/* The cube and its twin one drop below: as the one goes into the
-            paper, the other is the same cube coming out of the portal above. */}
+        {/* Stagger two full trips. As one sinks into the floor the other
+            emerges above; neither is visible when its own animation wraps. */}
         <div className="wl-shaft" style={SHAFT_STYLE}>
           <div className="wl-fall" ref={fallRef}>
             <div className="wl-view">
               <Airflow />
               <Cube />
             </div>
-            <div className="wl-view wl-twin">
+          </div>
+          <div className="wl-fall wl-twin">
+            <div className="wl-view">
               <Airflow />
               <Cube />
             </div>
