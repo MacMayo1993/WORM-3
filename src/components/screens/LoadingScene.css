@@ -143,6 +143,7 @@
   margin: calc(var(--wl-cube) / -2) 0 0 calc(var(--wl-cube) / -2);
   will-change: transform;
   animation: wl-fall calc(var(--wl-beat) * 2) linear infinite backwards;
+  animation-delay: calc(0s - var(--wl-start-phase));
 }
 
 @keyframes wl-fall {
@@ -201,10 +202,10 @@
   45% { transform: translateY(-6%) scaleX(1); opacity: 0.6; }
 }
 
-/* Hold the twin at the hidden start pose for one beat, then follow the
-   first cube at the same speed. No visibility toggle/raster on the seam. */
+/* The twin trails the first cube by one beat at the same speed. Both are
+   already moving on first paint; neither has to pop into view at a seam. */
 .wl-twin {
-  animation-delay: var(--wl-beat);
+  animation-delay: calc(var(--wl-beat) - var(--wl-start-phase));
 }
 
 .wl-cube {
@@ -411,6 +412,7 @@
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(16, 23, 41, 0.5), rgba(16, 23, 41, 0));
   animation: wl-shadow var(--wl-beat) infinite both;
+  animation-delay: calc(0s - var(--wl-start-phase));
 }
 
 @keyframes wl-shadow {
@@ -429,6 +431,7 @@
   border: 2px solid var(--wl-ink);
   opacity: 0;
   animation: wl-shock var(--wl-beat) infinite both;
+  animation-delay: calc(0s - var(--wl-start-phase));
 }
 
 @keyframes wl-shock {

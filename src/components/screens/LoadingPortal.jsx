@@ -39,6 +39,7 @@ import {
   WORM_SEGMENTS,
   FALL,
   EXIT_RIM_DEPTH,
+  LOADING_START_PHASE,
   crossing,
   funnelLean,
   funnelPoint,
@@ -646,7 +647,8 @@ export default function LoadingPortal({ sceneRef, fallRef, wellRef, topRef, play
         if (!document.hidden) {
           fall ??= fallAnimation(fallRef?.current);
           const ms = fall?.currentTime;
-          draw((typeof ms === 'number' ? ms : now - mountedAt) / 1000, now);
+          // CSSAnimation.currentTime does not include its negative start delay.
+          draw((typeof ms === 'number' ? ms : now - mountedAt) / 1000 + LOADING_START_PHASE, now);
         }
         raf = requestAnimationFrame(frame);
       };
