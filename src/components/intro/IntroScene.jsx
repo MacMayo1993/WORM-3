@@ -17,6 +17,7 @@ import { introOutro, introDive } from './introOutro.js';
 import { createDivePortal } from './introDivePortal.js';
 import { createTaps, tapTile, tapFlip } from './introTouch.js';
 import { feel } from '../../utils/feel.js';
+import { beatsCrossed } from './introBeats.js';
 import { addIntroDissolve } from './introDissolve.js';
 
 const [ORIGINAL, FLIPPED] = INTRO_STICKERS;
@@ -64,6 +65,9 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
   timeRef.current = time;
   const taps = useRef(null);
   if (!taps.current) taps.current = createTaps();
+  // The clock at the last frame, for the beats' sounds (introBeats.js); null
+  // until the first frame, so a returning player's late start plays nothing early.
+  const beatClock = useRef(null);
   const assets = useMemo(() => {
     const colors = {};
     for (let id = 1; id <= 6; id++) colors[id] = new THREE.Color(introColor(id));
@@ -116,6 +120,8 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
   useFrame((state) => {
     const { camera } = state;
     cameraRef.current = camera;
+    if (beatClock.current !== null) for (const event of beatsCrossed(beatClock.current, time, reducedMotion)) feel(event);
+    beatClock.current = time;
     const pose = sampleIntro(time, reducedMotion);
     const energy = introEnergy(time, reducedMotion);
     const outro = introOutro(time, reducedMotion);
