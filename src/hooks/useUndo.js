@@ -9,6 +9,7 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, unflipStickerPair, canUnflipStickerPair } from '../game/manifoldLogic.js';
 import { applyTileMove, inverseTileMove } from '../game/tileOrientation.js';
 import { clearHomeAlignments } from '../3d/tileHomeAlignment.js';
+import { restoreFlipCheckpoint } from '../game/flipRelapse.js';
 
 /**
  * Hook for undo functionality.
@@ -35,7 +36,7 @@ export function useUndo(startAnimation) {
     if (lastMove.beforeFlipInput) {
       clearHomeAlignments();
       useGameStore.setState(state => ({
-        ...lastMove.beforeFlipInput, rotationEpoch: state.rotationEpoch + 1, lastRotation: null,
+        ...restoreFlipCheckpoint(state, lastMove.beforeFlipInput), rotationEpoch: state.rotationEpoch + 1, lastRotation: null,
         moveHistory: state.moveHistory.slice(0, -1), firstFlipHighlightPair: null,
         cubiePops: {}, tunnelBirths: {}, tunnelPulses: {}, tunnelDeaths: {}, flipWaveOrigins: [], flipPulse: null,
       }));

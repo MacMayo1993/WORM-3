@@ -25,6 +25,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosStorm from '../manifold/ChaosStorm.jsx';
 import ChaosIgnitionMarker from '../manifold/ChaosIgnitionMarker.jsx';
 import { ignitionTileAt } from '../game/chaosIgnition.js';
+import { flipTurnsLocked } from '../game/flipRelapse.js';
 import { feel } from '../utils/feel.js';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
@@ -420,6 +421,9 @@ const CubeAssembly = React.memo(({
           // Aiming the first strike: a turn here would scramble the board out
           // from under the round's scripted unshuffle. Taps still aim.
           if (_cs.chaosIgnitionPicking) return;
+          // A flip level holding its turns (first-flip highlight, relapse lesson,
+          // opening, win) must not start a drag it would refuse to commit.
+          if (flipTurnsLocked(_cs)) return;
         }
         if (gsapAnimRef.current) return;
         const m = mapSwipe(ds.n, dx, dy, ds.shiftKey);
@@ -512,7 +516,9 @@ const CubeAssembly = React.memo(({
 
         // Calculate how many quarter turns to snap to (round to nearest)
         const quarterTurns = Math.round(currentAngle / quarterTurn);
-        const shouldComplete = quarterTurns !== 0;
+        // A lock that began mid-drag (the relapse lesson, a win) snaps the layer
+        // back: onMove would refuse the turn after the meshes were already written.
+        const shouldComplete = quarterTurns !== 0 && !flipTurnsLocked(useGameStore.getState());
 
         if (shouldComplete) {
           const savedPos = ds.pos;

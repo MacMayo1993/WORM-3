@@ -5,7 +5,7 @@
  * Includes support for Antipodal Mode (Mirror Quotient).
  */
 
-import { flipCheckpoint, showingRelapseLesson } from '../game/flipRelapse.js';
+import { flipCheckpoint, flipTurnsLocked } from '../game/flipRelapse.js';
 import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -69,7 +69,7 @@ export function useAnimation() {
   const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false, sliceIndices = null, sliceDirs = null, orientationResets = null) => {
     clearHomeAlignments();
     const state = useGameStore.getState();
-    if (showingRelapseLesson(state) || (state.currentLevelData?.scoring === 'flips' && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory))) return;
+    if (flipTurnsLocked(state)) return;
     const move = { axis, dir, sliceIndex, isUndo, sliceIndices, sliceDirs, orientationResets };
     pendingMoveRef.current = move;
     useGameStore.setState({
@@ -206,7 +206,7 @@ export function useAnimation() {
   const onMove = useCallback((axis, dir, sel, numTurns = 1) => {
     // Only the WORM scheduler may turn layers; startAnimation remains its port.
     const state = useGameStore.getState();
-    if (state.wormHealerMode || showingRelapseLesson(state) || (state.currentLevelData?.scoring === 'flips' && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory))) return;
+    if (state.wormHealerMode || flipTurnsLocked(state)) return;
     const sliceIndex = axis === 'col' ? sel.x : axis === 'row' ? sel.y : sel.z;
     if (numTurns <= 1) {
       startAnimation(axis, dir, sliceIndex);

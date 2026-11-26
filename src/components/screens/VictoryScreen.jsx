@@ -332,7 +332,7 @@ const VictoryScreen = ({
           </div>
         )}
 
-        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + (previous.bestFlips === 1 ? ' flip' : ' flips') + (Number.isFinite(previous.bestFlipTime) ? ' in ' + formatTime(previous.bestFlipTime) : '') + ' · ' : ''}{relapses} relapses
+        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + (previous.bestFlips === 1 ? ' flip' : ' flips') + (Number.isFinite(previous.bestFlipTime) ? ' in ' + formatTime(previous.bestFlipTime) : '') + ' · ' : ''}{relapses} {relapses === 1 ? 'relapse' : 'relapses'}
           {currentLevel === 604 && flips > 0 && <><br />Solved in {flips} flips. Can you do it in 0?</>}</p>}
         {isCampaignFinale && (
           <p style={{

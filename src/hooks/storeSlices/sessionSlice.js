@@ -48,7 +48,8 @@ export const createSessionSlice = (set, get) => ({
     flipActiveMs: 0,
     firstFlipHighlightPair: null,
     ...(get().currentLevelData?.scoring === 'flips' && { showNetPanel: false }),
-    flipHintBand: false,
+    // flipHintBand belongs to FlipPuzzleHUD's open hint (cleared when it closes or
+    // unmounts); clearing it here left the hint open with its turn guide gone.
     showCutawayLens: false,
     xpRun: null,
     moves: 0,

@@ -20,7 +20,10 @@ export const createProgressionSlice = (set, get) => ({
   beginPuzzleXp: (scrambleMoves = 15) => set(state => {
     if (state.demoMode || state.showMainMenu || state.wormHealerMode || (state.chaosLevel > 0 && !state.currentLevel) || state.teachModeActive || checkRubiksWin(state.cubies, state.size)) return {};
     const mode = puzzleMode(state), level = state.currentLevelData;
-    const moves = level ? (getLevelPar(level) || scrambleMoves) : scrambleMoves;
+    // A flip level's par counts flips only (0 on level 604), so its XP is sized by
+    // the authored scramble itself: every turn and flip it was staged with.
+    const authored = (level?.scrambleSequence?.length || 0) + (level?.flipSequence?.length || 0);
+    const moves = level ? ((level.scoring === 'flips' ? authored : getLevelPar(level)) || scrambleMoves) : scrambleMoves;
     return { xpRun: createXpRun(mode, state.gameStartTime, state.playerProgress.xp, {
       puzzle: true, levelId: state.currentLevel, size: state.size,
       eligible: moves >= (level ? 1 : 8), scrambleMoves: moves,

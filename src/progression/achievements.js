@@ -54,11 +54,11 @@ export function wormFeats(run) {
   return ids;
 }
 
-export function puzzleFeats(state, run, stars, priorBest) {
+export function puzzleFeats(state, run, stars, priorBest, score = state.moves) {
   if (run.assisted || !run.eligible) return [];
   const ids = [`${run.mode}-clear`];
   if (run.mode === 'story' && stars === 3) ids.push('story-stars');
-  if (run.mode === 'story' && priorBest && state.moves < priorBest) ids.push('story-best');
+  if (run.mode === 'story' && priorBest != null && score < priorBest) ids.push('story-best');
   if (run.mode === 'cube' && run.par > 0 && state.moves < run.par) ids.push('cube-par');
   if (['codex', 'daily'].includes(run.mode) && run.par > 0 && state.moves <= run.par) ids.push(`${run.mode}-par`);
   if (run.mode === 'freeplay' && run.size >= 4) ids.push('freeplay-large');

@@ -42,6 +42,7 @@ const DisparityHUD = React.lazy(() => import('./overlays/DisparityHUD.jsx'));
 const HealerWormHUD = React.lazy(() => import('./overlays/HealerWormHUD.jsx'));
 import TunnelTransitOverlay from '../worm/TunnelTransitOverlay.jsx';
 import { isMobile } from '../utils/device.js';
+import { flipFreeplayActive } from '../game/flipRelapse.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
 const ComingSoonScreen = React.lazy(() => import('./screens/ComingSoonScreen.jsx'));
@@ -152,7 +153,7 @@ export default function UILayer({
   const chaosFlipLocked = useGameStore(selectChaosFlipLocked);
 
   // UI visibility flags — change rarely, batched to minimise subscriptions
-  const flipFreeplay = useGameStore(s => s.flipFreeplay && s.settings?.flipRelapse && !s.currentLevelData && !s.demoMode && !s.wormHealerMode && !s.randomMode && !s.chaosLevel);
+  const flipFreeplay = useGameStore(s => flipFreeplayActive(s) && !!s.settings?.flipRelapse);
   const {
     showMainMenu, showTutorial, showLevelSelect, showPackSelect, activePackId, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,

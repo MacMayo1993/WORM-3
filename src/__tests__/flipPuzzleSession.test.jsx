@@ -40,25 +40,26 @@ afterEach(() => {
   vi.useRealTimers();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
-it('restores intervening relapses and reproduces the same roll after replaying a move', () => {
+it('a relapse clears the undo history, and undo never rewinds the roll clock', () => {
   const pos = {x: 0, y: 2, z: 2};
-  const play = () => {
-    act(() => input.flip(pos, 'PZ'));
-    act(() => input.onMove('col', 1, pos, 2));
-    act(() => vi.advanceTimersByTime(ROLL_MS * 6));
-    return useGameStore.getState();
-  };
-  const start = useGameStore.getState(), after = play();
+  // Undo before any relapse: the flip comes back, the clock keeps running.
+  act(() => input.flip(pos, 'PZ'));
+  act(() => vi.advanceTimersByTime(ROLL_MS - 1000));
+  const clock = useGameStore.getState().flipRun.elapsed;
+  expect(useGameStore.getState().flipRun.flips).toBe(1);
+  act(() => input.undo());
+  expect(useGameStore.getState().flipRun.flips).toBe(0);
+  expect(useGameStore.getState().flipRun.elapsed).toBeGreaterThanOrEqual(clock);
+  // Play on until a relapse lands: it clears the history, so Undo cannot rewind it.
+  act(() => input.flip(pos, 'PZ'));
+  act(() => input.onMove('col', 1, pos, 2));
+  act(() => vi.advanceTimersByTime(ROLL_MS * 6));
+  const after = useGameStore.getState();
   expect(after.flipRun.count).toBeGreaterThan(0);
-  expect(after.flipRun.flips).toBe(1);
+  expect(after.moveHistory).toEqual([]);
   act(() => input.undo());
-  expect(useGameStore.getState().flipRun.count).toBe(0);
-  act(() => input.undo());
-  expect(useGameStore.getState().cubies).toEqual(start.cubies);
-  expect(useGameStore.getState().flipRun).toEqual(start.flipRun);
-  const replay = play();
-  expect(replay.cubies).toEqual(after.cubies);
-  expect(replay.flipRun).toEqual(after.flipRun);
+  expect(useGameStore.getState().cubies).toBe(after.cubies);
+  expect(useGameStore.getState().flipRun.count).toBe(after.flipRun.count);
 });
 it('freezes the roll clock in the session menu and resumes without missed rolls', () => {
   act(() => vi.advanceTimersByTime(9000));
