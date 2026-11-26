@@ -689,7 +689,7 @@ const DRIFT_NOD_AMP = 0.60; //   divide the yaw's, so the pose never quite repea
 
 // ─── Menu cube scale ─────────────────────────────────────────────────────────
 // Home-screen cube scale. The carousel instead fits its measured stage.
-const MENU_CUBE_GROWTH = 1.05;
+const MENU_CUBE_GROWTH = 1.05 * 1.05;
 const MENU_BUTTON_LIFT_PX = 24;
 // Move the wordmark and live cube as one composition into the open space above
 // Play. Short screens retain their clearance; desktop needs a smaller shift.
@@ -699,7 +699,7 @@ const menuHeroDrop = (width, height) => Math.max(0, Math.min(
 // The wordmark and cube sit this much higher than the drop alone would put
 // them, so the cube's tumbling silhouette clears the Play key. Never more than
 // the drop itself: a short screen keeps the title clear of the top bar.
-const MENU_HERO_RAISE_PX = 8;
+const MENU_HERO_RAISE_PX = 13;
 const menuHeroRaise = (width, height) => Math.min(MENU_HERO_RAISE_PX, menuHeroDrop(width, height));
 const menuHeroTop = (width, height) => menuHeroDrop(width, height) - menuHeroRaise(width, height);
 const menuTitleSize = (width, height) => Math.max(74, Math.min(width * 0.21, height * 0.16, 170));
