@@ -1,25 +1,22 @@
 .worm-wordmark { display:inline-flex; align-items:flex-start; justify-content:center; white-space:nowrap; font-family:var(--display-font,'Bungee'),'Arial Black',sans-serif; font-size:inherit; font-weight:400; line-height:1.1; letter-spacing:.005em; vertical-align:baseline; -webkit-text-fill-color:initial; }
 .worm-wordmark-letters { display:inline-flex; transform:skewX(-5deg); }
-/* Dark toy-like extrusion, a cream keyline, and a restrained enamel highlight.
-   No blur glow: the silhouette stays sharp over every photo panorama. */
-.worm-wordmark-letter { display:inline-block; background:linear-gradient(180deg,color-mix(in srgb,currentColor 55%,white) 8%,currentColor 42%,color-mix(in srgb,currentColor 82%,black) 100%); background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; -webkit-text-stroke:.025em #fffdf2; paint-order:stroke fill; filter:drop-shadow(.018em .018em 0 #182a31) drop-shadow(.018em .025em 0 #182a31) drop-shadow(0 .025em .018em #0005); }
+/* Chunky toy letters: a side extruded in each letter's own deeper shade under
+   the ink edge, a cream keyline and an enamel gloss on the top half, with a light
+   sweep parked off the letter until an animated mark runs it. No blur glow: the
+   silhouette stays sharp over every photo panorama. */
+.worm-wordmark-letter { --side:color-mix(in srgb,currentColor 58%,black); display:inline-block; background:linear-gradient(105deg,#0000 42%,#fff8 50%,#0000 58%) 160% 0/260% 100% no-repeat,linear-gradient(180deg,#fff5 0 34%,#fff0 40%),linear-gradient(180deg,color-mix(in srgb,currentColor 55%,white) 8%,currentColor 42%,color-mix(in srgb,currentColor 82%,black) 100%); background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; -webkit-text-stroke:.032em #fffdf2; paint-order:stroke fill; filter:drop-shadow(0 .03em 0 var(--side)) drop-shadow(0 .03em 0 var(--side)) drop-shadow(0 .022em 0 #182a31) drop-shadow(0 .05em .03em #0007); }
 .worm-wordmark-cube { display:block; width:.52em; height:.572em; margin:.025em 0 0 .035em; overflow:visible; flex-shrink:0; transform:rotate(-7deg); filter:drop-shadow(0 .025em .018em #0004); }
 .worm-wordmark--menu { font-size:clamp(95px,26vw,170px); }
 .worm-wordmark--inline { font-size:.95em; letter-spacing:0; }
 .worm-wordmark--inline .worm-wordmark-letter { background:none; -webkit-text-fill-color:currentColor; -webkit-text-stroke:0; filter:none; }
 .worm-wordmark--inline .worm-wordmark-cube { width:.48em; height:.528em; margin-top:0; filter:none; }
-.worm-wordmark--animated .worm-wordmark-letter { animation:brandLetterIn .6s both; animation-delay:var(--letter-delay); }
-.worm-wordmark--animated .worm-wordmark-cube { animation:brandCubeIn .75s .3s both; }
+/* Animated marks: the letters bob in a worm's wave, a light sweeps them now and then, the exponent rocks. */
+.worm-wordmark--animated .worm-wordmark-letter { animation:brandLetterIn .6s both,menuLetterBob 3.2s ease-in-out infinite,menuShine 6s ease-in-out infinite; animation-delay:var(--letter-delay),calc(.8s + var(--letter-delay)*1.6),calc(1.4s + var(--letter-delay)*.6); }
+.worm-wordmark--animated .worm-wordmark-cube { animation:brandCubeIn .75s .3s both,menuCubeRock 3.6s 1.1s ease-in-out infinite; }
 @keyframes brandLetterIn { from { opacity:0; transform:translateY(-.2em) scale(.9); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes brandCubeIn { from { opacity:0; transform:translateY(-.2em) rotate(12deg) scale(.7); } to { opacity:1; transform:translateY(0) rotate(-7deg) scale(1); } }
-/* Menu: chunky toy letters. A side extruded in each letter's own deeper shade
-   under the ink edge, an enamel gloss on the top half, a light sweep now and
-   then, and the letters bob in a worm's wave with the exponent rocking. */
-.worm-wordmark--menu .worm-wordmark-letter { --side:color-mix(in srgb,currentColor 58%,black); background:linear-gradient(105deg,#0000 42%,#fff8 50%,#0000 58%) 160% 0/260% 100% no-repeat,linear-gradient(180deg,#fff5 0 34%,#fff0 40%),linear-gradient(180deg,color-mix(in srgb,currentColor 55%,white) 8%,currentColor 42%,color-mix(in srgb,currentColor 82%,black) 100%); background-clip:text; -webkit-background-clip:text; -webkit-text-stroke:.032em #fffdf2; filter:drop-shadow(0 .03em 0 var(--side)) drop-shadow(0 .03em 0 var(--side)) drop-shadow(0 .022em 0 #182a31) drop-shadow(0 .05em .03em #0007); }
-.worm-wordmark--menu.worm-wordmark--animated .worm-wordmark-letter { animation:brandLetterIn .6s both,menuLetterBob 3.2s ease-in-out infinite,menuShine 6s ease-in-out infinite; animation-delay:var(--letter-delay),calc(.8s + var(--letter-delay)*1.6),calc(1.4s + var(--letter-delay)*.6); }
-.worm-wordmark--menu.worm-wordmark--animated .worm-wordmark-cube { animation:brandCubeIn .75s .3s both,menuCubeRock 3.6s 1.1s ease-in-out infinite; }
 @keyframes menuLetterBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-.045em); } }
 @keyframes menuShine { 0%,70% { background-position:160% 0,0 0,0 0; } 90%,100% { background-position:-60% 0,0 0,0 0; } }
 @keyframes menuCubeRock { 0%,100% { transform:rotate(-7deg); } 50% { transform:translateY(-.04em) rotate(-1deg); } }
 @media(max-width:480px) { .worm-wordmark--menu { font-size:clamp(74px,21vw,120px); } }
-@media(prefers-reduced-motion:reduce) { .worm-wordmark--animated .worm-wordmark-letter,.worm-wordmark--animated .worm-wordmark-cube,.worm-wordmark--menu.worm-wordmark--animated .worm-wordmark-letter,.worm-wordmark--menu.worm-wordmark--animated .worm-wordmark-cube { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .worm-wordmark--animated .worm-wordmark-letter,.worm-wordmark--animated .worm-wordmark-cube { animation:none; } }
