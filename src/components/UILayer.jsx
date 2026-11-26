@@ -460,10 +460,10 @@ export default function UILayer({
         onFreeplay={() => { useGameStore.getState().clearLevel(); setSheetOpen(false); }}
       />}
 
-      {/* Level Badge — desktop only; on mobile the top bar + objective HUD already name the level */}
-      {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
+      {/* The flip score and hint occupy this area. Its top bar already names the level. */}
+      {currentLevelData && currentLevelData.scoring !== 'flips' && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
         <div className="level-badge">
-          <span className="level-badge-number">{currentLevelData.scoring === 'flips' ? currentLevel - 600 : currentLevel}</span>
+          <span className="level-badge-number">{currentLevel}</span>
           <span className="level-badge-name">{currentLevelData.name}</span>
         </div>
       )}

@@ -20,6 +20,9 @@ for (const phone of [false, true]) {
       await hud.getByRole('button', { name: 'Open cube net' }).tap();
       await page.getByRole('button', { name: 'Front row 1 column 2', exact: true }).tap();
     } else {
+      await hud.getByRole('button', { name: 'Hint' }).click();
+      await expect(hud).toContainText('back bottom edge');
+      await hud.getByRole('button', { name: 'Hide hint' }).click();
       await page.keyboard.press('ArrowUp');
       await page.keyboard.press('f');
     }
