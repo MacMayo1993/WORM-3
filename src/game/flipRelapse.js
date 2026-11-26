@@ -6,18 +6,42 @@ export const LESSON_MS = 1500;
 export const COOLDOWN_MS = 3000;
 
 export const flipPuzzle = state => state.currentLevelData?.scoring === 'flips';
+// Flip Cube free play itself: the flag is set by the Flip Cube wizard, and every
+// other mode reached without the main menu (Random, Teach, Chaos, WORM, a level)
+// reads as not free play, so its relapse toggle and numbers never leak there.
+export const flipFreeplayActive = state => !!state.flipFreeplay && !state.currentLevelData && !state.demoMode && !state.wormHealerMode &&
+  !state.teachModeActive && !state.randomMode && !state.chaosLevel;
 export const relapseEnabled = state => !state.demoMode && !state.wormHealerMode && !state.teachModeActive && !state.randomMode && !state.chaosLevel &&
-  (state.currentLevelData ? !!state.currentLevelData.relapse : !!(state.flipFreeplay && state.settings?.flipRelapse));
+  (state.currentLevelData ? !!state.currentLevelData.relapse : !!(flipFreeplayActive(state) && state.settings?.flipRelapse));
 export const flipSession = state => !state.demoMode && !state.wormHealerMode && !state.teachModeActive && (flipPuzzle(state) || relapseEnabled(state));
 export const showingRelapseLesson = state => state.hasShuffled && state.currentLevelData?.relapseLesson && !state.flipRun.lessonSeen;
+// Layer turns a flip level refuses right now: during the relapse lesson, the
+// first-flip highlight, before the opening turns finish and on the win screen.
+// The drag, its release and every move port read this one rule, so a drag can
+// never commit a turn the board refuses.
+export const flipTurnsLocked = state => !!(showingRelapseLesson(state) ||
+  (flipPuzzle(state) && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory)));
 
 export function newFlipRun(seed = 1) {
   return { seed, elapsed: 0, nextRoll: ROLL_MS, flips: 0, count: 0, lessonSeen: false, cooldowns: {}, event: null };
 }
 
+// Undo in a flip session restores the board and the player's score, never the
+// run's clock: rewinding `elapsed`/`nextRoll`/`seed` let turn-then-undo hold a
+// roll off for ever. A relapse clears the undo history (advanceFlipRun), so no
+// checkpoint ever spans one and the relapse count never needs rewinding.
 export function flipCheckpoint(state) {
-  if (!flipSession(state) && !state.flipFreeplay) return {};
-  return { beforeFlipInput: { cubies: state.cubies, moves: state.moves, flipRun: state.flipRun } };
+  if (!flipSession(state)) return {};
+  return { beforeFlipInput: { cubies: state.cubies, moves: state.moves, flips: state.flipRun.flips, focus: state.flipRun.focus ?? null } };
+}
+
+/** The store patch an Undo applies from a checkpoint: board and score back, clock kept. */
+export function restoreFlipCheckpoint(state, checkpoint) {
+  return {
+    cubies: checkpoint.cubies,
+    moves: checkpoint.moves,
+    flipRun: { ...state.flipRun, flips: checkpoint.flips, focus: checkpoint.focus }
+  };
 }
 
 export function notePlayerFlip(run, sticker, twin, size) {
@@ -82,5 +106,7 @@ export function advanceFlipRun(state, delta, cap) {
   run.count += hits.length;
   run.event = { at: elapsed, hits };
   run.focus = { ...hits[0], at: elapsed };
-  return { flipRun: run, cubies: board };
+  // A relapse is not undoable and clears the undo history: rewinding a player
+  // move past it would put back a board from before the relapse.
+  return { flipRun: run, cubies: board, moveHistory: [] };
 }

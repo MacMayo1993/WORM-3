@@ -1454,9 +1454,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // before the first pair highlight or scar has to appear.
   const warmScar = !presentation && (gameConfig.flipScored || scarMode) && stickerGridId === 'M1-005';
   const showScar = warmScar || (scarMode && history >= 2) || hitAt >= 0;
-  useLayoutEffect(() => showScar && surfaceCtx?.decals && innerGroupRef.current
-    ? surfaceCtx.decals.register(innerGroupRef.current, _sharedStickerGeo, flipScarMaterial, null, null, scarData, 'flip-scar')
-    : undefined, [showScar, surfaceCtx]);
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Mid-play, the worm's footprint is a decal batch (tileFootprint.js), never a mesh.
   const decalFootprint = wormHealerMode && !presentation && !!surfaceCtx?.decals;
@@ -1500,6 +1497,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [resting, decalFootprint, frames, frameHost]);
 
   useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation, resting]);
+  // The scar decal anchors on the inner group, which a resting tile swaps for its
+  // detached frame, so it re-registers with `resting` like the other batches.
+  useLayoutEffect(() => showScar && surfaceCtx?.decals && innerGroupRef.current
+    ? surfaceCtx.decals.register(innerGroupRef.current, _sharedStickerGeo, flipScarMaterial, null, null, scarData, 'flip-scar')
+    : undefined, [showScar, surfaceCtx, resting]);
   useLayoutEffect(() => frontBatchMaterial ? surfaceCtx.register(innerGroupRef.current, _playStickerGeo, frontBatchMaterial,
     null, null, styleIdentityRef, 'sticker-front', frames) : undefined, [surfaceCtx, frontBatchMaterial, resting, frames]);
   // The footprint and heal seal wait hidden on every tile (hiddenMatrices.js).

@@ -7,7 +7,11 @@ import { checkFlipPuzzleSolved } from '../game/winDetection.js';
 import { makeCubies } from '../game/cubeState.js';
 import { computeStars } from '../levels/scoring.js';
 import { searchFlipTarget } from '../levels/flipTarget.js';
-import { newFlipRun, advanceFlipRun, scarredPairs, canRelapse, flipCheckpoint, LESSON_MS, ROLL_MS } from '../game/flipRelapse.js';
+import { newFlipRun, advanceFlipRun, scarredPairs, canRelapse, flipCheckpoint, restoreFlipCheckpoint, flipTurnsLocked, flipFreeplayActive,
+  LESSON_MS, ROLL_MS } from '../game/flipRelapse.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { puzzleXpChanges } from '../progression/awards.js';
+import { createXpRun, newProgress } from '../progression/model.js';
 import { FLIP_CAP } from '../utils/constants.js';
 
 const prep = level => ({ size: 3, currentLevelData: level, cubies: buildLevelStartState(level, 3),
@@ -59,5 +63,67 @@ describe('Flip Cube levels', () => {
     expect(advanceFlipRun({ ...state, currentLevelData: FLIP_PUZZLES[0] }, ROLL_MS, 6).cubies).toBeUndefined();
     expect(canRelapse({ flips: 2, curr: 1, orig: 1 }, 3)).toBe(false);
     expect(canRelapse({ flips: 6, curr: 1, orig: 1 }, 6)).toBe(false);
+  });
+});
+
+describe('Flip Cube review fixes', () => {
+  it('locks turns (drag and release included) at the same moments the move port refuses them', () => {
+    const level = FLIP_PUZZLES[0];
+    const base = { ...prep(level), victory: null, firstFlipHighlightPair: null };
+    expect(flipTurnsLocked(base)).toBe(false);
+    expect(flipTurnsLocked({ ...base, firstFlipHighlightPair: ['M1-002', 'M4-002'] })).toBe(true);
+    expect(flipTurnsLocked({ ...base, hasShuffled: false })).toBe(true);
+    expect(flipTurnsLocked({ ...base, victory: 'rubiks' })).toBe(true);
+    const lesson = FLIP_PUZZLES.find(l => l.relapseLesson);
+    expect(flipTurnsLocked({ ...prep(lesson), victory: null })).toBe(true);
+    // Never outside a flip level.
+    expect(flipTurnsLocked({ ...base, currentLevelData: null, hasShuffled: false })).toBe(false);
+  });
+
+  it('undo restores the board and flip score but never rewinds the relapse clock', () => {
+    const state = { ...prep(FLIP_PUZZLES[6]), moves: 3 };
+    const saved = flipCheckpoint(state).beforeFlipInput;
+    expect(saved).not.toHaveProperty('flipRun');
+    const later = { ...state, moves: 5, flipRun: { ...state.flipRun, flips: 2, elapsed: 9000, nextRoll: 10000, seed: 77 } };
+    const restored = restoreFlipCheckpoint(later, saved);
+    expect(restored.cubies).toBe(state.cubies);
+    expect(restored.moves).toBe(3);
+    expect(restored.flipRun).toMatchObject({ flips: 0, elapsed: 9000, nextRoll: 10000, seed: 77 });
+  });
+
+  it('a relapse clears the undo history', () => {
+    const lesson = FLIP_PUZZLES.find(l => l.relapseLesson);
+    const state = { ...prep(lesson), moveHistory: [{ type: 'flip' }] };
+    const after = advanceFlipRun(state, LESSON_MS, FLIP_CAP);
+    expect(after.cubies).toBeDefined();
+    expect(after.moveHistory).toEqual([]);
+  });
+
+  it('plain free play takes no board snapshots, and the free-play flag never leaks into other modes', () => {
+    const free = { size: 3, cubies: makeCubies(3), moves: 0, flipRun: newFlipRun(1), flipFreeplay: true, settings: { flipRelapse: false } };
+    expect(flipCheckpoint(free)).toEqual({});
+    expect(flipCheckpoint({ ...free, settings: { flipRelapse: true } })).toHaveProperty('beforeFlipInput');
+    expect(flipFreeplayActive(free)).toBe(true);
+    for (const other of [{ randomMode: true }, { teachModeActive: true }, { chaosLevel: 1 }, { wormHealerMode: true }, { currentLevelData: FLIP_PUZZLES[0] }]) {
+      expect(flipFreeplayActive({ ...free, ...other })).toBe(false);
+    }
+  });
+
+  it('pays XP stars from flips on a flip level, and counts a flipped solve as solved', () => {
+    const level = FLIP_PUZZLES[1]; // Centre Swap: one centre-pair flip solves it
+    let cubies = buildLevelStartState(level, 3);
+    for (const move of [...level.scrambleSequence].reverse()) cubies = applyTileMove(cubies, 3, inverseTileMove(move)).cubies;
+    cubies = flip(cubies, buildManifoldGridMap(cubies, 3).get(centre));
+    expect(checkFlipPuzzleSolved(cubies, 3)).toBe(true);
+    const playerProgress = newProgress();
+    const state = {
+      ...useGameStore.getState(), demoMode: false, showMainMenu: false, wormHealerMode: false, teachModeActive: false, animState: null,
+      currentLevel: level.id, currentLevelData: level, activePackId: 'flip-puzzles', size: 3, cubies, moves: 40, gameTime: 30,
+      victory: 'rubiks', hasShuffled: true, flipRun: { ...newFlipRun(1), flips: level.flipPar }, playerProgress
+    };
+    state.xpRun = createXpRun('story', 0, 0, { puzzle: true, levelId: level.id, size: 3, eligible: true, scrambleMoves: 6, challenge: 'x' });
+    const result = puzzleXpChanges(state);
+    expect(result.playerProgress.milestones[`stars:${level.id}`]).toBe(3);
+    expect(result.playerProgress.bests).toMatchObject({ [Object.keys(result.playerProgress.bests)[0]]: level.flipPar });
   });
 });

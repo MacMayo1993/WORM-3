@@ -1,7 +1,16 @@
 import { ACHIEVEMENT_BY_ID, DISCOVERY_XP, wormFeats, puzzleFeats } from './achievements.js';
-import { checkRubiksWin } from '../game/winDetection.js';
+import { checkRubiksWin, checkFlipPuzzleSolved } from '../game/winDetection.js';
 import { addXp, count, levelProgress, wormOrbXp } from './model.js';
 import { computeStars } from '../levels/scoring.js';
+
+// Flip Cube levels score flips, not moves: stars, bests and the best-run feat
+// read the run's flip count (state.flipRun.flips), as the level map does.
+const flipScored = state => state.currentLevelData?.scoring === 'flips';
+// A flip level wins on any uniform six-colour layout (useGameSession), which the
+// standard check rejects when the solve is rotated or flipped.
+const puzzleSolved = state => (flipScored(state) ? checkFlipPuzzleSolved : checkRubiksWin)(state.cubies, state.size);
+const runScore = state => (flipScored(state) ? state.flipRun?.flips ?? 0 : state.moves);
+const starStats = state => ({ moves: state.moves, time: state.gameTime, flips: state.flipRun?.flips });
 
 export function xpChanges(state, amount, mode, label, run = null, progress = state.playerProgress) {
   const result = addXp(progress, amount, mode);
@@ -96,7 +105,7 @@ export function puzzleXpChanges(state) {
   const run = state.xpRun;
   if (!run?.puzzle || run.completed || state.demoMode || state.wormHealerMode ||
       state.showMainMenu || state.teachModeActive || !state.victory || !state.hasShuffled || state.animState ||
-      run.levelId !== state.currentLevel || run.size !== state.size || count(state.moves) === 0 || !checkRubiksWin(state.cubies, state.size)) return {};
+      run.levelId !== state.currentLevel || run.size !== state.size || count(state.moves) === 0 || !puzzleSolved(state)) return {};
   let progress = state.playerProgress;
   const completed = { ...run, completed: true };
   if (!run.eligible) return { xpRun: completed };
@@ -126,12 +135,13 @@ export function puzzleXpChanges(state) {
     if (!milestones[first]) { milestones[first] = 1; grants.push(['First clear', 40]); }
     if (run.levelId) {
       const key = `stars:${run.levelId}`;
-      const stars = computeStars(state.currentLevelData, { moves: state.moves, time: state.gameTime });
+      const stars = computeStars(state.currentLevelData, starStats(state));
       const extra = Math.max(0, stars - (milestones[key] || 0));
       milestones[key] = Math.max(stars, milestones[key] || 0);
       if (extra) grants.push(['New stars', extra * 20]);
-      if (bests[recordKey] && state.moves < bests[recordKey]) grants.push(['Personal best', 30]);
-      bests[recordKey] = Math.min(bests[recordKey] || Infinity, state.moves);
+      const score = runScore(state);
+      if (bests[recordKey] != null && score < bests[recordKey]) grants.push(['Personal best', 30]);
+      bests[recordKey] = Math.min(bests[recordKey] ?? Infinity, score);
     }
   }
   progress = {
@@ -140,10 +150,10 @@ export function puzzleXpChanges(state) {
   };
   let nextState = { ...state, playerProgress: progress, xpRun: completed };
   for (const [label, amount] of grants) nextState = { ...nextState, ...xpChanges(nextState, amount, run.mode, label, nextState.xpRun) };
-  const stars = run.levelId ? computeStars(state.currentLevelData, { moves: state.moves, time: state.gameTime }) : 0;
+  const stars = run.levelId ? computeStars(state.currentLevelData, starStats(state)) : 0;
   // Puzzle feats use the same replay reduction as the solve. Daily feats pay
   // once per date; a later improved par result can still earn its own feat.
-  let ids = puzzleFeats(state, run, stars, state.playerProgress.bests[recordKey]);
+  let ids = puzzleFeats(state, run, stars, state.playerProgress.bests[recordKey], runScore(state));
   if (run.dailyKey) ids = ids.filter(id => !state.playerProgress.milestones[`daily:${run.dailyKey}:feat:${id}`]);
   const rewarded = achievementChanges(nextState, ids, { factor: run.dailyKey ? 1 : replayFactor });
   if (run.dailyKey && ids.length) rewarded.playerProgress = { ...rewarded.playerProgress, milestones: {

@@ -4,6 +4,7 @@ import ParityWallet from '../overlays/ParityWallet.jsx';
 import { GAME_HUD, GAME_HUD_VARS } from '../../utils/uiTheme.js';
 import './instrumentHud.css';
 import { InspectionToggle } from '../overlays/InspectionLens.jsx';
+import { flipFreeplayActive } from '../../game/flipRelapse.js';
 
 // The session menu's Cube page: the Settings sheet's own Colors, Tiles and Scene
 // panels, loaded the first time the page opens (shared with WORM's pause card).
@@ -70,7 +71,7 @@ const TopMenuBar = ({
   const flipScored = currentLevelData?.scoring === 'flips';
   const flips = useGameStore(s => s.flipRun?.flips ?? 0);
   const relapses = useGameStore(s => s.flipRun?.count ?? 0);
-  const free = useGameStore(s => s.flipFreeplay);
+  const free = useGameStore(flipFreeplayActive);
   const relapseOn = useGameStore(s => !!s.settings?.flipRelapse);
   const tracksFlipMenu = flipScored || free;
   useEffect(() => {
