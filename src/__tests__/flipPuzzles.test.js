@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FLIP_PUZZLES } from '../levels/packs/flip-puzzles.js';
+import { FLIP_PUZZLES, FLIP_PUZZLE_BACKGROUNDS } from '../levels/packs/flip-puzzles.js';
+import { STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
 import { buildLevelStartState } from '../levels/levelStaging.js';
 import { applyTileMove, inverseTileMove } from '../game/tileOrientation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
@@ -125,5 +126,13 @@ describe('Flip Cube review fixes', () => {
     const result = puzzleXpChanges(state);
     expect(result.playerProgress.milestones[`stars:${level.id}`]).toBe(3);
     expect(result.playerProgress.bests).toMatchObject({ [Object.keys(result.playerProgress.bests)[0]]: level.flipPar });
+  });
+
+  it('gives every level a scene that draws (a photo panorama, the nebula or the black hole)', () => {
+    expect(new Set(FLIP_PUZZLE_BACKGROUNDS).size).toBe(FLIP_PUZZLES.length);
+    for (const level of FLIP_PUZZLES) {
+      const scene = level.background;
+      expect(STORY_ENVIRONMENTS[scene] || ['moon', 'blackhole'].includes(scene), `${level.name}: ${scene}`).toBeTruthy();
+    }
   });
 });

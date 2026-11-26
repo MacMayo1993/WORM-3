@@ -1,4 +1,11 @@
-import { createLevel, createLevelPack, DIFFICULTY, WIN_CONDITIONS } from '../schema.js';
+import { BACKGROUNDS, createLevel, createLevelPack, DIFFICULTY, WIN_CONDITIONS } from '../schema.js';
+
+// One scene per level, climbing the Story's journey from the daycare to the black
+// hole. A level without one fell back to 'abstract', which has no scene at all.
+export const FLIP_PUZZLE_BACKGROUNDS = [
+  BACKGROUNDS.DAYCARE, BACKGROUNDS.ELEMENTARY, BACKGROUNDS.MIDDLESCHOOL, BACKGROUNDS.HIGHSCHOOL, BACKGROUNDS.COLLEGE,
+  BACKGROUNDS.JOB, BACKGROUNDS.NASA, BACKGROUNDS.ROCKET, BACKGROUNDS.MOON, BACKGROUNDS.BLACKHOLE,
+];
 
 const turn = (axis, sliceIndex) => ({ axis, sliceIndex, dir: 1 });
 const right = turn('col', 2), left = turn('col', 0), up = turn('row', 2);
@@ -50,6 +57,7 @@ export const FLIP_PUZZLES = puzzles.map((puzzle, index) => {
   return createLevel({
     id, name: puzzle.name, description: puzzle.line, scoring: 'flips', flipPar: puzzle.target,
     relapse: index >= 4, relapseLesson: !!puzzle.lesson, winCondition: WIN_CONDITIONS.FLIP,
+    background: FLIP_PUZZLE_BACKGROUNDS[index],
     scrambleMoves: 0, scrambleSequence: puzzle.turns ?? [],
     flipSequence: [...bandFlips(puzzle.bands ?? []), ...(puzzle.repairs ?? []),
       ...(puzzle.scars ?? []).flatMap(([tile, count]) => Array(count).fill(tile))],
