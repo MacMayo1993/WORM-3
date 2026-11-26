@@ -23,16 +23,23 @@ export function createWorldTransformTracker() {
     function update(object) {
         const state = stateOf(object);
         if (state.frame === frame) return state.version;
+        const gap = state.frame !== frame - 1;
         state.frame = frame;
         const parent = object.parent;
-        return refresh(object, state, parent, parent ? update(parent) : 0);
+        return refresh(object, state, parent, parent ? update(parent) : 0, gap);
     }
-    function refresh(object, state, parent, parentVersion) {
+    // `gap`: the object was not checked last frame. Its transform may have moved
+    // and come back meanwhile (a slice turn that ends back on the grid), so equal
+    // components no longer prove its matrixWorld is current: the renderer last drew
+    // it mid-move. Recompute it, or every child read through it inherits that stale
+    // pose. A batch that skipped a piece while all its tiles drew their own meshes
+    // (Flip Cube's flipped tiles) left new tiles floating where the turn had been.
+    function refresh(object, state, parent, parentVersion, gap = false) {
         const auto = object.matrixAutoUpdate;
         const v = state.values;
         // No per-frame allocation. Matrix-driven objects are compared as matrices;
         // regular Object3Ds compare their ten transform components.
-        let changed = state.auto !== auto;
+        let changed = state.auto !== auto || gap;
         if (auto) {
             const p = object.position, q = object.quaternion, s = object.scale;
             const px = p.x, py = p.y, pz = p.z, qx = q.x, qy = q.y, qz = q.z, qw = q.w, sx = s.x, sy = s.y, sz = s.z;
@@ -81,11 +88,12 @@ export function createWorldTransformTracker() {
     function track(object, ownVisibility = true) {
         const state = stateOf(object);
         if (state.frame !== frame) {
+            const gap = state.frame !== frame - 1;
             state.frame = frame;
             const parent = object.parent;
             const parentVersion = parent ? track(parent) : 0;
             state.chainVisible = parentVersion >= 0;
-            if (state.chainVisible) refresh(object, state, parent, parentVersion);
+            if (state.chainVisible) refresh(object, state, parent, parentVersion, gap);
         }
         return state.chainVisible && (!ownVisibility || object.visible) ? state.version : -1;
     }
