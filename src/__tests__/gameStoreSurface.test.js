@@ -46,6 +46,7 @@ const EXPECTED_KEYS = [
   'disparityFlipCap', 'disparityGameLength', 'disparityParityScore', 'disparityRoundId',
   'disparityWinner', 'earnCoins', 'exitDemo', 'exploded',
   'explosionT', 'faceImages', 'faceRotationTarget', 'faceTextures',
+  'flipFreeplay', 'flipHintBand', 'flipRun', 'flipSessionMenu', 'flipActiveMs',
   'firstFlipHighlightPair', 'flipMode', 'flipPulse', 'flipWaveOrigins',
   'gameStartTime', 'gameTime',
   'hasFlippedOnce', 'hasShuffled',

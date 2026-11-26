@@ -290,6 +290,8 @@ const SFX = {
   // Subsequent flips on an existing pair. Pitch climbs the pentatonic scale with
   // the tile's flip count, so working a single pair toward its cap arpeggiates
   // upward and the danger is audible before it is visible.
+  scarSealed() { chord([392, 587.33], { dur: 0.18, gain: 0.18 }); },
+  relapse() { sweep(220, 72, 0.23, 0.32, 'triangle'); },
   tunnelPulse(flips = 0) {
     const f = COMBO_SCALE[Math.min(Math.max(0, flips), COMBO_SCALE.length - 1)];
     sweep(f, f * 1.25, 0.11, 0.38, 'triangle');
@@ -455,6 +457,8 @@ const HAPTICS = {
   countdownGo: [0, 20, 30, 40],
   tunnelBirth: [0, 12, 60, 30],
   // Grows with the flip count, mirroring the pitch climb.
+  scarSealed: [12, 25, 12],
+  relapse: [18, 30, 12],
   tunnelPulse: (flips = 0) => 10 + Math.min(flips, 6) * 4, // 10 → 34ms
   tunnelSnap: [0, 60, 35, 90],
   // A bolt landing: one short, hard tick. The storm sends it at the lowest

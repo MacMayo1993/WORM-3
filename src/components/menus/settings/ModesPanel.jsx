@@ -15,6 +15,8 @@ const Toggle = ({ label, on, onChange }) => (
 );
 
 export function ModesPanel() {
+  const relapse = useGameStore(s => !!s.settings?.flipRelapse);
+  const setSettings = useGameStore(s => s.setSettings);
   const hollowMode = useGameStore((state) => state.hollowMode);
   const setHollowMode = useGameStore((state) => state.setHollowMode);
 
@@ -26,6 +28,10 @@ export function ModesPanel() {
 
   return (
     <>
+      <section className="settings-section">
+        <h3 className="settings-section-title">Flip Cube Free Play</h3>
+        <Toggle label="Tile relapse" on={relapse} onChange={value => setSettings(s => ({ ...s, flipRelapse: value }))} />
+      </section>
       {/* Random Style Mode */}
       <section className="settings-section">
         <h3 className="settings-section-title">Random looks</h3>

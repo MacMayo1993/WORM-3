@@ -14,14 +14,15 @@ afterEach(() => { act(() => root.unmount()); host.remove(); delete globalThis.IS
 const render = node => act(() => root.render(node));
 const click = node => act(() => node.click());
 
-it('keeps both illustrated cube paths actionable and returns keyboard focus on close', () => {
+it('keeps all three illustrated cube paths actionable and returns keyboard focus on close', () => {
   const outside = document.createElement('button'); document.body.append(outside); outside.focus();
-  const cube = vi.fn(), chaos = vi.fn(), back = vi.fn();
-  render(<CubeModeSelectScreen onRubiks={cube} onDisparity={chaos} onBack={back} />);
+  const levels = vi.fn(), cube = vi.fn(), chaos = vi.fn(), back = vi.fn();
+  render(<CubeModeSelectScreen onLevels={levels} onRubiks={cube} onDisparity={chaos} onBack={back} />);
   const options = host.querySelectorAll('.cube-path-options>button');
-  expect(options).toHaveLength(2);
+  expect(options).toHaveLength(3);
   expect(options[0].querySelector('svg').getAttribute('aria-hidden')).toBe('true');
-  click(options[0]); click(options[1]);
+  click(options[0]); click(options[1]); click(options[2]);
+  expect(levels).toHaveBeenCalledOnce();
   expect(cube).toHaveBeenCalledOnce(); expect(chaos).toHaveBeenCalledOnce();
   act(() => host.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(back).toHaveBeenCalledOnce();

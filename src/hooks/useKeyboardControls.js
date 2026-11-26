@@ -86,6 +86,8 @@ export function useKeyboardControls({
 
       // ── Tier 1: works anywhere ────────────────────────────────────────────
 
+      // The Mobi card owns these keys, including its staged launch on dismissal.
+      if (state.showLevelTutorial && state.currentLevelData?.scoring === 'flips') return;
       if (key === 'escape') {
         // Close the topmost surface that owns the screen. Previously this only
         // ever cleared help and settings, so the store, every wizard, mode

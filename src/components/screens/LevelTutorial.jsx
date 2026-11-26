@@ -98,7 +98,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
         lineKey={index}
         index={index}
         count={lines.length}
-        tag={`Level ${isFinale ? '∞' : level.id} · ${level.name}`}
+        tag={`Level ${isFinale ? '∞' : level.scoring === 'flips' ? level.id - 600 : level.id} · ${level.name}`}
         dismissing={isDismissing}
         speech={speech}
         meta={<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 }}>

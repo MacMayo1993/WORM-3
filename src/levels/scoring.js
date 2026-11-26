@@ -17,6 +17,7 @@
 // measure against (so callers can fall back to the heuristic scoring).
 export function getLevelPar(level) {
   if (!level) return null;
+  if (level.scoring === 'flips') return level.flipPar;
   if (typeof level.par === 'number') return level.par;
   const turns = level.scrambleSequence?.length || 0;
   const flips = level.flipSequence?.length || 0;
@@ -33,6 +34,11 @@ export function parSlack(par) {
 // Star rating (1-3) for a completion. `stats` carries { moves, time }.
 export function computeStars(level, stats = {}) {
   if (!level) return 1;
+  if (level.scoring === 'flips') {
+    if (!Number.isInteger(stats.flips)) return 1;
+    if (stats.flips <= level.flipPar) return 3;
+    return stats.flips <= level.flipPar + Math.max(1, Math.ceil(level.flipPar / 2)) ? 2 : 1;
+  }
   const moves = typeof stats.moves === 'number' && stats.moves > 0 ? stats.moves : null;
   const par = getLevelPar(level);
 

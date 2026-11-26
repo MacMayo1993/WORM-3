@@ -18,6 +18,8 @@ import { liveRotation } from '../worm/liveRotation.js';
 import { COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
+import { relapseEnabled } from '../game/flipRelapse.js';
+import { flipScarMaterial } from './flipScar.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
@@ -151,6 +153,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
   const gameConfig = useGameStore(
     useShallow((s) => ({
+      scarMode: relapseEnabled(s),
+      flipScored: s.currentLevelData?.scoring === 'flips',
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
       disparityFlipCap: s.disparityFlipCap,
@@ -188,7 +192,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // already in this component's batched subscription above.
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
-  const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
+  const scarMode = !presentation && gameConfig.scarMode;
+  const isDead = !scarMode && (meta?.flips ?? 0) >= effectiveFlipCap;
   // The tile's outward normal expressed in the parent (cubie) frame. groupRef holds
   // the tile's own rotation, so "out of the cube" is local +Z rotated by `rot` — the
   // blink bounce offsets groupRef.position along this.
@@ -1434,6 +1439,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // The tile border, batched from the tile's own group like the faces.
   const showBorder = wormHealerMode && !isDead && !isSudokube;
   const borderBatched = showBorder && !!surfaceCtx;
+  const hitAt = useGameStore(s => {
+    if (presentation || (!scarMode && s.currentLevelData?.scoring !== 'flips')) return -10;
+    const focus = s.flipRun?.focus;
+    if (focus && (focus.id === stickerGridId || focus.twinId === stickerGridId)) return focus.at / 1000;
+    const event = s.flipRun?.event;
+    return event?.hits.some(hit => hit.id === stickerGridId || hit.twinId === stickerGridId) ? event.at / 1000 : -10;
+  });
+  const history = meta?.curr === meta?.orig ? (meta?.flips ?? 0) : 0;
+  const coolingDown = useGameStore(s => scarMode && s.flipRun?.cooldowns[stickerGridId] > s.flipRun.elapsed);
+  const scarData = useRef(null);
+  scarData.current = [scarMode ? (coolingDown ? -history : history) : 0, Number(history >= effectiveFlipCap), hitAt, Number(!reduceHomeMotion)];
+  // One transparent centre decal warms the actual instanced shader at entry,
+  // before the first pair highlight or scar has to appear.
+  const warmScar = !presentation && (gameConfig.flipScored || scarMode) && stickerGridId === 'M1-005';
+  const showScar = warmScar || (scarMode && history >= 2) || hitAt >= 0;
+  useLayoutEffect(() => showScar && surfaceCtx?.decals && innerGroupRef.current
+    ? surfaceCtx.decals.register(innerGroupRef.current, _sharedStickerGeo, flipScarMaterial, null, null, scarData, 'flip-scar')
+    : undefined, [showScar, surfaceCtx]);
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
   // Mid-play, the worm's footprint is a decal batch (tileFootprint.js), never a mesh.
   const decalFootprint = wormHealerMode && !presentation && !!surfaceCtx?.decals;

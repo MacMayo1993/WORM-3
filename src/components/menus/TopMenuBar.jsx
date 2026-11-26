@@ -67,8 +67,17 @@ const TopMenuBar = ({
   };
   const modeLabel = VISUAL_MODE_LABELS[visualMode] || 'Classic';
 
+  const flipScored = currentLevelData?.scoring === 'flips';
+  const flips = useGameStore(s => s.flipRun?.flips ?? 0);
+  const relapses = useGameStore(s => s.flipRun?.count ?? 0);
+  const free = useGameStore(s => s.flipFreeplay);
+  const relapseOn = useGameStore(s => !!s.settings?.flipRelapse);
+  const tracksFlipMenu = flipScored || free;
+  useEffect(() => {
+    if (tracksFlipMenu) return () => useGameStore.setState({ flipSessionMenu: false });
+  }, [tracksFlipMenu]);
   const levelLabel = currentLevelData
-    ? `Level ${currentLevelData.id} — ${currentLevelData.name}`
+    ? `Level ${flipScored ? currentLevelData.id - 600 : currentLevelData.id} — ${currentLevelData.name}`
     : null;
 
   const centerText = levelLabel || `${modeLabel} ${size}×${size}`;
@@ -181,9 +190,9 @@ const TopMenuBar = ({
     <header className="top-app-bar instrument-hud" style={GAME_HUD_VARS}>
       <div className="top-bar-left">
         <span className="top-bar-title" title={centerText}>{centerText}</span>
-        <span className="top-bar-progress" aria-label={`${faceStats.percent}% solved`}>
+        {!flipScored && <span className="top-bar-progress" aria-label={`${faceStats.percent}% solved`}>
           {faceStats.percent}<small>%</small>
-        </span>
+        </span>}
         {chaosMode && <span className="instrument-tag">Chaos {chaosLevel}</span>}
         {flipMode && <span className="instrument-tag">Flip</span>}
       </div>
@@ -196,7 +205,7 @@ const TopMenuBar = ({
           </svg>
         </button>}
         <details className="instrument-menu" ref={menuRef} onKeyDown={onMenuKeyDown}
-          onToggle={e => { if (!e.currentTarget.open) setPage('main'); }}>
+          onToggle={e => { if (tracksFlipMenu) useGameStore.setState({ flipSessionMenu: e.currentTarget.open }); if (!e.currentTarget.open) setPage('main'); }}>
           <summary className="top-bar-icon-btn" aria-label="Session menu" title="Session menu">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
           </summary>
@@ -205,7 +214,8 @@ const TopMenuBar = ({
               <span className="instrument-eyebrow">Session</span>
               <ParityWallet dark neutral />
               <dl className="instrument-stats">
-                <div><dt>Flips</dt><dd>{metrics?.flips ?? 0}</dd></div>
+                <div><dt>Flips</dt><dd>{flipScored ? flips : (metrics?.flips ?? 0)}</dd></div>
+                {(flipScored || free) && <div><dt>Relapses</dt><dd>{relapses}</dd></div>}
                 <div title="Tiles showing their twin’s color right now"><dt>Flipped tiles</dt><dd>{metrics?.wormholes ?? 0}</dd></div>
                 {chaosStats && <>
                   <div><dt>Active tiles</dt><dd>{chaosStats.flipPct}%</dd></div>
@@ -232,7 +242,9 @@ const TopMenuBar = ({
                 <SessionKey label={!showTunnels ? 'No tunnels' : tunnelDetail === 'full' ? 'Tunnels' : 'Hints'} pressed={!!showTunnels}
                   icon={ICONS.tunnels} disabled={tunnelsLocked} onClick={() => cycleTunnelDetail?.()} />
               </div>
-              <button type="button" className="instrument-all-settings" onClick={() => { closeMenu(); onShowSettings?.(); }}>
+              {free && !currentLevelData && <button type="button" className="instrument-all-settings" aria-pressed={relapseOn}
+                onClick={() => setSettings(s => ({ ...s, flipRelapse: !s.flipRelapse }))}>Tile relapse · {relapseOn ? 'On' : 'Off'}</button>}
+              <button type="button" className="instrument-all-settings"  onClick={() => { closeMenu(); onShowSettings?.(); }}>
                 All settings
               </button>
             </>}

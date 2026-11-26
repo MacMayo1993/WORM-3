@@ -1,3 +1,4 @@
+import { flipCheckpoint, flipSession, notePlayerFlip, showingRelapseLesson } from '../game/flipRelapse.js';
 import { currentExplosion } from '../worm/wormExpansion.js';
 /**
  * useCubeState Hook
@@ -76,8 +77,6 @@ export function useCubeState() {
     if (!cubies || cubies.length !== size) return new Map();
     return getManifoldMap(cubies, size, rotationEpoch);
   }, [cubies, size, rotationEpoch]);
-  const manifoldMapRef = useRef(manifoldMap);
-  manifoldMapRef.current = manifoldMap;
 
   // Calculate metrics. Only surface cubies carry stickers, so skip the fully-interior
   // cubies entirely instead of walking the whole n³ lattice — this memo recomputes on
@@ -131,7 +130,7 @@ export function useCubeState() {
         rotationEpoch: state.rotationEpoch + 1,
         lastRotation: { axis, sliceIndex, dir },
         moves: state.moves + 1,
-        moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
+        moveHistory: [...state.moveHistory, { ...flipCheckpoint(state), type: 'rotation', axis, dir, sliceIndex, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
       };
     });
   }, [size]);
@@ -148,18 +147,21 @@ export function useCubeState() {
   // Flip sticker pair
   const flipSticker = useCallback((pos, dirKey) => {
     // Block taps while the first-flip highlight is showing
-    if (firstFlipTimerRef.current) return;
+    const live = useGameStore.getState();
+    if (firstFlipTimerRef.current || showingRelapseLesson(live) || (flipSession(live) && (live.animState || live.victory || !live.hasShuffled))) return;
 
     // Refractory period — tile can't flip again within 7 seconds
-    if (isInRefractory(pos.x, pos.y, pos.z, dirKey)) return;
+    if (!flipSession(live) && isInRefractory(pos.x, pos.y, pos.z, dirKey)) return;
 
-    const currentCubies = cubiesRef.current;
+    const currentCubies = live.cubies;
     const currentSize = currentCubies.length;
     const currentExplosionT = currentExplosion(useGameStore.getState());
     // Re-use the manifold map already computed by useMemo — sticker flips don't
     // change cube geometry so the cached map is always valid here.
-    const currentManifoldMap = manifoldMapRef.current;
+    const currentManifoldMap = getManifoldMap(currentCubies, currentSize, live.rotationEpoch);
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+
+    if (!sticker || (flipSession(live) && live.flipRun.cooldowns[getManifoldGridId(sticker, currentSize)] > live.flipRun.elapsed)) return;
 
     // ── Burnt-out pair guard ──────────────────────────────────────────────
     // The cap in force, not the standard-play constant: a Disparity session
@@ -181,7 +183,8 @@ export function useCubeState() {
     // Before the very first flip, show the antipodal pair highlight for 800ms
     // so the player sees both linked tiles light up before the flip fires.
     // See shouldInterceptFirstFlip for why the one-shot ref is load-bearing.
-    if (shouldInterceptFirstFlip(hasFlippedOnce, firstFlipInterceptedRef.current, !!sticker)) {
+    const firstLessonTap = live.currentLevel === 601 && live.flipRun.flips === 0;
+    if (shouldInterceptFirstFlip(hasFlippedOnce && !firstLessonTap, firstFlipInterceptedRef.current, !!sticker)) {
       const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
       if (antipodalLoc) {
         const antSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
@@ -197,7 +200,10 @@ export function useCubeState() {
         firstFlipInterceptedRef.current = true;
         firstFlipTimerRef.current = setTimeout(() => {
           firstFlipTimerRef.current = null;
-          flipSticker(pos, dirKey);
+          const current = useGameStore.getState();
+          if (current.firstFlipHighlightPair && current.cubies === currentCubies && !current.showMainMenu && !current.showLevelSelect) flipSticker(pos, dirKey);
+          current.setFirstFlipHighlightPair(null);
+          firstFlipInterceptedRef.current = false;
         }, 800);
         return;
       }
@@ -289,7 +295,9 @@ export function useCubeState() {
     useGameStore.setState((state) => ({
       cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap, flipCap),
       moves: state.moves + 1,
-      moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-MAX_UNDO_HISTORY),
+      ...(flipSession(state) && { flipRun: notePlayerFlip(state.flipRun, sticker,
+        findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize)?.sticker, currentSize) }),
+      moveHistory: [...state.moveHistory, { ...flipCheckpoint(state), type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-MAX_UNDO_HISTORY),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
       // Screen-space echo of the flip, consumed by FlipScreenGlow outside the
@@ -314,7 +322,7 @@ export function useCubeState() {
         ...pruneExpiredFx(state.tunnelPulses, now),
         [pairId]: { startMs: now, durationMs: 400 },
       } : pruneExpiredFx(state.tunnelPulses, now),
-      tunnelDeaths: (pairDeath && pairId) ? {
+      tunnelDeaths: (pairDeath && pairId && !flipSession(state)) ? {
         ...pruneExpiredFx(state.tunnelDeaths, now),
         [pairId]: pairDeath,
       } : pruneExpiredFx(state.tunnelDeaths, now),
@@ -326,14 +334,15 @@ export function useCubeState() {
     // just happened. `combo` carries the flip count — the escalation level for
     // this event — so working one pair toward its cap climbs in pitch.
     if (pairId) {
-      if (pairDeath) feel('tunnelSnap');
+      if (pairDeath && flipSession(live)) feel('scarSealed');
+      else if (pairDeath) feel('tunnelSnap');
       else if (isFirstFlipOnPair) feel('tunnelBirth');
       else feel('tunnelPulse', { combo: flipsAfter });
     }
 
     // The guided demo narrates flips itself — don't stack the first-flip
     // caption/tutorial on top of it (it lingers beneath the demo overlays).
-    if (isFirstFlip && !useGameStore.getState().demoMode) {
+    if (isFirstFlip && !useGameStore.getState().demoMode && live.currentLevelData?.scoring !== 'flips') {
       setTimeout(() => useGameStore.getState().setShowFirstFlipCaption(true), 400);
       setTimeout(() => {
         if (!useGameStore.getState().demoMode) setShowFirstFlipTutorial(true);

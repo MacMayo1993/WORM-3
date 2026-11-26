@@ -352,6 +352,7 @@ export const TILE_STYLES = {
 };
 
 export const DEFAULT_SETTINGS = {
+  flipRelapse: false,
   livePortalViews: false,
   flipPads: 'full',
   // Lightning strikes and storm coats swell and fade instead of flashing.

@@ -7,6 +7,7 @@ import { faceRCFor } from '../game/coordinates.js';
 //          [Top/PY]
 // [Left/NX][Front/PZ][Right/PX][Back/NZ]
 //          [Bottom/NY]
+const faceNames = { PZ: 'Front', NZ: 'Back', PY: 'Top', NY: 'Bottom', PX: 'Right', NX: 'Left' };
 const FACES = [
   { dirKey: 'PY', label: 'U', gridRow: 1, gridCol: 2, filter: (_x, y, _z, s) => y === s - 1 },
   { dirKey: 'NX', label: 'L', gridRow: 2, gridCol: 1, filter: (x, _y, _z, _s) => x === 0 },
@@ -79,14 +80,15 @@ export default function CubeNet({ cubies, size, onTapFlip, flipMode, onClose, fa
           >
             <span className="net-face-label">{face.label}</span>
             {faceGrids[face.dirKey]?.flat().map((cell, idx) => (
-              <div
+              <button type="button" disabled={!flipMode || !cell}
+                aria-label={faceNames[face.dirKey] + ' row ' + (Math.floor(idx / size) + 1) + ' column ' + (idx % size + 1)}
                 key={idx}
                 className={`net-cell${flipMode && cell ? ' clickable' : ''}${cell?.flips > 0 ? ' flipped' : ''}`}
-                style={{ backgroundColor: cell?.color || '#222' }}
+                style={{ backgroundColor: cell?.color || '#222', padding: 0, minWidth: 0, minHeight: 0 }}
                 onClick={() => handleCellClick(cell)}
               >
                 {cell?.flips > 0 && <span className="net-flip-dot" />}
-              </div>
+              </button>
             ))}
           </div>
         ))}

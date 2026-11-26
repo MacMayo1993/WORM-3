@@ -3,6 +3,7 @@
  * Exports all available level packs
  */
 
+import flipPuzzles from './flip-puzzles.js';
 import storyCampaign from './story-campaign.js';
 import cubeAcademy from './cube-academy.js';
 import algorithmCodex from './algorithm-codex.js';
@@ -28,6 +29,7 @@ export const OFFICIAL_PACKS = [
  * Built-in packs (always available)
  */
 export const BUILT_IN_PACKS = {
+  'flip-puzzles': flipPuzzles,
   'story-campaign': storyCampaign,
   'cube-academy': cubeAcademy,
   'algorithm-codex': algorithmCodex,

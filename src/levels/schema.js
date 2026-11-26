@@ -22,6 +22,7 @@ export const GAME_MODES = {
  * Available win conditions
  */
 export const WIN_CONDITIONS = {
+  FLIP: 'flip',
   CLASSIC: 'classic',
   SUDOKUBE: 'sudokube',
   ULTIMATE: 'ultimate',
@@ -44,6 +45,7 @@ export const LEVEL_ID_RANGES = {
   'story-campaign': [1, 99],
   'cube-academy': [101, 199],
   'algorithm-codex': [201, 299],
+  'flip-puzzles': [601, 699],
   'short-challenges': [501, 599],
   // 301–399 is reserved for the standalone antipodal-descent builder
   // (antipodalLevelBridge). That pack is not registered by default — the
@@ -191,6 +193,9 @@ export function createLevel(overrides) {
     // inverse of `notation`, so performing it solves the level and par equals
     // quarterTurns. null for levels that are not algorithm lessons.
     algorithm: overrides.algorithm ?? null,
+    ...(overrides.scoring === 'flips' && {
+      scoring: 'flips', flipPar: overrides.flipPar, relapse: overrides.relapse, relapseLesson: overrides.relapseLesson,
+    }),
     actionFocus: overrides.actionFocus ?? null,
 
     // Visual settings

@@ -1,0 +1,8 @@
+.flip-puzzle-hud { position: fixed; z-index: 80; left: max(12px, env(safe-area-inset-left)); top: calc(60px + env(safe-area-inset-top)); width: max-content; max-width: min(320px, calc(100vw - 24px)); box-sizing: border-box; padding: 5px 10px; border: 2px solid #354d3c; border-radius: 10px; background: #fffdf0; color: #26372d; font: 700 14px/1.35 var(--heading-font, system-ui); box-shadow: 0 3px #354d3c; }
+.flip-puzzle-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.flip-puzzle-hud p { margin: 5px 0; }
+.flip-puzzle-row button { background: none; color: inherit; border: 0; min-height: 40px; padding: 0 8px; text-decoration: underline; font: inherit; }
+.flip-clock { display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
+.flip-clock svg { width: 22px; height: 22px; transform: rotate(-90deg); }
+.flip-clock circle { fill: none; stroke: #d6d3b9; stroke-width: 3; }
+.flip-clock circle + circle { stroke: #88620a; }

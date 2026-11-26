@@ -138,3 +138,6 @@
   translate: 0 4px;
   box-shadow: 0 2px 0 var(--piece-ledge), 0 6px 12px rgba(0, 0, 0, 0.28);
 }
+@media (min-width: 720px) {
+  .path-select.path-select .cube-path-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

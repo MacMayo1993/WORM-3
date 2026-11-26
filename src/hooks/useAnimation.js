@@ -5,6 +5,7 @@
  * Includes support for Antipodal Mode (Mirror Quotient).
  */
 
+import { flipCheckpoint, showingRelapseLesson } from '../game/flipRelapse.js';
 import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -67,6 +68,8 @@ export function useAnimation() {
   // Start a new animation (atomic: animState and pendingMove set in one render)
   const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false, sliceIndices = null, sliceDirs = null, orientationResets = null) => {
     clearHomeAlignments();
+    const state = useGameStore.getState();
+    if (showingRelapseLesson(state) || (state.currentLevelData?.scoring === 'flips' && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory))) return;
     const move = { axis, dir, sliceIndex, isUndo, sliceIndices, sliceDirs, orientationResets };
     pendingMoveRef.current = move;
     useGameStore.setState({
@@ -179,7 +182,7 @@ export function useAnimation() {
           rotationEpoch: state.rotationEpoch + 1,
           lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir, numTurns },
           moves: state.moves + numTurns,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, sliceIndices, sliceDirs, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
+          moveHistory: [...state.moveHistory, { ...flipCheckpoint(state), type: 'rotation', axis, dir, sliceIndex, sliceIndices, sliceDirs, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
           animState: null,
           pendingMove: null,
         };
@@ -202,7 +205,8 @@ export function useAnimation() {
   // triggering win detection or a stale animation frame.
   const onMove = useCallback((axis, dir, sel, numTurns = 1) => {
     // Only the WORM scheduler may turn layers; startAnimation remains its port.
-    if (useGameStore.getState().wormHealerMode) return;
+    const state = useGameStore.getState();
+    if (state.wormHealerMode || showingRelapseLesson(state) || (state.currentLevelData?.scoring === 'flips' && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory))) return;
     const sliceIndex = axis === 'col' ? sel.x : axis === 'row' ? sel.y : sel.z;
     if (numTurns <= 1) {
       startAnimation(axis, dir, sliceIndex);
@@ -217,7 +221,7 @@ export function useAnimation() {
           rotationEpoch: state.rotationEpoch + 1,
           lastRotation: { axis, sliceIndex, dir, numTurns },
           moves: state.moves + numTurns,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
+          moveHistory: [...state.moveHistory, { ...flipCheckpoint(state), type: 'rotation', axis, dir, sliceIndex, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
         };
       });
     }

@@ -1,0 +1,7 @@
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduced-motion]) .flip-next-level::after {
+    content: ''; position: absolute; inset: 2px; border: 2px solid #977100; border-radius: 12px; pointer-events: none;
+    animation: flip-next-pulse 2.6s ease-in-out infinite alternate;
+  }
+  @keyframes flip-next-pulse { from { opacity: .2; } to { opacity: .85; } }
+}

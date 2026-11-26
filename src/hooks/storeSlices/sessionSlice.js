@@ -4,12 +4,18 @@
  * Part of the useGameStore assembly (see src/hooks/useGameStore.js).
  */
 
+import { newFlipRun } from '../../game/flipRelapse.js';
 import { makeDisparityRuntimeDefaults, MAX_UNDO_HISTORY } from './sessionDefaults.js';
 
 export const createSessionSlice = (set, get) => ({
   // ========================================================================
   // GAME SESSION STATE
   // ========================================================================
+  flipFreeplay: false,
+  flipActiveMs: 0,
+  flipSessionMenu: false,
+  flipHintBand: false,
+  flipRun: newFlipRun(),
   moves: 0,
   gameTime: 0,
   gameStartTime: Date.now(),
@@ -38,6 +44,11 @@ export const createSessionSlice = (set, get) => ({
 
   incrementMoves: () => set((state) => ({ moves: state.moves + 1 })),
   resetGame: () => set({
+    flipRun: newFlipRun(get().currentLevelData?.id ?? (get().flipFreeplay ? Math.floor(Math.random() * 4294967296) : 1)),
+    flipActiveMs: 0,
+    firstFlipHighlightPair: null,
+    ...(get().currentLevelData?.scoring === 'flips' && { showNetPanel: false }),
+    flipHintBand: false,
     showCutawayLens: false,
     xpRun: null,
     moves: 0,

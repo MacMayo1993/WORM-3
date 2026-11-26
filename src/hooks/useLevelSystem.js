@@ -88,6 +88,9 @@ export function useLevelSystem({ onBriefingSkipped } = {}) {
 
     // Apply level settings
     if (levelData) {
+      if (levelData.scoring === 'flips') {
+        useGameStore.setState({ flipFreeplay: false, activePackId: 'flip-puzzles', showAntipodalPiP: true });
+      }
       setSize(levelData.cubeSize);
       setChaosLevel(levelData.chaosLevel);
 

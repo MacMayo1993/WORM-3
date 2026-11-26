@@ -10,14 +10,15 @@ import '../ui/pathSelect.css';
 
 // Flip Cube's two paths, each a piece of the cube in its mode's face colour.
 const PATHS = [
-  { id: 'freeplay', label: 'Flip Cube', note: 'Solve all six faces', meta: 'Flip, twist, restore', color: MODE_THEMES.cube.accent, glint: true },
+  { id: 'levels', label: 'Levels', note: 'Ten flip puzzles', meta: 'Turns are free', color: MODE_THEMES.cube.accent },
+  { id: 'freeplay', label: 'Free Play', note: 'Solve all six faces', meta: 'Flip, twist, restore', color: MODE_THEMES.cube.accent, glint: true },
   { id: 'chaos', label: 'Chaos', note: 'Bet on the surviving color pair', meta: 'Place your bet, ride the storm', color: MODE_THEMES.chaos.accent }
 ];
 
-export default function CubeModeSelectScreen({ onRubiks, onDisparity, onBack }) {
+export default function CubeModeSelectScreen({ onRubiks, onDisparity, onLevels, onBack }) {
   const ref = useRef(null);
   const onKeyDown = useDialogBehavior(ref, onBack);
-  const actions = { freeplay: onRubiks, chaos: onDisparity };
+  const actions = { levels: onLevels, freeplay: onRubiks, chaos: onDisparity };
   return <div ref={ref} onKeyDown={onKeyDown} tabIndex={-1} className="path-select" role="dialog" aria-modal="true"
     aria-labelledby="cube-mode-title" style={{ fontFamily: UI_FONT, zIndex: Z.FULLSCREEN }}>
     <div className="path-select-page">
@@ -32,7 +33,7 @@ export default function CubeModeSelectScreen({ onRubiks, onDisparity, onBack }) 
           <button key={path.id} className={`path-select-card piece${path.glint ? ' piece--glint' : ''}`} style={{ '--piece-color': path.color }}
             onClick={() => { wormMenuFeedback(); actions[path.id](); }}>
             <span className="piece-face">
-              <span className="path-select-art"><ModeArtwork mode={path.id} /></span>
+              <span className="path-select-art"><ModeArtwork mode={path.id === 'levels' ? 'freeplay' : path.id} /></span>
               <span className="path-select-copy">
                 <span className="path-select-cta piece-trailer">{path.label} <b aria-hidden="true">→</b></span>
                 <span className="path-select-note">{path.note}</span>

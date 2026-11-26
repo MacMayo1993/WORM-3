@@ -300,7 +300,11 @@ class ProgressManager {
     const existingStats = levelStats[levelId] || {};
     const now = new Date().toISOString();
 
+    const flipRecord = Number.isInteger(stats.flips) && (existingStats.bestFlips == null ||
+      stats.flips < existingStats.bestFlips || (stats.flips === existingStats.bestFlips && stats.time < existingStats.bestFlipTime));
     levelStats[levelId] = {
+      ...(existingStats.bestFlips != null && { bestFlips: existingStats.bestFlips, bestFlipTime: existingStats.bestFlipTime }),
+      ...(flipRecord && { bestFlips: stats.flips, bestFlipTime: stats.time }),
       bestTime: Math.min(existingStats.bestTime ?? Infinity, stats.time ?? Infinity),
       bestMoves: Math.min(existingStats.bestMoves ?? Infinity, stats.moves ?? Infinity),
       stars: Math.max(existingStats.stars ?? 0, this._calculateStars(levelId, stats)),
