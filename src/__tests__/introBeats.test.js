@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { INTRO_BEATS, beatsCrossed, introStartTime, INTRO_RETURN_START } from '../components/intro/introBeats.js';
-import { INTRO_FINISH, IMPLODE_START, IMPLODE_END } from '../components/intro/introTiming.js';
-import { sampleIntro } from '../components/intro/introChoreography.js';
+import { INTRO_BEATS, beatsCrossed } from '../components/intro/introBeats.js';
+import { INTRO_FINISH } from '../components/intro/introTiming.js';
+import { INTRO_COPY, introCopyFrame } from '../components/intro/introCopy.js';
 
 describe('the opening beats', () => {
   it('plays every beat exactly once over a run at any frame rate', () => {
@@ -25,15 +25,18 @@ describe('the opening beats', () => {
   });
 });
 
-describe('a returning player', () => {
-  it('starts with the burst cube about to snap shut, then gets the title and the dive', () => {
-    expect(introStartTime(false)).toBe(0);
-    expect(introStartTime(true, true)).toBe(0);
-    expect(introStartTime(true)).toBe(INTRO_RETURN_START);
-    expect(INTRO_RETURN_START).toBeLessThan(IMPLODE_START);
-    expect(sampleIntro(INTRO_RETURN_START).open).toBe(1);
-    expect(sampleIntro(IMPLODE_END).open).toBe(0);
-    // Half the opening or less.
-    expect(INTRO_FINISH - INTRO_RETURN_START).toBeLessThan(INTRO_FINISH * 0.55);
+describe('every launch', () => {
+  // A returning player once started at the snap-shut and lost the tagline; the
+  // whole opening plays every time, its two lines word by word.
+  it('plays both tagline lines, each one landing word by word', () => {
+    for (const line of INTRO_COPY) {
+      const words = line.text.split(' ');
+      const early = introCopyFrame(line.start + 0.05);
+      expect(early.beat).toBe(line);
+      expect(early.words[0].opacity).toBeGreaterThan(0);
+      expect(early.words[words.length - 1].opacity).toBe(0);
+      const landed = introCopyFrame(line.end - 0.5);
+      for (const word of landed.words) expect(word.opacity).toBeGreaterThan(0.5);
+    }
   });
 });
