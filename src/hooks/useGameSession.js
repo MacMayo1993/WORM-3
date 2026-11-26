@@ -84,7 +84,11 @@ export function useGameSession() {
     // Solving the cube — the thing the whole mode is for — made no sound at all;
     // the victory screen simply appeared. Fires once per win because the
     // achievedWins guard already makes this branch once-per-session.
+    // A solved level always closes the far-side window, so the clear card and the
+    // finished cube are never half-covered by it; the player reopens it at will.
+    const closeFarSide = () => { if (currentLevelData) useGameStore.getState().setShowAntipodalPiP(false); };
     if (wormWin && !achievedWins.worm) {
+      closeFarSide();
       feel('cubeSolved');
       setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
@@ -99,6 +103,7 @@ export function useGameSession() {
         });
         useGameStore.setState({ flipRun: { ...live.flipRun, completion: { previous } }, showNetPanel: false });
       }
+      closeFarSide();
       feel('cubeSolved');
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));

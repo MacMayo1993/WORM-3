@@ -94,3 +94,14 @@ it('banks a clear and its unlock before the clear card is dismissed', () => {
   expect(reloaded.getLevelStats(level.id)).toMatchObject({ bestFlips: 1, stars: 3, completionCount: 1 });
   expect(reloaded.isLevelUnlocked(602)).toBe(true);
 });
+
+it('closes the far-side window when the level is solved', () => {
+  const level = FLIP_PUZZLES[0];
+  const cubies = buildLevelStartState(level, 3);
+  act(() => useGameStore.setState({ currentLevelData: level, currentLevel: level.id, cubies, flipRun: newFlipRun(1), showAntipodalPiP: true, moveHistory: [] }));
+  // First Flip: one paired flip on the front top edge solves it.
+  act(() => input.flip({ x: 1, y: 2, z: 2 }, 'PZ'));
+  act(() => vi.advanceTimersByTime(2000));
+  expect(useGameStore.getState().victory).toBeTruthy();
+  expect(useGameStore.getState().showAntipodalPiP).toBe(false);
+});
