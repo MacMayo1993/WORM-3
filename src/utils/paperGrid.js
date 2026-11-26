@@ -20,6 +20,30 @@ export const PAPER_GRID = {
   lineMix: 0.4
 };
 
+// The opening and the loading cover tint the sheet through all six face colours.
+// A fixed grey line disappears on most of them (red, green and blue sit at its own
+// brightness; on red it was lighter than the paper), so on a tinted sheet each line
+// is inked in a deeper shade of the sheet under it, and every fifth line is ruled
+// heavier, as graph paper is. The cream carousel sheet keeps PAPER_GRID.line.
+export const TINTED_INK = {
+  shade: 0.55, // ink = the sheet's colour × this
+  minor: 0.6, // how much ink a line lays down
+  major: 0.85, // …and a fifth line
+  majorEvery: 5,
+  majorWidth: 1.8 // a fifth line's width, in device pixels
+};
+
+/** The ink for a tinted sheet of colour `paper` ({ r, g, b } 0–1), into `out`. */
+export function tintedInkInto(out, paper) {
+  out.r = paper.r * TINTED_INK.shade;
+  out.g = paper.g * TINTED_INK.shade;
+  out.b = paper.b * TINTED_INK.shade;
+  return out;
+}
+
+/** Is grid line `n` (vertical or horizontal) one of the heavier fifth lines? */
+export const isMajorLine = (n) => ((n % TINTED_INK.majorEvery) + TINTED_INK.majorEvery) % TINTED_INK.majorEvery === 0;
+
 const P = PAPER_GRID;
 
 /** A number as a GLSL float literal (26 → "26.0"). */

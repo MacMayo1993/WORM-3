@@ -32,7 +32,7 @@
 import React, { useEffect, useRef } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import { PAPER_GRID as P, paperShiftX, paperShiftY } from '../../utils/paperGrid.js';
+import { PAPER_GRID as P, TINTED_INK, isMajorLine, paperShiftX, paperShiftY } from '../../utils/paperGrid.js';
 import {
   MOTE_COUNT,
   THROAT,
@@ -138,33 +138,41 @@ function drawPaper(ctx, W, H, t, motion, well, pulse, opacity, dpr, pad = 0, col
   ctx.rect(0, 0, W, H);
   ctx.ellipse(well.cx, well.cy, well.a, well.b, 0, 0, TAU);
   ctx.clip('evenodd');
-  ctx.beginPath();
-  for (let n = Math.floor(-slack); n <= Math.ceil(W / cell + slack); n++) {
-    const near = Math.abs(n * cell - well.cx) < fineX + slack * cell;
-    let first = true;
-    eachSample(-cell, H + cell, near ? well.cy - fineY : Infinity, well.cy + fineY, (y) => {
-      const x = (n - motion * paperShiftX((H - y) / cell, t)) * cell;
-      lensPaperPoint(well, x, y, pulse, at);
-      if (first) ctx.moveTo(at.x, at.y);
-      else ctx.lineTo(at.x, at.y);
-      first = false;
-    });
+  // Each line is inked in a deeper shade of the sheet (TINTED_INK, as the
+  // opening shader does): a fixed grey vanished on most of the six colours.
+  // Every fifth line is ruled heavier, in a path of its own.
+  const ink = shade(color, 0.3).map((v) => Math.round(v * TINTED_INK.shade));
+  for (const major of [false, true]) {
+    ctx.beginPath();
+    for (let n = Math.floor(-slack); n <= Math.ceil(W / cell + slack); n++) {
+      if (isMajorLine(n) !== major) continue;
+      const near = Math.abs(n * cell - well.cx) < fineX + slack * cell;
+      let first = true;
+      eachSample(-cell, H + cell, near ? well.cy - fineY : Infinity, well.cy + fineY, (y) => {
+        const x = (n - motion * paperShiftX((H - y) / cell, t)) * cell;
+        lensPaperPoint(well, x, y, pulse, at);
+        if (first) ctx.moveTo(at.x, at.y);
+        else ctx.lineTo(at.x, at.y);
+        first = false;
+      });
+    }
+    for (let m = Math.floor(-slack); m <= Math.ceil(H / cell + slack); m++) {
+      if (isMajorLine(m) !== major) continue;
+      const near = Math.abs(H - m * cell - well.cy) < fineY + slack * cell;
+      let first = true;
+      eachSample(-cell, W + cell, near ? well.cx - fineX : Infinity, well.cx + fineX, (x) => {
+        const y = H - (m - motion * paperShiftY(x / cell, t)) * cell;
+        lensPaperPoint(well, x, y, pulse, at);
+        if (first) ctx.moveTo(at.x, at.y);
+        else ctx.lineTo(at.x, at.y);
+        first = false;
+      });
+    }
+    // The shader's antialiased line covers about one device pixel; a fifth line about two.
+    ctx.lineWidth = (major ? TINTED_INK.majorWidth : 1) / dpr;
+    ctx.strokeStyle = rgba(ink, major ? TINTED_INK.major : TINTED_INK.minor);
+    ctx.stroke();
   }
-  for (let m = Math.floor(-slack); m <= Math.ceil(H / cell + slack); m++) {
-    const near = Math.abs(H - m * cell - well.cy) < fineY + slack * cell;
-    let first = true;
-    eachSample(-cell, W + cell, near ? well.cx - fineX : Infinity, well.cx + fineX, (x) => {
-      const y = H - (m - motion * paperShiftY(x / cell, t)) * cell;
-      lensPaperPoint(well, x, y, pulse, at);
-      if (first) ctx.moveTo(at.x, at.y);
-      else ctx.lineTo(at.x, at.y);
-      first = false;
-    });
-  }
-  // The shader's antialiased line covers about one device pixel.
-  ctx.lineWidth = 1 / dpr;
-  ctx.strokeStyle = `rgba(${LINE_RGB},${P.lineMix})`;
-  ctx.stroke();
   ctx.restore();
 }
 

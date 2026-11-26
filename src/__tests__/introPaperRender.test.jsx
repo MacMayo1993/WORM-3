@@ -26,6 +26,8 @@ it('updates the existing backdrop uniform on intro time, replay and reduced-moti
       expect(scene.children).toHaveLength(1);
       const material = scene.children[0].material;
       expect(material.defines).toEqual({ OPENING: 1 });
+      // Lines inked from the sheet itself, every fifth one heavier (TINTED_INK).
+      expect(material.fragmentShader).toMatch(/#ifdef OPENING[\s\S]*ink = paper \* 0\.55;[\s\S]*majorUv/);
       const tint = material.uniforms.uOpeningTint;
       firstUniform ??= tint;
       expect(tint).toBe(firstUniform);
