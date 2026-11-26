@@ -1259,7 +1259,9 @@ export default function WORM3() {
   const recordCompletion = useCallback(() => {
     // The demo solves cubes on the player's behalf as part of its tour, so it
     // must never pay out.
-    const enabled = !useGameStore.getState().demoMode;
+    const live = useGameStore.getState();
+    if (currentLevelData?.scoring === 'flips' && live.flipRun.completion) return;
+    const enabled = !live.demoMode;
     const earn = (amount) => useGameStore.getState().earnCoins(amount);
 
     if (!currentLevel) {

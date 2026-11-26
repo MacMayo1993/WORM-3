@@ -72,7 +72,10 @@ const TopMenuBar = ({
   const relapses = useGameStore(s => s.flipRun?.count ?? 0);
   const free = useGameStore(s => s.flipFreeplay);
   const relapseOn = useGameStore(s => !!s.settings?.flipRelapse);
-  useEffect(() => () => useGameStore.setState({ flipSessionMenu: false }), []);
+  const tracksFlipMenu = flipScored || free;
+  useEffect(() => {
+    if (tracksFlipMenu) return () => useGameStore.setState({ flipSessionMenu: false });
+  }, [tracksFlipMenu]);
   const levelLabel = currentLevelData
     ? `Level ${flipScored ? currentLevelData.id - 600 : currentLevelData.id} — ${currentLevelData.name}`
     : null;
@@ -202,7 +205,7 @@ const TopMenuBar = ({
           </svg>
         </button>}
         <details className="instrument-menu" ref={menuRef} onKeyDown={onMenuKeyDown}
-          onToggle={e => { useGameStore.setState({ flipSessionMenu: e.currentTarget.open }); if (!e.currentTarget.open) setPage('main'); }}>
+          onToggle={e => { if (tracksFlipMenu) useGameStore.setState({ flipSessionMenu: e.currentTarget.open }); if (!e.currentTarget.open) setPage('main'); }}>
           <summary className="top-bar-icon-btn" aria-label="Session menu" title="Session menu">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/></svg>
           </summary>

@@ -10,7 +10,9 @@ for (const phone of [false, true]) {
     await page.getByRole('button', { name: 'Play level 1: First Flip', exact: true }).click();
     const launch = page.getByRole('button', { name: /Let's go/ });
     await launch.click();
-    if (await launch.isVisible()) await launch.click();
+    // A first tap can finish Mobi's speech. A second input advances the
+    // completed line and remains harmless if the card already dismissed.
+    await page.keyboard.press('Enter');
     const hud = page.getByRole('complementary', { name: 'Flip puzzle' });
     await expect(hud).toContainText('Flips 0');
     if (phone) {

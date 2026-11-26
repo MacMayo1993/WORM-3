@@ -48,6 +48,7 @@ describe('Flip Cube levels', () => {
     expect(checkFlipPuzzleSolved(board, 3)).toBe(false);
   });
   it('restores the same paired roll from a checkpoint and protects capped tiles', () => {
+    expect(FLIP_CAP % 2).toBe(0);
     const state = prep(FLIP_PUZZLES[4]);
     expect(scarredPairs(state.cubies, 3, 6)).toHaveLength(1);
     const saved = flipCheckpoint(state).beforeFlipInput;

@@ -8,7 +8,7 @@ export const COOLDOWN_MS = 3000;
 export const flipPuzzle = state => state.currentLevelData?.scoring === 'flips';
 export const relapseEnabled = state => !state.demoMode && !state.wormHealerMode && !state.teachModeActive && !state.randomMode && !state.chaosLevel &&
   (state.currentLevelData ? !!state.currentLevelData.relapse : !!(state.flipFreeplay && state.settings?.flipRelapse));
-export const flipSession = state => !state.demoMode && !state.wormHealerMode && (flipPuzzle(state) || relapseEnabled(state));
+export const flipSession = state => !state.demoMode && !state.wormHealerMode && !state.teachModeActive && (flipPuzzle(state) || relapseEnabled(state));
 export const showingRelapseLesson = state => state.hasShuffled && state.currentLevelData?.relapseLesson && !state.flipRun.lessonSeen;
 
 export function newFlipRun(seed = 1) {

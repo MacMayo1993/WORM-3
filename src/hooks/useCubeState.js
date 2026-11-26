@@ -77,8 +77,6 @@ export function useCubeState() {
     if (!cubies || cubies.length !== size) return new Map();
     return getManifoldMap(cubies, size, rotationEpoch);
   }, [cubies, size, rotationEpoch]);
-  const manifoldMapRef = useRef(manifoldMap);
-  manifoldMapRef.current = manifoldMap;
 
   // Calculate metrics. Only surface cubies carry stickers, so skip the fully-interior
   // cubies entirely instead of walking the whole n³ lattice — this memo recomputes on
@@ -155,12 +153,12 @@ export function useCubeState() {
     // Refractory period — tile can't flip again within 7 seconds
     if (!flipSession(live) && isInRefractory(pos.x, pos.y, pos.z, dirKey)) return;
 
-    const currentCubies = cubiesRef.current;
+    const currentCubies = live.cubies;
     const currentSize = currentCubies.length;
     const currentExplosionT = currentExplosion(useGameStore.getState());
     // Re-use the manifold map already computed by useMemo — sticker flips don't
     // change cube geometry so the cached map is always valid here.
-    const currentManifoldMap = manifoldMapRef.current;
+    const currentManifoldMap = getManifoldMap(currentCubies, currentSize, live.rotationEpoch);
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
 
     if (!sticker || (flipSession(live) && live.flipRun.cooldowns[getManifoldGridId(sticker, currentSize)] > live.flipRun.elapsed)) return;
@@ -336,7 +334,7 @@ export function useCubeState() {
     // just happened. `combo` carries the flip count — the escalation level for
     // this event — so working one pair toward its cap climbs in pitch.
     if (pairId) {
-      if (pairDeath && flipSession(live)) feel('cubeSolved');
+      if (pairDeath && flipSession(live)) feel('scarSealed');
       else if (pairDeath) feel('tunnelSnap');
       else if (isFirstFlipOnPair) feel('tunnelBirth');
       else feel('tunnelPulse', { combo: flipsAfter });

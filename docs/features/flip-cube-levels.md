@@ -1,6 +1,13 @@
 # Flip Cube Levels and Relapse: Design Plan
 
-Status: **plan for review**. Nothing here is built yet. Comments and improvements are welcome. The open questions at the end are the places where feedback matters most.
+**Implementation update.** The ten-stage campaign opens from Play → Flip Cube → Levels. The sections below preserve the original proposal. The implemented campaign makes these changes following review.
+
+- The opening sequence is First Flip, Centre Swap, Twin Trouble and Half-Turn Trick. These four puzzles give players time to experiment. The fourth can be solved with one middle-slice half turn and zero flips.
+- Scar Tissue demonstrates one guaranteed relapse before accepting input. Later rolls use a level-specific seed that repeats on retry. Undo restores the board, counters, clock, cooldowns and random sequence to the state before the input. Active play time continues to count toward the time tiebreaker.
+- The map and clear card call the authored flip counts **targets**. Each has a verified solution. The search for cheaper solutions covers four quarter turns and does not establish a global minimum.
+- Each run starts with its authored pairs in home coordinates, then plays its authored outer turns. Gold scars have reached the six-flip cap. Free Play has its own optional relapse switch.
+
+The [campaign definitions](../../src/levels/packs/flip-puzzles.js), [solution checks](../../src/__tests__/flipPuzzles.test.js) and [desktop and touch playthroughs](../../e2e/flipPuzzles.e2e.js) give the current behavior.
 
 ## 1. Summary
 

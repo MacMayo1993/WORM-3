@@ -154,6 +154,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const gameConfig = useGameStore(
     useShallow((s) => ({
       scarMode: relapseEnabled(s),
+      flipScored: s.currentLevelData?.scoring === 'flips',
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
       disparityFlipCap: s.disparityFlipCap,
@@ -1446,9 +1447,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     return event?.hits.some(hit => hit.id === stickerGridId || hit.twinId === stickerGridId) ? event.at / 1000 : -10;
   });
   const history = meta?.curr === meta?.orig ? (meta?.flips ?? 0) : 0;
+  const coolingDown = useGameStore(s => scarMode && s.flipRun?.cooldowns[stickerGridId] > s.flipRun.elapsed);
   const scarData = useRef(null);
-  scarData.current = [scarMode ? history : 0, Number(history >= effectiveFlipCap), hitAt, Number(!reduceHomeMotion)];
-  const showScar = (scarMode && history >= 2) || hitAt >= 0;
+  scarData.current = [scarMode ? (coolingDown ? -history : history) : 0, Number(history >= effectiveFlipCap), hitAt, Number(!reduceHomeMotion)];
+  // One transparent centre decal warms the actual instanced shader at entry,
+  // before the first pair highlight or scar has to appear.
+  const warmScar = !presentation && (gameConfig.flipScored || scarMode) && stickerGridId === 'M1-005';
+  const showScar = warmScar || (scarMode && history >= 2) || hitAt >= 0;
   useLayoutEffect(() => showScar && surfaceCtx?.decals && innerGroupRef.current
     ? surfaceCtx.decals.register(innerGroupRef.current, _sharedStickerGeo, flipScarMaterial, null, null, scarData, 'flip-scar')
     : undefined, [showScar, surfaceCtx]);

@@ -274,6 +274,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     }}>
                       {level.name}
                     </span>
+                    {level.scoring === 'flips' && <small>Target {level.flipPar}</small>}
                     <svg width="17" height="20" viewBox="0 0 24 28" aria-hidden="true" style={{ marginTop: '7px' }}>
                       <path d="M7 11V8a5 5 0 0 1 10 0v3" fill="none" stroke={PAPER_TEXT_FAINT} strokeWidth="2.4" strokeLinecap="round" />
                       <rect x="4.5" y="11" width="15" height="12.5" rx="2.6" fill={PAPER_TEXT_FAINT} />

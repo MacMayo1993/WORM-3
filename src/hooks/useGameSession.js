@@ -7,6 +7,8 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { checkRubiksWin, checkFlipPuzzleSolved, allStickersFlipped } from '../game/winDetection.js';
+import { recordLevelCompletion } from '../levels/completion.js';
+import { progressManager } from '../levels/ProgressManager.js';
 import { feel } from '../utils/feel.js';
 import { VICTORY } from '../utils/constants.js';
 
@@ -87,6 +89,16 @@ export function useGameSession() {
       setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
     } else if (rubiksSolved && !achievedWins.rubiks) {
+      const live = flipPuzzle ? useGameStore.getState() : null;
+      if (live?.currentLevel && !live.flipRun.completion) {
+        const previous = progressManager.getLevelStats(live.currentLevel);
+        recordLevelCompletion({
+          levelId: live.currentLevel, levelData: currentLevelData,
+          stats: { moves: live.moves, time: live.gameTime, flips: live.flipRun.flips },
+          earn: live.earnCoins,
+        });
+        useGameStore.setState({ flipRun: { ...live.flipRun, completion: { previous } }, showNetPanel: false });
+      }
       feel('cubeSolved');
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));

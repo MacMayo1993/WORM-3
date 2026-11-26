@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from '../utils/device.js';
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -32,7 +33,7 @@ const HighlightRing = ({ position, rotation, color }) => {
   useFrame(() => {
     if (!ringRef.current) return;
     const t = performance.now() / 1000;
-    const pulse = Math.sin(t * 4) * 0.5 + 0.5;
+    const pulse = prefersReducedMotion() ? 0.5 : Math.sin(t * 4) * 0.5 + 0.5;
     const breathe = 0.95 + pulse * 0.15;
     ringRef.current.scale.set(breathe, breathe, 1);
     ringMat.opacity = 0.5 + pulse * 0.4;
@@ -72,7 +73,7 @@ const TetherLine = ({ from, to, color }) => {
   useFrame(() => {
     if (!lineRef.current) return;
     const t = performance.now() / 1000;
-    mat.opacity = 0.2 + Math.sin(t * 3) * 0.15;
+    mat.opacity = prefersReducedMotion() ? 0.3 : 0.2 + Math.sin(t * 3) * 0.15;
   });
 
   return <line ref={lineRef} geometry={geo} material={mat} />;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { LESSON_MS, ROLL_MS, scarredPairs, showingRelapseLesson } from '../../game/flipRelapse.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import './flipPuzzleHUD.css';
 
 export default function FlipPuzzleHUD({ level }) {
@@ -18,6 +19,7 @@ export default function FlipPuzzleHUD({ level }) {
   }, [hint, level?.id]);
   const remaining = Math.max(0, (lesson ? LESSON_MS : due) - elapsed);
   const seconds = Math.ceil(remaining / 1000);
+  const ringFraction = Math.min(1, (prefersReducedMotion() ? seconds * 1000 : remaining) / (lesson ? LESSON_MS : ROLL_MS));
   const showClock = candidates && (level ? level.relapse : true);
   const last = event && elapsed - event.at < 4000 ? event : null;
   if (!level && !showClock && !last) return null;
@@ -26,7 +28,7 @@ export default function FlipPuzzleHUD({ level }) {
       {level && <><strong>Flips {flips}</strong><span>{level.flipPar ? 'Target ' + level.flipPar : 'Try for zero flips'}</span></>}
       {showClock && <span className="flip-clock" aria-label={'Next relapse roll in ' + seconds + ' seconds'}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" />
-          <circle cx="12" cy="12" r="9" pathLength="1" strokeDasharray="1" strokeDashoffset={1 - remaining / (lesson ? LESSON_MS : ROLL_MS)} /></svg>
+          <circle cx="12" cy="12" r="9" pathLength="1" strokeDasharray="1" strokeDashoffset={1 - ringFraction} /></svg>
         {seconds}s</span>}
       {level && <button type="button" aria-expanded={hint} onClick={() => setHint(v => !v)}>{hint ? 'Hide hint' : 'Hint'}</button>}
     </div>

@@ -1,5 +1,4 @@
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { progressManager } from '../../levels/ProgressManager.js';
 import ModeArtwork from '../ui/ModeArtwork.jsx';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -144,7 +143,7 @@ const VictoryScreen = ({
   const flips = useGameStore(s => s.flipRun?.flips ?? 0);
   const relapses = useGameStore(s => s.flipRun?.count ?? 0);
   const score = flipScored ? flips : moves;
-  const previous = flipScored ? progressManager.getLevelStats(currentLevel) : null;
+  const previous = useGameStore(s => s.flipRun?.completion?.previous);
   const newBest = flipScored && (previous?.bestFlips == null || flips < previous.bestFlips ||
     (flips === previous.bestFlips && time < previous.bestFlipTime));
   const stars = isLevelWin ? computeStars(levelData, { moves, time, flips }) : 0;
@@ -333,7 +332,7 @@ const VictoryScreen = ({
           </div>
         )}
 
-        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + ' flips · ' : ''}{relapses} relapses
+        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + (previous.bestFlips === 1 ? ' flip' : ' flips') + (Number.isFinite(previous.bestFlipTime) ? ' in ' + formatTime(previous.bestFlipTime) : '') + ' · ' : ''}{relapses} relapses
           {currentLevel === 604 && flips > 0 && <><br />Solved in {flips} flips. Can you do it in 0?</>}</p>}
         {isCampaignFinale && (
           <p style={{
