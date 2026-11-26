@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { PAPER_GRID as P, glslFloat as f, glslVec3 } from '../utils/paperGrid.js';
+import { PAPER_GRID as P, TINTED_INK, glslFloat as f, glslVec3 } from '../utils/paperGrid.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { getCarouselTheme, getCarouselFace, getCarouselCubeFrame, getModeDiveState, isCarouselActive } from '../components/menus/menuCarouselState.js';
 import { menuLeanInto } from '../components/menus/menuPointer.js';
@@ -114,6 +114,16 @@ const fragmentShader = `varying vec2 paperUv;
           ${INTRO_PAPER_SHADER}
           #endif
           vec3 ink = ${glslVec3(P.line)};
+          #ifdef OPENING
+          // On a tinted sheet a fixed grey line vanishes: ink each line in a
+          // deeper shade of the sheet, and rule every fifth line heavier
+          // (TINTED_INK in paperGrid.js, which the loading cover reads too).
+          ink = paper * ${f(TINTED_INK.shade)};
+          vec2 majorUv = gridUv / ${f(TINTED_INK.majorEvery)};
+          vec2 majorLine = abs(fract(majorUv - 0.5) - 0.5) / fwidth(majorUv);
+          float majorGrid = 1.0 - min(min(majorLine.x, majorLine.y) / ${f(TINTED_INK.majorWidth)}, 1.0);
+          grid = min(max(grid * ${f(TINTED_INK.minor)}, majorGrid * ${f(TINTED_INK.major)}), 1.0) / ${f(P.lineMix)};
+          #endif
           #ifdef CAROUSEL
           // Paper, not plastic: fibres and the odd speck, and a darker edge.
           float fibre = paperNoise(vec2(paperUv.x * aspect * 340.0, paperUv.y * 46.0));
