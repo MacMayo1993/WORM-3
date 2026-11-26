@@ -67,7 +67,7 @@ export const createUiSlice = (set, _get) => ({
     ? (state) => ({ showHelp: showHelp(state.showHelp) })
     : { showHelp }),
   setShowSettings: (showSettings) => set({ showSettings }),
-  setShowMainMenu: (showMainMenu) => set(showMainMenu ? { showMainMenu, captureMode: false } : { showMainMenu }),
+  setShowMainMenu: (showMainMenu) => set(showMainMenu ? { showMainMenu, captureMode: false, flipFreeplay: false, flipSessionMenu: false } : { showMainMenu }),
   setShowLevelSelect: (showLevelSelect) => set({ showLevelSelect }),
   setShowPackSelect: (showPackSelect) => set({ showPackSelect }),
   setActivePackId: (activePackId) => set({ activePackId }),

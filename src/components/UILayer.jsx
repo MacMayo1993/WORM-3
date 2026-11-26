@@ -46,6 +46,7 @@ import { isMobile } from '../utils/device.js';
 // Lazy-loaded — deferred to reduce initial parse time
 const ComingSoonScreen = React.lazy(() => import('./screens/ComingSoonScreen.jsx'));
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
+const FlipPuzzleHUD = React.lazy(() => import('./overlays/FlipPuzzleHUD.jsx'));
 const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.jsx'));
 const PackSelectScreen = React.lazy(() => import('./screens/PackSelectScreen.jsx'));
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
@@ -151,6 +152,7 @@ export default function UILayer({
   const chaosFlipLocked = useGameStore(selectChaosFlipLocked);
 
   // UI visibility flags — change rarely, batched to minimise subscriptions
+  const flipFreeplay = useGameStore(s => s.flipFreeplay && s.settings?.flipRelapse && !s.currentLevelData && !s.demoMode && !s.wormHealerMode && !s.randomMode && !s.chaosLevel);
   const {
     showMainMenu, showTutorial, showLevelSelect, showPackSelect, activePackId, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
@@ -461,14 +463,18 @@ export default function UILayer({
       {/* Level Badge — desktop only; on mobile the top bar + objective HUD already name the level */}
       {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
         <div className="level-badge">
-          <span className="level-badge-number">{currentLevel}</span>
+          <span className="level-badge-number">{currentLevelData.scoring === 'flips' ? currentLevel - 600 : currentLevel}</span>
           <span className="level-badge-name">{currentLevelData.name}</span>
         </div>
       )}
 
       {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
-        <StoryObjectiveHUD level={currentLevelData} />
+        currentLevelData.scoring === 'flips'
+          ? <Suspense fallback={null}><FlipPuzzleHUD key={currentLevel} level={currentLevelData} /></Suspense>
+          : <StoryObjectiveHUD level={currentLevelData} />
       )}
+
+      {flipFreeplay && showGameHUD && <Suspense fallback={null}><FlipPuzzleHUD /></Suspense>}
 
       {showMainMenu && !showModeSelect && !showSettings && (
         <MainMenu
@@ -533,6 +539,7 @@ export default function UILayer({
       <ScreenTransition show={showCubeModeSelect}>
         <Suspense fallback={<ScreenFallback label="Loading" />}>
           <CubeModeSelectScreen
+            onLevels={() => onSelectPack('flip-puzzles')}
             onRubiks={onCubeModeRubiks}
             onDisparity={onCubeModeDisparity}
             onBack={onCubeModeBack}

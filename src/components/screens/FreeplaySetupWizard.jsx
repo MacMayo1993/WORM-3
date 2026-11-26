@@ -15,6 +15,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   // Which category the pane is showing. The rail sets it directly; Back and
   // Continue walk it, which is the order the categories are listed in below.
   const [step, setStep] = useState(0);
+  const [relapse, setRelapse] = useState(!!initialSettings?.flipRelapse);
   const isMobile = useIsMobile();
   const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({ initialSettings, accent: ACCENT, accentShadow: ACCENT_SHADOW });
@@ -54,11 +55,12 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       subtitle: '',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
-      content: <SizeStep cos={cos} slot="body" />
+      content: <><SizeStep cos={cos} slot="body" /><label><input type="checkbox" checked={relapse}
+        onChange={e => setRelapse(e.target.checked)} /> Tile relapse · healed pairs may flip again</label></>
     }
   ];
 
-  const finish = () => onComplete({ ...cos.settings, cubeSize: cos.cubeSize });
+  const finish = () => onComplete({ ...cos.settings, flipRelapse: relapse, cubeSize: cos.cubeSize });
 
   const handleNext = () => (step < categories.length - 1 ? setStep(step + 1) : finish());
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());

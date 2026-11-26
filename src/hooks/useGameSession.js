@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { checkRubiksWin, allStickersFlipped } from '../game/winDetection.js';
+import { checkRubiksWin, checkFlipPuzzleSolved, allStickersFlipped } from '../game/winDetection.js';
 import { feel } from '../utils/feel.js';
 import { VICTORY } from '../utils/constants.js';
 
@@ -35,12 +35,12 @@ export function useGameSession() {
 
   // Game timer effect
   useEffect(() => {
-    if (victory) return; // Pause timer when victory screen is showing
+    if (victory || currentLevelData?.scoring === 'flips') return; // Pause timer when victory screen is showing
     const interval = setInterval(() => {
       setGameTime(Math.floor((Date.now() - gameStartTimeRef.current) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [victory, setGameTime]);
+  }, [victory, setGameTime, currentLevelData]);
 
   // Win condition detection
   useEffect(() => {
@@ -75,8 +75,9 @@ export function useGameSession() {
     // player who makes every face uniform in any orientation registers the solve
     // — the strict home-orientation check would reject 23 of a 2×2's 24 solved
     // states, leaving the cube visibly solved with no win.
-    const rubiksSolved = checkRubiksWin(cubies, size);
-    const wormWin = rubiksSolved && allStickersFlipped(cubies, size);
+    const flipPuzzle = currentLevelData?.winCondition === 'flip';
+    const rubiksSolved = flipPuzzle ? checkFlipPuzzleSolved(cubies, size) : checkRubiksWin(cubies, size);
+    const wormWin = !flipPuzzle && rubiksSolved && allStickersFlipped(cubies, size);
 
     // Solving the cube — the thing the whole mode is for — made no sound at all;
     // the victory screen simply appeared. Fires once per win because the

@@ -1,3 +1,5 @@
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { progressManager } from '../../levels/ProgressManager.js';
 import ModeArtwork from '../ui/ModeArtwork.jsx';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -138,9 +140,16 @@ const VictoryScreen = ({
   // ProgressManager records them, so the reward shown here matches what's saved.
   const isLevelWin = Boolean(currentLevel && levelData);
   const par = getLevelPar(levelData);
-  const stars = isLevelWin ? computeStars(levelData, { moves, time }) : 0;
-  const underPar = par != null && typeof moves === 'number' && moves <= par;
-  const starVerdict = stars >= 3 ? 'Under par!' : stars === 2 ? 'Nicely done' : 'Cleared';
+  const flipScored = levelData?.scoring === 'flips';
+  const flips = useGameStore(s => s.flipRun?.flips ?? 0);
+  const relapses = useGameStore(s => s.flipRun?.count ?? 0);
+  const score = flipScored ? flips : moves;
+  const previous = flipScored ? progressManager.getLevelStats(currentLevel) : null;
+  const newBest = flipScored && (previous?.bestFlips == null || flips < previous.bestFlips ||
+    (flips === previous.bestFlips && time < previous.bestFlipTime));
+  const stars = isLevelWin ? computeStars(levelData, { moves, time, flips }) : 0;
+  const underPar = par != null && typeof score === 'number' && score <= par;
+  const starVerdict = flipScored && underPar ? (score < par ? 'Beat the target!' : 'Target met!') : stars >= 3 ? 'Under par!' : stars === 2 ? 'Nicely done' : 'Cleared';
 
   // Per-win theming — all share the warm STEP COMPLETE look; only the confetti
   // mascot glyph color shifts. Only classic and worm victories remain.
@@ -284,7 +293,7 @@ const VictoryScreen = ({
               textTransform: 'none',
               letterSpacing: '0.14em'
             }}>
-              Level {currentLevel} Complete
+              Level {flipScored ? currentLevel - 600 : currentLevel} Complete
             </span>
           </div>
         )}
@@ -324,6 +333,8 @@ const VictoryScreen = ({
           </div>
         )}
 
+        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + ' flips · ' : ''}{relapses} relapses
+          {currentLevel === 604 && flips > 0 && <><br />Solved in {flips} flips. Can you do it in 0?</>}</p>}
         {isCampaignFinale && (
           <p style={{
             fontSize: '12px', color: GOLD, margin: '-4px 0 20px', lineHeight: 1.5,
@@ -343,8 +354,8 @@ const VictoryScreen = ({
           marginBottom: '26px',
         }}>
           {[
-            { label: 'Moves', value: moves, highlight: underPar },
-            ...(par != null ? [{ label: 'Par', value: par }] : []),
+            { label: flipScored ? 'Flips' : 'Moves', value: score, highlight: underPar },
+            ...(par != null ? [{ label: flipScored ? 'Target' : 'Par', value: par }] : []),
             // Counted in whole seconds, formatted on the way out, so the clock
             // rolls up rather than appearing already stopped.
             { label: 'Time', value: time, format: formatTime },
@@ -386,7 +397,7 @@ const VictoryScreen = ({
             </button>
           )}
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button type="button" className="arcade-key" onClick={onContinue} style={{ flex: 1 }}>Keep playing</button>
+            <button type="button" className="arcade-key" onClick={onContinue} style={{ flex: 1 }}>{flipScored ? 'Level map' : 'Keep playing'}</button>
             {hasNextLevel && onNextLevel && (
               <button type="button" className="arcade-key" onClick={onNewGame} style={{ flex: 1 }}>
                 {currentLevel ? 'Retry level' : 'New puzzle'}

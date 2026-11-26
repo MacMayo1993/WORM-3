@@ -55,6 +55,17 @@ export function buildLevelStartState(level, size, { random = Math.random, levelN
   const scrambleSequence = level?.scrambleSequence;
   const flipSequence = level?.flipSequence;
 
+  const stageFlips = () => {
+    if (!flipSequence?.length) return;
+    const flipMap = buildManifoldGridMap(state, size);
+    for (const { x, y, z, dirKey } of flipSequence) {
+      state = flipStickerPair(state, size, x, y, z, dirKey, flipMap);
+    }
+  };
+
+  // Flip puzzles describe permanent pairs in home coordinates, then turn the board.
+  const flipFirst = level?.scoring === 'flips';
+  if (flipFirst) stageFlips();
   if (scrambleSequence?.length) {
     // Authored turns. numTurns is honoured for completeness, though authored
     // data emits one entry per quarter turn: getLevelPar counts entries, so a
@@ -75,12 +86,7 @@ export function buildLevelStartState(level, size, { random = Math.random, levelN
   // Authored antipodal flips. flipStickerPair moves the partner too, so one
   // entry per pair is enough. Flips don't relocate stickers, so a single
   // manifold map built here stays valid for the whole sequence.
-  if (flipSequence?.length) {
-    const flipMap = buildManifoldGridMap(state, size);
-    for (const { x, y, z, dirKey } of flipSequence) {
-      state = flipStickerPair(state, size, x, y, z, dirKey, flipMap);
-    }
-  }
+  if (!flipFirst) stageFlips();
 
   return state;
 }

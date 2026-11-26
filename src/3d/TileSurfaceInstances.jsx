@@ -1,3 +1,5 @@
+import { flipScarMaterial } from './flipScar.js';
+import { LESSON_MS, showingRelapseLesson } from '../game/flipRelapse.js';
 import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
 import { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -22,6 +24,12 @@ export function TileSurfaceProvider({ children, exteriorPortals }) {
   // PiP and live portal views render other cameras; keep their tiles available.
   useFrame(({ camera }) => {
     const state = useGameStore.getState();
+    if (state.flipRun) {
+      const run = state.flipRun;
+      flipScarMaterial.uniforms.playTime.value = run.elapsed / 1000;
+      const due = showingRelapseLesson(state) ? LESSON_MS : run.nextRoll;
+      flipScarMaterial.uniforms.warning.value = Number(due - run.elapsed <= 1500);
+    }
     const view = state.showAntipodalPiP || state.settings?.livePortalViews === true ? null : camera;
     pool.update(view);
     pool.decals.update(view);

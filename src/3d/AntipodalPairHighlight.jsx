@@ -80,6 +80,7 @@ const TetherLine = ({ from, to, color }) => {
 
 const AntipodalPairHighlight = () => {
   const pair = useGameStore((s) => s.firstFlipHighlightPair);
+  const linked = useGameStore(s => s.currentLevelData?.scoring === 'flips');
   const size = useGameStore((s) => s.size);
 
   if (!pair) return null;
@@ -93,8 +94,8 @@ const AntipodalPairHighlight = () => {
 
   return (
     <group>
-      <HighlightRing position={srcPos} rotation={srcRot} color={srcColor} />
-      <HighlightRing position={antPos} rotation={antRot} color={antColor} />
+      <HighlightRing position={srcPos} rotation={srcRot} color={linked ? '#ffe493' : srcColor} />
+      <HighlightRing position={antPos} rotation={antRot} color={linked ? '#ffe493' : antColor} />
       <TetherLine from={srcPos} to={antPos} color="#ffffff" />
     </group>
   );

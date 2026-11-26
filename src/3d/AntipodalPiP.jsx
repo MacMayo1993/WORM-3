@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Color, PerspectiveCamera, Vector3 } from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { currentExplosion } from '../worm/wormExpansion.js';
 import { raisedCubieExtent } from './raisedCubieMotion.js';
@@ -56,7 +57,19 @@ export default function AntipodalPiP() {
 
     const camera = rig.camera;
     main.getWorldPosition(camera.position).negate();
+    const focus = state.currentLevelData?.scoring === 'flips' && state.flipRun?.focus;
+    const selected = state.currentLevelData?.scoring === 'flips' && state.firstFlipHighlightPair?.antipodal;
+    const loc = selected || (focus && state.flipRun.elapsed - focus.at < 1600 &&
+      getManifoldMap(state.cubies, size, state.rotationEpoch).get(focus.twinId));
+    if (loc && rig.cube) {
+      // Aim at the actual twin's face, even after a turn separates the linked identities.
+      const dir = loc.dir ?? loc.dirKey;
+      const distance = camera.position.length();
+      rig.point.set(0, 0, 0).setComponent({ X: 0, Y: 1, Z: 2 }[dir[1]], dir[0] === 'P' ? 1 : -1);
+      camera.position.copy(rig.point.transformDirection(rig.cube.matrixWorld)).multiplyScalar(distance);
+    }
     camera.up.copy(main.up);
+    if (loc && Math.abs(rig.point.copy(camera.position).normalize().dot(camera.up)) > .98) camera.up.set(0, 0, -1);
     camera.near = main.near; camera.far = main.far;
     camera.aspect = view.width / view.height;
     camera.lookAt(0, 0, 0);

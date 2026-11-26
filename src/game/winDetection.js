@@ -34,6 +34,15 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
   return true;
 };
 
+// The Flip Cube campaign accepts every distinct, uniform six-face colour layout.
+export function checkFlipPuzzleSolved(cubies, size) {
+  if (!checkRubiksSolvedRotationInvariant(cubies, size)) return false;
+  const last = size - 1;
+  const near = cubies[0][0][0].stickers;
+  const far = cubies[last][last][last].stickers;
+  return new Set([near.NX.curr, near.NY.curr, near.NZ.curr, far.PX.curr, far.PY.curr, far.PZ.curr]).size === 6;
+}
+
 // Convenience wrapper: solved up to antipodal identification (flips allowed).
 export const checkRubiksSolvedAntipodal = (cubies, size) => checkRubiksSolved(cubies, size, { antipodal: true });
 

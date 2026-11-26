@@ -1,3 +1,4 @@
+import './flipLevelMap.css';
 import { PACK_ACCENTS } from '../../utils/modeThemes.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { loadProgress, progressManager } from '../../utils/levels.js';
@@ -166,7 +167,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
           gap: '12px',
           paddingBottom: '90px',
         }}>
-          {LEVELS.map((level) => {
+          {LEVELS.map((level, index) => {
             // Pack-relative: a level is open when its declared prerequisite is
             // done. isLevelUnlocked walks the story campaign, so it reported
             // every level of another pack as locked. testMode still has to be
@@ -175,6 +176,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
             // inline skips the check that used to apply it.
             const prereq = level.requirements?.previousLevel ?? null;
             const unlocked = progressManager.testMode || prereq === null || completedLevels.includes(prereq);
+            const number = level.scoring === 'flips' ? index + 1 : level.id;
             const beaten = completedLevels.includes(level.id);
             const stat = levelStats[level.id];
             const stars = stat?.stars || 0;
@@ -184,11 +186,12 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
             return (
               <button
                 key={level.id}
+                className={isNext && level.scoring === 'flips' ? 'flip-next-level' : undefined}
                 onClick={() => unlocked && onSelectLevel(level.id)}
                 onMouseEnter={() => setHovered(level.id)}
                 onMouseLeave={() => setHovered(null)}
                 disabled={!unlocked}
-                aria-label={`${unlocked ? (beaten ? 'Replay completed' : 'Play') : 'Locked'} level ${level.id}: ${level.name}`}
+                aria-label={`${unlocked ? (beaten ? 'Replay completed' : 'Play') : 'Locked'} level ${number}: ${level.name}`}
                 style={{
                   position: 'relative',
                   minHeight: '132px',
@@ -240,7 +243,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                       color: PAPER_TEXT,
                       lineHeight: 1,
                     }}>
-                      {level.id}
+                      {number}
                     </span>
                     <span style={{
                       marginTop: '7px', padding: '0 8px',
@@ -251,7 +254,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                       {level.name}
                     </span>
                     <StarRow count={STARS_PER_LEVEL} earned={stars} />
-                    <BestStats stats={stat} />
+                    {level.scoring === 'flips' ? <small>Target {level.flipPar}{stat?.bestFlips != null && ` · Best ${stat.bestFlips}${Number.isFinite(stat.bestFlipTime) ? ' (' + formatTime(stat.bestFlipTime) + ')' : ''}`}</small> : <BestStats stats={stat} />}
                   </>
                 ) : (
                   /* Locked chapters used to render a bare padlock — no name, no
@@ -261,7 +264,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     <span style={{
                       fontSize: '22px', fontWeight: 800, color: PAPER_TEXT_FAINT, lineHeight: 1,
                     }}>
-                      {level.id}
+                      {number}
                     </span>
                     <span style={{
                       marginTop: '6px', padding: '0 8px',

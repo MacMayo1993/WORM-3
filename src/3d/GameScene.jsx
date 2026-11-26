@@ -129,7 +129,7 @@ export default function GameScene({
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
-    demoLearnGuide,
+    demoLearnGuide, flipHintBand,
     size,
     cubies,
     wormHealerMode,
@@ -147,6 +147,7 @@ export default function GameScene({
     solveModeActive: s.solveModeActive,
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
+    flipHintBand: s.flipHintBand,
     demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
     cubies: s.cubies,
@@ -378,6 +379,8 @@ export default function GameScene({
           />
         )}
 
+        {flipHintBand && currentLevelData?.id === 604 && <TurnGuide axis="col" sliceIndex={1} dir={1} size={size}
+          reduced={isMobile || perfReducedFX} turning={!!animState} />}
         <AntipodalPairHighlight />
 
         {wormHealerMode && (

@@ -32,6 +32,16 @@ export function useUndo(startAnimation) {
 
     const lastMove = moveHistory[moveHistory.length - 1];
 
+    if (lastMove.beforeFlipInput) {
+      clearHomeAlignments();
+      useGameStore.setState(state => ({
+        ...lastMove.beforeFlipInput, rotationEpoch: state.rotationEpoch + 1, lastRotation: null,
+        moveHistory: state.moveHistory.slice(0, -1), firstFlipHighlightPair: null,
+        cubiePops: {}, tunnelBirths: {}, tunnelPulses: {}, tunnelDeaths: {}, flipWaveOrigins: [], flipPulse: null,
+      }));
+      return;
+    }
+
     if (lastMove.type === 'rotation') {
       const { axis, dir, sliceIndex } = lastMove;
       const turns = lastMove.numTurns ?? 1;

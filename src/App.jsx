@@ -419,7 +419,7 @@ export default function WORM3() {
   }, [teachActive, showMainMenu, size, exitTeachMode]);
 
   // Parity instability — flipped tiles spontaneously re-flip and propagate
-  useParityDecay();
+
 
   // Screen shake on each style cycle
   const randomStyleTick = useGameStore(s => s.randomStyleTick);
@@ -794,6 +794,12 @@ export default function WORM3() {
     // — a map holding a single card is a screen to click through, not a choice.
     // Registering first is what makes getLevel(DAILY_LEVEL_ID) resolve; it also
     // re-points the id if this session has been open since before midnight.
+    if (packId === 'flip-puzzles') {
+      setShowCubeModeSelect(false);
+      st.setRandomMode(false);
+      st.setWormHealerMode(false);
+      st.clearLevel();
+    }
     if (packId === DAILY_PACK_ID) {
       ensureDailyPack();
       handleLevelSelect(DAILY_LEVEL_ID);
@@ -807,7 +813,8 @@ export default function WORM3() {
   const handleBackToPackSelect = useCallback(() => {
     const st = useGameStore.getState();
     st.setShowLevelSelect(false);
-    st.setShowPackSelect(true);
+    if (st.activePackId === 'flip-puzzles') setShowCubeModeSelect(true);
+    else st.setShowPackSelect(true);
   }, []);
 
   const handleMenuPlay = handleStartCampaign;
@@ -859,6 +866,7 @@ export default function WORM3() {
 
     const newSettings = {
       ...settings,
+      flipRelapse: wizardSettings.flipRelapse ?? false,
       colorScheme: wizardSettings.colorScheme,
       backgroundTheme: wizardSettings.backgroundTheme,
       projectiscopeDesign: wizardSettings.projectiscopeDesign ?? settings.projectiscopeDesign,
@@ -880,6 +888,7 @@ export default function WORM3() {
       useGameStore.getState().resetGame();
     }
     // Cube is solved while MOBI intro plays; scramble fires when player taps through.
+    useGameStore.setState({ flipFreeplay: true });
     launchWithMobi(MOBI_LINES_FREEPLAY, 'FREEPLAY', () => { animatedShuffle(); });
   }, [settings, setSettings, animatedShuffle, size, changeSize, launchWithMobi]);
 
@@ -1217,15 +1226,19 @@ export default function WORM3() {
     const levelSize = currentLevelData?.cubeSize || size;
     // Staging rules live in levels/levelStaging.js — see the note there on why a
     // level that authors its own setup is never randomised on top.
-    const state = buildLevelStartState(currentLevelData, levelSize, { levelNumber: currentLevel });
+    const openingTurns = currentLevelData?.scoring === 'flips' ? currentLevelData.scrambleSequence : null;
+    const setup = openingTurns?.length ? { ...currentLevelData, scrambleSequence: [] } : currentLevelData;
+    const state = buildLevelStartState(setup, levelSize, { levelNumber: currentLevel });
     setRotatedCubies(state);
     // Save the level's chaos setting before resetGame() wipes it.
     const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
     useGameStore.getState().resetGame();
     clearRefractory();
     if (savedChaosLevel > 0) useGameStore.getState().setChaosLevel(savedChaosLevel);
-    useGameStore.getState().setHasShuffled(true);
-  }, [cancelShuffle, currentLevelData, currentLevel, size, setRotatedCubies]);
+    const ready = () => useGameStore.getState().setHasShuffled(true);
+    if (openingTurns?.length) startAnimatedShuffle(openingTurns, ready);
+    else ready();
+  }, [cancelShuffle, currentLevelData, currentLevel, size, setRotatedCubies, startAnimatedShuffle]);
 
   // Scramble a chapter that opened without a briefing. Keyed on the token alone
   // so a later shuffleForLevel identity change cannot re-scramble mid-play.
@@ -1259,7 +1272,7 @@ export default function WORM3() {
     recordLevelCompletion({
       levelId: currentLevel,
       levelData: currentLevelData,
-      stats: { moves, time: gameTime },
+      stats: { moves, time: gameTime, ...(currentLevelData?.scoring === 'flips' && { flips: useGameStore.getState().flipRun.flips }) },
       earn,
       dailyReward: EARN_DAILY_CHALLENGE,
       enabled,
@@ -1270,7 +1283,14 @@ export default function WORM3() {
   const handleVictoryContinue = useCallback(() => {
     recordCompletion();
     setVictory(null);
-  }, [recordCompletion, setVictory]);
+    if (currentLevelData?.scoring === 'flips') {
+      const state = useGameStore.getState();
+      state.setHasShuffled(false);
+      state.setShowNetPanel(false);
+      state.clearLevel();
+      state.setShowLevelSelect(true);
+    }
+  }, [recordCompletion, setVictory, currentLevelData]);
 
   const handleVictoryNewGame = useCallback(() => {
     recordCompletion();
@@ -1410,13 +1430,14 @@ export default function WORM3() {
   // first-flip gate.  Without this, resetting mid-countdown lets the timeout fire
   // after ~3 s and silently restart chaos on the freshly-solved cube.
   const handleReset = useCallback(() => {
+    if (currentLevelData?.scoring === 'flips') { shuffleForLevel(); return; }
     reset();
     cancelDisparityRun();
     // reset() calls resetGame() which clears chaosLevel. Re-apply the level's
     // configured chaos so the mode stays active after a keyboard/button reset.
     const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
     if (savedChaosLevel > 0) useGameStore.getState().setChaosLevel(savedChaosLevel);
-  }, [reset, cancelDisparityRun, currentLevelData]);
+  }, [reset, cancelDisparityRun, currentLevelData, shuffleForLevel]);
 
   // Surfaces that own the screen but live in App's local state rather than the
   // store, so selectCubeInputBlocked cannot see them.
@@ -1425,12 +1446,14 @@ export default function WORM3() {
     || showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showDisparityWizard || showDisparityBetting;
 
+  useParityDecay(keyboardDisabled || pageHidden || sheetOpen || wormPauseMenuOpen || teachMode.active);
+
   const { performCursorRotation } = useKeyboardControls({
     onMove,
     onFlip: onTapFlip,
     onUndo: undo,
     onReset: handleReset,
-    onShuffle: animatedShuffle,
+    onShuffle: currentLevelData?.scoring === 'flips' ? shuffleForLevel : animatedShuffle,
     onSaveState: handleSaveState,
     onLoadState: handleLoadState,
     onLevelJump: handleLevelSelect,
@@ -1477,7 +1500,7 @@ export default function WORM3() {
             onCubeSelect={() => { setShowModeSelect(false); handleMenuTeach(); }}
             onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
-            onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
+            onFreeplay={() => { setShowModeSelect(false); useGameStore.getState().setShowMainMenu(false); setShowCubeModeSelect(true); }}
             onRandom={() => { setShowModeSelect(false); handleMenuRandomMode(); }}
             onStore={() => { setShowModeSelect(false); handleOpenStore(); }}
             onComingSoon={() => { setShowModeSelect(false); handleMenuComingSoon(); }}
@@ -1617,7 +1640,7 @@ export default function WORM3() {
             }}
             handlers={{
               onReset: handleReset,
-              onShuffle: animatedShuffle,
+              onShuffle: currentLevelData?.scoring === 'flips' ? shuffleForLevel : animatedShuffle,
               onShuffleForLevel: shuffleForLevel,
               onChangeSize: changeSize,
               onSetChaosLevel: setChaosLevel,
