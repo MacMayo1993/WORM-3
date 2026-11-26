@@ -47,6 +47,9 @@ function dissolving(amount, reducedMotion, lift = 10) {
     ...(reducedMotion ? null : { transform: `translateY(${-amount * lift}px)` }) };
 }
 
+/** CSS pixels the phrase settles above its old mark (53% down), to sit centred over the portal. */
+const PHRASE_LIFT = 12;
+
 /**
  * Where the surviving phrase glides to: the middle of the emptied screen, grown
  * to a title-card size that still fits a phone. Measured once, from its resting
@@ -58,7 +61,7 @@ function measureGlide(element) {
   const { innerWidth: width, innerHeight: height } = window;
   return {
     x: width / 2 - (rect.left + rect.width / 2),
-    y: height * 0.53 - (rect.top + rect.height / 2),
+    y: height * 0.53 - PHRASE_LIFT - (rect.top + rect.height / 2),
     scale: Math.max(1, Math.min(1.6, (width * 0.86) / rect.width))
   };
 }
