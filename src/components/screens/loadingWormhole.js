@@ -15,11 +15,11 @@
  * start the cube `lead` cubes above the top portal's centre. Time 0 is that
  * start of the track. The cover joins that track during the first shared crossing.
  *
- * The floor portal cuts the cube on its own surface, the way a portal slices
- * what goes through it: along the front half of a flat ellipse across the mouth,
- * through the mouth's centre at its ends and `cut` cubes below it at the front
- * (roughly where a level plane through the centre meets the tilted cube's
- * faces), so it sinks into the paper in plain view. The upper portal shows the
+ * The floor portal swallows the cube on its own surface, the way a portal takes
+ * what goes through it: below a flat ellipse across the mouth (through its
+ * centre at its ends and `cut` cubes below it at the front, roughly where a
+ * level plane through the centre meets the tilted cube's faces) the cube fades
+ * into the throat (shaftFadeMask), seen in the whole opening as it sinks. The upper portal shows the
  * cube in its whole opening as it comes out (shaftClipPath): it is never hidden
  * while it emerges, only above the mouth. The cube passes through,
  * half of it in each portal, when its centre crosses the cut, `lead + cut` cubes
@@ -31,6 +31,9 @@ export const FALL = { period: 2, drop: 2.8, cut: 0.05, lead: 1.35 };
 // Ceiling ellipse half-depth in cube units, wider than the interior cut so
 // you can see the first stickers against the inside of the exit itself.
 export const EXIT_RIM_DEPTH = 0.34;
+// How far below the floor mouth's centre (in its half-heights) the sinking cube
+// has faded out completely: short of the front rim, so it is gone inside the hole.
+export const FLOOR_FADE_END = 0.3;
 // The lead plus cut is half the drop. Use the exact half-beat for pulse
 // comparisons at the seam (decimal geometry adds a rounding error).
 export const PASS_AT = FALL.period / 2;
@@ -52,14 +55,16 @@ const fmt = (v) => +v.toFixed(4);
  * at the mouth's centre instead hid every part still in the back half of the
  * opening, so a cube coming out showed as a corner under the portal.
  *
- * At the bottom it is the front half of a flat ellipse through the floor
- * portal's centre, `cut` deep at the front (FALL.cut): the cube sinks into the
- * paper. `rim` is the CSS length of a portal's half-height, which places its
- * centre in the shaft.
+ * At the bottom it closes on the floor mouth's FRONT rim (half-depth `floor`,
+ * the mouth's own half-height): the cube is seen going down into the whole
+ * opening and is hidden only behind the near lip, while shaftFadeMask darkens
+ * it into the throat below the surface. Cutting it on a line through the
+ * mouth's centre hid the bottom half of a cube still in the opening. `rim` is
+ * the CSS length of a portal's half-height, which places its centre in the shaft.
  */
 export function shaftClipPath(
   rim = 'var(--wl-wb)',
-  cut = `calc(var(--wl-cube) * ${FALL.cut})`,
+  floor = rim,
   steps = 12,
   exit = `min(${rim}, calc(var(--wl-cube) * var(--wl-exit-rim, ${EXIT_RIM_DEPTH})))`
 ) {
@@ -68,9 +73,20 @@ export function shaftClipPath(
       const angle = from + ((to - from) * i) / steps;
       return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${depth} * ${fmt(Math.sin(angle))})`;
     });
-  // Left to right over the exit mouth's back rim, then right to left across the
-  // floor's cut. LoadingPortal lights each portal's surface as the cube breaks it.
-  return `polygon(${[...arc(rim, exit, Math.PI, 2 * Math.PI), ...arc(`100% - ${rim}`, cut, 0, Math.PI)].join(', ')})`;
+  // Left to right over the exit mouth's back rim, then right to left along the
+  // floor mouth's front rim. LoadingPortal lights each portal's surface as the
+  // cube breaks it.
+  return `polygon(${[...arc(rim, exit, Math.PI, 2 * Math.PI), ...arc(`100% - ${rim}`, floor, 0, Math.PI)].join(', ')})`;
+}
+
+/**
+ * The shaft's mask: whatever has gone through the floor portal's surface (at
+ * the front, `cut` below the mouth's centre) fades into the throat, gone well
+ * before the near lip, so the cube reads as sinking through and vanishing
+ * rather than as cut off.
+ */
+export function shaftFadeMask(rim = 'var(--wl-wb)', cut = `calc(var(--wl-cube) * ${FALL.cut})`) {
+  return `linear-gradient(to bottom, #000 calc(100% - ${rim} + ${cut}), #0000 calc(100% - ${rim} * ${FLOOR_FADE_END}))`;
 }
 
 /**
