@@ -15,15 +15,13 @@
  * start the cube `lead` cubes above the top portal's centre. Time 0 is that
  * start of the track. The cover joins that track during the first shared crossing.
  *
- * Both portals cut the cube on their own surface, the way a portal slices what
- * goes through it: along the front half of a flat ellipse across the mouth,
+ * The floor portal cuts the cube on its own surface, the way a portal slices
+ * what goes through it: along the front half of a flat ellipse across the mouth,
  * through the mouth's centre at its ends and `cut` cubes below it at the front
  * (roughly where a level plane through the centre meets the tilted cube's
- * faces). So the cube comes out of the upper mouth and sinks into the lower one
- * in plain view, inside the rim, rather than sliding out from behind it. The
- * cube and its twin are exactly one drop apart, so the two cuts fall on the same
- * line of the cube: whatever has sunk into the paper has come out of the portal
- * above, and the two pieces always add up to one cube. The cube passes through,
+ * faces), so it sinks into the paper in plain view. The upper portal shows the
+ * cube in its whole opening as it comes out (shaftClipPath): it is never hidden
+ * while it emerges, only above the mouth. The cube passes through,
  * half of it in each portal, when its centre crosses the cut, `lead + cut` cubes
  * into each fall, which this `lead` puts at mid-beat. That also leaves the
  * two-beat track's restart (cube wholly below the floor to wholly above the
@@ -45,22 +43,34 @@ const fmt = (v) => +v.toFixed(4);
 
 /**
  * The CSS clip-path for the shaft the cube falls down, which is exactly as wide
- * as the portals and runs from the upper portal's surface to the floor
- * portal's: each edge is the front half of a flat ellipse through the portal's
- * centre, `cut` deep at the front (FALL.cut). The cube shows below the upper
- * portal's surface and above the floor portal's, cut along the same line of the
- * cube in each, so it is never in both at once. `rim` is the CSS length of a
- * portal's half-height, which places its centre in the shaft.
+ * as the portals and runs from the upper portal to the floor portal.
+ *
+ * At the top it opens on the exit mouth's BACK rim (half-depth `exit`, the
+ * flattened ellipse LoadingPortal draws there): the cube is seen inside the
+ * whole opening as it comes out, over the vortex, and stays hidden only above
+ * the mouth, so it comes out of the portal rather than from behind it. Cutting it
+ * at the mouth's centre instead hid every part still in the back half of the
+ * opening, so a cube coming out showed as a corner under the portal.
+ *
+ * At the bottom it is the front half of a flat ellipse through the floor
+ * portal's centre, `cut` deep at the front (FALL.cut): the cube sinks into the
+ * paper. `rim` is the CSS length of a portal's half-height, which places its
+ * centre in the shaft.
  */
-export function shaftClipPath(rim = 'var(--wl-wb)', cut = `calc(var(--wl-cube) * ${FALL.cut})`, steps = 12) {
-  const arc = (centre, from, to) =>
+export function shaftClipPath(
+  rim = 'var(--wl-wb)',
+  cut = `calc(var(--wl-cube) * ${FALL.cut})`,
+  steps = 12,
+  exit = `min(${rim}, calc(var(--wl-cube) * var(--wl-exit-rim, ${EXIT_RIM_DEPTH})))`
+) {
+  const arc = (centre, depth, from, to) =>
     Array.from({ length: steps + 1 }, (_, i) => {
       const angle = from + ((to - from) * i) / steps;
-      return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${cut} * ${fmt(Math.sin(angle))})`;
+      return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${depth} * ${fmt(Math.sin(angle))})`;
     });
-  // Left to right across the ceiling portal's surface, then right to left
-  // across the floor's. LoadingPortal lights each cut as the cube breaks it.
-  return `polygon(${[...arc(rim, Math.PI, 0), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
+  // Left to right over the exit mouth's back rim, then right to left across the
+  // floor's cut. LoadingPortal lights each portal's surface as the cube breaks it.
+  return `polygon(${[...arc(rim, exit, Math.PI, 2 * Math.PI), ...arc(`100% - ${rim}`, cut, 0, Math.PI)].join(', ')})`;
 }
 
 /**

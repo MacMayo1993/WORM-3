@@ -138,34 +138,31 @@ describe('loading screen timing', () => {
 });
 
 describe('the shaft between the portals', () => {
-  const clip = shaftClipPath('R', 'C', 12);
+  const clip = shaftClipPath('R', 'C', 12, 'E');
   const points = clip.slice('polygon('.length, -1).split(', ');
 
-  it("cuts the cube on each portal's surface, through its centre and a little in front of it", () => {
+  it('shows the cube in the whole exit mouth as it comes out, never hiding it inside the opening', () => {
     expect(points).toHaveLength(26);
-    expect(points[0]).toBe('0% calc(R + C * 0)');
-    expect(points[6]).toBe('50% calc(R + C * 1)'); // the upper portal's surface, at the front
-    expect(points[12]).toBe('100% calc(R + C * 0)');
+    // Over the exit mouth's back rim: the cube is seen in the whole opening,
+    // and hidden only above the mouth.
+    expect(points[0]).toBe('0% calc(R + E * 0)');
+    expect(points[6]).toBe('50% calc(R + E * -1)'); // the back of the exit mouth
+    expect(points[12]).toBe('100% calc(R + E * 0)');
+    for (const point of points.slice(0, 13)) expect(point).not.toMatch(/E \* 0\.\d+\)$|E \* 1\)$/);
+    // The exit mouth is the flattened ellipse LoadingPortal draws there.
+    expect(shaftClipPath()).toContain(`min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, ${EXIT_RIM_DEPTH})))`);
+  });
+
+  it('sinks the cube into the floor portal along a cut just in front of its centre', () => {
     expect(points[13]).toBe('100% calc(100% - R + C * 0)');
     expect(points[19]).toBe('50% calc(100% - R + C * 1)'); // the floor portal's surface, at the front
     expect(points[25]).toBe('0% calc(100% - R + C * 0)');
-    // Inside the mouth, so the cube is seen coming out of it (and going in),
-    // not sliding out from behind its rim: the cut is shallower than the near
-    // lip, which lies the mouth's half-height (0.18 of a mouth 2.4 cubes wide)
-    // in front of the centre.
+    // Inside the mouth, so the cube is seen going in, not sliding behind the rim:
+    // the cut is shallower than the near lip.
     expect(FALL.cut).toBeGreaterThan(0);
     expect(FALL.cut).toBeLessThan(EXIT_RIM_DEPTH - 0.1);
     expect(EXIT_RIM_DEPTH).toBeLessThan(2.4 * 0.18);
     expect(shaftClipPath()).toContain(`calc(var(--wl-cube) * ${FALL.cut})`);
-  });
-
-  it('cuts the cube and its twin, one drop apart, on the same line, so it is never in both portals', () => {
-    const upper = points
-      .slice(0, 13)
-      .map((p) => p.replace('calc(R + ', 'calc('))
-      .reverse();
-    const lower = points.slice(13).map((p) => p.replace('calc(100% - R + ', 'calc('));
-    expect(lower).toEqual(upper);
   });
 
   it('passes through, half in each portal, mid-fall', () => {
