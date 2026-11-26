@@ -29,7 +29,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
-import { EXIT_RIM_DEPTH, LOADING_START_PHASE, shaftClipPath } from './loadingWormhole.js';
+import { EXIT_RIM_DEPTH, LOADING_START_PHASE, shaftClipPath, shaftFadeMask } from './loadingWormhole.js';
 import { createLoadingPlay, openingLine, orientationAim, pointerAim } from './loadingPlay.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import LoadingPortal from './LoadingPortal.jsx';
@@ -148,8 +148,9 @@ const Storm = React.memo(function Storm({ near }) {
   );
 });
 
-// Between the two portals' near lips.
-const SHAFT_STYLE = { clipPath: shaftClipPath() };
+// Between the two portals' near lips, fading into the floor portal's throat.
+const SHAFT_MASK = shaftFadeMask();
+const SHAFT_STYLE = { clipPath: shaftClipPath(), maskImage: SHAFT_MASK, WebkitMaskImage: SHAFT_MASK };
 const SCENE_STYLE = { '--wl-exit-rim': EXIT_RIM_DEPTH, '--wl-start-phase': `${LOADING_START_PHASE}s` };
 const MOBI_STYLE = { '--wl-mobi': `url("${import.meta.env.BASE_URL}Mobi.webp")` };
 

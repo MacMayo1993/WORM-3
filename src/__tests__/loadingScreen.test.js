@@ -18,6 +18,8 @@ import {
   passPulse,
   passes,
   shaftClipPath,
+  shaftFadeMask,
+  FLOOR_FADE_END,
   spinAngle,
   wormPose
 } from '../components/screens/loadingWormhole.js';
@@ -153,16 +155,22 @@ describe('the shaft between the portals', () => {
     expect(shaftClipPath()).toContain(`min(var(--wl-wb), calc(var(--wl-cube) * var(--wl-exit-rim, ${EXIT_RIM_DEPTH})))`);
   });
 
-  it('sinks the cube into the floor portal along a cut just in front of its centre', () => {
+  it('shows the cube in the whole floor mouth as it sinks, hidden only behind the near lip', () => {
     expect(points[13]).toBe('100% calc(100% - R + C * 0)');
-    expect(points[19]).toBe('50% calc(100% - R + C * 1)'); // the floor portal's surface, at the front
+    expect(points[19]).toBe('50% calc(100% - R + C * 1)'); // the floor mouth's front rim
     expect(points[25]).toBe('0% calc(100% - R + C * 0)');
-    // Inside the mouth, so the cube is seen going in, not sliding behind the rim:
-    // the cut is shallower than the near lip.
-    expect(FALL.cut).toBeGreaterThan(0);
+    // By default the floor arc is the mouth's own half-height, not a line through its centre.
+    expect(shaftClipPath()).toContain('calc(100% - var(--wl-wb) + var(--wl-wb) * 1)');
+  });
+
+  it('fades what has gone through the floor surface into the throat, gone before the near lip', () => {
+    const mask = shaftFadeMask('R', 'C');
+    expect(mask).toBe(`linear-gradient(to bottom, #000 calc(100% - R + C), #0000 calc(100% - R * ${FLOOR_FADE_END}))`);
+    // Fully faded inside the opening, below the surface's front.
+    expect(FLOOR_FADE_END).toBeGreaterThan(0);
+    expect(FLOOR_FADE_END).toBeLessThan(1);
     expect(FALL.cut).toBeLessThan(EXIT_RIM_DEPTH - 0.1);
-    expect(EXIT_RIM_DEPTH).toBeLessThan(2.4 * 0.18);
-    expect(shaftClipPath()).toContain(`calc(var(--wl-cube) * ${FALL.cut})`);
+    expect(shaftFadeMask()).toContain(`calc(var(--wl-cube) * ${FALL.cut})`);
   });
 
   it('passes through, half in each portal, mid-fall', () => {
@@ -176,8 +184,9 @@ describe('the shaft between the portals', () => {
     const halfCube = 0.9;
     // The cube starting the fall is wholly above the upper portal's cut ...
     expect(-FALL.lead + halfCube).toBeLessThan(FALL.cut - 0.4);
-    // ... and the same cube ending it wholly below the floor portal's.
-    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + FALL.cut + 0.3);
+    // ... and the same cube ending it wholly below the floor mouth's near lip
+    // (half-height 2.4 × 0.18 cubes).
+    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + 2.4 * 0.18 + 0.1);
   });
 
   it("lights the portals' surfaces while the cube breaks through them, and not at the restart", () => {
