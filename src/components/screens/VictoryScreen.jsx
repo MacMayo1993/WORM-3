@@ -9,7 +9,9 @@ import {
  TEXT_XS, Z,
   ARCADE_INK, ARCADE_MUTED, ARCADE_CARD, ARCADE_LINE, ARCADE_LINE_SOFT, ARCADE_CARD_SHADOW } from '../../utils/uiTheme.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
-import { computeStars, getLevelPar } from '../../levels/scoring.js';
+import { computeStars, getLevelPar, nextFlipStar } from '../../levels/scoring.js';
+import { flipClearRecords, nextStarLine } from './flipClearRecords.js';
+import './flipClearCard.css';
 import { prefersReducedMotion } from '../../utils/device.js';
 
 // ─── Reward beat timings ──────────────────────────────────────────────────────
@@ -332,8 +334,17 @@ const VictoryScreen = ({
           </div>
         )}
 
-        {flipScored && <p>{newBest && 'New best · '}{previous?.bestFlips != null ? 'Previous best ' + previous.bestFlips + (previous.bestFlips === 1 ? ' flip' : ' flips') + (Number.isFinite(previous.bestFlipTime) ? ' in ' + formatTime(previous.bestFlipTime) : '') + ' · ' : ''}{relapses} {relapses === 1 ? 'relapse' : 'relapses'}
-          {currentLevel === 604 && flips > 0 && <><br />Solved in {flips} flips. Can you do it in 0?</>}</p>}
+        {/* What this clear changed, then what the next star asks for. */}
+        {flipScored && (
+          <div className="flip-clear" style={{ animation: `vsVerdictIn 0.4s ease-out ${STAR_DELAY_BASE + 3 * STAR_DELAY_STEP + 0.15}s both` }}>
+            <ul className="flip-clear-records" aria-label="Records">
+              {flipClearRecords({ previous, stars, flips, newBest, relapses }).map(record => (
+                <li key={record.id} className={`flip-clear-chip flip-clear-chip--${record.tone}`}>{record.label}</li>
+              ))}
+            </ul>
+            <p className="flip-clear-next">{nextStarLine(nextFlipStar(levelData, flips), levelData.flipPar, flips)}</p>
+          </div>
+        )}
         {isCampaignFinale && (
           <p style={{
             fontSize: '12px', color: GOLD, margin: '-4px 0 20px', lineHeight: 1.5,
@@ -343,7 +354,9 @@ const VictoryScreen = ({
           </p>
         )}
 
-        <XpRunSummary mode="puzzle" />
+        {/* A flip level keeps its numbers and keys above the fold on a phone; the XP
+            summary follows them. */}
+        {!flipScored && <XpRunSummary mode="puzzle" />}
 
         {/* Stats */}
         <div style={{
@@ -404,6 +417,8 @@ const VictoryScreen = ({
             )}
           </div>
         </div>
+
+        {flipScored && <div style={{ marginTop: '18px' }}><XpRunSummary mode="puzzle" /></div>}
 
         {/* Main Menu escape hatch */}
         {onMainMenu && (

@@ -31,13 +31,30 @@ export function parSlack(par) {
   return Math.max(2, Math.ceil(par * 0.5));
 }
 
+// A Flip Cube level's star lines in flips: three stars at its target or fewer,
+// two up to half again over (at least one), one for any solve.
+export function flipStarLines(level) {
+  return { three: level.flipPar, two: level.flipPar + Math.max(1, Math.ceil(level.flipPar / 2)) };
+}
+
+/**
+ * What the next star asks for after a run of `flips` on a flip level:
+ * { stars, flips } for the next star up, or null when the run already has three.
+ */
+export function nextFlipStar(level, flips) {
+  const lines = flipStarLines(level);
+  if (flips <= lines.three) return null;
+  return flips <= lines.two ? { stars: 3, flips: lines.three } : { stars: 2, flips: lines.two };
+}
+
 // Star rating (1-3) for a completion. `stats` carries { moves, time }.
 export function computeStars(level, stats = {}) {
   if (!level) return 1;
   if (level.scoring === 'flips') {
     if (!Number.isInteger(stats.flips)) return 1;
-    if (stats.flips <= level.flipPar) return 3;
-    return stats.flips <= level.flipPar + Math.max(1, Math.ceil(level.flipPar / 2)) ? 2 : 1;
+    const lines = flipStarLines(level);
+    if (stats.flips <= lines.three) return 3;
+    return stats.flips <= lines.two ? 2 : 1;
   }
   const moves = typeof stats.moves === 'number' && stats.moves > 0 ? stats.moves : null;
   const par = getLevelPar(level);
