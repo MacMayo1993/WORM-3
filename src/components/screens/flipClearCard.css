@@ -1,0 +1,8 @@
+/* Flip Cube clear card: records chips and the next-star line (VictoryScreen). */
+.flip-clear { margin: 0 0 18px; }
+.flip-clear-records { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
+.flip-clear-chip { padding: 4px 10px; border: 2px solid #354d3c; border-radius: 999px; background: #fffdf0; color: #26372d;
+  font: 800 12px/1.2 var(--heading-font, system-ui); box-shadow: 0 2px #354d3c; }
+.flip-clear-chip--gold { background: #ffe38a; }
+.flip-clear-chip--green { background: #cdeec0; }
+.flip-clear-next { margin: 0; color: #88620a; font: 800 13px/1.35 var(--heading-font, system-ui); }

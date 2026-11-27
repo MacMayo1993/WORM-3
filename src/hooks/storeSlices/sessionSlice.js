@@ -14,7 +14,10 @@ export const createSessionSlice = (set, get) => ({
   flipFreeplay: false,
   flipActiveMs: 0,
   flipSessionMenu: false,
-  flipHintBand: false,
+  // Flip Cube levels: the Show-me step on the cube (levels/flipHint.js) and the
+  // Check rings (game/flipCheck.js). FlipPuzzleHUD owns both while it is up.
+  flipHint: null,
+  flipCheck: false,
   flipRun: newFlipRun(),
   moves: 0,
   gameTime: 0,
@@ -48,8 +51,8 @@ export const createSessionSlice = (set, get) => ({
     flipActiveMs: 0,
     firstFlipHighlightPair: null,
     ...(get().currentLevelData?.scoring === 'flips' && { showNetPanel: false }),
-    // flipHintBand belongs to FlipPuzzleHUD's open hint (cleared when it closes or
-    // unmounts); clearing it here left the hint open with its turn guide gone.
+    // flipHint belongs to FlipPuzzleHUD's open hint, which recomputes it from the
+    // new board; clearing it here left the hint open with its guide gone.
     showCutawayLens: false,
     xpRun: null,
     moves: 0,

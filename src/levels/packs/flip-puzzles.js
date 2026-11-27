@@ -52,12 +52,23 @@ const puzzles = [
     line: 'Find the band that brings the faces together. One pair will remain.', hint: 'Restore the outer layers. A half turn through the middle leaves one corner pair to fix.' },
 ];
 
+// The level's solution as quarter turns, which the Show-me hint follows
+// (levels/flipHint.js): undo the scramble, then each band's middle half turn.
+// The pairs left after it are the level's flips.
+const BAND_AXIS = { x: 'col', y: 'row', z: 'depth' };
+function solutionTurns(puzzle) {
+  const undo = [...(puzzle.turns ?? [])].reverse().map(turn => ({ ...turn, dir: -turn.dir }));
+  const halves = (puzzle.bands ?? []).flatMap(band => [turn(BAND_AXIS[band], 1), turn(BAND_AXIS[band], 1)]);
+  return [...undo, ...halves];
+}
+
 export const FLIP_PUZZLES = puzzles.map((puzzle, index) => {
   const id = 601 + index;
   return createLevel({
     id, name: puzzle.name, description: puzzle.line, scoring: 'flips', flipPar: puzzle.target,
     relapse: index >= 4, relapseLesson: !!puzzle.lesson, winCondition: WIN_CONDITIONS.FLIP,
     background: FLIP_PUZZLE_BACKGROUNDS[index],
+    plan: solutionTurns(puzzle),
     scrambleMoves: 0, scrambleSequence: puzzle.turns ?? [],
     flipSequence: [...bandFlips(puzzle.bands ?? []), ...(puzzle.repairs ?? []),
       ...(puzzle.scars ?? []).flatMap(([tile, count]) => Array(count).fill(tile))],

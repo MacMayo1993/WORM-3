@@ -5,3 +5,49 @@
   }
   @keyframes flip-next-pulse { from { opacity: .2; } to { opacity: .85; } }
 }
+
+/* Flip Cube level map (FlipLevelMap.jsx): a road climbing the page. */
+.flip-map { position: fixed; inset: 0; height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 0 0; overflow: hidden; }
+.flip-map-head { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 540px; margin: 0 auto; padding: 0 72px 10px 14px; box-sizing: border-box; }
+.flip-map-title { flex: 1; min-width: 0; }
+.flip-map-title h1 { margin: 0; color: #26372d; font: 400 20px/1.1 var(--display-font, 'Bungee'), sans-serif; text-transform: uppercase; }
+.flip-map-title p { margin: 2px 0 0; color: #5b6b5f; font: 800 12px/1.2 var(--heading-font, system-ui); }
+.flip-map-stars { color: #26372d; font: 800 22px/1 var(--heading-font, system-ui); }
+.flip-map-stars span { margin-left: 3px; color: #c8902a; }
+.flip-map-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.flip-map-board { position: relative; width: 100%; max-width: 540px; margin: 0 auto; }
+.flip-map-trail { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.flip-map-road { fill: none; stroke-linecap: round; }
+.flip-map-road--cleared { stroke: #354d3c; stroke-width: 12; }
+.flip-map-road--open { stroke: #354d3c; stroke-width: 5; stroke-dasharray: 2 12; opacity: .55; }
+.flip-map-road--locked { stroke: #b9b7a3; stroke-width: 4; stroke-dasharray: 2 12; }
+/* A yellow centre line rides the cleared road. */
+.flip-map-road--line { stroke: var(--flip-yellow, #ffd500); stroke-width: 5; }
+/* The piece's centre sits on the trail point; the label hangs toward the middle. */
+.flip-map-stage { position: absolute; transform: translate(-37px, -50%); display: flex; align-items: center; gap: 10px; }
+.flip-map-stage--right { flex-direction: row-reverse; transform: translate(calc(-100% + 37px), -50%); }
+.flip-map-piece { width: 74px; height: 74px; padding: 5px; border-radius: 22px; flex: none; }
+.flip-map-piece .piece-face { display: grid; place-items: center; border-radius: 16px; }
+.flip-map-number { color: #26372d; font: 400 30px/1 var(--display-font, 'Bungee'), sans-serif; }
+.flip-map-piece--locked { cursor: default; box-shadow: 0 4px 0 #050506; }
+.flip-map-piece--locked .flip-map-number { font-size: 22px; filter: grayscale(1); }
+.flip-map-label { display: flex; flex-direction: column; gap: 2px; width: min(136px, 34vw); box-sizing: border-box; padding: 6px 9px; border: 2px solid #354d3c; border-radius: 12px;
+  background: #fffdf0; box-shadow: 0 3px #354d3c; color: #26372d; font: 800 12px/1.25 var(--heading-font, system-ui); }
+.flip-map-stage--right .flip-map-label { text-align: right; }
+.flip-map-label strong { font-size: 13px; }
+.flip-map-scene { color: #6b7a6f; font-weight: 700; }
+.flip-map-row { display: flex; justify-content: space-between; gap: 6px; }
+.flip-map-stage--right .flip-map-row { flex-direction: row-reverse; }
+.flip-map-stars-row b { color: rgba(30, 22, 18, .18); }
+.flip-map-stars-row b.on { color: #c8902a; }
+.flip-map-next { align-self: flex-start; margin-top: 2px; padding: 1px 7px; border-radius: 999px; background: #354d3c; color: #fffdf0; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.flip-map-stage--right .flip-map-next { align-self: flex-end; }
+.flip-map-crown { position: absolute; left: 37px; top: -20px; width: 34px; transform: translateX(-50%); fill: #f2b705; stroke: #354d3c; stroke-width: 1.6; stroke-linejoin: round; }
+.flip-map-stage--right .flip-map-crown { left: auto; right: 37px; transform: translateX(50%); }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduced-motion]) .flip-map-stage--next .flip-map-piece::after {
+    content: ''; position: absolute; inset: -7px; border: 3px solid #977100; border-radius: 26px; pointer-events: none;
+    animation: flip-next-pulse 1.6s ease-in-out infinite alternate;
+  }
+}

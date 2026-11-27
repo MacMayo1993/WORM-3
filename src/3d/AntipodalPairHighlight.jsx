@@ -80,9 +80,15 @@ const TetherLine = ({ from, to, color }) => {
 };
 
 const AntipodalPairHighlight = () => {
-  const pair = useGameStore((s) => s.firstFlipHighlightPair);
+  const firstPair = useGameStore((s) => s.firstFlipHighlightPair);
+  // A Flip Cube level's Show-me hint rings the next pair to flip the same way.
+  const hintPair = useGameStore((s) => (s.flipHint?.kind === 'pair' && !s.animState ? s.flipHint : null));
   const linked = useGameStore(s => s.currentLevelData?.scoring === 'flips');
   const size = useGameStore((s) => s.size);
+  const pair = firstPair ?? (hintPair && {
+    source: { x: hintPair.a.x, y: hintPair.a.y, z: hintPair.a.z, dir: hintPair.a.dirKey },
+    antipodal: { x: hintPair.b.x, y: hintPair.b.y, z: hintPair.b.z, dir: hintPair.b.dirKey },
+  });
 
   if (!pair) return null;
 
