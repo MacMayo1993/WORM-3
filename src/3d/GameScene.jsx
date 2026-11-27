@@ -23,6 +23,7 @@ import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
 import TurnGuide from '../teach/TurnGuide.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
+import FlipCheckMarks from './FlipCheckMarks.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import { usesWormRideCamera } from '../worm/wormCameraMode.js';
 import AntipodalPiP from './AntipodalPiP.jsx';
@@ -129,7 +130,7 @@ export default function GameScene({
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
-    demoLearnGuide, flipHintBand,
+    demoLearnGuide, flipHint,
     size,
     cubies,
     wormHealerMode,
@@ -147,7 +148,7 @@ export default function GameScene({
     solveModeActive: s.solveModeActive,
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
-    flipHintBand: s.flipHintBand,
+    flipHint: s.flipHint,
     demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
     cubies: s.cubies,
@@ -379,8 +380,9 @@ export default function GameScene({
           />
         )}
 
-        {flipHintBand && currentLevelData?.id === 604 && <TurnGuide axis="col" sliceIndex={1} dir={1} size={size}
-          reduced={isMobile || perfReducedFX} turning={!!animState} />}
+        {flipHint?.kind === 'turn' && !animState && <TurnGuide axis={flipHint.axis} sliceIndex={flipHint.sliceIndex} dir={flipHint.dir}
+          size={size} reduced={isMobile || perfReducedFX} turning={false} />}
+        {currentLevelData?.scoring === 'flips' && <FlipCheckMarks />}
         <AntipodalPairHighlight />
 
         {wormHealerMode && (

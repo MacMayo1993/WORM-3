@@ -14,8 +14,10 @@ export const CUBE_PIECE_POP = 0.55;
 export const LEGACY_PIECE_POP = 0.1;
 // Chaos and cube demos need visible raised tunnels without overwriting the
 // player's ordinary-mode bounce preference. Reduced motion is separate.
-export const effectiveFlipPads = state => (state.chaosLevel > 0 || state.demoMode) && !state.wormHealerMode
-  && !state.mirrorMode ? 'full' : state.settings?.flipPads;
+// Flip Cube levels keep every tile flat: the puzzle has to read as a cube, and
+// popped pieces and pads on stalks turned a well-flipped board into an explosion.
+export const effectiveFlipPads = state => state.currentLevelData?.scoring === 'flips' && !state.wormHealerMode ? 'off'
+  : (state.chaosLevel > 0 || state.demoMode) && !state.wormHealerMode && !state.mirrorMode ? 'full' : state.settings?.flipPads;
 export const flipCubePadsEnabled = state => !state.wormHealerMode
   && !state.mirrorMode && effectiveFlipPads(state) !== 'off';
 const popAmount = (distance, size) => distance / (Math.max(0.5, (size - 1) / 2) * cubeExpansionMultiplier(size));

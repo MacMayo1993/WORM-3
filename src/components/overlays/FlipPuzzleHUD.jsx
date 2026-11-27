@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { LESSON_MS, ROLL_MS, scarredPairs, showingRelapseLesson } from '../../game/flipRelapse.js';
+import { flipHint, hintLine } from '../../levels/flipHint.js';
+import { flipCheckTiles } from '../../game/flipCheck.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import './flipPuzzleHUD.css';
 
@@ -13,10 +15,16 @@ export default function FlipPuzzleHUD({ level }) {
   const lesson = useGameStore(showingRelapseLesson);
   const candidates = useGameStore(s => scarredPairs(s.cubies, s.size, selectEffectiveFlipCap(s))
     .some(p => !(s.flipRun.cooldowns[p.id] > s.flipRun.elapsed || s.flipRun.cooldowns[p.twinId] > s.flipRun.elapsed)));
-  useEffect(() => {
-    useGameStore.setState({ flipHintBand: !!(hint && level?.id === 604) });
-    return () => useGameStore.setState({ flipHintBand: false });
-  }, [hint, level?.id]);
+  const cubies = useGameStore(s => s.cubies);
+  const size = useGameStore(s => s.size);
+  const cap = useGameStore(selectEffectiveFlipCap);
+  const check = useGameStore(s => s.flipCheck);
+  // The next step of the level's own solution, from the board as it stands. It
+  // follows every turn and flip while the hint is open (levels/flipHint.js).
+  const step = useMemo(() => (hint && level ? flipHint(level, cubies, size, cap) : null), [hint, level, cubies, size, cap]);
+  const wrong = useMemo(() => (check && level ? flipCheckTiles(cubies, size).length : 0), [check, level, cubies, size]);
+  useEffect(() => { useGameStore.setState({ flipHint: step }); }, [step]);
+  useEffect(() => () => useGameStore.setState({ flipHint: null, flipCheck: false }), []);
   const remaining = Math.max(0, (lesson ? LESSON_MS : due) - elapsed);
   const seconds = Math.ceil(remaining / 1000);
   const ringFraction = Math.min(1, (prefersReducedMotion() ? seconds * 1000 : remaining) / (lesson ? LESSON_MS : ROLL_MS));
@@ -31,8 +39,11 @@ export default function FlipPuzzleHUD({ level }) {
           <circle cx="12" cy="12" r="9" pathLength="1" strokeDasharray="1" strokeDashoffset={1 - ringFraction} /></svg>
         {seconds}s</span>}
       {level && <button type="button" aria-expanded={hint} onClick={() => setHint(v => !v)}>{hint ? 'Hide hint' : 'Hint'}</button>}
+      {level && <button type="button" aria-pressed={check} onClick={() => useGameStore.setState({ flipCheck: !check })}>
+        {check ? `Check · ${wrong} off` : 'Check'}</button>}
     </div>
-    {hint && <><p>{level.tutorial.tip}</p><button type="button" onClick={() => useGameStore.getState().setShowNetPanel(true)}>Open cube net</button></>}
+    {hint && <><p className="flip-hint-step">{hintLine(step)}</p><p>{level.tutorial.tip}</p>
+      <button type="button" className="flip-net-key" onClick={() => useGameStore.getState().setShowNetPanel(true)}>Open cube net</button></>}
     {lesson && <p>Watch the cracked edge.</p>}
     <div role="status">{last && <p>{last.hits.length === 1 ? 'Scarred pair flipped' : last.hits.length + ' scarred pairs flipped'} · {last.hits.map(hit => hit.from + ' ↔ ' + hit.to).join(', ')}</p>}</div>
   </aside>;
