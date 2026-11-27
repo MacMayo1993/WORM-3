@@ -98,7 +98,9 @@ export default function FlipLevelMap({ pack, onSelectLevel, onBack }) {
                   aria-label={`${open ? (beaten ? 'Replay' : 'Play') : 'Locked'} level ${index + 1}: ${level.name}${beaten ? `, ${stars} of 3 stars` : ''}`}>
                   <span className="piece-face"><span className="flip-map-number">{open ? index + 1 : '🔒'}</span></span>
                 </button>
-                <div className="flip-map-label" aria-hidden="true">
+                {/* The label opens the level too: on a phone it is the bigger target.
+                    The piece stays the one accessible key. */}
+                <div className={`flip-map-label${open ? ' is-open' : ''}`} aria-hidden="true" onClick={() => open && onSelectLevel(level.id)}>
                   <strong>{level.name}</strong>
                   <span className="flip-map-scene">{SCENE_NAMES[level.background] ?? ''}</span>
                   <span className="flip-map-row">

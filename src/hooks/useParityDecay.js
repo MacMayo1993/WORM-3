@@ -23,8 +23,17 @@ export function useParityDecay(paused = false) {
         updated.flipActiveMs = state.flipActiveMs + delta;
         updated.gameTime = Math.floor(updated.flipActiveMs / 1000);
       }
-      useGameStore.setState(updated);
-      if (updated.cubies) feel('relapse');
+      const { cubeTurn, ...patch } = updated;
+      const warned = !state.flipRun.cubeTurn && patch.flipRun?.cubeTurn;
+      useGameStore.setState(patch);
+      if (patch.cubies) feel('relapse');
+      if (warned) feel('countdownBeat');
+      // The cube's own turn plays like a scramble move: animated, no move counted
+      // and no undo entry (handleAnimComplete clears the history for it).
+      if (cubeTurn) {
+        const move = { ...cubeTurn, isShuffle: true, isCubeTurn: true, sliceIndices: null, sliceDirs: null, orientationResets: null };
+        useGameStore.setState({ animState: { ...move, t: 0 }, pendingMove: move });
+      }
     }, 200);
     document.addEventListener('visibilitychange', rebase);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', rebase); };

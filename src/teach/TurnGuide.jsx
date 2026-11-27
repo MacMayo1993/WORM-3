@@ -125,12 +125,17 @@ const trackFragment = (lite) => `
 
 // Warm cream to soft amber: the cue's own colours, the deep tone lifted a
 // little toward the core so the whole guide reads as light, not paint.
-const CORE = new THREE.Color(ACTION_CUES.turn.color);
-const DEEP = new THREE.Color(ACTION_CUES.turn.deep).lerp(CORE, 0.4);
+// `cue` picks the palette: 'turn' for the player's hint, 'danger' for a turn the
+// cube is about to make on its own (Flip Cube levels' cube turns).
+const cueColors = cue => {
+  const core = new THREE.Color(ACTION_CUES[cue].color);
+  return { core, deep: new THREE.Color(ACTION_CUES[cue].deep).lerp(core, 0.4) };
+};
+const CUES = { turn: cueColors('turn'), danger: cueColors('danger') };
 
 // Two bounded draws; no lights, texture loads, points, or frame allocations.
 // Hazard warnings keep their own LayerHighlight and quality policy.
-export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false, turning = false }) {
+export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false, turning = false, cue = 'turn' }) {
   const [calm] = useState(prefersReducedMotion);
   const age = useRef(0);
   const rim = useMemo(() => getSliceRimGeometry(size, axis, sliceIndex), [size, axis, sliceIndex]);
@@ -141,14 +146,16 @@ export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false
   // the old object, frozen at the opacity 0 it was given when the first move
   // turned: the guide showed the first move and never another.
   const uniforms = useMemo(() => ({
-    uDeep: { value: DEEP.clone() },
-    uCore: { value: CORE.clone() },
+    uDeep: { value: CUES.turn.deep.clone() },
+    uCore: { value: CUES.turn.core.clone() },
     uTime: { value: 0 },
     uDir: { value: 1 },
     uOpacity: { value: calm ? 1 : 0 },
     uLength: { value: 1 },
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
   uniforms.uDir.value = dir === 1 ? 1 : -1;
+  uniforms.uCore.value.copy((CUES[cue] ?? CUES.turn).core);
+  uniforms.uDeep.value.copy((CUES[cue] ?? CUES.turn).deep);
   uniforms.uLength.value = track.userData.trackLength;
   const rimShader = useMemo(() => rimFragment(reduced), [reduced]);
   const trackShader = useMemo(() => trackFragment(reduced), [reduced]);

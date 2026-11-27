@@ -8,6 +8,7 @@ import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js'
 import { checkFlipPuzzleSolved } from '../game/winDetection.js';
 import { makeCubies } from '../game/cubeState.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
+import { newFlipRun, stepCubeTurns } from '../game/flipRelapse.js';
 
 const play = (board, step) => step.kind === 'turn'
   ? applyTileMove(board, 3, step).cubies
@@ -76,5 +77,53 @@ describe('Flip Cube levels keep the cube flat', () => {
     expect(effectiveFlipPads({ settings, currentLevelData: FLIP_PUZZLES[5] })).toBe('off');
     expect(effectiveFlipPads({ settings, currentLevelData: null })).toBe('full');
     expect(effectiveFlipPads({ settings, chaosLevel: 1 })).toBe('full');
+  });
+});
+
+describe('the cube turns on its own from level 7', () => {
+  it('runs only on levels 7–10, sooner each level, with a warning before each turn', () => {
+    expect(FLIP_PUZZLES.slice(0, 6).every(level => !level.cubeTurns)).toBe(true);
+    const gaps = FLIP_PUZZLES.slice(6).map(level => level.cubeTurns.every);
+    expect(gaps).toEqual([30, 25, 20, 15]);
+    expect(FLIP_PUZZLES.slice(6).every(level => level.cubeTurns.warn === 3)).toBe(true);
+  });
+
+  it('schedules the first turn, picks its layer when the warning starts and turns when it is due', () => {
+    const level = FLIP_PUZZLES[9];
+    const run = { ...newFlipRun(level.id) };
+    const at = ms => { run.elapsed = ms; return stepCubeTurns(run, level, 3); };
+    expect(at(0)).toBeNull();
+    expect(run.nextCubeTurn).toBe(15000);
+    expect(at(11000)).toBeNull();
+    expect(run.cubeTurn).toBeNull();
+    expect(at(12000)).toBeNull();
+    const warned = run.cubeTurn;
+    expect(warned).toMatchObject({ at: 15000 });
+    expect(['col', 'row', 'depth']).toContain(warned.axis);
+    const turn = at(15000);
+    expect(turn).toEqual({ axis: warned.axis, sliceIndex: warned.sliceIndex, dir: warned.dir });
+    expect(run).toMatchObject({ cubeTurn: null, nextCubeTurn: 30000, cubeTurns: 1 });
+  });
+
+  it('is the same for the same seed, and leaves the relapse rolls untouched', () => {
+    const turns = seed => {
+      const run = newFlipRun(seed), out = [];
+      for (let ms = 0; ms <= 120000; ms += 500) { run.elapsed = ms; const t = stepCubeTurns(run, FLIP_PUZZLES[8], 3); if (t) out.push(t); }
+      return { out, seed: run.seed };
+    };
+    const a = turns(609), b = turns(609);
+    expect(a.out).toEqual(b.out);
+    expect(a.out).toHaveLength(6);
+    expect(a.seed).toBe(newFlipRun(609).seed);
+  });
+
+  it('a hint after the cube turns a layer shows the turn that undoes it', () => {
+    const level = FLIP_PUZZLES[6];
+    const start = buildLevelStartState(level, 3);
+    const onPlan = flipHint(level, start, 3);
+    const turned = applyTileMove(start, 3, { axis: 'col', sliceIndex: 1, dir: 1 }).cubies;
+    const step = flipHint(level, turned, 3);
+    expect(step).toMatchObject({ kind: 'turn', back: true });
+    expect(flipHint(level, applyTileMove(turned, 3, step).cubies, 3)).toEqual(onPlan);
   });
 });

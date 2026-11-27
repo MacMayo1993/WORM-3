@@ -13,6 +13,8 @@ export default function FlipPuzzleHUD({ level }) {
   const due = useGameStore(s => s.flipRun.nextRoll);
   const event = useGameStore(s => s.flipRun.event);
   const lesson = useGameStore(showingRelapseLesson);
+  const nextCubeTurn = useGameStore(s => s.flipRun.nextCubeTurn);
+  const warning = useGameStore(s => !!s.flipRun.cubeTurn);
   const candidates = useGameStore(s => scarredPairs(s.cubies, s.size, selectEffectiveFlipCap(s))
     .some(p => !(s.flipRun.cooldowns[p.id] > s.flipRun.elapsed || s.flipRun.cooldowns[p.twinId] > s.flipRun.elapsed)));
   const cubies = useGameStore(s => s.cubies);
@@ -38,6 +40,12 @@ export default function FlipPuzzleHUD({ level }) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="9" pathLength="1" strokeDasharray="1" strokeDashoffset={1 - ringFraction} /></svg>
         {seconds}s</span>}
+      {level?.cubeTurns && nextCubeTurn != null && <span className={`flip-clock flip-clock--cube${warning ? ' is-warning' : ''}`}
+        aria-label={warning ? 'The cube is about to turn a layer' : `The cube turns a layer in ${Math.ceil(Math.max(0, nextCubeTurn - elapsed) / 1000)} seconds`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="9" pathLength="1" strokeDasharray="1"
+            strokeDashoffset={1 - Math.min(1, Math.max(0, nextCubeTurn - elapsed) / (level.cubeTurns.every * 1000))} /></svg>
+        {warning ? 'Turning!' : `Turn ${Math.ceil(Math.max(0, nextCubeTurn - elapsed) / 1000)}s`}</span>}
       {level && <button type="button" aria-expanded={hint} onClick={() => setHint(v => !v)}>{hint ? 'Hide hint' : 'Hint'}</button>}
       {level && <button type="button" aria-pressed={check} onClick={() => useGameStore.setState({ flipCheck: !check })}>
         {check ? `Check · ${wrong} off` : 'Check'}</button>}

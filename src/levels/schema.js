@@ -194,7 +194,7 @@ export function createLevel(overrides) {
     // quarterTurns. null for levels that are not algorithm lessons.
     algorithm: overrides.algorithm ?? null,
     ...(overrides.scoring === 'flips' && {
-      scoring: 'flips', flipPar: overrides.flipPar, relapse: overrides.relapse, relapseLesson: overrides.relapseLesson, plan: overrides.plan,
+      scoring: 'flips', flipPar: overrides.flipPar, relapse: overrides.relapse, relapseLesson: overrides.relapseLesson, plan: overrides.plan, cubeTurns: overrides.cubeTurns,
     }),
     actionFocus: overrides.actionFocus ?? null,
 

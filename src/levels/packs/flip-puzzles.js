@@ -56,6 +56,9 @@ const puzzles = [
 // (levels/flipHint.js): undo the scramble, then each band's middle half turn.
 // The pairs left after it are the level's flips.
 const BAND_AXIS = { x: 'col', y: 'row', z: 'depth' };
+/** Seconds between the cube's own turns on levels 7–10, and the warning before each. */
+export const CUBE_TURN_EVERY = [30, 25, 20, 15];
+export const CUBE_TURN_WARN = 3;
 function solutionTurns(puzzle) {
   const undo = [...(puzzle.turns ?? [])].reverse().map(turn => ({ ...turn, dir: -turn.dir }));
   const halves = (puzzle.bands ?? []).flatMap(band => [turn(BAND_AXIS[band], 1), turn(BAND_AXIS[band], 1)]);
@@ -69,6 +72,9 @@ export const FLIP_PUZZLES = puzzles.map((puzzle, index) => {
     relapse: index >= 4, relapseLesson: !!puzzle.lesson, winCondition: WIN_CONDITIONS.FLIP,
     background: FLIP_PUZZLE_BACKGROUNDS[index],
     plan: solutionTurns(puzzle),
+    // From level 7 the cube fights back: it turns a layer on its own, with a
+    // warning first, sooner each level (game/flipRelapse.js, stepCubeTurns).
+    ...(index >= 6 && { cubeTurns: { every: CUBE_TURN_EVERY[index - 6], warn: CUBE_TURN_WARN } }),
     scrambleMoves: 0, scrambleSequence: puzzle.turns ?? [],
     flipSequence: [...bandFlips(puzzle.bands ?? []), ...(puzzle.repairs ?? []),
       ...(puzzle.scars ?? []).flatMap(([tile, count]) => Array(count).fill(tile))],

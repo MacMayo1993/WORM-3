@@ -49,6 +49,10 @@ describe('FlipLevelMap', () => {
     act(() => keys[2].click());
     expect(picked).toEqual([603]);
     expect(host.querySelectorAll('.flip-map-road--line')).toHaveLength(1);
+    // Its label opens it too; a locked label does nothing.
+    act(() => host.querySelectorAll('.flip-map-label')[1].click());
+    act(() => host.querySelectorAll('.flip-map-label')[5].click());
+    expect(picked).toEqual([603, 602]);
     host.remove();
   });
 });
