@@ -105,3 +105,27 @@ it('closes the far-side window when the level is solved', () => {
   expect(useGameStore.getState().victory).toBeTruthy();
   expect(useGameStore.getState().showAntipodalPiP).toBe(false);
 });
+
+it('turns a layer on its own on a cube-turn level, without counting a move or leaving an undo', () => {
+  const level = FLIP_PUZZLES[9];
+  act(() => useGameStore.setState({ currentLevelData: level, currentLevel: level.id, cubies: buildLevelStartState(level, 3),
+    flipRun: newFlipRun(level.id), moveHistory: [], moves: 0 }));
+  act(() => input.flip({ x: 0, y: 2, z: 2 }, 'PZ'));
+  expect(useGameStore.getState().moveHistory).toHaveLength(1);
+  const before = useGameStore.getState().cubies;
+  // Into the warning: the layer is picked and shown, nothing has turned yet.
+  act(() => vi.advanceTimersByTime(12600));
+  expect(useGameStore.getState().flipRun.cubeTurn).toBeTruthy();
+  expect(useGameStore.getState().cubies).toBe(before);
+  // Past the turn: it starts like a scramble move.
+  act(() => vi.advanceTimersByTime(3000));
+  const { pendingMove, animState } = useGameStore.getState();
+  expect(pendingMove).toMatchObject({ isCubeTurn: true, isShuffle: true });
+  expect(animState).toBeTruthy();
+  act(() => input.handleAnimComplete());
+  const after = useGameStore.getState();
+  expect(after.cubies).not.toBe(before);
+  expect(after.moves).toBe(1);
+  expect(after.moveHistory).toEqual([]);
+  expect(after.flipRun.cubeTurns).toBe(1);
+});

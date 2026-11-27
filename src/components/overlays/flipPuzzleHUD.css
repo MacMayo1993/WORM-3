@@ -8,3 +8,5 @@
 .flip-clock circle + circle { stroke: #88620a; }
 .flip-puzzle-row button[aria-pressed="true"] { color: #b3124a; }
 .flip-puzzle-hud .flip-hint-step { color: #88620a; }
+.flip-clock--cube circle + circle { stroke: #c84b55; }
+.flip-clock--cube.is-warning { color: #b3124a; }

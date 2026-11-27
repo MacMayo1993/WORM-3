@@ -148,6 +148,9 @@ export function useAnimation() {
           lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir, numTurns: pm.numTurns ?? 1 },
           animState: null,
           pendingMove: null,
+          // A Flip level's own turn is the cube's move, not the player's: Undo
+          // cannot take it back, and no earlier checkpoint may restore past it.
+          ...(pm.isCubeTurn && { moveHistory: [] }),
         }));
         pendingMoveRef.current = null;
 

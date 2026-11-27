@@ -40,7 +40,7 @@ describe('FlipLevelMap', () => {
     act(() => root.render(<FlipLevelMap pack={pack} onSelectLevel={id => picked.push(id)} onBack={() => {}} />));
     const keys = [...host.querySelectorAll('.flip-map-piece')];
     expect(keys).toHaveLength(10);
-    expect(keys[0].getAttribute('aria-label')).toMatch(/Replay level 1: First Flip, 3 of 3 stars/);
+    expect(keys[0].getAttribute('aria-label')).toBe('Replay level 1: First Flip, 3 of 3 stars, best 1 flip');
     expect(keys[2].getAttribute('aria-label')).toMatch(/^Play level 3/);
     expect(keys[3].disabled).toBe(true);
     expect(host.querySelector('.flip-map-stage--next').textContent).toMatch(/Twin Trouble/);
@@ -49,6 +49,10 @@ describe('FlipLevelMap', () => {
     act(() => keys[2].click());
     expect(picked).toEqual([603]);
     expect(host.querySelectorAll('.flip-map-road--line')).toHaveLength(1);
+    // Its label opens it too; a locked label does nothing.
+    act(() => host.querySelectorAll('.flip-map-label')[1].click());
+    act(() => host.querySelectorAll('.flip-map-label')[5].click());
+    expect(picked).toEqual([603, 602]);
     host.remove();
   });
 });

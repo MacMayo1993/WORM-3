@@ -23,7 +23,44 @@ export const flipTurnsLocked = state => !!(showingRelapseLesson(state) ||
   (flipPuzzle(state) && (state.firstFlipHighlightPair || !state.hasShuffled || state.victory)));
 
 export function newFlipRun(seed = 1) {
-  return { seed, elapsed: 0, nextRoll: ROLL_MS, flips: 0, count: 0, lessonSeen: false, cooldowns: {}, event: null };
+  return { seed, elapsed: 0, nextRoll: ROLL_MS, flips: 0, count: 0, lessonSeen: false, cooldowns: {}, event: null,
+    // The cube's own turns (levels with `cubeTurns`): when the next one lands, the
+    // layer it has picked once its warning starts, and how many it has made. Their
+    // randomness has its own stream, so adding them leaves the relapse rolls alone.
+    turnSeed: (seed ^ 0x9e3779b9) >>> 0, nextCubeTurn: null, cubeTurn: null, cubeTurns: 0 };
+}
+
+const AXES = ['col', 'row', 'depth'];
+const nextRandom = run => { run.turnSeed = (Math.imul(run.turnSeed, 1664525) + 1013904223) >>> 0; return run.turnSeed / 4294967296; };
+
+/**
+ * The cube turning a layer on its own, on a level that asks for it
+ * (`level.cubeTurns`: { every, warn } in seconds). Writes into `run` (a copy):
+ * schedules the first turn, picks the layer when its warning starts (so the
+ * glow can show it) and, when the turn is due, returns it for the driver to
+ * play. Any outer or middle layer, either way; seeded per run.
+ */
+export function stepCubeTurns(run, level, size) {
+  const spec = level?.cubeTurns;
+  if (!spec) return null;
+  const every = spec.every * 1000, warn = spec.warn * 1000;
+  if (run.nextCubeTurn == null) run.nextCubeTurn = run.elapsed + every;
+  if (!run.cubeTurn && run.elapsed >= run.nextCubeTurn - warn) {
+    run.cubeTurn = {
+      axis: AXES[Math.floor(nextRandom(run) * AXES.length)],
+      sliceIndex: Math.floor(nextRandom(run) * size),
+      dir: nextRandom(run) < 0.5 ? 1 : -1,
+      at: run.nextCubeTurn,
+    };
+  }
+  if (run.cubeTurn && run.elapsed >= run.cubeTurn.at) {
+    const turn = run.cubeTurn;
+    run.cubeTurn = null;
+    run.nextCubeTurn = run.elapsed + every;
+    run.cubeTurns += 1;
+    return { axis: turn.axis, sliceIndex: turn.sliceIndex, dir: turn.dir };
+  }
+  return null;
 }
 
 // Undo in a flip session restores the board and the player's score, never the
@@ -86,6 +123,8 @@ function positionName(loc, size) {
 export function advanceFlipRun(state, delta, cap) {
   const elapsed = state.flipRun.elapsed + delta;
   const run = { ...state.flipRun, elapsed };
+  const cubeTurn = state.hasShuffled && !state.victory ? stepCubeTurns(run, state.currentLevelData, state.size) : null;
+  if (cubeTurn) return { flipRun: run, cubeTurn };
   if (!relapseEnabled(state)) return { flipRun: run };
   const lesson = showingRelapseLesson(state);
   if (elapsed < (lesson ? LESSON_MS : run.nextRoll)) return { flipRun: run };

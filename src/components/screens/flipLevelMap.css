@@ -51,3 +51,4 @@
     animation: flip-next-pulse 1.6s ease-in-out infinite alternate;
   }
 }
+.flip-map-label.is-open { cursor: pointer; }
