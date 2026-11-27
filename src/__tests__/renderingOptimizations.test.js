@@ -19,6 +19,27 @@ describe('changed sticker ancestry', () => {
     root.attach(sticker); check(); root.position.x = 9; check();
     sticker.matrixAutoUpdate = false; sticker.matrix.makeTranslation(5, 6, 7); check();
   });
+  it('recomputes a piece that moved and came back while it went unchecked', () => {
+    // Flip Cube level 6: a piece whose tiles all drew their own meshes was not
+    // checked while a slice turn carried it round. The renderer last drew it at the
+    // turned pose, then the commit put it back on the grid, so its components read
+    // unchanged while its matrixWorld was still the turned one. A tile that moved
+    // onto it was placed from that stale matrix and floated there for good.
+    const root = new THREE.Group(), piece = new THREE.Group();
+    root.add(piece); piece.position.set(1, 0, -1);
+    const tracker = createWorldTransformTracker();
+    tracker.begin(); tracker.update(piece);
+    // Unchecked frames: the turn moves the piece and the renderer draws it there.
+    piece.position.set(1, 1, 0); root.updateMatrixWorld(true);
+    tracker.begin(); tracker.begin();
+    // The commit puts it back between frames; a new tile arrives on it.
+    piece.position.set(1, 0, -1);
+    const tile = new THREE.Group(); tile.position.z = -0.51; piece.add(tile);
+    tracker.begin(); tracker.update(tile);
+    const tracked = tile.matrixWorld.clone();
+    tile.updateWorldMatrix(true, false);
+    expect(tracked.elements).toEqual(tile.matrixWorld.elements);
+  });
   it('leaves idle versions unchanged and only recomposes changed ancestry', () => {
     const root = new THREE.Group(), a = new THREE.Group(), b = new THREE.Group(); root.add(a, b);
     const tracker = createWorldTransformTracker(); tracker.begin();
