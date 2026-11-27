@@ -1,4 +1,5 @@
 import './flipLevelMap.css';
+import FlipLevelMap from './FlipLevelMap.jsx';
 import { PACK_ACCENTS } from '../../utils/modeThemes.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { loadProgress, progressManager } from '../../utils/levels.js';
@@ -322,4 +323,12 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
   );
 };
 
-export default LevelSelectScreen;
+// Flip Cube Levels is a map of its own (FlipLevelMap.jsx); every other pack keeps
+// this grid of cards.
+const LevelSelect = (props) => {
+  const pack = getPack(props.packId);
+  return pack?.id === 'flip-puzzles' ? <FlipLevelMap pack={pack} onSelectLevel={props.onSelectLevel} onBack={props.onBack} />
+    : <LevelSelectScreen {...props} />;
+};
+
+export default LevelSelect;
