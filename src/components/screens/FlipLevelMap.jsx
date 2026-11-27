@@ -95,7 +95,7 @@ export default function FlipLevelMap({ pack, onSelectLevel, onBack }) {
                 <button type="button" className={`piece flip-map-piece${open ? '' : ' flip-map-piece--locked'}`}
                   style={{ '--piece-color': open ? yellow : '#c9c6b4' }} disabled={!open}
                   onClick={() => open && onSelectLevel(level.id)}
-                  aria-label={`${open ? (beaten ? 'Replay' : 'Play') : 'Locked'} level ${index + 1}: ${level.name}${beaten ? `, ${stars} of 3 stars` : ''}`}>
+                  aria-label={`${open ? (beaten ? 'Replay' : 'Play') : 'Locked'} level ${index + 1}: ${level.name}${beaten ? `, ${stars} of 3 stars` : ''}${beaten && Number.isInteger(stat?.bestFlips) ? `, best ${flipsWord(stat.bestFlips)}` : ''}`}>
                   <span className="piece-face"><span className="flip-map-number">{open ? index + 1 : '🔒'}</span></span>
                 </button>
                 {/* The label opens the level too: on a phone it is the bigger target.

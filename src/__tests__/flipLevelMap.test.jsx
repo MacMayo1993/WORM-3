@@ -40,7 +40,7 @@ describe('FlipLevelMap', () => {
     act(() => root.render(<FlipLevelMap pack={pack} onSelectLevel={id => picked.push(id)} onBack={() => {}} />));
     const keys = [...host.querySelectorAll('.flip-map-piece')];
     expect(keys).toHaveLength(10);
-    expect(keys[0].getAttribute('aria-label')).toMatch(/Replay level 1: First Flip, 3 of 3 stars/);
+    expect(keys[0].getAttribute('aria-label')).toBe('Replay level 1: First Flip, 3 of 3 stars, best 1 flip');
     expect(keys[2].getAttribute('aria-label')).toMatch(/^Play level 3/);
     expect(keys[3].disabled).toBe(true);
     expect(host.querySelector('.flip-map-stage--next').textContent).toMatch(/Twin Trouble/);

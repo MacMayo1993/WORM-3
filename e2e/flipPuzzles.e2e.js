@@ -29,8 +29,9 @@ for (const phone of [false, true]) {
     await expect(page.getByLabel('3 of 3 stars')).toBeVisible();
     await expect(page.getByText('Target met!', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Level map', exact: true }).click();
-    const card = page.getByRole('button', { name: 'Replay completed level 1: First Flip' });
-    await expect(card).toContainText('Best 1');
+    // The map's piece names the clear, its stars and best flips; its label shows them.
+    await expect(page.getByRole('button', { name: 'Replay level 1: First Flip, 3 of 3 stars, best 1 flip', exact: true })).toBeVisible();
+    await expect(page.locator('.flip-map-stage', { hasText: 'First Flip' })).toContainText('Best 1 flip');
     expect(errors).toEqual([]);
   });
 }
