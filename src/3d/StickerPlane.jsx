@@ -1343,9 +1343,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
 
   const backTileStyle = isDead || lightweightNumbers || isChrome ? 'solid' : isNeon ? 'neonSign' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
-  // The back is never animated, so in WORM it is always one of the tile-surface
+  // The back is never animated, so in every mode it is one of the tile-surface
   // batches: plain backs share one material, styled backs their style's instanced twin.
-  const batchBack = wormHealerMode && !!surfaceCtx && !useGlassStyle;
+  // Outside WORM it was one draw per tile (54 on a 3×3 Flip level).
+  const batchBack = !!surfaceCtx && !useGlassStyle;
   const instanceBack = batchBack && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
@@ -1651,7 +1652,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {antipodalHex && (
         <group ref={backOrientationRef} name={batchBack ? 'sticker-antipodal-back' : ''}
           position={[0, 0, -0.018]} rotation={[0, Math.PI, -displayAngle]} scale={[0.8, 0.8, 1]}>
-        {/* In WORM the back is drawn by the tile-surface batches from this group (see batchBack),
+        {/* The back is drawn by the tile-surface batches from this group (see batchBack),
             which then carries the back's name. */}
         {!batchBack && <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />

@@ -22,6 +22,7 @@ import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { ALL_TILE_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
+import { registerPreviewRenderer } from './previewHost.js';
 
 // ─── Cube geometry constants ─────────────────────────────────────────────────
 // The preview cube is normalised to one unit across whatever its piece count, so
@@ -412,3 +413,6 @@ export function unregisterCubePreview(id) {
   registry.delete(id);
   maybeStopLoop();
 }
+
+// The main Canvas hands over its renderer and ticks this one (previewHost.js).
+registerPreviewRenderer({ setShared: setCubeSharedRenderer, active: hasActiveCubePreviews, tick: tickCubePreviews });

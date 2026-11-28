@@ -24,7 +24,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { sharedUniforms } from './styles/TileStyleMaterials.jsx';
+import { sharedUniforms } from './styles/sharedTileUniforms.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 

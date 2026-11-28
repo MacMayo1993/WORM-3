@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
-import { ensureInstanceColor, setInstanceCount, uploadInstancePrefix } from './instanceUploads.js';
+import { ensureInstanceColor, setInstanceCount, uploadInstanceRange } from './instanceUploads.js';
 import { frameWorldVersion, isRestingFrameAnchor, nextCullStamp, tileInView } from './tileFrames.js';
 
 // Opaque tile accessories share geometry/material draws but retain their own
@@ -109,7 +109,13 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         camera.updateWorldMatrix(true, false);
         frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       }
-      for (const batch of batches.values()) { batch.count = 0; batch.matrixDirty = batch.colorDirty = batch.seedDirty = batch.dataDirty = false; }
+      // Each kind of write keeps the span of slots it touched (lo..hi), so the upload
+      // sends that span rather than every live slot.
+      for (const batch of batches.values()) {
+        batch.count = 0;
+        batch.mLo = batch.cLo = batch.sLo = batch.dLo = Infinity;
+        batch.mHi = batch.cHi = batch.sHi = batch.dHi = -1;
+      }
       for (const entry of entries) {
         const { anchor, geometry, colorRef, seedRef, dataRef, frames } = entry;
         // A hidden anchor draws nothing whatever its ancestors are doing: decide that
@@ -143,7 +149,8 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         if (moved || entry.worldVersion !== version || entry.rootVersion !== rootVersion) {
           local.multiplyMatrices(inverse, anchor.matrixWorld);
           batch.mesh.setMatrixAt(slot, local);
-          batch.matrixDirty = true;
+          if (slot < batch.mLo) batch.mLo = slot;
+          batch.mHi = slot;
         }
         if (colorRef) {
           // Most tiles pass a hex string; parsing it is a regex per tile per frame.
@@ -155,21 +162,25 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
           } else color.setRGB(entry.cr, entry.cg, entry.cb);
           if (moved || entry.r !== color.r || entry.g !== color.g || entry.b !== color.b) {
             batch.mesh.setColorAt(slot, color);
-            batch.colorDirty = true;
+            if (slot < batch.cLo) batch.cLo = slot;
+            batch.cHi = slot;
             entry.r = color.r; entry.g = color.g; entry.b = color.b;
           }
         }
         if (seedRef && (moved || entry.seed !== seedRef.current)) {
           entry.seed = seedRef.current;
           batch.seeds.array[slot] = entry.seed;
-          batch.seedDirty = true;
+          if (slot < batch.sLo) batch.sLo = slot;
+          batch.sHi = slot;
         }
         if (dataRef) {
           const next = dataRef.current, held = entry.data, array = batch.data.array, at = slot * 4;
+          let changed = false;
           for (let i = 0; i < 4; i++) {
             const value = next[i] ?? 0;
-            if (moved || held[i] !== value) { held[i] = array[at + i] = value; batch.dataDirty = true; }
+            if (moved || held[i] !== value) { held[i] = array[at + i] = value; changed = true; }
           }
+          if (changed) { if (slot < batch.dLo) batch.dLo = slot; batch.dHi = slot; }
         }
         batch.owners[slot] = entry;
         entry.worldVersion = version; entry.rootVersion = rootVersion;
@@ -178,10 +189,10 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
         const { mesh, count } = batch;
         setInstanceCount(mesh, count);
         batch.owners.length = count;
-        if (batch.matrixDirty) uploadInstancePrefix(mesh.instanceMatrix, count);
-        if (batch.colorDirty) uploadInstancePrefix(mesh.instanceColor, count);
-        if (batch.seedDirty) uploadInstancePrefix(batch.seeds, count);
-        if (batch.dataDirty) uploadInstancePrefix(batch.data, count);
+        uploadInstanceRange(mesh.instanceMatrix, batch.mLo, batch.mHi + 1);
+        uploadInstanceRange(mesh.instanceColor, batch.cLo, batch.cHi + 1);
+        uploadInstanceRange(batch.seeds, batch.sLo, batch.sHi + 1);
+        uploadInstanceRange(batch.data, batch.dLo, batch.dHi + 1);
       }
     },
     dispose() {

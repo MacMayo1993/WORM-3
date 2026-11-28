@@ -115,7 +115,9 @@ export function createCubieBodyBatches(capacity = 4096, materialFor = material =
       }
       for (const batch of batches.values()) {
         const { mesh, items, owners } = batch;
-        if (camera) items.sort(byFarthestFirst);
+        // Only see-through bodies need painter's order; opaque ones keep their slots,
+        // so a still cube uploads nothing.
+        if (camera && mesh.material.transparent) items.sort(byFarthestFirst);
         let dirty = false;
         for (let slot = 0; slot < items.length; slot++) {
           const entry = items[slot];

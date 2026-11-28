@@ -86,7 +86,6 @@ export default function UILayer({
   canUndo,
   victory,
   moves,
-  gameTime,
   currentLevel,
   currentLevelData,
   hasNextLevel,
@@ -151,6 +150,8 @@ export default function UILayer({
   // A Chaos round owns the flips (the storm flips, the player heals), so its
   // Flip key goes dim rather than lighting up and doing nothing.
   const chaosFlipLocked = useGameStore(selectChaosFlipLocked);
+  // The clock ticks every second; only the win card shows it, and it stops there.
+  const gameTime = useGameStore(s => (s.victory ? s.gameTime : 0));
 
   // UI visibility flags — change rarely, batched to minimise subscriptions
   const flipFreeplay = useGameStore(s => flipFreeplayActive(s) && !!s.settings?.flipRelapse);

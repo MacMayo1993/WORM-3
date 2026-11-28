@@ -70,9 +70,7 @@ import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import MenuPaperBackdrop from './3d/MenuPaperBackdrop.jsx';
 import { subscribeCarouselActive, isCarouselActive } from './components/menus/menuCarouselState.js';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
-import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
-import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
-import { setCubeSharedRenderer, tickCubePreviews, hasActiveCubePreviews } from './3d/CubePreviewRenderer.js';
+import { setPreviewHostRenderer, tickPreviewRenderers } from './3d/previewHost.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -266,16 +264,8 @@ function MenuScene({ onCubeClick, background }) {
  */
 function TilePreviewHost() {
   const { gl } = useThree();
-  useEffect(() => {
-    setSharedRenderer(gl);
-    setWormSharedRenderer(gl);
-    setCubeSharedRenderer(gl);
-  }, [gl]);
-  useFrame((_, delta) => {
-    if (hasActivePreviews()) tickPreviews(delta);
-    if (hasActiveWormPreviews()) tickWormPreviews(delta);
-    if (hasActiveCubePreviews()) tickCubePreviews(delta);
-  });
+  useEffect(() => setPreviewHostRenderer(gl), [gl]);
+  useFrame((_, delta) => tickPreviewRenderers(delta));
   return null;
 }
 
@@ -344,7 +334,7 @@ export default function WORM3() {
     setCubies, setRotatedCubies, changeSize, reset, flipSticker, healSticker
   } = useCubeState();
 
-  const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
+  const { moves, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
 
   const {
     animState, startAnimation, handleAnimComplete, onMove, startAnimatedShuffle, cancelShuffle
@@ -1274,12 +1264,12 @@ export default function WORM3() {
     recordLevelCompletion({
       levelId: currentLevel,
       levelData: currentLevelData,
-      stats: { moves, time: gameTime, ...(currentLevelData?.scoring === 'flips' && { flips: useGameStore.getState().flipRun.flips }) },
+      stats: { moves, time: useGameStore.getState().gameTime, ...(currentLevelData?.scoring === 'flips' && { flips: useGameStore.getState().flipRun.flips }) },
       earn,
       dailyReward: EARN_DAILY_CHALLENGE,
       enabled,
     });
-  }, [currentLevel, currentLevelData, moves, gameTime, size]);
+  }, [currentLevel, currentLevelData, moves, size]);
 
   // Victory handlers
   const handleVictoryContinue = useCallback(() => {
@@ -1614,7 +1604,6 @@ export default function WORM3() {
             canUndo={canUndo}
             victory={victory}
             moves={moves}
-            gameTime={gameTime}
             currentLevel={currentLevel}
             currentLevelData={currentLevelData}
             hasNextLevel={hasNextLevel}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { wormBuffs } from './wormBuffs.js';
 import { callWormTurn } from './wormTurnBridge.js';
@@ -11,9 +11,19 @@ export default function SignatureButton({ compact = false }) {
   const phase = useGameStore(s => s.wormGamePhase);
   const [readout, setReadout] = useState(wormBuffs.signature);
   const def = SIGNATURES[character];
+  const ring = useRef(null);
+  // The cooldown ring moves every tick; everything else on the key changes a few
+  // times a cooldown. Write the ring straight to the SVG and re-render only when the
+  // label, state or notice changes (it re-rendered ten times a second before).
   useEffect(() => {
     if (!def || def.passive) return;
-    const id = setInterval(() => setReadout(wormBuffs.signature), 100);
+    let last;
+    const id = setInterval(() => {
+      const r = wormBuffs.signature;
+      ring.current?.setAttribute('stroke-dasharray', `${Math.max(0, Math.min(100, (r?.fraction ?? 1) * 100))} 100`);
+      const key = r ? `${r.character}|${r.ready}|${r.active}|${r.coiled}|${r.returnReady}|${r.activeSeconds}|${r.charges}|${r.seconds}|${r.notice}|${r.reason}` : '';
+      if (key !== last) { last = key; setReadout(r); }
+    }, 100);
     return () => clearInterval(id);
   }, [def]);
   if (!def || def.passive) return null;
@@ -44,7 +54,7 @@ export default function SignatureButton({ compact = false }) {
       style={{ '--control-accent': def.color }}>
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
         <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" opacity="0.2" />
-        <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" pathLength="100"
+        <circle ref={ring} cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" pathLength="100"
           strokeDasharray={`${Math.max(0, Math.min(100, (current?.fraction ?? 1) * 100))} 100`} transform="rotate(-90 16 16)" />
         <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           {character === 'inch' ? <path d="M11 23h10l-10-4 10-4-10-4h10M16 10V6m-3 3 3-3 3 3" />

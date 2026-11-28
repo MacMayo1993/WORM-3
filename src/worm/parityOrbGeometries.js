@@ -8,8 +8,8 @@ import { PARITY_ORB_SCALE } from './healerWorm/constants.js';
 
 const _orbGeos = {
   normal: {
-    shell:        new THREE.SphereGeometry(0.21, 32, 32),          // smooth glassy, iridescent gem shell
-    innerCore:    new THREE.SphereGeometry(0.115, 20, 20),         // bright energy core seen through the shell
+    shell:        new THREE.SphereGeometry(0.21, 24, 18),          // smooth glassy gem shell; ~0.3 units on screen, so 24×18 is round (32×32 was 2.4× the triangles)
+    innerCore:    new THREE.SphereGeometry(0.115, 14, 10),         // bright energy core seen through the shell
     innerGlow:    new THREE.SphereGeometry(0.30, 24, 18),          // soft additive inner halo (smooth, not faceted)
     core:         createParityMobiusGeometry(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
     ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
@@ -22,8 +22,8 @@ const _orbGeos = {
     parityAxis:   new THREE.CylinderGeometry(0.010, 0.010, 0.54, 12),
   },
   target: {
-    shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
-    innerCore:    new THREE.SphereGeometry(0.15, 24, 24),
+    shell:        new THREE.SphereGeometry(0.27, 28, 20),          // larger smooth gem for target
+    innerCore:    new THREE.SphereGeometry(0.15, 16, 12),
     innerGlow:    new THREE.SphereGeometry(0.40, 24, 18),
     core:         createParityMobiusGeometry(0.30, 0.10),                           // Möbius strip, antipodal color
     ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),

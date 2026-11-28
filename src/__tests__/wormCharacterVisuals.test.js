@@ -71,6 +71,15 @@ describe('character identity', () => {
     accents.dispose();
   });
 
+  it('draws static accents that share a material as one mesh (the Ranger: cheeks and freckles, two draws)', () => {
+    const meshes = character => { let n = 0; createCharacterAccents(character).group.traverse(o => { if (o.isMesh) n++; }); return n; };
+    expect(meshes('classic')).toBe(2);
+    expect(meshes('inch')).toBe(2);
+    // The Scout's pulsing bulb and the Sage's swaying quill keep their own meshes.
+    expect(meshes('glow')).toBe(3);
+    expect(meshes('book')).toBeGreaterThanOrEqual(5);
+  });
+
   it("lights the Scout's lure in the skin's glow colour", () => {
     const accents = createCharacterAccents('glow');
     accents.setSkin(getSkin('royal'));

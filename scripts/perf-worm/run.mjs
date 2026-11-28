@@ -294,16 +294,24 @@ if (MODE === 'events') {
 }
 
 if (MODE === 'frames' || MODE === 'react') {
-  await page.evaluate((react) => { const W = window.__perf; W.frames = []; W.renders = {}; W.reactOn = react; }, MODE === 'react');
+  await page.evaluate((react) => { const W = window.__perf; W.frames = []; W.renders = {}; W.origins = {}; W.reactOn = react;
+    // Which store keys change, so a re-render's origin can be traced to its subscription.
+    W.storeKeys = {};
+    if (react) window.__store.subscribe((s, p) => { for (const k in s) if (s[k] !== p[k]) W.storeKeys[k] = (W.storeKeys[k] || 0) + 1; });
+  }, MODE === 'react');
   if (args.profile) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
   const heap0 = await cdp.send('Runtime.getHeapUsage');
   await playFor(MS);
   const heap1 = await cdp.send('Runtime.getHeapUsage');
-  const { frames, renders } = await page.evaluate(() => ({ frames: window.__perf.frames, renders: window.__perf.renders }));
+  const { frames, renders, origins, storeKeys } = await page.evaluate(() => ({ frames: window.__perf.frames, renders: window.__perf.renders, origins: window.__perf.origins, storeKeys: window.__perf.storeKeys }));
   Object.assign(out, summarize(frames), { reactCommits: commitCost(frames), phases: phases(frames), deaths, heapMB: [r1(heap0.usedSize / 1e6), r1(heap1.usedSize / 1e6)] });
   console.log(JSON.stringify(out, null, 2));
   console.log(`\nSlowest frames:\n${worst(frames)}`);
-  if (MODE === 'react') console.log(`\nComponent renders in ${MS / 1000}s:\n${top(renders, 40, ([k, v]) => `${String(v).padStart(6)}  ${k}`)}`);
+  if (MODE === 'react') {
+    console.log(`\nComponent renders in ${MS / 1000}s:\n${top(renders, 40, ([k, v]) => `${String(v).padStart(6)}  ${k}`)}`);
+    console.log(`\nWhere re-renders start (component < its parent):\n${top(origins, 30, ([k, v]) => `${String(v).padStart(6)}  ${k}`)}`);
+    console.log(`\nStore keys that changed:\n${top(storeKeys, 40, ([k, v]) => `${String(v).padStart(6)}  ${k}`)}`);
+  }
   if (args.profile) {
     const { profile } = await cdp.send('Profiler.stop');
     const self = new Map();

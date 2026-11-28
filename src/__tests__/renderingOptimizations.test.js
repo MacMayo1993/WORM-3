@@ -95,3 +95,19 @@ describe('direct preview ownership', () => {
     unregisterDirectWormPreview(second); expect(getDirectWormPreview()).toBeNull();
   });
 });
+
+describe('compact cubie geometry where a piece is small on screen', () => {
+  it('takes the compact body and sticker from 6×6, from 4×4 on a phone, and with reduced FX', async () => {
+    const { compactBodyGeometry } = await import('../3d/glassViewQuality.js');
+    const { cubieBodyGeometry } = await import('../3d/cubieBodyGeometry.js');
+    const { createPlayStickerGeometry } = await import('../3d/rubiksPiece.js');
+    expect([3, 5, 6, 8].map(n => compactBodyGeometry(n, false, false))).toEqual([false, false, true, true]);
+    expect([3, 4].map(n => compactBodyGeometry(n, true, false))).toEqual([false, true]);
+    expect(compactBodyGeometry(3, false, true)).toBe(true);
+    const tris = g => (g.index ? g.index.count : g.attributes.position.count) / 3;
+    // The compact versions are about a third of the full ones.
+    expect(tris(cubieBodyGeometry(0.96, 0.08, true))).toBeLessThan(tris(cubieBodyGeometry(0.96, 0.08, false)) / 2.5);
+    expect(tris(createPlayStickerGeometry(0.85, 0, { bevelSegments: 1, curveSegments: 2 })))
+      .toBeLessThan(tris(createPlayStickerGeometry()) / 2.5);
+  });
+});

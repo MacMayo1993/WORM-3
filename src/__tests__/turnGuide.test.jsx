@@ -66,6 +66,14 @@ it.each([false,true])('keeps two meshes, reverses without rebuilding, hides duri
     for(let i=0;i<30;i++)await tick();
     expect(uniforms.uOpacity.value).toBe(1);
     expect(uniforms.uLength.value).toBe(track.geometry.userData.trackLength);
+    // A warming guide is drawn (so its programs link) but never shows, even calm.
+    await render({axis:'col',sliceIndex:1,warm:true});for(let i=0;i<30;i++)await tick();
+    expect(uniforms.uOpacity.value).toBe(0);
+    // The danger cue changes only colours, on the same program.
+    const program=track.material;
+    await render({axis:'col',sliceIndex:1,cue:'danger'});await tick();
+    expect(track.material).toBe(program);
+    expect(uniforms.uCore.value.getHexString()).toBe(new THREE.Color('#ff9494').getHexString());
     expect(templateDispose).not.toHaveBeenCalled();
   } finally {
     await act(async()=>root.unmount());expect(templateDispose).not.toHaveBeenCalled();templateDispose.mockRestore();delete globalThis.IS_REACT_ACT_ENVIRONMENT;

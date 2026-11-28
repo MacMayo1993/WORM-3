@@ -22,7 +22,7 @@ import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
 import TurnGuide from '../teach/TurnGuide.jsx';
-import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
+import AntipodalPairHighlight, { PairHighlightWarmup } from './AntipodalPairHighlight.jsx';
 import FlipCheckMarks from './FlipCheckMarks.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import { usesWormRideCamera } from '../worm/wormCameraMode.js';
@@ -98,6 +98,60 @@ function ShadowCadence({ enabled = true, slow }) {
   return null;
 }
 
+// The backdrop and its reflections, apart from GameScene: GameScene re-renders on
+// every board change (a slice turn, a flip, a heal), and none of that reaches the
+// sky, the panoramas or the ambience.
+const SceneBackdrop = React.memo(function SceneBackdrop({ levelBackground, inLevel, storyEnvFile, theme, projectiscopeDesign, bgFile, knownTheme, pulse, reflections, size }) {
+  return <>
+    {/* Level-specific backgrounds */}
+    {levelBackground === 'blackhole' && <BlackHoleEnvironment flipTrigger={pulse} />}
+    {(levelBackground === 'nebula' || levelBackground === 'moon') && (
+      <NebulaEnvironment variant="game" pulseTrigger={pulse} speed={0.5}
+        density={isMobile ? 0.55 : 0.85} structure={1.0} performanceMode={isMobile} />
+    )}
+    {/* Story chapters render against the same shipped panoramas as every
+        other mode, which also supplies the image-based lighting they never
+        had. See STORY_ENVIRONMENTS for the chapter → environment casting. */}
+    {storyEnvFile && (
+      <ErrorBoundary3D>
+        <InteractivePhotoBackground files={getBackgroundUrl(storyEnvFile)} />
+      </ErrorBoundary3D>
+    )}
+    {/* Free play: Black Hole */}
+    {!inLevel && theme === 'projectiscope' && (
+      <ErrorBoundary3D><ProjectiscopeBackground design={projectiscopeDesign} /></ErrorBoundary3D>
+    )}
+    {!inLevel && theme === 'blackhole' && <BlackHoleEnvironment flipTrigger={pulse} />}
+    {/* Free play: Nebula */}
+    {!inLevel && theme === 'nebula' && (
+      <NebulaEnvironment variant="game" pulseTrigger={pulse} speed={0.5}
+        density={isMobile ? 0.55 : 0.85} structure={1.0} performanceMode={isMobile} />
+    )}
+    {/* Free play: interactive photo panoramas */}
+    {!inLevel && bgFile && (
+      <ErrorBoundary3D>
+        <InteractivePhotoBackground files={getBackgroundUrl(bgFile)} />
+      </ErrorBoundary3D>
+    )}
+    {!inLevel && !bgFile && PHOTO_PRESETS.has(theme) && (
+      <ErrorBoundary3D>
+        <InteractivePhotoBackground preset={theme} />
+      </ErrorBoundary3D>
+    )}
+    {!inLevel && !bgFile && !PHOTO_PRESETS.has(theme) &&
+      (theme === 'blackhole' || !knownTheme) && (
+      <BlackHoleEnvironment flipTrigger={pulse} />
+    )}
+    {/* Reflections for scenes without a photo panorama (space scenes and
+        levels without a background): the stickers' gloss needs something
+        to catch. The environment lights only, never the backdrop. */}
+    {reflections && <SafeEnvironment preset="city" />}
+
+    {/* Mini cubes and twin wormholes drifting far beyond the camera. */}
+    <ErrorBoundary3D><BackgroundAmbience size={size} /></ErrorBoundary3D>
+  </>;
+});
+
 export default function GameScene({
   // 8 ephemeral callbacks
   onMove,
@@ -130,7 +184,7 @@ export default function GameScene({
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
-    demoLearnGuide, flipHint, cubeTurnWarning,
+    demoLearnGuide, flipHint, cubeTurnWarning, flipLevelWarming,
     size,
     cubies,
     wormHealerMode,
@@ -149,6 +203,7 @@ export default function GameScene({
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
     flipHint: s.flipHint,
+    flipLevelWarming: s.currentLevelData?.scoring === 'flips' && !s.hasShuffled,
     cubeTurnWarning: s.flipRun?.cubeTurn ?? null,
     demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
@@ -284,52 +339,9 @@ export default function GameScene({
       )}
 
       <Suspense fallback={null}>
-        {/* Level-specific backgrounds */}
-        {currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {(currentLevelData?.background === 'nebula' || currentLevelData?.background === 'moon') && (
-          <NebulaEnvironment variant="game" pulseTrigger={blackHolePulse} speed={0.5}
-            density={isMobile ? 0.55 : 0.85} structure={1.0} performanceMode={isMobile} />
-        )}
-        {/* Story chapters render against the same shipped panoramas as every
-            other mode, which also supplies the image-based lighting they never
-            had. See STORY_ENVIRONMENTS for the chapter → environment casting. */}
-        {storyEnvFile && (
-          <ErrorBoundary3D>
-            <InteractivePhotoBackground files={getBackgroundUrl(storyEnvFile)} />
-          </ErrorBoundary3D>
-        )}
-        {/* Free play: Black Hole */}
-        {!currentLevelData && settings.backgroundTheme === 'projectiscope' && (
-          <ErrorBoundary3D><ProjectiscopeBackground design={settings.projectiscopeDesign} /></ErrorBoundary3D>
-        )}
-        {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {/* Free play: Nebula */}
-        {!currentLevelData && settings.backgroundTheme === 'nebula' && (
-          <NebulaEnvironment variant="game" pulseTrigger={blackHolePulse} speed={0.5}
-            density={isMobile ? 0.55 : 0.85} structure={1.0} performanceMode={isMobile} />
-        )}
-        {/* Free play: interactive photo panoramas */}
-        {!currentLevelData && bgConfig?.file && (
-          <ErrorBoundary3D>
-            <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
-          </ErrorBoundary3D>
-        )}
-        {!currentLevelData && !bgConfig?.file && PHOTO_PRESETS.has(settings.backgroundTheme) && (
-          <ErrorBoundary3D>
-            <InteractivePhotoBackground preset={settings.backgroundTheme} />
-          </ErrorBoundary3D>
-        )}
-        {!currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
-          (settings.backgroundTheme === 'blackhole' || !bgConfig) && (
-          <BlackHoleEnvironment flipTrigger={blackHolePulse} />
-        )}
-        {/* Reflections for scenes without a photo panorama (space scenes and
-            levels without a background): the stickers' gloss needs something
-            to catch. The environment lights only, never the backdrop. */}
-        {reflections && <SafeEnvironment preset="city" />}
-
-        {/* Mini cubes and twin wormholes drifting far beyond the camera. */}
-        <ErrorBoundary3D><BackgroundAmbience size={size} /></ErrorBoundary3D>
+        <SceneBackdrop levelBackground={currentLevelData?.background} inLevel={!!currentLevelData} storyEnvFile={storyEnvFile}
+          theme={settings.backgroundTheme} projectiscopeDesign={settings.projectiscopeDesign} bgFile={bgConfig?.file}
+          knownTheme={!!bgConfig} pulse={blackHolePulse} reflections={reflections} size={size} />
         <TeachViewOffset />
 
         <WormholeWarpFX
@@ -384,6 +396,16 @@ export default function GameScene({
         {flipHint?.kind === 'turn' && !animState && <TurnGuide axis={flipHint.axis} sliceIndex={flipHint.sliceIndex} dir={flipHint.dir}
           size={size} reduced={isMobile || perfReducedFX} turning={false} />}
         {currentLevelData?.scoring === 'flips' && <FlipCheckMarks />}
+        {/* While a Flip level is briefing and making its opening turns, draw its
+            guides, rings and pair highlight at zero opacity: their programs link
+            then, not in the frame the player opens the hint or makes a first flip.
+            They stay mounted (hidden) for the level: a disposed material releases
+            its program, and the real guide would link it all over again. */}
+        {currentLevelData?.scoring === 'flips' && <group name="flip-level-warmup" visible={flipLevelWarming}>
+          <TurnGuide axis="col" sliceIndex={0} dir={1} size={size} reduced={isMobile || perfReducedFX} turning={false} warm />
+          <FlipCheckMarks warm />
+          <PairHighlightWarmup />
+        </group>}
         {/* The layer the cube is about to turn on its own, in the danger colour. */}
         {cubeTurnWarning && !animState && <TurnGuide axis={cubeTurnWarning.axis} sliceIndex={cubeTurnWarning.sliceIndex}
           dir={cubeTurnWarning.dir} size={size} reduced={isMobile || perfReducedFX} turning={false} cue="danger" />}

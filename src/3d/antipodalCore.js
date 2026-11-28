@@ -211,7 +211,9 @@ export function createCoreStickerMaterial(glow, performanceMode = false, chrome 
     shader.uniforms.uCoreGlow = glow;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uCoreGlow;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * uCoreGlow;');
+      // vColor is the instance colour: a compile before the colours are attached
+      // (a warm-up, a remount) must not fail on it.
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\ntotalEmissiveRadiance += vColor.rgb * uCoreGlow;\n#endif');
   };
   material.customProgramCacheKey = () => `antipodal-core-sticker${chrome ? '-chrome' : ''}`;
   return material;

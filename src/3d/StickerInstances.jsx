@@ -1,10 +1,20 @@
 import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
-import { uploadInstancePrefix } from './instanceUploads.js';
+import { uploadInstancePrefix, uploadInstanceRange } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
 import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 import { frameWorldVersion, isRestingFrameAnchor } from './tileFrames.js';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { compactBodyGeometry } from './glassViewQuality.js';
+
+// The plain sticker at full rounding (~284 triangles) and compact (92): a board where
+// a piece is a few pixels across takes the compact one (compactBodyGeometry's rule),
+// which on an 8×8 cut ~75k triangles a frame. Shared, never disposed.
+let _fullSticker = null, _compactSticker = null;
+const stickerGeometry = compact => (compact
+  ? (_compactSticker ??= createPlayStickerGeometry(0.85, 0, { bevelSegments: 1, curveSegments: 2 }))
+  : (_fullSticker ??= createPlayStickerGeometry()));
 import { isMobile } from '../utils/device.js';
 // StickerInstances.jsx
 // Batches simple (solid-colour) sticker planes into a single THREE.InstancedMesh,
@@ -73,7 +83,7 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
   const instanceMesh = useMemo(() => {
     // The menu cube's sticker (rubiksPiece.js): rounded, bevelled and clear-coated,
     // still one draw call for every plain sticker on the cube.
-    const geo = createPlayStickerGeometry();
+    const geo = stickerGeometry(false);
     const { Material, sticker } = rubiksFinish(isMobile);
     const source = chrome ? new THREE.MeshStandardMaterial(CHROME_TILE_FINISH)
       : new Material({ ...sticker, envMapIntensity: 0.3 });
@@ -100,6 +110,10 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
   // all solid stickers invisible for the lifetime of the session.
   // The Three.js resources are freed implicitly when the WebGL context is
   // destroyed (i.e. when the persistent Canvas unmounts at app shutdown).
+  const compact = useGameStore(s => compactBodyGeometry(s.size, isMobile, s.perfReducedFX));
+  // Same attributes either way, so swapping the geometry links no new program.
+  useLayoutEffect(() => { instanceMesh.geometry = stickerGeometry(compact); }, [instanceMesh, compact]);
+
   useLayoutEffect(() => {
     scene.add(instanceMesh);
     return () => {
@@ -229,8 +243,9 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
     if (!instanceMesh.visible) return;
 
     transformTracker.begin();
-    let matDirty = false;
-    let colDirty = false;
+    // The span of slots this frame wrote, so the upload sends only that: on a
+    // still board the worm presses a few tiles and the rest hold.
+    let mLo = Infinity, mHi = -1, cLo = Infinity, cHi = -1;
 
     // Iterate values(), not entries(): a for-of over the Map itself materialises a
     // fresh [key, value] pair array for every registered sticker on every frame —
@@ -248,7 +263,8 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
           // re-uploaded rather than skipped as "unchanged".
           const mbase = slot * 16;
           lastMatricesRef.current.fill(NaN, mbase, mbase + 16);
-          matDirty = true;
+          if (slot < mLo) mLo = slot;
+          if (slot > mHi) mHi = slot;
           zeroedSlotsRef.current.add(slot);
         }
         continue;
@@ -269,7 +285,8 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
         instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
         lm.set(me, mbase);
         entry.worldVersion = worldVersion;
-        matDirty = true;
+        if (slot < mLo) mLo = slot;
+        if (slot > mHi) mHi = slot;
       }
 
       // Upload the current colour only when it has changed since the last frame.
@@ -284,13 +301,14 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
           lc[base] = r;
           lc[base + 1] = g;
           lc[base + 2] = b;
-          colDirty = true;
+          if (slot < cLo) cLo = slot;
+          if (slot > cHi) cHi = slot;
         }
       }
     }
 
-    if (matDirty) uploadInstancePrefix(instanceMesh.instanceMatrix, instanceMesh.count);
-    if (colDirty) uploadInstancePrefix(instanceMesh.instanceColor, instanceMesh.count);
+    uploadInstanceRange(instanceMesh.instanceMatrix, mLo, mHi + 1);
+    uploadInstanceRange(instanceMesh.instanceColor, cLo, cHi + 1);
   });
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);

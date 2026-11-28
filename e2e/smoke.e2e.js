@@ -57,9 +57,11 @@ test('starts a WORM free-play run', async ({ page }) => {
     // Paused controls remain mounted with the same layout, but are intentionally
     // aria-hidden/inert. Accessibility was checked live; use CSS for geometry.
     const controls = await page.locator('.worm-hud-bottom .worm-control').evaluateAll(buttons => {
+      // A face mixed with color-mix() computes to `color(srgb r g b)` in 0–1, not rgb() in 0–255.
       const luminance = color => {
+        const unit = color.startsWith('color(') ? 1 : 255;
         const rgb = color.match(/[\d.]+/g).slice(0, 3).map(value => {
-          const channel = Number(value) / 255;
+          const channel = Number(value) / unit;
           return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
         });
         return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;

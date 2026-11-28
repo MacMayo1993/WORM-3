@@ -26,12 +26,14 @@ export const CHECK_MARK_HALO = '#fffdf2';
 const _matrix = new THREE.Matrix4(), _quat = new THREE.Quaternion(), _euler = new THREE.Euler();
 const _pos = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
 
-export default function FlipCheckMarks() {
-  const on = useGameStore(s => s.flipCheck && s.currentLevelData?.scoring === 'flips');
+// `warm` draws one ring at zero opacity so the rings' programs link during the
+// level's briefing rather than the moment the player first taps Check.
+export default function FlipCheckMarks({ warm = false }) {
+  const on = useGameStore(s => warm || (s.flipCheck && s.currentLevelData?.scoring === 'flips'));
   const cubies = useGameStore(s => s.cubies);
   const size = useGameStore(s => s.size);
   const turning = useGameStore(s => !!s.animState);
-  const tiles = useMemo(() => (on ? flipCheckTiles(cubies, size) : []), [on, cubies, size]);
+  const tiles = useMemo(() => (warm ? [{ x: 0, y: size - 1, z: size - 1, dirKey: 'PZ' }] : on ? flipCheckTiles(cubies, size) : []), [warm, on, cubies, size]);
   const rings = useMemo(() => [[0.3, 0.46, CHECK_MARK_HALO, 4], [0.33, 0.43, CHECK_MARK_INK, 5]].map(([inner, outer, color, order]) => {
     const m = new THREE.InstancedMesh(new THREE.RingGeometry(inner, outer, 32),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }), MAX_MARKS);
@@ -57,7 +59,7 @@ export default function FlipCheckMarks() {
   }, [mesh, ink, tiles, size]);
   useFrame(({ clock }) => {
     const shown = on && !turning && mesh.count > 0;
-    const opacity = prefersReducedMotion() ? 0.95 : 0.8 + Math.sin(clock.elapsedTime * 3) * 0.15;
+    const opacity = warm ? 0 : prefersReducedMotion() ? 0.95 : 0.8 + Math.sin(clock.elapsedTime * 3) * 0.15;
     for (const m of rings) { m.visible = shown; m.material.opacity = opacity; }
   });
   return <group><primitive ref={ref} object={mesh} /><primitive object={ink} /></group>;

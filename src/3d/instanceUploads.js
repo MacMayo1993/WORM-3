@@ -11,6 +11,23 @@ export function uploadInstancePrefix(attribute, count) {
   attribute.needsUpdate = true;
 }
 
+// Upload only items [first, end) — the span a frame actually wrote — merged with
+// any span still pending from frames the renderer has not drawn yet. A batch
+// whose tiles mostly hold still (the worm presses a few, the rest rest) then
+// sends those few, not the whole buffer.
+export function uploadInstanceRange(attribute, first, end) {
+  if (!attribute || end <= first) return;
+  const size = attribute.itemSize;
+  let start = first * size, stop = Math.min(attribute.array.length, end * size);
+  for (const range of attribute.updateRanges) {
+    start = Math.min(start, range.start);
+    stop = Math.max(stop, range.start + range.count);
+  }
+  attribute.clearUpdateRanges();
+  attribute.addUpdateRange(start, stop - start);
+  attribute.needsUpdate = true;
+}
+
 export function setInstanceCount(mesh, count) {
   if (!mesh) return;
   mesh.count = count;
