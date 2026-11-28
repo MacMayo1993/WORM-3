@@ -13,7 +13,7 @@ import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { cubieBodyGeometry } from './cubieBodyGeometry.js';
-import { compactGlassGeometry } from './glassViewQuality.js';
+import { compactBodyGeometry, compactGlassGeometry } from './glassViewQuality.js';
 import { useCubieBodyBatches } from './cubieBodyBatchContext.js';
 import { useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { LEGO_FACE_TRANSFORMS, LEGO_STUD_PARTS } from './legoStud.js';
@@ -457,7 +457,7 @@ const Cubie = React.forwardRef(function Cubie({
     !mirrorMode && !effectiveHollowMode && !hideBody && !raised && !returningBody;
   const bodyRef = useRef(null);
   const bodyGeometry = cubieBodyGeometry(bodySize, undefined,
-    effectiveVisualMode === 'glass' && compactGlassGeometry(size, isMobile, perfReducedFX));
+    effectiveVisualMode === 'glass' ? compactGlassGeometry(size, isMobile, perfReducedFX) : compactBodyGeometry(size, isMobile, perfReducedFX));
   const bodyLook = batchBody || expansionBody ? JSON.stringify(bodyMatProps) : '';
   useLayoutEffect(() => {
     const anchor = expansionBody ? frameHost.parent : bodyRef.current;

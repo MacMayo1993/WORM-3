@@ -5,6 +5,12 @@ import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 // existing mobile/adaptive tiers spend fewer vertices on that thin bevel.
 export const compactGlassGeometry = (size, mobile, reducedFX) => size >= 6 || mobile || reducedFX;
 
+// Every view's cubie body takes the compact rounding (two steps: 236 triangles
+// instead of 716) where a piece is too small on screen for the difference to
+// show: boards from 6×6, phones from 4×4, and reduced FX. On an 8×8 the bodies
+// were ~640k of the frame's ~766k triangles at full rounding.
+export const compactBodyGeometry = (size, mobile, reducedFX) => size >= 6 || (mobile && size >= 4) || reducedFX;
+
 // A view pickup overrides the saved view without changing it. Opaque-only
 // passes must follow that temporary appearance too, then resume on expiry.
 export const skipsOpaqueCubeEffects = view => view === 'glass' || view === 'wireframe';

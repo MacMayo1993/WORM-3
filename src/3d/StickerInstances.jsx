@@ -5,6 +5,16 @@ import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 import { frameWorldVersion, isRestingFrameAnchor } from './tileFrames.js';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { compactBodyGeometry } from './glassViewQuality.js';
+
+// The plain sticker at full rounding (~284 triangles) and compact (92): a board where
+// a piece is a few pixels across takes the compact one (compactBodyGeometry's rule),
+// which on an 8×8 cut ~75k triangles a frame. Shared, never disposed.
+let _fullSticker = null, _compactSticker = null;
+const stickerGeometry = compact => (compact
+  ? (_compactSticker ??= createPlayStickerGeometry(0.85, 0, { bevelSegments: 1, curveSegments: 2 }))
+  : (_fullSticker ??= createPlayStickerGeometry()));
 import { isMobile } from '../utils/device.js';
 // StickerInstances.jsx
 // Batches simple (solid-colour) sticker planes into a single THREE.InstancedMesh,
@@ -73,7 +83,7 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
   const instanceMesh = useMemo(() => {
     // The menu cube's sticker (rubiksPiece.js): rounded, bevelled and clear-coated,
     // still one draw call for every plain sticker on the cube.
-    const geo = createPlayStickerGeometry();
+    const geo = stickerGeometry(false);
     const { Material, sticker } = rubiksFinish(isMobile);
     const source = chrome ? new THREE.MeshStandardMaterial(CHROME_TILE_FINISH)
       : new Material({ ...sticker, envMapIntensity: 0.3 });
@@ -100,6 +110,10 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
   // all solid stickers invisible for the lifetime of the session.
   // The Three.js resources are freed implicitly when the WebGL context is
   // destroyed (i.e. when the persistent Canvas unmounts at app shutdown).
+  const compact = useGameStore(s => compactBodyGeometry(s.size, isMobile, s.perfReducedFX));
+  // Same attributes either way, so swapping the geometry links no new program.
+  useLayoutEffect(() => { instanceMesh.geometry = stickerGeometry(compact); }, [instanceMesh, compact]);
+
   useLayoutEffect(() => {
     scene.add(instanceMesh);
     return () => {

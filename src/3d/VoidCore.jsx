@@ -32,6 +32,7 @@ import { isMobile } from '../utils/device.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
+import { compactBodyGeometry } from './glassViewQuality.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
@@ -66,6 +67,7 @@ const HIDDEN_STICKER = new THREE.Matrix4().makeScale(0, 0, 0);
 function VoidCore({ cubieRefs = null }) {
   const cubies = useGameStore(s => s.cubies);
   const size = useGameStore(s => s.size);
+  const compactCore = useGameStore(s => compactBodyGeometry(s.size, isMobile, s.perfReducedFX));
   const wormMode = useGameStore(s => s.wormHealerMode);
   const settings = useGameStore(s => s.settings);
   const visualMode = useGameStore(s => s.visualMode);
@@ -109,12 +111,14 @@ function VoidCore({ cubieRefs = null }) {
   useEffect(() => addMirrorSubject(portalRims.layers[1].mesh), [portalRims]);
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
-    sticker: createPlayStickerGeometry(CORE_STICKER),
+    // The core holds the whole N×N again: compact rounding where the board's own
+    // stickers take it (compactBodyGeometry).
+    sticker: createPlayStickerGeometry(CORE_STICKER, 0, compactCore ? { bevelSegments: 1, curveSegments: 2 } : undefined),
     chromeMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile, true),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room'),
     stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room')
-  }), [glow, passage]);
+  }), [glow, passage, compactCore]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   // Every look's materials are kept for the core's life. A view power swaps the
   // cube's look and back within seconds, and a disposed material releases its
