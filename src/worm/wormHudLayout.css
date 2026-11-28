@@ -58,33 +58,35 @@
 .worm-action-center { flex-direction: column; }
 .worm-primary-actions { display: flex; justify-content: center; gap: 6px; }
 .worm-jump-slot { position: relative; display: flex; flex: 1; min-width: 0; }
-/* Every live-play key has the same opaque face and bright ink. Element and
-   character colors identify the border, never the text/background contrast. */
+/* Every live-play key is ivory plastic with dark-green ink on a hard ledge, like
+   the rest of the in-play HUD and Flip Cube's dock. A key's state or character
+   colour (--control-accent) tints its face and rims it; the ink never changes, so
+   contrast holds whatever the accent. */
 .worm-instrument .worm-hud-bottom .worm-control {
   --control-accent: #a6b99a;
   box-sizing: border-box; min-height: 48px; min-width: 48px;
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 6px 8px; border: 2px solid var(--control-accent); border-radius: 14px;
-  background: var(--hud-text); color: var(--hud-raised);
-  box-shadow: 0 4px 0 #18251d, 0 6px 12px #0003, inset 0 1px 0 #ffffff20;
+  padding: 6px 8px; border: 2px solid var(--hud-ink); border-radius: 14px;
+  background: color-mix(in srgb, var(--control-accent) 22%, var(--hud-raised)); color: var(--hud-text);
+  box-shadow: 0 4px 0 var(--hud-ink), 0 6px 12px #0002, inset 0 2px 0 #ffffffb0, inset 0 0 0 2px color-mix(in srgb, var(--control-accent) 70%, transparent);
   opacity: 1; filter: none; font-weight: 800; line-height: 1.15;
   text-shadow: none; letter-spacing: .02em; touch-action: manipulation;
 }
 .worm-instrument .worm-hud-bottom .worm-control:active:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--hud-ink); transform: translateY(3px);
-  box-shadow: 0 1px 0 #18251d, inset 0 2px 4px #0003;
+  background: color-mix(in srgb, var(--control-accent) 34%, var(--hud-inset)); transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--hud-ink), inset 0 2px 4px #0002;
 }
 .worm-instrument .worm-hud-bottom .worm-control:is(:disabled, [aria-disabled="true"]) {
-  color: #c5ccbf; border-color: #758370; cursor: default;
-  box-shadow: 0 2px 0 #18251d; transform: none;
+  color: var(--hud-muted); background: var(--hud-inset); border-color: var(--hud-border); cursor: default;
+  box-shadow: 0 2px 0 var(--hud-border); transform: none;
 }
 .worm-instrument .worm-hud-bottom .worm-control[data-state="portal"],
 .worm-instrument .worm-hud-bottom .worm-control[data-state="rescue"] {
-  --control-accent: #ffe58a; outline: 2px solid var(--control-accent); outline-offset: 2px;
+  --control-accent: #ffd23f; outline: 3px solid var(--control-accent); outline-offset: 2px;
 }
-.worm-instrument .worm-hud-bottom .worm-control[data-state="air"] { --control-accent: #9ff2df; }
-.worm-instrument .worm-hud-bottom .worm-control[data-state="fire"] { --control-accent: #ffb45e; }
-.worm-instrument .worm-hud-bottom .worm-control[data-state="active"] { --control-accent: #b7ed96; }
+.worm-instrument .worm-hud-bottom .worm-control[data-state="air"] { --control-accent: #5fd8bd; }
+.worm-instrument .worm-hud-bottom .worm-control[data-state="fire"] { --control-accent: #ff9a2e; }
+.worm-instrument .worm-hud-bottom .worm-control[data-state="active"] { --control-accent: #8fd36a; }
 .worm-instrument .worm-hud-bottom .worm-jump { min-width: 0; font-size: 15px; }
 .worm-instrument .worm-hud-bottom .worm-control.worm-boost { padding-inline: 3px; position: relative; overflow: hidden; flex-shrink: 0; width: 60px; }
 .worm-instrument .worm-hud-bottom .worm-steer { padding: 6px; }
@@ -95,7 +97,7 @@
 .worm-control-caption { font-size: 12px; font-weight: 800; }
 .worm-instrument .worm-hud-bottom .worm-combat-fire small { font-size: 12px; opacity: 1; }
 .worm-instrument .worm-hud-bottom .worm-control:focus-visible {
-  outline: 3px solid var(--hud-raised); outline-offset: 3px;
+  outline: 3px solid var(--arcade-focus, #2774ad); outline-offset: 3px;
 }
 @media (max-width: 360px) {
   .worm-instrument .worm-hud-bottom .worm-control.worm-boost { width: 56px; }
