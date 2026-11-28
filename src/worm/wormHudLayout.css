@@ -77,7 +77,9 @@
   box-shadow: 0 1px 0 var(--hud-ink), inset 0 2px 4px #0002;
 }
 .worm-instrument .worm-hud-bottom .worm-control:is(:disabled, [aria-disabled="true"]) {
-  color: var(--hud-muted); background: var(--hud-inset); border-color: var(--hud-border); cursor: default;
+  /* A key on cooldown still names its action: #3f4a3c on the inset is 7.2:1
+     (the muted ink was 4.5:1); the flat, ledgeless face says it is resting. */
+  color: #3f4a3c; background: var(--hud-inset); border-color: var(--hud-border); cursor: default;
   box-shadow: 0 2px 0 var(--hud-border); transform: none;
 }
 .worm-instrument .worm-hud-bottom .worm-control[data-state="portal"],
