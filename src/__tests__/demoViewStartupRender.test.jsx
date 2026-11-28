@@ -56,7 +56,10 @@ it.each([false, true])('keeps the demo Grid → Sudoku → Classic scene mounted
     expect(labels('GridLabel:')).toEqual(ids());
     expect(textRender).not.toHaveBeenCalled();
     pool.update();
-    const batches = pool.group.children.filter(o => o.count > 0);
+    // Every tile's antipodal back is one more batch, in every mode.
+    const backs = pool.group.children.filter(o => o.count > 0 && o.material === pool.backMaterial);
+    expect(backs.reduce((sum, o) => sum + o.count, 0)).toBe(54);
+    const batches = pool.group.children.filter(o => o.count > 0 && o.material !== pool.backMaterial);
     expect(batches.length).toBeLessThanOrEqual(12);
     expect(new Set(batches.map(o => o.material)).size).toBe(1);
     expect(batches.reduce((sum, o) => sum + o.count, 0)).toBe(54 * 6);
@@ -71,7 +74,7 @@ it.each([false, true])('keeps the demo Grid → Sudoku → Classic scene mounted
     await act(async () => VIEW_SHOWCASE_SEQUENCE[1].cleanup(useGameStore.getState()));
     pool.update();
     expect(labels('NumberLabel:')).toHaveLength(0);
-    expect(pool.group.children.every(o => o.count === 0)).toBe(true);
+    expect(pool.group.children.every(o => o.count === 0 || o.material === pool.backMaterial)).toBe(true);
     // An explicit retry reuses the atlas without blanking the surrounding scene.
     await act(async () => VIEW_SHOWCASE_SEQUENCE[0].apply(useGameStore.getState()));
     expect(labels('GridLabel:')).toEqual(ids());

@@ -4,8 +4,9 @@ import { createCubieBodyBatches } from './cubieBodyBatches.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { CubieBodyBatchContext } from './cubieBodyBatchContext.js';
 
-// See cubieBodyBatches.js. WORM only: the other modes draw opaque, single-sided
-// bodies, which three.js already renders in one pass without re-selecting programs.
+// See cubieBodyBatches.js. WORM's transparent shells were the reason it was built;
+// the other modes' opaque bodies join it too, one draw per look instead of one per
+// piece. Only WORM passes `materialFor` (the exterior portal bore).
 export function CubieBodyBatchProvider({ enabled, materialFor, children }) {
   const pool = useMemo(() => enabled ? createCubieBodyBatches(4096, materialFor) : null, [enabled, materialFor]);
   useLayoutEffect(() => () => pool?.dispose(), [pool]);

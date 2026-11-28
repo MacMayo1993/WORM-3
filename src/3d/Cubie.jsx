@@ -444,11 +444,13 @@ const Cubie = React.forwardRef(function Cubie({
   const [returningBody, setReturningBody] = useState(false);
   useEffect(() => { if (raised && omitBody) setReturningBody(true); }, [raised, omitBody]);
 
-  // WORM's see-through shells are batched by look. A raised piece's window (0.16
-  // and no depth writes) is its own material and keeps its own mesh.
+  // Bodies are batched by look: WORM's see-through shells, and the other modes'
+  // opaque plastic (26 draws on a 3×3 Flip level, 98 on a 5×5, became one). A raised
+  // piece's window (0.16 and no depth writes), the desktop Classic coat (a physical
+  // material) and any other see-through look keep their own mesh.
   const bodyBatches = useCubieBodyBatches();
   const showsBody = !mirrorMode && !effectiveHollowMode && !hideBody && !(omitBody && !raised && !returningBody);
-  const batchBody = !!bodyBatches && wormMode && showsBody && !raisedWindow && !coatBody;
+  const batchBody = !!bodyBatches && showsBody && !raisedWindow && !coatBody && (wormMode || !bodyMatProps.transparent);
   // Mega's ordinary bodies are omitted at rest, but Explode exposes all their
   // sides. Reuse the existing content group as an instance anchor, with no extra
   // scene nodes or per-piece materials. Raised/returning pieces keep their own

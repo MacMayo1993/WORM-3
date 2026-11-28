@@ -1338,7 +1338,8 @@ const CubeAssembly = React.memo(({
               onComplete={onFlipWaveComplete}
             />
           )}
-          <CubieBodyBatchProvider enabled={wormHealerMode} materialFor={exteriorPortals.materialFor}>
+          {/* Every mode batches its plain bodies; only WORM's are portal-bored. */}
+          <CubieBodyBatchProvider enabled materialFor={wormHealerMode ? exteriorPortals.materialFor : undefined}>
           <CubieTicksProvider value={cubieTicks}>
           <group>
             {items.map((it, idx) => {
