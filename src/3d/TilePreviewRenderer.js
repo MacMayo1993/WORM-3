@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { getTileStyleMaterial } from './styles/TileStyleMaterials.jsx';
 import { isAnimatedStyle } from './styles/animatedStyles.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
+import { registerPreviewRenderer } from './previewHost.js';
 
 const PREVIEW_SIZE = 64;
 
@@ -420,3 +421,6 @@ export function renderTileImage(styleKey, colorHex, size = 96) {
     return null;
   }
 }
+
+// The main Canvas hands over its renderer and ticks this one (previewHost.js).
+registerPreviewRenderer({ setShared: setSharedRenderer, active: hasActivePreviews, tick: tickPreviews });

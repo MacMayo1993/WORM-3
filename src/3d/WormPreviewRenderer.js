@@ -44,6 +44,7 @@ import {
 } from '../worm/wormBookFX.js';
 
 import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from '../worm/healerWorm/inchGait.js';
+import { registerPreviewRenderer } from './previewHost.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -1047,3 +1048,6 @@ export function unregisterWormPreview(id) {
   registry.delete(id);
   maybeStopLoop();
 }
+
+// The main Canvas hands over its renderer and ticks this one (previewHost.js).
+registerPreviewRenderer({ setShared: setWormSharedRenderer, active: hasActiveWormPreviews, tick: tickWormPreviews });
