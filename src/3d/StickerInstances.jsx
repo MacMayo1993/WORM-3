@@ -1,5 +1,5 @@
 import { CHROME_TILE_FINISH } from './cubeViewStyles.js';
-import { uploadInstancePrefix } from './instanceUploads.js';
+import { uploadInstancePrefix, uploadInstanceRange } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
 import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
@@ -243,8 +243,9 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
     if (!instanceMesh.visible) return;
 
     transformTracker.begin();
-    let matDirty = false;
-    let colDirty = false;
+    // The span of slots this frame wrote, so the upload sends only that: on a
+    // still board the worm presses a few tiles and the rest hold.
+    let mLo = Infinity, mHi = -1, cLo = Infinity, cHi = -1;
 
     // Iterate values(), not entries(): a for-of over the Map itself materialises a
     // fresh [key, value] pair array for every registered sticker on every frame —
@@ -262,7 +263,8 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
           // re-uploaded rather than skipped as "unchanged".
           const mbase = slot * 16;
           lastMatricesRef.current.fill(NaN, mbase, mbase + 16);
-          matDirty = true;
+          if (slot < mLo) mLo = slot;
+          if (slot > mHi) mHi = slot;
           zeroedSlotsRef.current.add(slot);
         }
         continue;
@@ -283,7 +285,8 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
         instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
         lm.set(me, mbase);
         entry.worldVersion = worldVersion;
-        matDirty = true;
+        if (slot < mLo) mLo = slot;
+        if (slot > mHi) mHi = slot;
       }
 
       // Upload the current colour only when it has changed since the last frame.
@@ -298,13 +301,14 @@ function StickerBatch({ children, exteriorPortals, chrome = false }) {
           lc[base] = r;
           lc[base + 1] = g;
           lc[base + 2] = b;
-          colDirty = true;
+          if (slot < cLo) cLo = slot;
+          if (slot > cHi) cHi = slot;
         }
       }
     }
 
-    if (matDirty) uploadInstancePrefix(instanceMesh.instanceMatrix, instanceMesh.count);
-    if (colDirty) uploadInstancePrefix(instanceMesh.instanceColor, instanceMesh.count);
+    uploadInstanceRange(instanceMesh.instanceMatrix, mLo, mHi + 1);
+    uploadInstanceRange(instanceMesh.instanceColor, cLo, cHi + 1);
   });
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);
