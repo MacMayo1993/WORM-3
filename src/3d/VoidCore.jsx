@@ -111,15 +111,19 @@ function VoidCore({ cubieRefs = null }) {
   useEffect(() => addMirrorSubject(portalRims.layers[1].mesh), [portalRims]);
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
-    // The core holds the whole N×N again: compact rounding where the board's own
-    // stickers take it (compactBodyGeometry).
-    sticker: createPlayStickerGeometry(CORE_STICKER, 0, compactCore ? { bevelSegments: 1, curveSegments: 2 } : undefined),
     chromeMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile, true),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room'),
     stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile),
       passage.uniforms, coreRoomCutoutGLSL, 'core-room')
-  }), [glow, passage, compactCore]);
+  }), [glow, passage]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
+  // The core holds the whole N×N again: compact rounding where the board's own
+  // stickers take it (compactBodyGeometry). Reduced FX can switch that mid-run, so
+  // only the geometry changes, on the same mesh with the same attributes: a new
+  // mesh would be drawn before its instance colours were back.
+  const stickerGeometry = useMemo(() => createPlayStickerGeometry(CORE_STICKER, 0,
+    compactCore ? { bevelSegments: 1, curveSegments: 2 } : undefined), [compactCore]);
+  useEffect(() => () => stickerGeometry.dispose(), [stickerGeometry]);
   // Every look's materials are kept for the core's life. A view power swaps the
   // cube's look and back within seconds, and a disposed material releases its
   // program: every swap, and every restore, relinked the core's programs mid-run.
@@ -428,7 +432,8 @@ function VoidCore({ cubieRefs = null }) {
           visible={styled.slots.size < layout.stickers.length}
           frustumCulled={false}
           ref={stickersRef}
-          args={[parts.sticker, null, layout.stickers.length]}
+          args={[undefined, undefined, layout.stickers.length]}
+          geometry={stickerGeometry}
           material={chromeCore ? parts.chromeMaterial : parts.stickerMaterial}
         />
         {styled.batches.map(batch => <instancedMesh key={`${size}-${batch.key}`}

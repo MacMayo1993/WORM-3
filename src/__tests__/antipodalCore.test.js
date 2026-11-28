@@ -229,3 +229,14 @@ describe('network state', () => {
     expect(interiorExposure({ visualMode: 'gap' })).toBe(0.6);
   });
 });
+
+describe('core sticker glow', () => {
+  it('compiles before its instance colours are attached', async () => {
+    const { createCoreStickerMaterial } = await import('../3d/antipodalCore.js');
+    const material = createCoreStickerMaterial({ value: 0.08 });
+    const shader = { uniforms: {}, fragmentShader: '#include <common>\n#include <emissivemap_fragment>\n' };
+    material.onBeforeCompile(shader);
+    // vColor exists only with USE_COLOR (instance colours); a compile without them failed.
+    expect(shader.fragmentShader).toMatch(/#ifdef USE_COLOR\ntotalEmissiveRadiance \+= vColor\.rgb \* uCoreGlow;\n#endif/);
+  });
+});
