@@ -6,11 +6,24 @@ import { ELEMENTS, WAVES } from './combatDefs.js';
 import SignatureButton from '../SignatureButton.jsx';
 import './combat.css';
 
-function useCombatReadout() {
+// Polls the combat bridge ten times a second. With `keyOf`, the component re-renders
+// only when that key changes: AmbientCombatActions sits in every free-play run, so
+// an unconditional tick re-rendered it (and the ability key inside it) ten times a
+// second with no combat at all.
+function useCombatReadout(keyOf = null) {
   const [, update] = useState(0);
-  useEffect(() => { const id = setInterval(() => update(n => n+1), 100); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    let last;
+    const id = setInterval(() => {
+      if (!keyOf) { update(n => n + 1); return; }
+      const key = keyOf(combatBridge.current);
+      if (key !== last) { last = key; update(n => n + 1); }
+    }, 100);
+    return () => clearInterval(id);
+  }, [keyOf]);
   return combatBridge.current;
 }
+const ambientKey = c => (c ? `${c.ambient}|${c.encounter}|${c.noticeT > 0 ? c.notice : ''}|${c.warning > 0 ? Math.ceil(c.warning) : 0}|${c.health}` : '');
 export function CombatCard({ onRetry, onHome }) {
   const c = useCombatReadout();
   const alive = useGameStore(s => s.wormAlive);
@@ -33,7 +46,7 @@ export function CombatCard({ onRetry, onHome }) {
   </section>;
 }
 export function AmbientCombatActions() {
-  const c = useCombatReadout();
+  const c = useCombatReadout(ambientKey);
   const alive = useGameStore(s => s.wormAlive);
   const encounter = c?.ambient && c.encounter && alive;
   if (!encounter) return <div className="worm-ambient-controls"><SignatureButton />{alive && c?.noticeT > 0 && <div className="worm-ambient-notice" role="status">{c.notice}</div>}</div>;
