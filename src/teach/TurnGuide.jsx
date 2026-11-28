@@ -135,7 +135,9 @@ const CUES = { turn: cueColors('turn'), danger: cueColors('danger') };
 
 // Two bounded draws; no lights, texture loads, points, or frame allocations.
 // Hazard warnings keep their own LayerHighlight and quality policy.
-export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false, turning = false, cue = 'turn' }) {
+// `warm` draws it at zero opacity, so its programs link before they are needed
+// (Flip Cube levels warm the hint and danger guides during the briefing).
+export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false, turning = false, cue = 'turn', warm = false }) {
   const [calm] = useState(prefersReducedMotion);
   const age = useRef(0);
   const rim = useMemo(() => getSliceRimGeometry(size, axis, sliceIndex), [size, axis, sliceIndex]);
@@ -165,7 +167,7 @@ export default function TurnGuide({ axis, sliceIndex, dir, size, reduced = false
     age.current += Math.min(delta, .05);
     uniforms.uTime.value = calm ? 0 : age.current;
     // A static preview must not cut across the pieces while the real layer turns.
-    uniforms.uOpacity.value = turning ? 0 : calm ? 1 : THREE.MathUtils.smoothstep(age.current, 0, .45);
+    uniforms.uOpacity.value = turning || warm ? 0 : calm ? 1 : THREE.MathUtils.smoothstep(age.current, 0, .45);
   });
   const lite = reduced ? 'lite' : 'full';
   return <group name="teach-turn-guide">

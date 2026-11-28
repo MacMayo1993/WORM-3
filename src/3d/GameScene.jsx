@@ -22,7 +22,7 @@ import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
 import TurnGuide from '../teach/TurnGuide.jsx';
-import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
+import AntipodalPairHighlight, { PairHighlightWarmup } from './AntipodalPairHighlight.jsx';
 import FlipCheckMarks from './FlipCheckMarks.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import { usesWormRideCamera } from '../worm/wormCameraMode.js';
@@ -130,7 +130,7 @@ export default function GameScene({
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
-    demoLearnGuide, flipHint, cubeTurnWarning,
+    demoLearnGuide, flipHint, cubeTurnWarning, flipLevelWarming,
     size,
     cubies,
     wormHealerMode,
@@ -149,6 +149,7 @@ export default function GameScene({
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
     flipHint: s.flipHint,
+    flipLevelWarming: s.currentLevelData?.scoring === 'flips' && !s.hasShuffled,
     cubeTurnWarning: s.flipRun?.cubeTurn ?? null,
     demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
@@ -384,6 +385,16 @@ export default function GameScene({
         {flipHint?.kind === 'turn' && !animState && <TurnGuide axis={flipHint.axis} sliceIndex={flipHint.sliceIndex} dir={flipHint.dir}
           size={size} reduced={isMobile || perfReducedFX} turning={false} />}
         {currentLevelData?.scoring === 'flips' && <FlipCheckMarks />}
+        {/* While a Flip level is briefing and making its opening turns, draw its
+            guides, rings and pair highlight at zero opacity: their programs link
+            then, not in the frame the player opens the hint or makes a first flip.
+            They stay mounted (hidden) for the level: a disposed material releases
+            its program, and the real guide would link it all over again. */}
+        {currentLevelData?.scoring === 'flips' && <group name="flip-level-warmup" visible={flipLevelWarming}>
+          <TurnGuide axis="col" sliceIndex={0} dir={1} size={size} reduced={isMobile || perfReducedFX} turning={false} warm />
+          <FlipCheckMarks warm />
+          <PairHighlightWarmup />
+        </group>}
         {/* The layer the cube is about to turn on its own, in the danger colour. */}
         {cubeTurnWarning && !animState && <TurnGuide axis={cubeTurnWarning.axis} sliceIndex={cubeTurnWarning.sliceIndex}
           dir={cubeTurnWarning.dir} size={size} reduced={isMobile || perfReducedFX} turning={false} cue="danger" />}

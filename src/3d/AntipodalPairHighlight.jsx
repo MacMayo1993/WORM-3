@@ -18,7 +18,7 @@ const DIR_ROTATIONS = {
 const _sharedRingGeo = new THREE.RingGeometry(0.38, 0.52, 24);
 const _sharedDiscGeo = new THREE.CircleGeometry(0.42, 24);
 
-const HighlightRing = ({ position, rotation, color }) => {
+const HighlightRing = ({ position, rotation, color, warm = false }) => {
   const ringRef = useRef();
   const discRef = useRef();
   const ringMat = useMemo(() => new THREE.MeshBasicMaterial({
@@ -36,8 +36,8 @@ const HighlightRing = ({ position, rotation, color }) => {
     const pulse = prefersReducedMotion() ? 0.5 : Math.sin(t * 4) * 0.5 + 0.5;
     const breathe = 0.95 + pulse * 0.15;
     ringRef.current.scale.set(breathe, breathe, 1);
-    ringMat.opacity = 0.5 + pulse * 0.4;
-    discMat.opacity = 0.08 + pulse * 0.12;
+    ringMat.opacity = warm ? 0 : 0.5 + pulse * 0.4;
+    discMat.opacity = warm ? 0 : 0.08 + pulse * 0.12;
   });
 
   return (
@@ -48,7 +48,7 @@ const HighlightRing = ({ position, rotation, color }) => {
   );
 };
 
-const TetherLine = ({ from, to, color }) => {
+const TetherLine = ({ from, to, color, warm = false }) => {
   const lineRef = useRef();
   const mat = useMemo(() => new THREE.LineBasicMaterial({
     color, transparent: true, opacity: 0.35,
@@ -73,7 +73,7 @@ const TetherLine = ({ from, to, color }) => {
   useFrame(() => {
     if (!lineRef.current) return;
     const t = performance.now() / 1000;
-    mat.opacity = prefersReducedMotion() ? 0.3 : 0.2 + Math.sin(t * 3) * 0.15;
+    mat.opacity = warm ? 0 : prefersReducedMotion() ? 0.3 : 0.2 + Math.sin(t * 3) * 0.15;
   });
 
   return <line ref={lineRef} geometry={geo} material={mat} />;
@@ -107,5 +107,14 @@ const AntipodalPairHighlight = () => {
     </group>
   );
 };
+
+/** One ring and tether at zero opacity, so the pair highlight's programs link before
+ * a Flip Cube level's first flip or Show-me pair needs them. */
+export const PairHighlightWarmup = () => (
+  <group>
+    <HighlightRing position={[0, 0, 0]} rotation={[0, 0, 0]} color="#ffe493" warm />
+    <TetherLine from={[0, 0, 0]} to={[0, 0.01, 0]} color="#ffffff" warm />
+  </group>
+);
 
 export default AntipodalPairHighlight;

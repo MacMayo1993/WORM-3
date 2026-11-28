@@ -1,6 +1,6 @@
 import { bumpTileRolls } from './tileStyleIdentity.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
-import { createExteriorPortals } from './exteriorPortals.js';
+import { createExteriorPortals, exteriorPortalWarmupMaterial } from './exteriorPortals.js';
 import { megaChassisLayout } from './megaChassis.js';
 import { CubieBodyBatchProvider } from './CubieBodyBatches.jsx';
 import { wormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
@@ -30,6 +30,7 @@ import { feel } from '../utils/feel.js';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { warmFlipPortal } from './flipPortal.js';
+import { createStickerPortalWarmupMaterials } from './stickerPortalShaders.js';
 import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateSharedGaze, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
@@ -755,6 +756,16 @@ const CubeAssembly = React.memo(({
   const cubieTicks = useMemo(() => createCubieTicks(), []);
   useFrame((_state, delta) => cubieTicks.run(delta), wormHealerMode ? -0.41 : -0.75);
 
+  // The warmed copies hold their programs for the cube's life (a disposed material
+  // releases its program); freed with the cube.
+  const cubeEffectWarmup = useRef(null);
+  useEffect(() => () => {
+    const w = cubeEffectWarmup.current;
+    if (!w) return;
+    w.materials.forEach(m => m.dispose());
+    w.geometry.dispose();
+  }, []);
+
   // Pre-compile default tile style shaders on mount to prevent first-use stalls.
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
   // before any user interaction, eliminating the ~200 ms hitch on first style pick.
@@ -763,6 +774,19 @@ const CubeAssembly = React.memo(({
     // Worm uses the same instanced portal face as Flip Cube, including Remix.
     // Warm it before the constrained-style early return to avoid a first-flip hitch.
     warmFlipPortal(gl, camera, scene);
+    // Outside WORM (which warms its own), a flip mounts the tile's spin-reveal,
+    // eyelid and crack overlays under the exterior portal bore: warm those patched
+    // programs now and keep the copies alive, or the first flip links them in its
+    // frame (Flip Cube levels showed the spin-reveal linking on the first flip).
+    if (!state.wormHealerMode) {
+      const geometry = new THREE.PlaneGeometry(0.1, 0.1);
+      const warm = new THREE.Scene();
+      const materials = createStickerPortalWarmupMaterials().map(m => { const bored = exteriorPortalWarmupMaterial(m); m.dispose(); return bored; });
+      materials.forEach(material => warm.add(new THREE.Mesh(geometry, material)));
+      try { gl.compile(warm, camera, scene); } catch { /* a lost context compiles nothing */ }
+      warm.clear();
+      cubeEffectWarmup.current = { geometry, materials };
+    }
     // Constrained Remix and Numbers tiles use solid surfaces, including backs.
     // Compiling unused decorative shaders here defeats their startup fallback.
     if (state.wormHealerMode && (state.randomMode || state.visualMode === 'sudokube')
