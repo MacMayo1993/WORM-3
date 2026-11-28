@@ -27,6 +27,7 @@
     linkLog: [],
     reactOn: false,
     renders: {},
+    origins: {},
     roots: {},
     sample: null
   });
@@ -117,17 +118,29 @@
     return t.displayName || t.name || t.render?.displayName || t.render?.name || t.type?.displayName || t.type?.name || '(anon)';
   };
   const COMPOSITE = new Set([0, 1, 11, 14, 15]);
+  // `origins` counts where each re-render started: a component that rendered
+  // while the nearest composite above it did not (its own state or a store
+  // subscription), named with its parent so the trigger can be found.
   const walk = (fiber, rootName) => {
-    const stack = [fiber];
+    const stack = [[fiber, false, '']];
     while (stack.length) {
-      const f = stack.pop();
-      if (COMPOSITE.has(f.tag) && (!f.alternate || (f.flags & 1) === 1)) {
-        const key = `${rootName}:${nameOf(f)}${f.alternate ? '' : ' [mount]'}`;
-        W.renders[key] = (W.renders[key] || 0) + 1;
+      const [f, parentRendered, parentName] = stack.pop();
+      let rendered = parentRendered, name = parentName;
+      if (COMPOSITE.has(f.tag)) {
+        rendered = !f.alternate || (f.flags & 1) === 1;
+        name = nameOf(f);
+        if (rendered) {
+          const key = `${rootName}:${name}${f.alternate ? '' : ' [mount]'}`;
+          W.renders[key] = (W.renders[key] || 0) + 1;
+          if (!parentRendered && f.alternate) {
+            const o = `${rootName}:${name} < ${parentName}`;
+            W.origins[o] = (W.origins[o] || 0) + 1;
+          }
+        }
       }
       // A child pointer shared with the alternate means React never entered it.
       if (f.alternate && f.alternate.child === f.child && f.tag !== 3) continue;
-      for (let c = f.child; c; c = c.sibling) stack.push(c);
+      for (let c = f.child; c; c = c.sibling) stack.push([c, rendered, name]);
     }
   };
   window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {

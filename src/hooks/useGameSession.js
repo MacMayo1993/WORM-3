@@ -4,7 +4,7 @@
  * Manages game session state: moves, time, victory conditions.
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { checkRubiksWin, checkFlipPuzzleSolved, allStickersFlipped } from '../game/winDetection.js';
 import { recordLevelCompletion } from '../levels/completion.js';
@@ -19,7 +19,6 @@ export function useGameSession() {
   const size = useGameStore((state) => state.size);
   const cubies = useGameStore((state) => state.cubies);
   const moves = useGameStore((state) => state.moves);
-  const gameTime = useGameStore((state) => state.gameTime);
   const gameStartTime = useGameStore((state) => state.gameStartTime);
   const hasShuffled = useGameStore((state) => state.hasShuffled);
   const victory = useGameStore((state) => state.victory);
@@ -110,18 +109,11 @@ export function useGameSession() {
     }
   }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, currentLevelData, demoMode, setVictory, setAchievedWins]);
 
-  // Format time for display
-  const formatTime = useCallback((seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
   return {
-    // State
+    // State. The clock is not here: it ticks every second, and the app root
+    // calls this hook, so reading it here re-rendered the whole app (HUD and 3D
+    // scene) once a second. Read `gameTime` where it is shown.
     moves,
-    gameTime,
-    formattedTime: formatTime(gameTime),
     victory,
     achievedWins,
     hasShuffled,
