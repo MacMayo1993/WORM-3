@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { setWormSkinDisplacementEnabled } from './wormSkinMaterial.js';
 
 // Six broad polished faces, bright bevels and pointed ends. The old subdivided
@@ -193,6 +194,7 @@ export function createCharacterAccents(character) {
     add(geo(new THREE.TubeGeometry(curve, 18, 0.055, 6, false)), stalkMat, 0, 0, 0);
     const bulbMat = mat({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 1.3, roughness: 0.2, toneMapped: false });
     const bulb = add(geo(new THREE.SphereGeometry(0.21, 16, 12)), bulbMat, 0, 0.96, 1.76);
+    bulb.userData.animated = true; // update() pulses it
     const coreMat = mat({ color: '#ffffff', toneMapped: false }, THREE.MeshBasicMaterial);
     add(geo(new THREE.SphereGeometry(0.08, 10, 8)), coreMat, -0.05, 1.03, 1.9);
     tint = skin => { bulbMat.color.set(skin.glow); bulbMat.emissive.set(skin.glow); stalkMat.color.set(skin.belly).multiplyScalar(0.7); };
@@ -263,6 +265,7 @@ export function createCharacterAccents(character) {
       h.scale.set(0.23, 0.62, 0.23); h.rotation.z = -side * 0.42;
     }
   }
+  mergeStaticAccents(group, geometries);
   return {
     group,
     /** Recolour the parts that follow the equipped skin. */
@@ -271,6 +274,37 @@ export function createCharacterAccents(character) {
     update(time) { update?.(time); },
     dispose() { geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
   };
+}
+
+// The accent pieces that share a material and never move on their own (the
+// Ranger's two cheeks and six freckles, the Brute's feelers and knobs) become one
+// mesh each, their local transforms baked in: the classic face was eight draws of
+// accents, now two. A piece update() animates (userData.animated), a named one and
+// anything in a nested group (the Sage's swaying quill) stays as it is.
+const _merge = new THREE.Matrix4();
+function mergeStaticAccents(group, geometries) {
+  const byMaterial = new Map();
+  for (const child of group.children) {
+    if (!child.isMesh || child.userData.animated || child.name) continue;
+    const list = byMaterial.get(child.material) ?? [];
+    list.push(child);
+    byMaterial.set(child.material, list);
+  }
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length < 2) continue;
+    const parts = meshes.map(mesh => {
+      mesh.updateMatrix();
+      return mesh.geometry.clone().applyMatrix4(_merge.copy(mesh.matrix));
+    });
+    const merged = mergeGeometries(parts, false);
+    parts.forEach(g => g.dispose());
+    if (!merged) continue;
+    geometries.push(merged);
+    meshes.forEach(mesh => group.remove(mesh));
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.raycast = () => null;
+    group.add(mesh);
+  }
 }
 
 const faceDir = new THREE.Vector3(), right = new THREE.Vector3(), faceUp = new THREE.Vector3();
